@@ -26,8 +26,8 @@ flowchart LR
 
 | Goal | Outcome | Status | Exit evidence |
 |---|---|---|---|
-| G0 | Durable product truth, governance, architecture constraints, and approved next plan | In progress | Local verification, coherent commit, remote baseline, owner approval |
-| G1 | Approved Studio workflow plus measured renderer decision | Pending | Usability walkthrough and reproducible spike results |
+| G0 | Durable product truth, governance, architecture constraints, and approved next plan | Complete | Local verification, coherent commit, remote baseline, owner approval |
+| G1 | Approved Studio workflow plus measured renderer decision | In progress | Usability walkthrough and reproducible spike results |
 | G2 | Minimal typed project/action/history/render foundation | Pending | Contract and persistence tests |
 | G3 | Upload → select time/region → static nameplate → preview → accept/undo → export | Pending | Real exported fixture and owner walkthrough |
 | G4 | Natural-language request becomes a safe structured edit proposal | Pending | Fail-closed interpretation tests and owner approval loop |

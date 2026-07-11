@@ -4,7 +4,7 @@ Last updated: 2026-07-12
 
 ## Active goal
 
-**G0 — Foundation and continuity**
+**G1 — Interface design and renderer feasibility spike**
 
 ## State summary
 
@@ -13,24 +13,21 @@ Last updated: 2026-07-12
 - Owner requirements and corrections have been converted into durable requirements and decisions.
 - The product architecture direction is approved at the principle level: modular monolith, headless canonical edit engine, deterministic execution, replaceable AI/render/storage adapters.
 - The interface direction is approved at the principle level: clean black-and-white Studio for a non-editor.
-- No frontend, backend, renderer, AI integration, database, or editing primitive has been implemented.
+- No frontend, backend, renderer, AI integration, database, or editing primitive has been implemented yet.
+- The local `main` branch is connected to and pushed at `budhasantosh010/stage-2-sanverse-video-editing-`.
+- The owner explicitly authorized G1 to begin.
 
 ## Currently being completed
 
-- Lightweight continuity hooks and verification scripts
-- G0 verification evidence
-- Initial Git commit
-- Private GitHub repository and push
+- First-edit job story and interface state model
+- Low-fidelity black-and-white Studio wireframe
+- Common renderer-spike contract, representative fixtures, and measurement plan
 
 ## Next gated goal
 
-**G1 — Interface design and renderer feasibility spike**
+**G2 — Canonical project foundation**
 
-G1 does not begin until:
-
-1. G0 verification passes.
-2. The baseline is committed and pushed.
-3. The owner reviews the handoff and explicitly approves the G1 plan.
+G2 does not begin until G1's owner workflow review and measured renderer decision are complete.
 
 ## Known unknowns
 
@@ -41,4 +38,4 @@ G1 does not begin until:
 
 ## Honest evidence level
 
-G0 documents describe approved intent and proposed implementation. They are not evidence of a working video editor. Product capability remains **E0: not implemented**.
+G0 governance is locally verified and remotely backed up. It is not evidence of a working video editor. Product capability remains **E0: not implemented** while G1 design/spike work begins.

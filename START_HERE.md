@@ -8,10 +8,11 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 ## Current gate
 
-- Active macro stage: **G0 — Foundation and continuity**
+- Completed macro stage: **G0 — Foundation and continuity**
+- Active macro stage: **G1 — Interface design and renderer feasibility spike**
 - Product code: **not started**
-- Next stage: **G1 — Interface design and renderer feasibility spike**
-- Permission gate: do not begin G1 implementation until the owner reviews the G0 handoff and explicitly approves it.
+- Owner authorization: approved on 2026-07-12 after creating the GitHub repository and instructing work to continue.
+- G1 boundary: validate the workflow and renderer architecture; do not silently expand into G2's production project engine.
 
 ## Read in this order
 

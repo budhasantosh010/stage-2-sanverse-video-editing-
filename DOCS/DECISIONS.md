@@ -6,7 +6,7 @@ Only durable, approved decisions belong here. Proposals stay in plans or the bla
 
 - Status: Approved
 - Date: 2026-07-12
-- Decision: Stage 2 is an independent repository named `stage-2-sanverse-video-editing` under the owner's GitHub account.
+- Decision: Stage 2 is an independent repository named `stage-2-sanverse-video-editing-` under the owner's GitHub account. The trailing hyphen is part of the owner-created repository slug.
 - Why: It is a substantially larger product with its own lifecycle, architecture, tests, and release path. Stage 1 remains a read-only upstream input system.
 - Revisit trigger: A later integration analysis proves a monorepo materially lowers cost without coupling releases.
 
