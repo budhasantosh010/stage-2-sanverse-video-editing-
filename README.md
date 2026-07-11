@@ -6,7 +6,7 @@ The intended experience is simple: upload a cleaned talking-head video, point or
 
 ## Current status
 
-The project is at **G0: foundation and continuity**. No product implementation exists yet. G0 establishes the requirements, architecture constraints, anti-drift system, decision record, and verified implementation plan before interface or media-engine code begins.
+**G0: foundation and continuity** is complete. The project is at **G1: interface design and renderer feasibility spike**. The first-edit workflow and low-fidelity Studio wireframe are under owner review; no working editor capability is claimed yet.
 
 Start every new or compacted session with [START_HERE.md](START_HERE.md).
 

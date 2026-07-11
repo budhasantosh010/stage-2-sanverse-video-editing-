@@ -18,3 +18,11 @@
 - Remote baseline after merge: `751911f` on `main`.
 - Owner explicitly instructed work to continue, satisfying the G1 entry gate.
 - Active work is now limited to the interface workflow/wireframe and renderer feasibility spike defined in the approved G1 plan.
+
+## 2026-07-12 — G1 first-edit design drafted
+
+- Defined the first nameplate-edit job story around completing one edit in under a minute without editor terminology.
+- Mapped empty, importing, ready, selecting, clarification, proposal, preview, accepted, undo/export, and recoverable-failure states.
+- Produced and visually verified a black-and-white Studio wireframe.
+- Preserved canvas-first interaction, plain-language proposal details, preview-before-acceptance, and a simple moment strip.
+- G1-01 remains in progress until the owner reviews the workflow; no product behavior has been implemented.
