@@ -20,7 +20,9 @@ Which rendering architecture best supports fast non-editor previews, expressive 
 - Hybrid static-nameplate adapter: the same validated request now produces a
   byte-reproducible local browser preview document and a safe FFmpeg argument
   list. Three measured preview generations and three measured exports were
-  repeatable on this Windows machine. Source bytes were unchanged.
+  repeatable on this Windows machine. Parsed translations have exactly equal
+  text/timing and a maximum 0.0005556 normalized placement delta caused by
+  integer-pixel export rounding. Source bytes were unchanged.
 
 ## First-loop decision
 
@@ -33,6 +35,9 @@ HyperFrames remains a candidate for later expressive motion. Its package was
 inspected and its generated layout received a system-Chrome sanity check, but
 the HyperFrames runtime itself has not been installed or executed. Preview to
 export pixel fidelity also remains unmeasured.
+
+The broader comparison remains open for real-video/audio behavior, pixel
+fidelity, approved motion primitives, and HyperFrames runtime evidence.
 
 ## Run tests
 

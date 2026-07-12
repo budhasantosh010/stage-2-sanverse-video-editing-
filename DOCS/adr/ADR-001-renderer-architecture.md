@@ -62,8 +62,31 @@ averaged 0.0015684 seconds to generate. Three exports had identical hashes and
 averaged 0.9173232 seconds. The output probed as 1280 x 720, 30 fps, and five
 seconds. Source hashes were unchanged.
 
-The hybrid test proves contract-level correspondence for text, placement, and
-timing. It does not prove pixel-identical preview and export.
+The hybrid test parses both generated outputs rather than relying on their
+shared input. Text and timing match exactly. Preview normalized bounds are
+`0.64, 0.68, 0.28, 0.16`; export normalized bounds are
+`0.63984375, 0.68055556, 0.2796875, 0.15972222`. The maximum normalized
+delta is 0.00055556, within the half-pixel rounding tolerance at this canvas.
+This is structural fidelity, not pixel fidelity. No browser/export pixel
+comparison was performed.
+
+### Local deployment-cost facts
+
+Measured on the current Windows machine without installing or executing
+HyperFrames:
+
+| Candidate surface | Project artifact | Already-installed runtime facts | Still unmeasured |
+|---|---|---|---|
+| FFmpeg-native export | 5,099-byte adapter | FFmpeg executable 540,672 bytes; version N-122089-g37858dc6bd-20251211; `-version` startup averaged 0.0600123s | deployment image, long-video cost |
+| Browser preview | 3,983-byte composition adapter; 1,864-byte generated fixture document | Chrome executable found; file size 3,985,048 bytes | browser startup, deployed web bundle, pixel fidelity |
+| Hybrid boundary | 10,035-byte orchestration/measurement adapter plus the two adapters above | reuses the existing browser and FFmpeg | production integration and operational cost |
+| HyperFrames candidate | project-owned composition adapter only | local Node v24.14.1, browser, and FFmpeg exist; static package metadata requires Node 22+, browser, and FFmpeg | package archive/install size, dependency tree, startup, render, determinism, deployment |
+
+The executable sizes are facts about already-installed files, not incremental
+application bundle sizes. No HyperFrames archive exists in the tracked project,
+so its archive size was not measured. The claim that the hybrid is the lowest
+integration-cost first step is an estimate supported by requiring no new
+runtime in this spike; it is not a deployed cost benchmark.
 
 ## Why this is the minimum supported choice
 

@@ -68,3 +68,48 @@ def test_export_command_is_an_argument_list_not_a_shell_string() -> None:
         Path("work/source with spaces.mp4")
     )
     assert command[-1] == str(Path("work/output with spaces.mp4"))
+
+
+def test_proves_structural_fidelity_from_generated_preview_and_export() -> None:
+    candidate = importlib.import_module("spikes.renderer.hybrid_candidate")
+    request = load_request(FIXTURE)
+    plan = candidate.build_hybrid_plan(
+        request,
+        input_path=Path("work/source.mp4"),
+        output_path=Path("work/output.mp4"),
+        font_path=Path("C:/Windows/Fonts/arial.ttf"),
+    )
+
+    fidelity = candidate.inspect_structural_fidelity(request, plan)
+
+    assert fidelity.preview_text == ("Santosh", "Founder")
+    assert fidelity.export_text == ("Santosh", "Founder")
+    assert fidelity.preview_time_window == (1.0, 4.0)
+    assert fidelity.export_time_window == (1.0, 4.0)
+    assert fidelity.preview_bounds == (0.64, 0.68, 0.28, 0.16)
+    assert fidelity.export_bounds == (
+        819 / 1280,
+        490 / 720,
+        358 / 1280,
+        115 / 720,
+    )
+    assert fidelity.maximum_normalized_bound_delta <= 0.5 / 720
+    assert fidelity.equivalent is True
+
+
+def test_measures_local_deployment_facts_without_hyperframes_execution() -> None:
+    candidate = importlib.import_module("spikes.renderer.hybrid_candidate")
+
+    measurement = candidate.measure_local_deployment(load_request(FIXTURE))
+
+    assert measurement.hybrid_adapter_bytes > 0
+    assert measurement.browser_adapter_bytes > 0
+    assert measurement.ffmpeg_adapter_bytes > 0
+    assert measurement.generated_preview_bytes > 0
+    assert measurement.ffmpeg_executable_path.is_file()
+    assert measurement.ffmpeg_executable_bytes > 0
+    assert measurement.ffmpeg_version.startswith("ffmpeg version")
+    assert len(measurement.ffmpeg_startup_seconds) == 3
+    assert all(seconds > 0 for seconds in measurement.ffmpeg_startup_seconds)
+    assert measurement.hyperframes_runtime_executed is False
+    assert measurement.hyperframes_archive_bytes is None
