@@ -18,9 +18,9 @@ Move from the smallest complete user outcome toward broader capability. Architec
 
 **Why:** The user workflow and render approach constrain the project model. A wrong renderer choice could force a major rewrite.
 
-**Build:** Low-fidelity black-and-white Studio flow, representative edit fixtures, a thin comparison harness for FFmpeg-native, HTML/Chromium, and hybrid rendering.
+**Build:** Low-fidelity black-and-white Home/Studio flow, a thin runnable web shell for owner interaction testing, representative edit fixtures, and a comparison harness for FFmpeg-native, HTML/Chromium, and hybrid rendering.
 
-**Exit:** Owner can explain and approve the workflow; renderer decision is backed by reproducible measurements.
+**Exit:** Owner can start the web shell on strict localhost port 2000, complete and approve the Home-to-Studio walkthrough, and review a renderer decision backed by reproducible measurements.
 
 ## G2 — Canonical project foundation
 

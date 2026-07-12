@@ -65,3 +65,12 @@ Only durable, approved decisions belong here. Proposals stay in plans or the bla
 - Decision: Install deterministic context injection, prompt logging, and pre-edit decision reminders. Defer semantic indexing, automatic diagram rendering, heuristic goal scoring, and destructive rollback helpers.
 - Why: The old template contains useful mechanisms, but unproven automation adds dependencies, latency, and failure paths. Every governance layer must earn its complexity.
 - Revisit trigger: Committed documents and lightweight hooks prove insufficient in actual sessions.
+
+## DEC-009 — Runnable web shell before remaining renderer work
+
+- Status: Approved
+- Date: 2026-07-12
+- Decision: Pause HyperFrames runtime and hybrid renderer work long enough to build a thin, runnable Home-to-Studio web shell on localhost port 2000. The shell uses real local video selection and browser preview, but it must not pretend that upload, editing, AI, persistence, or export exists.
+- Why: The owner needs to evaluate how the product looks, works, and feels before more renderer investment. A static wireframe cannot validate interaction clarity.
+- Architecture boundary: Use production-quality frontend boundaries and tests, but do not introduce a backend, database, renderer, or provider until the first UX loop requires them.
+- Revisit trigger: The owner completes the runnable Home-to-Studio walkthrough and records corrections; renderer comparison then resumes before G2 closes.

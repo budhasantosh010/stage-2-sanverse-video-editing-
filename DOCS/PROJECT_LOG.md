@@ -51,3 +51,12 @@
 - Added a local-only composition adapter through RED/GREEN TDD; 9 focused tests and all 34 renderer tests pass.
 - Generated the static-nameplate HTML and visually sanity-checked it using the existing system Chrome.
 - This proves only project-owned HTML generation and layout. HyperFrames runtime behavior and MP4 rendering remain unverified pending explicit owner approval for third-party npm execution.
+
+## 2026-07-12 — Owner prioritized runnable web validation
+
+- Owner clarified that Stage 2 will be a web application.
+- Owner reserved localhost port 2000 because ports 3000, 5000, and 8000 are already used on the laptop.
+- Startup must fail visibly if port 2000 is occupied rather than silently choosing another port.
+- Owner asked to test how the application looks, works, and feels before HyperFrames work continues.
+- AOCS Omega Type 2/depth 1 analysis identified the missing runnable user loop as the current highest-impact bottleneck.
+- Renderer evidence remains preserved; HyperFrames runtime and hybrid evaluation are paused, not discarded.

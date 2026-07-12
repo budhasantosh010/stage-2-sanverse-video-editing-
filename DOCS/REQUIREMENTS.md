@@ -86,3 +86,12 @@ Status values: `Approved`, `Proposed`, `Deferred`, `Rejected`, `Superseded`.
 - Editing controls, canvas tools, proposals, history, and the time strip must remain hidden until the user opens or creates a video project.
 - Starting may happen by dropping a cleaned video, attaching one inside the composer, opening a recent project, or describing the intended edit and then supplying the video.
 - Source: owner correction on 2026-07-12.
+
+### REQ-013 — Web delivery and fixed local port
+
+- Status: Approved
+- Stage 2 must be built as a browser-accessible web application.
+- The user-facing local development server must bind to port 2000.
+- Local startup must use strict port behavior: if port 2000 is occupied, startup fails visibly instead of silently switching to 3000, 5000, 8000, or another port.
+- Port 2000 is a local-development constraint. A deployed web application will use its hosting platform's normal public HTTP/HTTPS routing.
+- Source: owner correction on 2026-07-12.

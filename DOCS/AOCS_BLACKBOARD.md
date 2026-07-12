@@ -39,3 +39,14 @@ This is a compact separation of facts, owner requirements, inferences, proposals
 - Stage 1 optional artifact quality.
 - Free provider capability and limits.
 - Which advanced primitives real workflows need first.
+
+## AOCS Omega routing — 2026-07-12 runnable web shell
+
+- Classification: Type 2, medium risk, fractal depth 1.
+- Reality-tested fact, confidence 100: no runnable web application or server exists yet.
+- Owner requirement, confidence 100: Stage 2 is a web application and its user-facing local development server uses strict port 2000.
+- Owner priority, confidence 100: show and test the runnable interface before continuing HyperFrames.
+- High-confidence inference, confidence 94: the current bottleneck is interaction validation, not renderer expressiveness.
+- Red-team risk: a visual prototype could become throwaway code or falsely imply editing works.
+- Accepted mitigation: build a thin production-structured shell with typed state and tests, real local video preview, and explicit unavailable states; add no backend or fake editing.
+- Falsification condition: if the runnable shell cannot expose meaningful workflow corrections without a renderer, resume the renderer spike immediately and keep the shell limited to its validated pieces.

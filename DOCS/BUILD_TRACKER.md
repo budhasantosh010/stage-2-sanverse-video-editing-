@@ -11,8 +11,9 @@ Last updated: 2026-07-12
 | G0-05 | G0 | Coherent Git baseline | Complete | `eb08ce2`, merged remote history at `751911f` |
 | G0-06 | G0 | Private GitHub repository | Complete | SSH push to `budhasantosh010/stage-2-sanverse-video-editing-` |
 | G0-07 | G0 | Owner approval to enter G1 | Complete | Explicit owner instruction on 2026-07-12 |
-| G1-01 | G1 | Two-screen user journey and low-fidelity Home/Studio design | Complete | Owner approved both screens and instructed renderer work to continue |
-| G1-02 | G1 | Renderer comparison harness and fixtures | In progress | Contract and FFmpeg measured; HyperFrames local composition adapter passes tests, but runtime render and hybrid remain pending |
+| G1-01 | G1 | Two-screen user journey and low-fidelity Home/Studio design | Complete | Owner approved both screens |
+| G1-01B | G1 | Runnable Home-to-Studio web shell on strict port 2000 | Pending | Active implementation plan written; no application code exists yet |
+| G1-02 | G1 | Renderer comparison harness and fixtures | In progress | Contract and FFmpeg measured; HyperFrames/hybrid paused until runnable UX review |
 | G1-03 | G1 | Architecture decision record for renderer | Pending | Approved evidence table |
 
 ## Status rules

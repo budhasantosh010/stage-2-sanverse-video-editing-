@@ -9,10 +9,11 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 ## Current gate
 
 - Completed macro stage: **G0 — Foundation and continuity**
-- Active macro stage: **G1 — Interface design and renderer feasibility spike**
+- Active macro stage: **G1 — Runnable web UX validation and renderer feasibility**
 - Product code: **not started**; isolated G1 renderer-spike code exists and must not be mistaken for the production engine.
-- Owner authorization: approved on 2026-07-12 after creating the GitHub repository and instructing work to continue.
-- G1 boundary: validate the workflow and renderer architecture; do not silently expand into G2's production project engine.
+- Immediate next slice: a real Home-to-Studio web shell at strict http://localhost:2000.
+- Owner direction: build the browser application and let the owner test its look, workflow, and feel before continuing HyperFrames/hybrid work.
+- G1 boundary: validate the runnable workflow and renderer architecture; do not silently expand into G2's canonical project engine, AI, persistence, or real editing.
 
 ## Read in this order
 
