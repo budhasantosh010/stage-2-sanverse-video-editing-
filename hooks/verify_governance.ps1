@@ -39,11 +39,21 @@ $trackedSecretPatterns = @(
     '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'
 )
 
-$candidateFiles = Get-ChildItem -LiteralPath $root -Recurse -File -Force |
-    Where-Object {
-        $_.FullName -notlike "$(Join-Path $root '.git')*" -and
-        $_.FullName -ne (Join-Path $root 'DOCS/_raw/user_messages.txt')
+$relativeCandidates = & git -C $root ls-files --cached --others --exclude-standard
+if ($LASTEXITCODE -ne 0) {
+    throw 'Could not determine governance scope from Git.'
+}
+
+$candidateFiles = foreach ($relativePath in $relativeCandidates) {
+    if ($relativePath -eq 'DOCS/_raw/user_messages.txt') {
+        continue
     }
+
+    $absolutePath = Join-Path $root $relativePath
+    if (Test-Path -LiteralPath $absolutePath -PathType Leaf) {
+        Get-Item -LiteralPath $absolutePath
+    }
+}
 
 foreach ($file in $candidateFiles) {
     $content = Get-Content -LiteralPath $file.FullName -Raw -ErrorAction SilentlyContinue
