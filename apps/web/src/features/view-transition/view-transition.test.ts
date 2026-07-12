@@ -10,6 +10,7 @@ afterEach(() => {
     value: originalMatchMedia,
   })
   Reflect.deleteProperty(document, 'startViewTransition')
+  delete document.documentElement.dataset.viewTransition
 })
 
 function setReducedMotion(matches: boolean): void {
@@ -33,6 +34,7 @@ describe('transitionView', () => {
 
     expect(startViewTransition).toHaveBeenCalledOnce()
     expect(update).toHaveBeenCalledOnce()
+    expect(document.documentElement.dataset.viewTransition).toBe('native')
   })
 
   it('updates directly when reduced motion is requested', () => {
@@ -57,6 +59,7 @@ describe('transitionView', () => {
     transitionView(update)
 
     expect(update).toHaveBeenCalledOnce()
+    expect(document.documentElement.dataset.viewTransition).toBe('fallback')
   })
 
   it('updates directly when the browser rejects transition startup', () => {
@@ -71,6 +74,7 @@ describe('transitionView', () => {
 
     expect(() => transitionView(update)).not.toThrow()
     expect(update).toHaveBeenCalledOnce()
+    expect(document.documentElement.dataset.viewTransition).toBe('fallback')
   })
 
   it('does not swallow an error thrown by the screen update', () => {

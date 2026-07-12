@@ -20,6 +20,7 @@ Only the shared motion tokens, transition-capability marker, Home/Studio CSS, vi
 - Full frontend suite: 56 of 56 tests passed after the final correction.
 - Production build, project setup verification, governance verification, and `git diff --check` passed.
 - Independent motion review passed after two fix-and-re-review cycles.
+- A later live browser probe exposed a lifecycle mismatch: the page could retain a stale `native` marker even after the API was unavailable. A new RED/GREEN test now requires `transitionView` to refresh the capability marker at the exact navigation boundary and to fall back if native transition startup throws.
 
 ## Rollback
 

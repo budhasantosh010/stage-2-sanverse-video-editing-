@@ -9,8 +9,11 @@ export function supportsNativeViewTransitions(): boolean {
 export function transitionView(update: () => void): void {
   const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   const transitionDocument = document as ViewTransitionDocument
+  const hasNativeTransition = supportsNativeViewTransitions()
 
-  if (prefersReducedMotion || !supportsNativeViewTransitions()) {
+  document.documentElement.dataset.viewTransition = hasNativeTransition ? 'native' : 'fallback'
+
+  if (prefersReducedMotion || !hasNativeTransition) {
     update()
     return
   }
@@ -28,6 +31,7 @@ export function transitionView(update: () => void): void {
       throw error
     }
 
+    document.documentElement.dataset.viewTransition = 'fallback'
     update()
   }
 }
