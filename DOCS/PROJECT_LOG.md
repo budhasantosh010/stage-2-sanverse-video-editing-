@@ -34,3 +34,13 @@
 - Editing tools, canvas, proposal/history panel, and time strip appear only after the user supplies or opens a video project.
 - Updated the durable requirement, interface decision, active G1 plan, flow, and state model before continuing visual work.
 - Created and visually checked a separate Home wireframe; preserved the original editing workspace as Screen 2.
+
+## 2026-07-12 — Renderer Track B began with FFmpeg-native candidate
+
+- Owner approved the Home and Studio designs and instructed work to continue.
+- Verified local Python, pytest, Node, Chrome, FFmpeg, ffprobe, drawtext, and overlay capabilities.
+- Primary-source research identified HyperFrames as OpenDesign's current HTML/Chromium video path; it remains a candidate, not a decision.
+- Implemented a renderer-neutral static-nameplate spike contract with fail-closed bounds and timing.
+- Completed eight RED/GREEN cycles including a real FFmpeg render, ffprobe validation, CLI report, and repeat-mode hash comparison.
+- After independent-review fixes, three fresh FFmpeg-native runs produced the same output SHA-256; average edit render was 0.7155 seconds for the five-second synthetic fixture.
+- Product capability remains E0; this is isolated renderer evidence only.

@@ -1,0 +1,43 @@
+{
+  "candidate": "ffmpeg-native",
+  "canvas": {
+    "fps": 30,
+    "height": 720,
+    "width": 1280
+  },
+  "deterministic_for_this_fixture": true,
+  "environment": {
+    "ffmpeg": "N-122089-g37858dc6bd-20251211",
+    "operating_system": "Windows",
+    "python": "3.13.5"
+  },
+  "fixture_id": "static-nameplate-01",
+  "interval_semantics": {
+    "end": 4.0,
+    "end_exclusive": true,
+    "start": 1.0,
+    "start_inclusive": true
+  },
+  "output_bytes": 13515,
+  "output_sha256_runs": [
+    "c5aba3067b8c4fe5d3178ee19ea87dfd5a6d88e18cf32266a3a4a34ac3584736",
+    "c5aba3067b8c4fe5d3178ee19ea87dfd5a6d88e18cf32266a3a4a34ac3584736",
+    "c5aba3067b8c4fe5d3178ee19ea87dfd5a6d88e18cf32266a3a4a34ac3584736"
+  ],
+  "render_seconds_runs": [
+    0.7039955000000191,
+    0.747780600002443,
+    0.694785799998499
+  ],
+  "repeat_runs": 3,
+  "schema_version": "renderer-spike/v1",
+  "source_seconds_runs": [
+    1.160984299996926,
+    1.1248002000029373,
+    1.10291540000253
+  ],
+  "test_suite": {
+    "passed": 25,
+    "ruff": "passed"
+  }
+}

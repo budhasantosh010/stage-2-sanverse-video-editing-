@@ -1,0 +1,30 @@
+{
+  "schema_version": "renderer-spike/v1",
+  "fixture_id": "static-nameplate-01",
+  "source": {
+    "kind": "synthetic-talking-head",
+    "duration_seconds": 5.0
+  },
+  "canvas": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30
+  },
+  "overlay": {
+    "kind": "nameplate",
+    "primary_text": "Santosh",
+    "secondary_text": "Founder",
+    "bounds": {
+      "space": "normalized",
+      "x": 0.64,
+      "y": 0.68,
+      "width": 0.28,
+      "height": 0.16
+    },
+    "start_seconds": 1.0,
+    "end_seconds": 4.0,
+    "motion": {
+      "kind": "static"
+    }
+  }
+}

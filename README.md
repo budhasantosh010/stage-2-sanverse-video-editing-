@@ -6,7 +6,7 @@ The intended experience is simple: upload a cleaned talking-head video, point or
 
 ## Current status
 
-**G0: foundation and continuity** is complete. The project is at **G1: interface design and renderer feasibility spike**. The first-edit workflow and low-fidelity Studio wireframe are under owner review; no working editor capability is claimed yet.
+**G0: foundation and continuity** is complete. The project is at **G1: interface design and renderer feasibility spike**. The Home-to-Studio workflow is owner-approved, and the first FFmpeg-native renderer fixture is measured; no working editor capability is claimed yet.
 
 Start every new or compacted session with [START_HERE.md](START_HERE.md).
 

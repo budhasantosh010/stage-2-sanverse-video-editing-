@@ -13,15 +13,15 @@ Last updated: 2026-07-12
 - Owner requirements and corrections have been converted into durable requirements and decisions.
 - The product architecture direction is approved at the principle level: modular monolith, headless canonical edit engine, deterministic execution, replaceable AI/render/storage adapters.
 - The interface direction is approved at the principle level: calm black-and-white Home first, then a focused Studio after a video/project is opened.
-- No frontend, backend, renderer, AI integration, database, or editing primitive has been implemented yet.
+- No production frontend, backend, renderer, AI integration, database, or editing primitive has been implemented. Isolated G1 renderer-spike code now exists.
 - The local `main` branch is connected to and pushed at `budhasantosh010/stage-2-sanverse-video-editing-`.
 - The owner explicitly authorized G1 to begin.
 
 ## Currently being completed
 
-- Corrected two-screen first-edit job story and interface state model
-- Low-fidelity black-and-white Home and Studio wireframes
-- Owner walkthrough of the Home-to-Studio transition; renderer spike remains gated until approval
+- Track A Home-to-Studio workflow and wireframes are owner-approved
+- Renderer-neutral spike contract and FFmpeg-native static candidate are measured
+- HyperFrames and hybrid candidates remain pending before the renderer decision
 
 ## Next gated goal
 
@@ -38,4 +38,4 @@ G2 does not begin until G1's owner workflow review and measured renderer decisio
 
 ## Honest evidence level
 
-G0 governance is locally verified and remotely backed up. It is not evidence of a working video editor. Product capability remains **E0: not implemented** while G1 design/spike work begins.
+G0 governance is locally verified and remotely backed up. The isolated FFmpeg-native synthetic fixture has E3 integration evidence, but it is not a working video editor. Product capability remains **E0: not implemented**.

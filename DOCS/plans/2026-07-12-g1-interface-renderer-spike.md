@@ -1,6 +1,6 @@
 # G1 Plan — Interface Design and Renderer Feasibility Spike
 
-Status: Track A Home/Studio design is under owner review; Track B renderer implementation has not started.
+Status: Track A Home/Studio design is owner-approved; Track B renderer comparison is in progress.
 
 ## Goal
 

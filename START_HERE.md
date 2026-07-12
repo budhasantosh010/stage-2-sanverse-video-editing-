@@ -10,7 +10,7 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 - Completed macro stage: **G0 — Foundation and continuity**
 - Active macro stage: **G1 — Interface design and renderer feasibility spike**
-- Product code: **not started**
+- Product code: **not started**; isolated G1 renderer-spike code exists and must not be mistaken for the production engine.
 - Owner authorization: approved on 2026-07-12 after creating the GitHub repository and instructing work to continue.
 - G1 boundary: validate the workflow and renderer architecture; do not silently expand into G2's production project engine.
 
