@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import type { AppState } from './app-state'
 import {
   createInitialState,
   openLocalProject,
@@ -88,6 +89,11 @@ describe('app state', () => {
 })
 
 if (false) {
+  const updateUnionDraft = (state: AppState): AppState =>
+    updateDraftRequest(state, 'Keep the draft editable')
+
+  void updateUnionDraft
+
   const studio = openLocalProject(createInitialState(), {
     name: 'cleaned.mp4',
     mediaUrl: 'blob:test',

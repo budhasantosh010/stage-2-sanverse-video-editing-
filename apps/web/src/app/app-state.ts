@@ -29,6 +29,7 @@ export function createInitialState(): HomeState {
 
 export function updateDraftRequest(state: HomeState, value: string): HomeState
 export function updateDraftRequest(state: StudioState, value: string): StudioState
+export function updateDraftRequest(state: AppState, value: string): AppState
 export function updateDraftRequest(state: AppState, value: string): AppState {
   if (state.screen === 'home') {
     return {
