@@ -32,7 +32,13 @@ Spec-review RED added structural-output inspection and local deployment
 measurement requirements. The focused run then failed with two missing
 attributes: `inspect_structural_fidelity` and `measure_local_deployment`.
 After the minimum implementation, 5 focused tests passed. The final complete
-renderer suite passed 39 tests.
+renderer suite at that review point passed 39 tests.
+
+Quality-review RED then added valid adversarial text plus output-collision and
+workspace-boundary cases. Five tests failed: one exposed truncation at an
+escaped apostrophe and four exposed missing canonical path protections. After
+escape-aware inspection and bounded export validation, 10 focused tests and
+all 44 renderer tests passed.
 
 ## Measured results
 
@@ -70,6 +76,8 @@ generated outputs, not an inference from their shared request:
 - Maximum normalized placement delta: 0.00055556
 - Allowed pixel-rounding tolerance: 0.00069444 (half a pixel at 720 pixels)
 - Structural-equivalence result: true
+- Adversarial structural text: exact round-trip verified for apostrophes,
+  commas, colons, backslashes, and HTML-like characters
 
 Unknown: preview-to-export pixel fidelity. No pixel comparison was run.
 
@@ -84,7 +92,7 @@ runtime would be newly shipped.
 
 | Field | Measured value |
 |---|---:|
-| Hybrid project-owned adapter source | 10,035 bytes |
+| Hybrid project-owned adapter source | 13,660 bytes |
 | Browser-composition adapter source | 3,983 bytes |
 | FFmpeg adapter source | 5,099 bytes |
 | Generated preview document | 1,864 bytes |
@@ -93,7 +101,7 @@ runtime would be newly shipped.
 | Existing FFmpeg executable | `C:\\ffmpeg-master-latest-win64-gpl-shared\\bin\\ffmpeg.exe` |
 | Existing FFmpeg executable file size | 540,672 bytes |
 | FFmpeg version | N-122089-g37858dc6bd-20251211 |
-| FFmpeg `-version` startup | 0.0663191s, 0.0575930s, 0.0561248s |
+| FFmpeg `-version` startup | 0.0734585s, 0.0719573s, 0.0804442s |
 | Existing Node executable | `C:\\Program Files\\nodejs\\node.exe` |
 | Existing Node executable file size | 91,426,304 bytes |
 | Node version | v24.14.1 |
@@ -103,7 +111,8 @@ runtime would be newly shipped.
 Candidate comparison from these measurements:
 
 - FFmpeg-native export requires the existing FFmpeg runtime. Its project-owned
-  adapter is 5,099 bytes; executable startup averaged 0.0600123 seconds.
+  adapter is 5,099 bytes; the latest executable startup measurement averaged
+  0.0752867 seconds.
 - Browser preview uses the existing product browser. The generated fixture
   document is 1,864 bytes; browser startup and deployed bundle size were not
   measured.
@@ -117,6 +126,19 @@ Candidate comparison from these measurements:
 Estimate, not measurement: avoiding another runtime is likely the lower-cost
 first-loop integration. A real deployment benchmark is still required before
 making a production infrastructure claim.
+
+## Export safety boundary
+
+- Output must resolve inside the explicit trusted renderer work directory.
+- Canonically equal input/output paths, relative aliases, and existing hard
+  links identifying the same file fail before a command is returned.
+- The default trusted root is `spikes/renderer/work`; tests may inject a
+  temporary trusted root owned by the test.
+- FFmpeg resolves to an existing executable path from trusted application
+  configuration or the local executable search path.
+- Metadata subprocesses use argument arrays, no shell, and a five-second
+  timeout. The generated export command is returned for a trusted caller to
+  execute; the spike does not accept executable paths or commands from AI.
 
 ## Limitations
 

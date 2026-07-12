@@ -23,6 +23,11 @@ Which rendering architecture best supports fast non-editor previews, expressive 
   repeatable on this Windows machine. Parsed translations have exactly equal
   text/timing and a maximum 0.0005556 normalized placement delta caused by
   integer-pixel export rounding. Source bytes were unchanged.
+- Adversarial valid text containing apostrophes, commas, colons, backslashes,
+  and HTML-like characters round-trips through both inspected translations.
+- Hybrid export rejects canonical path collisions, existing hard-link aliases,
+  and output outside its explicit trusted work directory. FFmpeg is resolved
+  to an existing executable rather than left as a shell-resolved command.
 
 ## First-loop decision
 

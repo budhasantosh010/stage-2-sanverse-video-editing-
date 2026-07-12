@@ -14,6 +14,10 @@ from spikes.renderer.ffmpeg_native import build_nameplate_command
 from spikes.renderer.hyperframes_candidate import build_composition, write_composition
 
 
+DEFAULT_TRUSTED_WORK_DIR = Path(__file__).resolve().parent / "work"
+SUBPROCESS_TIMEOUT_SECONDS = 5.0
+
+
 @dataclass(frozen=True)
 class HybridPlan:
     """One renderer-neutral request mapped to preview and export adapters."""
@@ -62,10 +66,21 @@ def build_export_command(
     input_path: str | Path,
     output_path: str | Path,
     font_path: str | Path,
+    *,
+    trusted_work_dir: str | Path = DEFAULT_TRUSTED_WORK_DIR,
+    ffmpeg_executable: str | Path | None = None,
 ) -> list[str]:
-    """Return safe FFmpeg arguments; execution remains the caller's decision."""
+    """Return safe arguments for a trusted executable and bounded output path."""
 
-    return build_nameplate_command(request, input_path, output_path, font_path)
+    _validate_export_paths(input_path, output_path, trusted_work_dir)
+    command = build_nameplate_command(
+        request,
+        input_path,
+        output_path,
+        font_path,
+    )
+    command[0] = str(_resolve_ffmpeg_executable(ffmpeg_executable))
+    return command
 
 
 def write_preview_document(
@@ -90,6 +105,8 @@ def build_hybrid_plan(
     font_path: str | Path,
     *,
     video_filename: str = "source.mp4",
+    trusted_work_dir: str | Path = DEFAULT_TRUSTED_WORK_DIR,
+    ffmpeg_executable: str | Path | None = None,
 ) -> HybridPlan:
     """Build preview markup and export arguments from the same validated request."""
 
@@ -103,8 +120,65 @@ def build_hybrid_plan(
             input_path=input_path,
             output_path=output_path,
             font_path=font_path,
+            trusted_work_dir=trusted_work_dir,
+            ffmpeg_executable=ffmpeg_executable,
         ),
     )
+
+
+def _canonical_path(path: str | Path) -> Path:
+    return Path(path).expanduser().resolve(strict=False)
+
+
+def _paths_identify_same_file(left: Path, right: Path) -> bool:
+    if os.path.normcase(str(left)) == os.path.normcase(str(right)):
+        return True
+    if left.exists() and right.exists():
+        try:
+            return os.path.samefile(left, right)
+        except OSError:
+            return False
+    return False
+
+
+def _validate_export_paths(
+    input_path: str | Path,
+    output_path: str | Path,
+    trusted_work_dir: str | Path,
+) -> None:
+    source = _canonical_path(input_path)
+    output = _canonical_path(output_path)
+    workspace = _canonical_path(trusted_work_dir)
+    if _paths_identify_same_file(source, output):
+        raise ValueError("renderer input and output must identify different files")
+    try:
+        output.relative_to(workspace)
+    except ValueError as error:
+        raise ValueError(
+            "renderer output must stay inside the trusted renderer workspace"
+        ) from error
+    if output == workspace:
+        raise ValueError(
+            "renderer output must be a file inside the trusted renderer workspace"
+        )
+
+
+def _resolve_ffmpeg_executable(
+    configured_path: str | Path | None,
+) -> Path:
+    """Resolve the tool path supplied by trusted application configuration."""
+
+    candidate = (
+        str(configured_path)
+        if configured_path is not None
+        else shutil.which("ffmpeg")
+    )
+    if candidate is None:
+        raise RuntimeError("ffmpeg executable is required")
+    executable = Path(candidate).expanduser().resolve(strict=False)
+    if not executable.is_file():
+        raise ValueError("configured ffmpeg executable must be an existing file")
+    return executable
 
 
 def _required_match(pattern: str, value: str, label: str) -> re.Match[str]:
@@ -112,6 +186,48 @@ def _required_match(pattern: str, value: str, label: str) -> re.Match[str]:
     if match is None:
         raise ValueError(f"could not inspect {label}")
     return match
+
+
+def _read_escaped_single_quoted_value(
+    value: str,
+    start: int,
+) -> tuple[str, int]:
+    decoded: list[str] = []
+    escaped = False
+    for index in range(start, len(value)):
+        character = value[index]
+        if escaped:
+            decoded.append(character)
+            escaped = False
+        elif character == "\\":
+            escaped = True
+        elif character == "'":
+            return "".join(decoded), index + 1
+        else:
+            decoded.append(character)
+    raise ValueError("could not inspect escaped export text")
+
+
+def _read_export_text_values(filter_graph: str) -> tuple[str, str]:
+    values: list[str] = []
+    cursor = 0
+    marker = ":text='"
+    while True:
+        drawtext = filter_graph.find("drawtext=", cursor)
+        if drawtext < 0:
+            break
+        text_start = filter_graph.find(marker, drawtext)
+        next_filter = filter_graph.find(",drawtext=", drawtext + 1)
+        if text_start < 0 or (next_filter >= 0 and text_start > next_filter):
+            raise ValueError("could not inspect export text")
+        decoded, cursor = _read_escaped_single_quoted_value(
+            filter_graph,
+            text_start + len(marker),
+        )
+        values.append(decoded)
+    if len(values) != 2:
+        raise ValueError("could not inspect export text")
+    return values[0], values[1]
 
 
 def inspect_structural_fidelity(
@@ -178,13 +294,7 @@ def inspect_structural_fidelity(
         float(export_timing_match.group(1)),
         float(export_timing_match.group(2)),
     )
-    export_text_matches = re.findall(
-        r"drawtext=[^,]*?text='([^']*)'",
-        filter_graph,
-    )
-    if len(export_text_matches) != 2:
-        raise ValueError("could not inspect export text")
-    export_text = (export_text_matches[0], export_text_matches[1])
+    export_text = _read_export_text_values(filter_graph)
 
     requested_bounds = (
         request.overlay.bounds.x,
@@ -267,6 +377,7 @@ def measure_local_deployment(
             check=True,
             capture_output=True,
             text=True,
+            timeout=SUBPROCESS_TIMEOUT_SECONDS,
         )
         startup_seconds.append(time.perf_counter() - started)
         version = completed.stdout.splitlines()[0]
@@ -280,6 +391,7 @@ def measure_local_deployment(
             check=True,
             capture_output=True,
             text=True,
+            timeout=SUBPROCESS_TIMEOUT_SECONDS,
         )
         node_version = completed.stdout.strip()
 

@@ -29,6 +29,10 @@ Use the minimum hybrid architecture for the first static-nameplate loop:
 - preview and export adapters remain replaceable behind explicit contracts;
 - production code must not accept HTML or FFmpeg command text from AI output;
 - FFmpeg execution uses argument arrays with no shell invocation;
+- output resolves inside a caller-approved renderer workspace and cannot
+  canonically identify the input file;
+- the FFmpeg executable is resolved from trusted application configuration or
+  the local executable path before a command is returned;
 - source media remains immutable.
 
 This decision does not select a permanent renderer for all future editing
@@ -70,6 +74,11 @@ delta is 0.00055556, within the half-pixel rounding tolerance at this canvas.
 This is structural fidelity, not pixel fidelity. No browser/export pixel
 comparison was performed.
 
+An adversarial valid-text test additionally proves exact structural round-trip
+for apostrophes, commas, colons, backslashes, and HTML-like characters. The
+inspector reads FFmpeg's escaped quoted values character by character instead
+of treating an escaped apostrophe or comma as a delimiter.
+
 ### Local deployment-cost facts
 
 Measured on the current Windows machine without installing or executing
@@ -77,9 +86,9 @@ HyperFrames:
 
 | Candidate surface | Project artifact | Already-installed runtime facts | Still unmeasured |
 |---|---|---|---|
-| FFmpeg-native export | 5,099-byte adapter | FFmpeg executable 540,672 bytes; version N-122089-g37858dc6bd-20251211; `-version` startup averaged 0.0600123s | deployment image, long-video cost |
+| FFmpeg-native export | 5,099-byte adapter | FFmpeg executable 540,672 bytes; version N-122089-g37858dc6bd-20251211; latest `-version` startup averaged 0.0752867s | deployment image, long-video cost |
 | Browser preview | 3,983-byte composition adapter; 1,864-byte generated fixture document | Chrome executable found; file size 3,985,048 bytes | browser startup, deployed web bundle, pixel fidelity |
-| Hybrid boundary | 10,035-byte orchestration/measurement adapter plus the two adapters above | reuses the existing browser and FFmpeg | production integration and operational cost |
+| Hybrid boundary | 13,660-byte orchestration/measurement adapter plus the two adapters above | reuses the existing browser and FFmpeg | production integration and operational cost |
 | HyperFrames candidate | project-owned composition adapter only | local Node v24.14.1, browser, and FFmpeg exist; static package metadata requires Node 22+, browser, and FFmpeg | package archive/install size, dependency tree, startup, render, determinism, deployment |
 
 The executable sizes are facts about already-installed files, not incremental

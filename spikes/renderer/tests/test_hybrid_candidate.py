@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import importlib
+import os
+from dataclasses import replace
 from pathlib import Path
+
+import pytest
 
 from spikes.renderer.contract import load_request
 
@@ -19,12 +23,14 @@ def test_builds_browser_preview_and_ffmpeg_export_from_same_request() -> None:
         output_path=Path("work/output.mp4"),
         font_path=Path("C:/Windows/Fonts/arial.ttf"),
         video_filename="source.mp4",
+        trusted_work_dir=Path("work"),
     )
 
     assert 'data-composition-id="main"' in plan.preview_document
     assert 'src="source.mp4"' in plan.preview_document
     assert "Santosh" in plan.preview_document
-    assert plan.export_command[0] == "ffmpeg"
+    assert Path(plan.export_command[0]).is_file()
+    assert Path(plan.export_command[0]).name.lower() == "ffmpeg.exe"
     assert plan.export_command[plan.export_command.index("-i") + 1] == str(
         Path("work/source.mp4")
     )
@@ -60,6 +66,7 @@ def test_export_command_is_an_argument_list_not_a_shell_string() -> None:
         input_path=Path("work/source with spaces.mp4"),
         output_path=Path("work/output with spaces.mp4"),
         font_path=Path("C:/Windows/Fonts/arial.ttf"),
+        trusted_work_dir=Path("work"),
     )
 
     assert isinstance(command, list)
@@ -78,6 +85,7 @@ def test_proves_structural_fidelity_from_generated_preview_and_export() -> None:
         input_path=Path("work/source.mp4"),
         output_path=Path("work/output.mp4"),
         font_path=Path("C:/Windows/Fonts/arial.ttf"),
+        trusted_work_dir=Path("work"),
     )
 
     fidelity = candidate.inspect_structural_fidelity(request, plan)
@@ -113,3 +121,95 @@ def test_measures_local_deployment_facts_without_hyperframes_execution() -> None
     assert all(seconds > 0 for seconds in measurement.ffmpeg_startup_seconds)
     assert measurement.hyperframes_runtime_executed is False
     assert measurement.hyperframes_archive_bytes is None
+
+
+def test_structural_fidelity_handles_adversarial_valid_text() -> None:
+    candidate = importlib.import_module("spikes.renderer.hybrid_candidate")
+    request = load_request(FIXTURE)
+    request = replace(
+        request,
+        overlay=replace(
+            request.overlay,
+            primary_text=r"O'Brien, CEO: C:\clips\<draft> & [safe]",
+            secondary_text=r"50% %{pts}; backslash=\ HTML=<script>no()</script>",
+        ),
+    )
+    plan = candidate.build_hybrid_plan(
+        request,
+        input_path=Path("work/source.mp4"),
+        output_path=Path("work/output.mp4"),
+        font_path=Path("C:/Windows/Fonts/arial.ttf"),
+        trusted_work_dir=Path("work"),
+    )
+
+    fidelity = candidate.inspect_structural_fidelity(request, plan)
+
+    assert fidelity.preview_text == (
+        request.overlay.primary_text,
+        request.overlay.secondary_text,
+    )
+    assert fidelity.export_text == (
+        request.overlay.primary_text,
+        request.overlay.secondary_text,
+    )
+    assert fidelity.equivalent is True
+
+
+@pytest.mark.parametrize("alias_kind", ["same", "relative"])
+def test_rejects_canonical_input_output_collisions(
+    tmp_path: Path,
+    alias_kind: str,
+) -> None:
+    candidate = importlib.import_module("spikes.renderer.hybrid_candidate")
+    trusted = tmp_path / "trusted"
+    trusted.mkdir()
+    source = trusted / "source.mp4"
+    source.write_bytes(b"source")
+    output = (
+        source
+        if alias_kind == "same"
+        else trusted / "nested" / ".." / "source.mp4"
+    )
+
+    with pytest.raises(ValueError, match="input and output"):
+        candidate.build_export_command(
+            load_request(FIXTURE),
+            source,
+            output,
+            Path("C:/Windows/Fonts/arial.ttf"),
+            trusted_work_dir=trusted,
+        )
+
+
+def test_rejects_existing_hardlink_collision(tmp_path: Path) -> None:
+    candidate = importlib.import_module("spikes.renderer.hybrid_candidate")
+    trusted = tmp_path / "trusted"
+    trusted.mkdir()
+    source = trusted / "source.mp4"
+    alias = trusted / "alias.mp4"
+    source.write_bytes(b"source")
+    os.link(source, alias)
+
+    with pytest.raises(ValueError, match="input and output"):
+        candidate.build_export_command(
+            load_request(FIXTURE),
+            source,
+            alias,
+            Path("C:/Windows/Fonts/arial.ttf"),
+            trusted_work_dir=trusted,
+        )
+
+
+def test_rejects_output_outside_trusted_workspace(tmp_path: Path) -> None:
+    candidate = importlib.import_module("spikes.renderer.hybrid_candidate")
+    trusted = tmp_path / "trusted"
+    trusted.mkdir()
+
+    with pytest.raises(ValueError, match="trusted renderer workspace"):
+        candidate.build_export_command(
+            load_request(FIXTURE),
+            trusted / "source.mp4",
+            tmp_path / "outside.mp4",
+            Path("C:/Windows/Fonts/arial.ttf"),
+            trusted_work_dir=trusted,
+        )
