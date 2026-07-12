@@ -44,3 +44,10 @@
 - Completed eight RED/GREEN cycles including a real FFmpeg render, ffprobe validation, CLI report, and repeat-mode hash comparison.
 - After independent-review fixes, three fresh FFmpeg-native runs produced the same output SHA-256; average edit render was 0.7155 seconds for the five-second synthetic fixture.
 - Product capability remains E0; this is isolated renderer evidence only.
+## 2026-07-12 — HyperFrames candidate prepared without package execution
+
+- Pinned and statically inspected hyperframes@0.7.54; no package code was executed.
+- Verified explicit telemetry, update-check, auto-install, and browser-path controls in the distributed CLI.
+- Added a local-only composition adapter through RED/GREEN TDD; 9 focused tests and all 34 renderer tests pass.
+- Generated the static-nameplate HTML and visually sanity-checked it using the existing system Chrome.
+- This proves only project-owned HTML generation and layout. HyperFrames runtime behavior and MP4 rendering remain unverified pending explicit owner approval for third-party npm execution.

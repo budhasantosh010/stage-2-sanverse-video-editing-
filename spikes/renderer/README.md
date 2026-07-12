@@ -16,7 +16,7 @@ Which rendering architecture best supports fast non-editor previews, expressive 
 
 - Common renderer-neutral static-nameplate contract: implemented and fail-closed for finite positive canvas/source values, supported kinds, canvas bounds, and source timing.
 - FFmpeg-native static nameplate: rendered, probed, visually inspected, repeated three times with identical output hashes, and tested against hostile drawtext/font-path characters.
-- HyperFrames: primary-source research complete; local package evaluation pending.
+- HyperFrames: pinned-package static inspection complete; local-only static composition adapter passes tests and a system-Chrome layout sanity check. HyperFrames itself has not been installed or executed.
 - Hybrid: pending.
 
 ## Run tests

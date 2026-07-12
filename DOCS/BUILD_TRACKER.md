@@ -12,7 +12,7 @@ Last updated: 2026-07-12
 | G0-06 | G0 | Private GitHub repository | Complete | SSH push to `budhasantosh010/stage-2-sanverse-video-editing-` |
 | G0-07 | G0 | Owner approval to enter G1 | Complete | Explicit owner instruction on 2026-07-12 |
 | G1-01 | G1 | Two-screen user journey and low-fidelity Home/Studio design | Complete | Owner approved both screens and instructed renderer work to continue |
-| G1-02 | G1 | Renderer comparison harness and fixtures | In progress | Contract plus FFmpeg static fixture measured; HyperFrames and hybrid pending |
+| G1-02 | G1 | Renderer comparison harness and fixtures | In progress | Contract and FFmpeg measured; HyperFrames local composition adapter passes tests, but runtime render and hybrid remain pending |
 | G1-03 | G1 | Architecture decision record for renderer | Pending | Approved evidence table |
 
 ## Status rules

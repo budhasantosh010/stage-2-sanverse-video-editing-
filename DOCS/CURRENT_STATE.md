@@ -21,7 +21,7 @@ Last updated: 2026-07-12
 
 - Track A Home-to-Studio workflow and wireframes are owner-approved
 - Renderer-neutral spike contract and FFmpeg-native static candidate are measured
-- HyperFrames and hybrid candidates remain pending before the renderer decision
+- The local-only HyperFrames composition adapter is test-verified and visually sanity-checked in system Chrome; HyperFrames runtime installation/execution and the hybrid candidate remain pending before the renderer decision
 
 ## Next gated goal
 
@@ -31,7 +31,7 @@ G2 does not begin until G1's owner workflow review and measured renderer decisio
 
 ## Known unknowns
 
-- Which renderer approach best satisfies preview fidelity, motion flexibility, performance, determinism, and deployment constraints.
+- Which renderer approach best satisfies preview fidelity, motion flexibility, performance, determinism, and deployment constraints; no HyperFrames runtime evidence exists yet.
 - The exact Stage 1 artifact contract beyond cleaned MP4.
 - Real completion-time and edit-acceptance baselines.
 - Whether free OpenCode Zen/NVIDIA endpoints support the schemas, quotas, latency, and commercial terms needed for later stages.
