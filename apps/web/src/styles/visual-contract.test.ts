@@ -12,6 +12,34 @@ function readSource(relativePath: string): string {
   return existsSync(sourcePath) ? readFileSync(sourcePath, 'utf8') : ''
 }
 
+function readHexToken(source: string, token: string): string {
+  const match = source.match(new RegExp(`${token}:\\s*(#[0-9a-f]{6})`, 'i'))
+
+  if (!match) {
+    throw new Error(`Missing six-digit hexadecimal token: ${token}`)
+  }
+
+  return match[1]
+}
+
+function relativeLuminance(hex: string): number {
+  const channels = [hex.slice(1, 3), hex.slice(3, 5), hex.slice(5, 7)].map((channel) => {
+    const srgb = Number.parseInt(channel, 16) / 255
+    return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4
+  })
+
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+}
+
+function contrastRatio(foreground: string, background: string): number {
+  const foregroundLuminance = relativeLuminance(foreground)
+  const backgroundLuminance = relativeLuminance(background)
+  const lighter = Math.max(foregroundLuminance, backgroundLuminance)
+  const darker = Math.min(foregroundLuminance, backgroundLuminance)
+
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
 describe('shared visual and accessibility contract', () => {
   const tokens = readSource('styles/tokens.css')
   const globalStyles = readSource('styles/global.css')
@@ -58,5 +86,27 @@ describe('shared visual and accessibility contract', () => {
     expect(studioStyles).toContain('var(--color-workspace)')
     expect(studioStyles).toContain('var(--border-subtle)')
     expect(allStyles).not.toMatch(/(?:linear|radial|conic|repeating-linear|repeating-radial)-gradient\s*\(/i)
+  })
+
+  test('keeps placeholder and normal muted text at WCAG AA contrast', () => {
+    const placeholder = readHexToken(tokens, '--color-placeholder')
+    const mutedText = readHexToken(tokens, '--color-text-muted')
+    const whiteSurface = readHexToken(tokens, '--color-surface')
+    const homeCanvas = readHexToken(tokens, '--color-canvas')
+    const studioSurface = readHexToken(tokens, '--color-surface-subtle')
+
+    expect(contrastRatio(placeholder, whiteSurface)).toBeGreaterThanOrEqual(4.5)
+    expect(contrastRatio(mutedText, homeCanvas)).toBeGreaterThanOrEqual(4.5)
+    expect(contrastRatio(mutedText, studioSurface)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  test('uses a normal readable token for section indexes', () => {
+    const homeSectionIndex = homeStyles.match(/\.home-screen__section-index\s*{[^}]*}/s)?.[0]
+    const studioSectionIndex = studioStyles.match(/\.studio-screen__section-index\s*{[^}]*}/s)?.[0]
+
+    expect(homeSectionIndex).toContain('color: var(--color-text-muted)')
+    expect(studioSectionIndex).toContain('color: var(--color-text-muted)')
+    expect(homeSectionIndex).not.toContain('var(--color-text-disabled)')
+    expect(studioSectionIndex).not.toContain('var(--color-text-disabled)')
   })
 })
