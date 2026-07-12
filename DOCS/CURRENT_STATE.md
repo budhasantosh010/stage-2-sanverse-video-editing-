@@ -12,16 +12,16 @@ Last updated: 2026-07-12
 - The Stage 1 project and the prior anti-drift template were inspected read-only.
 - Owner requirements and corrections have been converted into durable requirements and decisions.
 - The product architecture direction is approved at the principle level: modular monolith, headless canonical edit engine, deterministic execution, replaceable AI/render/storage adapters.
-- The interface direction is approved at the principle level: clean black-and-white Studio for a non-editor.
+- The interface direction is approved at the principle level: calm black-and-white Home first, then a focused Studio after a video/project is opened.
 - No frontend, backend, renderer, AI integration, database, or editing primitive has been implemented yet.
 - The local `main` branch is connected to and pushed at `budhasantosh010/stage-2-sanverse-video-editing-`.
 - The owner explicitly authorized G1 to begin.
 
 ## Currently being completed
 
-- First-edit job story and interface state model
-- Low-fidelity black-and-white Studio wireframe
-- Common renderer-spike contract, representative fixtures, and measurement plan
+- Corrected two-screen first-edit job story and interface state model
+- Low-fidelity black-and-white Home and Studio wireframes
+- Owner walkthrough of the Home-to-Studio transition; renderer spike remains gated until approval
 
 ## Next gated goal
 

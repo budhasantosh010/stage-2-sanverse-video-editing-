@@ -26,3 +26,11 @@
 - Produced and visually verified a black-and-white Studio wireframe.
 - Preserved canvas-first interaction, plain-language proposal details, preview-before-acceptance, and a simple moment strip.
 - G1-01 remains in progress until the owner reviews the workflow; no product behavior has been implemented.
+
+## 2026-07-12 — Owner corrected the entry experience
+
+- Owner clarified that the existing Studio wireframe is Screen 2, not the first-arrival experience.
+- Screen 1 must use OpenDesign-like progressive disclosure: a calm Home centered on chat/upload, drag-and-drop entry, and recent projects.
+- Editing tools, canvas, proposal/history panel, and time strip appear only after the user supplies or opens a video project.
+- Updated the durable requirement, interface decision, active G1 plan, flow, and state model before continuing visual work.
+- Created and visually checked a separate Home wireframe; preserved the original editing workspace as Screen 2.

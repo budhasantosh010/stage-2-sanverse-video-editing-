@@ -1,6 +1,6 @@
 # G1 Plan — Interface Design and Renderer Feasibility Spike
 
-Status: Ready for owner review; implementation not started.
+Status: Track A Home/Studio design is under owner review; Track B renderer implementation has not started.
 
 ## Goal
 
@@ -15,8 +15,8 @@ The interface determines what “point here,” “at this time,” “preview,�
 ### Track A — User workflow and interface
 
 1. Write the primary job story for the first nameplate edit.
-2. Map states: empty project, media loaded, moment selected, region selected, request entered, clarification, proposal, previewing, accepted, undo, export, recoverable failure.
-3. Produce a low-fidelity black-and-white wireframe for desktop.
+2. Map states: Home, prompt/video supplied, importing, Studio ready, moment selected, region selected, request entered, clarification, proposal, previewing, accepted, undo, export, recoverable failure.
+3. Produce two low-fidelity black-and-white desktop wireframes: calm Home first, focused Studio second.
 4. Define progressive disclosure: what the default user sees versus advanced details.
 5. Walk the flow with the owner using plain language and revise it before coding a polished UI.
 
@@ -72,7 +72,7 @@ These remain candidates until the spike and G2 design review. No framework may o
 
 G1 closes only when:
 
-1. The owner can complete and explain the first-edit flow from the wireframe without learning professional editing terminology.
+1. The owner can explain how to start from Home and complete the first-edit flow in Studio without learning professional editing terminology.
 2. Each renderer candidate has been exercised on the same fixtures or has a documented, reproducible reason it cannot be.
 3. Results are recorded with commands, machine context, artifacts/checksums, timings, and visible limitations.
 4. A renderer decision record explains the winner, rejected alternatives, and revisit trigger.
@@ -82,7 +82,7 @@ G1 closes only when:
 
 1. Create fixture/media policy and a tiny sanitized test clip.
 2. Write the job story and state model.
-3. Produce the low-fidelity Studio wireframe.
+3. Produce the low-fidelity Home and Studio wireframes.
 4. Owner walkthrough and correction gate.
 5. Define common renderer-spike input/output contract.
 6. Implement one fixture at a time across candidates.

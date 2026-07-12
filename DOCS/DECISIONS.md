@@ -26,12 +26,12 @@ Only durable, approved decisions belong here. Proposals stay in plans or the bla
 - Why: This creates an auditable trust boundary and prevents probabilistic model output from arbitrarily changing media projects.
 - Revisit trigger: None for the trust boundary; provider and model implementations remain replaceable.
 
-## DEC-004 — Minimal black-and-white Studio
+## DEC-004 — Two-stage black-and-white interface
 
 - Status: Approved
 - Date: 2026-07-12
-- Decision: The initial product surface is a calm black/white/grayscale Studio with project/export controls, a central video canvas, a right-side conversational proposal/history panel, and a simple lower time strip.
-- Why: The user wants a clean, low-learning-curve experience like OpenDesign, not a dense traditional editor.
+- Decision: The initial product experience has two progressively disclosed surfaces. Screen 1 is a calm Home screen with a centered chat/upload composer, drag-and-drop entry, and recent projects. Screen 2 is the focused Studio with project/export controls, a central video canvas, a right-side conversational proposal/history panel, and a simple lower time strip. The Studio appears only after a video/project is opened.
+- Why: Showing editing controls on first arrival would overwhelm the target non-editor. The user wants OpenDesign's calm conversational start, followed by editing capability only when it becomes relevant.
 - Revisit trigger: Real usability evidence shows another layout materially reduces completion time.
 
 ## DEC-005 — Vertical slices before broad primitive coverage

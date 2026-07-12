@@ -78,3 +78,11 @@ Status values: `Approved`, `Proposed`, `Deferred`, `Rejected`, `Superseded`.
 - Before materially changing direction, explain what is understood, what is assumed, and what will be built next.
 - The owner approves medium-to-large goal transitions.
 - Technical explanations must remain understandable to a non-technical founder.
+
+### REQ-012 — Calm landing before the editing Studio
+
+- Status: Approved
+- A first-time or returning user must land on a calm Home screen centered on one chat/upload composer, drag-and-drop video entry, and recent projects.
+- Editing controls, canvas tools, proposals, history, and the time strip must remain hidden until the user opens or creates a video project.
+- Starting may happen by dropping a cleaned video, attaching one inside the composer, opening a recent project, or describing the intended edit and then supplying the video.
+- Source: owner correction on 2026-07-12.

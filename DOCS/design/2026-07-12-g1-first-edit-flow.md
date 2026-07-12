@@ -8,20 +8,21 @@ Status: Owner review required before interface implementation.
 
 ## First successful edit
 
-1. The owner opens Stage 2 and drops in a cleaned MP4.
-2. The video becomes ready and begins at a clear review state.
-3. The owner plays or scrubs to the desired moment.
-4. The owner draws a rectangle where the nameplate should appear.
-5. The owner writes: “Add Santosh — Founder here for five seconds.”
-6. The system shows one structured proposal in plain language:
+1. The owner lands on Home and sees one central chat/upload composer rather than editing controls.
+2. The owner drops in a cleaned MP4, attaches it in the composer, or opens a recent project.
+3. The video becomes ready and the product transitions into the Studio.
+4. The owner plays or scrubs to the desired moment.
+5. The owner draws a rectangle where the nameplate should appear.
+6. The owner writes: “Add Santosh — Founder here for five seconds.”
+7. The system shows one structured proposal in plain language:
    - **What:** nameplate with “Santosh” and “Founder”
    - **Where:** the selected rectangle
    - **When:** current time through five seconds later
    - **Motion:** none in the first slice
-7. The system renders a real preview of the affected interval.
-8. The owner accepts, asks for a change, or cancels.
-9. An accepted edit appears as one understandable item in history and the time strip.
-10. The owner can undo it, reload the project, and export the same accepted result.
+8. The system renders a real preview of the affected interval.
+9. The owner accepts, asks for a change, or cancels.
+10. An accepted edit appears as one understandable item in history and the time strip.
+11. The owner can undo it, reload the project, and export the same accepted result.
 
 ## What the user should not need to know
 
@@ -36,11 +37,13 @@ Status: Owner review required before interface implementation.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> Empty
-  Empty --> Importing: Drop cleaned MP4
+  [*] --> Home
+  Home --> Importing: Drop or attach cleaned MP4
+  Home --> Importing: Describe edit, then supply video
+  Home --> Ready: Open recent project
   Importing --> Ready: Media validated
   Importing --> ImportFailure: Unsupported or unreadable media
-  ImportFailure --> Empty: Remove or choose another file
+  ImportFailure --> Home: Remove or choose another file
 
   Ready --> Inspecting: Play or scrub
   Inspecting --> RegionSelected: Draw on paused frame
@@ -64,7 +67,7 @@ stateDiagram-v2
 
 | State | Main canvas | Right panel | Time strip | Primary action |
 |---|---|---|---|---|
-| Empty | Drop zone and one-sentence promise | Hidden or short guidance | Hidden | Choose video |
+| Home | One promise, central composer/drop zone, recent projects | Integrated into the central composer | Hidden | Drop, attach, describe, or open |
 | Importing | Video placeholder and progress | Validation status | Hidden | Cancel |
 | Ready/Inspecting | Video with play/pause and point/draw cursor | “What should change?” | Playhead and accepted edits | Describe edit |
 | Region selected | Visible rectangle and time label | Request composer | Selected moment | Send request |
@@ -86,11 +89,13 @@ Advanced details may reveal IDs, coordinates, or renderer diagnostics only when 
 
 Without coaching on editing terminology, the owner can:
 
-1. Identify where to upload a video.
-2. Identify how to point to a place on the video.
-3. Understand what the proposal will change.
-4. Distinguish preview from acceptance.
-5. Find undo and export.
+1. Understand how to begin from Home without seeing editing controls.
+2. Identify where to drop or attach a video and where to describe the desired edit.
+3. Understand why the Studio appears after a project is opened.
+4. Identify how to point to a place on the video.
+5. Understand what the proposal will change.
+6. Distinguish preview from acceptance.
+7. Find undo and export.
 
 If any step requires explanation, revise the workflow before building a polished interface.
 
