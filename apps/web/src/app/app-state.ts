@@ -1,18 +1,18 @@
-export type AppState =
-  | {
-      screen: 'home'
-      draftRequest: string
-    }
-  | {
-      screen: 'studio'
-      project: {
-        name: string
-        mediaUrl: string
-        draftRequest: string
-      }
-    }
+export type HomeState = {
+  screen: 'home'
+  draftRequest: string
+}
 
-type StudioState = Extract<AppState, { screen: 'studio' }>
+export type StudioState = {
+  screen: 'studio'
+  project: {
+    name: string
+    mediaUrl: string
+    draftRequest: string
+  }
+}
+
+export type AppState = HomeState | StudioState
 
 type LocalProjectInput = {
   name: string
@@ -20,13 +20,15 @@ type LocalProjectInput = {
   draftRequest?: string
 }
 
-export function createInitialState(): AppState {
+export function createInitialState(): HomeState {
   return {
     screen: 'home',
     draftRequest: '',
   }
 }
 
+export function updateDraftRequest(state: HomeState, value: string): HomeState
+export function updateDraftRequest(state: StudioState, value: string): StudioState
 export function updateDraftRequest(state: AppState, value: string): AppState {
   if (state.screen === 'home') {
     return {
@@ -45,24 +47,19 @@ export function updateDraftRequest(state: AppState, value: string): AppState {
 }
 
 export function openLocalProject(
-  state: AppState,
+  state: HomeState,
   input: LocalProjectInput,
 ): StudioState {
-  const currentDraftRequest =
-    state.screen === 'home'
-      ? state.draftRequest
-      : state.project.draftRequest
-
   return {
     screen: 'studio',
     project: {
       name: input.name,
       mediaUrl: input.mediaUrl,
-      draftRequest: input.draftRequest ?? currentDraftRequest,
+      draftRequest: input.draftRequest ?? state.draftRequest,
     },
   }
 }
 
-export function returnHome(_state: StudioState): AppState {
+export function returnHome(_state: StudioState): HomeState {
   return createInitialState()
 }

@@ -86,3 +86,16 @@ describe('app state', () => {
     })
   })
 })
+
+if (false) {
+  const studio = openLocalProject(createInitialState(), {
+    name: 'cleaned.mp4',
+    mediaUrl: 'blob:test',
+  })
+
+  // @ts-expect-error Opening a project is exclusively a Home-to-Studio transition.
+  openLocalProject(studio, {
+    name: 'replacement.mp4',
+    mediaUrl: 'blob:replacement',
+  })
+}
