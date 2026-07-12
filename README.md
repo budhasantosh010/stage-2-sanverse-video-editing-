@@ -14,11 +14,10 @@ Start every new or compacted session with [START_HERE.md](START_HERE.md).
 
 ```powershell
 cd "C:\Users\Lenovo\Music\Startups\YT Automations\A1 Talking Head Youtube Video\Sanverse YT Channel\Stage 2 Sanverse Editing Workflow"
-npm install
 npm run dev
 ```
 
-Then open <http://localhost:2000>. See [DOCS/LOCAL_DEVELOPMENT.md](DOCS/LOCAL_DEVELOPMENT.md) for first-install versus later-run instructions, port-conflict help, local-video privacy details, and the owner walkthrough.
+Then open <http://localhost:2000>. `npm install` is not required on every run; use it only on the first setup or after dependency files change. See [DOCS/LOCAL_DEVELOPMENT.md](DOCS/LOCAL_DEVELOPMENT.md) for exact cases, port-conflict help, local-video privacy details, and the owner walkthrough.
 
 ## Non-negotiable product principles
 

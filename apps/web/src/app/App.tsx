@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
+import { flushSync } from 'react-dom'
 
 import {
   createInitialState,
@@ -8,6 +9,7 @@ import {
   type AppState,
 } from './app-state'
 import { createLocalMediaHandle } from '../features/local-media/local-media'
+import { transitionView } from '../features/view-transition/view-transition'
 import { HomeScreen } from '../screens/home/HomeScreen'
 import { StudioScreen } from '../screens/studio/StudioScreen'
 
@@ -22,9 +24,13 @@ function disposeCurrentHandle(handleRef: RefObject<LocalMediaHandle | null>): vo
 export function App() {
   const [appState, setAppState] = useState<AppState>(createInitialState)
   const mediaHandleRef = useRef<LocalMediaHandle | null>(null)
+  const transitionSequenceRef = useRef(0)
 
   useEffect(() => {
-    return () => disposeCurrentHandle(mediaHandleRef)
+    return () => {
+      transitionSequenceRef.current += 1
+      disposeCurrentHandle(mediaHandleRef)
+    }
   }, [])
 
   if (appState.screen === 'home') {
@@ -37,16 +43,29 @@ export function App() {
           )
         }}
         onStartProject={(file) => {
+          const transitionSequence = transitionSequenceRef.current + 1
+          transitionSequenceRef.current = transitionSequence
           disposeCurrentHandle(mediaHandleRef)
 
           const handle = createLocalMediaHandle(file)
           mediaHandleRef.current = handle
-          setAppState(
-            openLocalProject(appState, {
-              name: file.name,
-              mediaUrl: handle.url,
-            }),
-          )
+          transitionView(() => {
+            if (
+              transitionSequence !== transitionSequenceRef.current ||
+              mediaHandleRef.current !== handle
+            ) {
+              return
+            }
+
+            flushSync(() => {
+              setAppState(
+                openLocalProject(appState, {
+                  name: file.name,
+                  mediaUrl: handle.url,
+                }),
+              )
+            })
+          })
         }}
       />
     )
@@ -56,10 +75,20 @@ export function App() {
     <StudioScreen
       project={appState.project}
       onBack={() => {
-        disposeCurrentHandle(mediaHandleRef)
-        setAppState((current) =>
-          current.screen === 'studio' ? returnHome(current) : current,
-        )
+        const transitionSequence = transitionSequenceRef.current + 1
+        transitionSequenceRef.current = transitionSequence
+        transitionView(() => {
+          if (transitionSequence !== transitionSequenceRef.current) {
+            return
+          }
+
+          flushSync(() => {
+            disposeCurrentHandle(mediaHandleRef)
+            setAppState((current) =>
+              current.screen === 'studio' ? returnHome(current) : current,
+            )
+          })
+        })
       }}
     />
   )

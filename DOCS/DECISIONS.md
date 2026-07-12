@@ -74,3 +74,11 @@ Only durable, approved decisions belong here. Proposals stay in plans or the bla
 - Why: The owner needs to evaluate how the product looks, works, and feels before more renderer investment. A static wireframe cannot validate interaction clarity.
 - Architecture boundary: Use production-quality frontend boundaries and tests, but do not introduce a backend, database, renderer, or provider until the first UX loop requires them.
 - Revisit trigger: The owner completes the runnable Home-to-Studio walkthrough and records corrections; renderer comparison then resumes before G2 closes.
+
+## DEC-010 — Purposeful motion, not ornamental animation
+
+- Status: Approved
+- Date: 2026-07-13
+- Decision: Use a small shared motion system for screen continuity and direct control feedback. Prefer browser-native view transitions with a deterministic no-animation fallback when unsupported or when reduced motion is requested.
+- Why: The owner found the first real-video flow abrupt. Motion must explain state change without becoming decoration or slowing a non-editor down.
+- Revisit trigger: Representative use shows the motion feels slow, distracting, or fails to clarify the action.

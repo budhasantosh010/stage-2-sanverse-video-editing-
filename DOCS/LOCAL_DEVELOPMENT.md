@@ -2,6 +2,17 @@
 
 This guide starts the current Stage 2 frontend on this Windows computer. The runnable application is a browser-only Home-to-Studio shell. It does not yet upload, save, edit, render, or export a video.
 
+## Normal start on this laptop
+
+The dependencies are already installed. For normal use, do **not** run `npm install` again:
+
+```powershell
+cd "C:\Users\Lenovo\Music\Startups\YT Automations\A1 Talking Head Youtube Video\Sanverse YT Channel\Stage 2 Sanverse Editing Workflow"
+npm run dev
+```
+
+`npm install` is needed only for a first setup, after `package.json` or `package-lock.json` changes, or if `node_modules` was removed or damaged.
+
 ## First installation
 
 Open PowerShell, then run these commands exactly:

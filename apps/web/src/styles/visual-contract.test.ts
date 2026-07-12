@@ -109,4 +109,19 @@ describe('shared visual and accessibility contract', () => {
     expect(homeSectionIndex).not.toContain('var(--color-text-disabled)')
     expect(studioSectionIndex).not.toContain('var(--color-text-disabled)')
   })
+
+  test('keeps the Home question subordinate to the editing task', () => {
+    const headingRule = homeStyles.match(/\.home-screen h1\s*{[^}]*}/s)?.[0] ?? ''
+    const maximumRem = headingRule.match(/font-size:\s*clamp\([^,]+,[^,]+,\s*([\d.]+)rem\)/)?.[1]
+
+    expect(Number(maximumRem)).toBeLessThanOrEqual(3.75)
+  })
+
+  test('uses one shared, restrained motion system for interactive feedback', () => {
+    expect(tokens).toContain('--motion-duration-fast:')
+    expect(tokens).toContain('--motion-duration-screen:')
+    expect(tokens).toContain('--motion-ease-standard:')
+    expect(homeStyles).toMatch(/\.home-screen__choose-button\s*{[^}]*transition:/s)
+    expect(studioStyles).toMatch(/\.studio-screen__back[^}]*transition:/s)
+  })
 })

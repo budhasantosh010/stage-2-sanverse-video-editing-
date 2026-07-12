@@ -1,5 +1,5 @@
 import { StrictMode } from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -7,6 +7,10 @@ import { App } from './App'
 
 const originalCreateObjectURL = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
 const originalRevokeObjectURL = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL')
+const originalStartViewTransition = Object.getOwnPropertyDescriptor(
+  document,
+  'startViewTransition',
+)
 
 let createObjectURL: ReturnType<typeof vi.fn>
 let revokeObjectURL: ReturnType<typeof vi.fn>
@@ -41,6 +45,11 @@ afterEach(() => {
   cleanup()
   restoreUrlMethod('createObjectURL', originalCreateObjectURL)
   restoreUrlMethod('revokeObjectURL', originalRevokeObjectURL)
+  if (originalStartViewTransition) {
+    Object.defineProperty(document, 'startViewTransition', originalStartViewTransition)
+  } else {
+    Reflect.deleteProperty(document, 'startViewTransition')
+  }
 })
 
 describe('App', () => {
@@ -104,5 +113,34 @@ describe('App', () => {
       screen.getByRole('heading', { name: /what do you want to edit today/i }),
     ).toBeInTheDocument()
     expect(createObjectURL).not.toHaveBeenCalled()
+  })
+
+  it('lets only the latest pending video selection enter Studio', async () => {
+    const user = userEvent.setup()
+    const pendingUpdates: Array<() => void> = []
+    createObjectURL.mockReturnValueOnce('blob:first-video').mockReturnValueOnce('blob:second-video')
+    Object.defineProperty(document, 'startViewTransition', {
+      configurable: true,
+      value: vi.fn((update: () => void) => {
+        pendingUpdates.push(update)
+      }),
+    })
+    const { container } = render(<App />)
+    const input = screen.getByLabelText(/choose video/i)
+
+    await user.upload(input, new File(['first'], 'first.mp4', { type: 'video/mp4' }))
+    await user.upload(input, new File(['second'], 'second.mp4', { type: 'video/mp4' }))
+
+    expect(pendingUpdates).toHaveLength(2)
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:first-video')
+
+    act(() => pendingUpdates[0]())
+    expect(
+      screen.getByRole('heading', { name: /what do you want to edit today/i }),
+    ).toBeInTheDocument()
+
+    act(() => pendingUpdates[1]())
+    expect(screen.getByText('second.mp4')).toBeInTheDocument()
+    expect(container.querySelector('video')).toHaveAttribute('src', 'blob:second-video')
   })
 })

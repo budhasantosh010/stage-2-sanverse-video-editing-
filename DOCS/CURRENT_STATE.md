@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 ## Active goal
 
@@ -15,6 +15,8 @@ Last updated: 2026-07-12
 - The interface direction is approved at the principle level: calm black-and-white Home first, then a focused Studio after a video/project is opened.
 - A runnable browser-only Home-to-Studio frontend shell now exists at strict `http://localhost:2000`. Live Home and port behavior were verified, and the controlled automated workflow has E3 evidence.
 - The shell uses a local browser object URL for the selected MP4; it does not upload or alter the source file, and cleanup occurs on Back or app unmount.
+- The owner completed the first real-video Home-to-Studio walkthrough. The flow reached Studio and video playback worked, but the owner found the Home heading too large, state changes abrupt, and Studio non-actionable because pointing, chat execution, and editing do not exist yet.
+- A tested UX refinement now caps the Home heading, softens the main surfaces, and adds shared button and Home/Studio transitions with a reduced-motion fallback. A fresh owner re-test is pending.
 - No backend, upload, persistence, AI integration, database, real editing primitive, renderer integration, or export has been implemented.
 - The local `main` branch is connected to and pushed at `budhasantosh010/stage-2-sanverse-video-editing-`.
 - The owner explicitly authorized G1 to begin.
@@ -22,9 +24,10 @@ Last updated: 2026-07-12
 ## Currently being completed
 
 - Track A Home-to-Studio workflow and wireframes are owner-approved
-- Track A2 runnable Home-to-Studio web shell is implemented and verified on controlled fixtures; the owner real-video walkthrough is still pending
+- Track A2 runnable Home-to-Studio web shell received its first owner real-video review; corrective motion/hierarchy work is implemented and awaits owner re-test
 - Renderer-neutral spike contract and FFmpeg-native static candidate are measured
 - HyperFrames runtime and hybrid work are intentionally paused until the owner can test the runnable interface
+- The first pointed-nameplate implementation plan is queued; execution remains gated behind the G1 renderer decision rather than silently skipping into G2/G3
 
 ## Next gated goal
 
@@ -34,7 +37,8 @@ G2 does not begin until G1's owner workflow review and measured renderer decisio
 
 ## Known unknowns
 
-- Whether the runnable Home-to-Studio interaction feels calm and understandable with the owner's real video. The agent's browser-control surface could not attach a local file, so no full manual Studio walkthrough was performed.
+- Whether the refined Home-to-Studio motion and hierarchy now feel calm enough. The first owner walkthrough proved the previous version was too abrupt and visually oversized.
+- The exact interaction contract for pointing at a video while preserving normal playback controls; this must be solved before chat can safely bind intent to a spatial target.
 - Which renderer approach best satisfies preview fidelity, motion flexibility, performance, determinism, and deployment constraints; no HyperFrames runtime evidence exists yet.
 - The exact Stage 1 artifact contract beyond cleaned MP4.
 - Real completion-time and edit-acceptance baselines.

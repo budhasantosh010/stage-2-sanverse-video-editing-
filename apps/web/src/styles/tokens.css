@@ -33,10 +33,14 @@
 
   --border-subtle: 1px solid var(--color-border);
   --border-strong: 1px solid var(--color-border-ink);
-  --radius-small: 2px;
-  --radius-panel: 3px;
-  --shadow-editorial: 8px 8px 0 var(--color-shadow);
-  --shadow-editorial-compact: 5px 5px 0 var(--color-shadow);
+  --radius-small: 10px;
+  --radius-panel: 16px;
+  --shadow-editorial: 0 18px 50px rgba(17, 17, 17, 0.08);
+  --shadow-editorial-compact: 0 12px 32px rgba(17, 17, 17, 0.08);
   --focus-ring: 3px solid var(--color-ink);
   --focus-offset: 3px;
+
+  --motion-duration-fast: 160ms;
+  --motion-duration-screen: 280ms;
+  --motion-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
 }

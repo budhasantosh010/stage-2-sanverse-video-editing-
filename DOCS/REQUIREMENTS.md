@@ -95,3 +95,11 @@ Status values: `Approved`, `Proposed`, `Deferred`, `Rejected`, `Superseded`.
 - Local startup must use strict port behavior: if port 2000 is occupied, startup fails visibly instead of silently switching to 3000, 5000, 8000, or another port.
 - Port 2000 is a local-development constraint. A deployed web application will use its hosting platform's normal public HTTP/HTTPS routing.
 - Source: owner correction on 2026-07-12.
+
+### REQ-014 — Proportionate hierarchy and purposeful motion
+
+- Status: Approved
+- The Home question must guide the user without dominating the whole viewport.
+- Moving between Home and Studio, selecting a video, and pressing primary controls must feel continuous rather than like an abrupt cut.
+- Motion must use one restrained ease-in/ease-out system, reinforce the user's action, and honor reduced-motion preferences.
+- Source: owner real-video walkthrough on 2026-07-13.

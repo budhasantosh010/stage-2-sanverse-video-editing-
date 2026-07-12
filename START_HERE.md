@@ -11,8 +11,8 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 - Completed macro stage: **G0 — Foundation and continuity**
 - Active macro stage: **G1 — Runnable web UX validation and renderer feasibility**
 - Product code: a runnable browser-only Home-to-Studio frontend shell exists at strict http://localhost:2000; it must not be mistaken for a working editor or production engine.
-- Immediate next gate: the owner performs the real-video Home-to-Studio walkthrough and records workflow and visual feedback.
-- Verified boundary: live Home and strict-port behavior were checked; the controlled automated workflow has E3 evidence. Owner hands-on evidence (E4) is pending.
+- Immediate next gate: the owner re-tests the refined Home-to-Studio hierarchy and motion, then G1 resumes the measured renderer decision required before the first real edit loop.
+- Verified boundary: the first owner real-video walkthrough reached Studio and exposed concrete UX failures; the corrective code has automated evidence, while owner acceptance of the refinement is pending.
 - Absent capabilities: no backend, upload, persistence, AI, real editing, render, or export exists.
 - G1 boundary: validate the runnable workflow and renderer architecture; do not silently expand into G2's canonical project engine, AI, persistence, or real editing.
 
