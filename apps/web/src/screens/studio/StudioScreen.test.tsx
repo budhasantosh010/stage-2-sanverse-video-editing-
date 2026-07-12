@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -33,6 +33,23 @@ describe('StudioScreen', () => {
     expect(video).toHaveAttribute('controls')
     expect(video).not.toHaveAttribute('autoplay')
     expect(video).toHaveTextContent(/browser does not support video playback/i)
+  })
+
+  it('shows a recoverable message when the browser cannot preview the MP4', async () => {
+    const user = userEvent.setup()
+    const onBack = vi.fn()
+    const { container } = renderStudio({ onBack })
+    const video = container.querySelector('video')
+
+    expect(video).not.toBeNull()
+    fireEvent.error(video as HTMLVideoElement)
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /browser could not preview this mp4.*try another video.*go back/i,
+    )
+
+    await user.click(screen.getByRole('button', { name: /back to home/i }))
+    expect(onBack).toHaveBeenCalledOnce()
   })
 
   it('labels a non-empty request as a draft that has not been executed', () => {

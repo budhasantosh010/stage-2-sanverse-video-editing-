@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { StudioState } from '../../app/app-state'
 import './StudioScreen.css'
 
@@ -10,6 +11,7 @@ const UNAVAILABLE_DESCRIPTION = 'studio-unavailable-description'
 
 export function StudioScreen({ project, onBack }: StudioScreenProps) {
   const draftRequest = project.draftRequest.trim()
+  const [hasPreviewError, setHasPreviewError] = useState(false)
 
   return (
     <main className="studio-screen">
@@ -52,10 +54,17 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
               preload="metadata"
               src={project.mediaUrl}
               aria-label={`Preview of ${project.name}`}
+              onError={() => setHasPreviewError(true)}
             >
               Your browser does not support video playback.
             </video>
           </div>
+          {hasPreviewError ? (
+            <p role="alert">
+              This browser could not preview this MP4. Try another video, or go back to Home
+              to choose one.
+            </p>
+          ) : null}
         </section>
 
         <aside className="studio-screen__conversation" aria-label="Conversation">
