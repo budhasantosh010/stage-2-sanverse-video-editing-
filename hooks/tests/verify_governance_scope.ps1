@@ -4,6 +4,7 @@ $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $verifier = Join-Path $root 'hooks/verify_governance.ps1'
 $ignoredSentinel = Join-Path $root 'node_modules/governance-ignored-sentinel.tmp'
 $untrackedSentinel = Join-Path $root 'governance-untracked-sentinel.tmp'
+$unicodeSentinel = Join-Path $root 'governance-ünicode-sentinel.tmp'
 $fakeSecret = 'OPENAI_' + 'API_KEY=not-a-real-secret'
 
 function Invoke-Verifier {
@@ -36,9 +37,17 @@ try {
     if ($untrackedResult.Output -notmatch 'governance-untracked-sentinel\.tmp') {
         throw "Governance failed without identifying the untracked sentinel:`n$($untrackedResult.Output)"
     }
+
+    Remove-Item -LiteralPath $untrackedSentinel -Force
+    [System.IO.File]::WriteAllText($unicodeSentinel, $fakeSecret)
+    $unicodeResult = Invoke-Verifier
+    if ($unicodeResult.ExitCode -eq 0) {
+        throw 'Untracked project files with non-ASCII names must enter governance scope.'
+    }
+
 }
 finally {
-    Remove-Item -LiteralPath $ignoredSentinel, $untrackedSentinel -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $ignoredSentinel, $untrackedSentinel, $unicodeSentinel -Force -ErrorAction SilentlyContinue
 }
 
 Write-Output 'PASS: governance scans tracked and untracked project files while excluding ignored dependencies.'

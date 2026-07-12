@@ -502,7 +502,7 @@ Expected: all tests and production build pass.
 
 Guide:
 
-    cd "C:UsersLenovoMusicStartupsYT AutomationsA1 Talking Head Youtube VideoSanverse YT ChannelStage 2 Sanverse Editing Workflow"
+    cd "C:\Users\Lenovo\Music\Startups\YT Automations\A1 Talking Head Youtube Video\Sanverse YT Channel\Stage 2 Sanverse Editing Workflow"
     npm install
     npm run dev
 
@@ -541,6 +541,20 @@ Run the pre-commit verification pipeline, then:
     git add README.md package.json package-lock.json apps/web DOCS
     git commit -m "[verified] feat: add runnable Home-to-Studio web shell"
     git push origin main
+
+## Implementation status and evidence
+
+Tasks 1 through 7 are implemented. Task 8 documentation and verification are recorded without changing the original task history above.
+
+- `npm test -- --run`: 46 of 46 tests passed.
+- `npm run build`: passed.
+- Live server: HTTP 200 at `127.0.0.1:2000`.
+- Live Home at 1280 by 720: accessible DOM and viewport verified; the prompt had a unique label and its controlled value updated.
+- Strict-port behavior: a second `npm run dev` exited 1 with `Error: Port 2000 is already in use`.
+- Automated component/integration evidence covers local video source, draft not executed, disabled unavailable actions, Back cleanup, and media-error recovery.
+- Limitation: the browser-control surface could not attach a local file to the native file input, so the agent did not complete a full manual Studio walkthrough.
+- Status: G1-01B remains in progress pending the owner's real-video walkthrough and feedback. This prevents an E4 or completion claim.
+- Scope remains unchanged: no backend, upload, persistence, AI, real editing, render, or export exists.
 
 ## Owner review gate
 

@@ -12,7 +12,7 @@ Last updated: 2026-07-12
 | G0-06 | G0 | Private GitHub repository | Complete | SSH push to `budhasantosh010/stage-2-sanverse-video-editing-` |
 | G0-07 | G0 | Owner approval to enter G1 | Complete | Explicit owner instruction on 2026-07-12 |
 | G1-01 | G1 | Two-screen user journey and low-fidelity Home/Studio design | Complete | Owner approved both screens |
-| G1-01B | G1 | Runnable Home-to-Studio web shell on strict port 2000 | Pending | Active implementation plan written; no application code exists yet |
+| G1-01B | G1 | Runnable Home-to-Studio web shell on strict port 2000 | In progress | 46/46 tests and production build pass; live Home/strict port verified; owner real-video walkthrough and feedback pending |
 | G1-02 | G1 | Renderer comparison harness and fixtures | In progress | Contract and FFmpeg measured; HyperFrames/hybrid paused until runnable UX review |
 | G1-03 | G1 | Architecture decision record for renderer | Pending | Approved evidence table |
 

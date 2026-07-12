@@ -6,9 +6,19 @@ The intended experience is simple: upload a cleaned talking-head video, point or
 
 ## Current status
 
-**G0: foundation and continuity** is complete. The project is at **G1: interface design and renderer feasibility spike**. The Home-to-Studio workflow is owner-approved, and the first FFmpeg-native renderer fixture is measured; no working editor capability is claimed yet.
+**G0: foundation and continuity** is complete. The project is at **G1: runnable web UX validation and renderer feasibility**. A runnable frontend Home-to-Studio shell now exists on strict local port 2000, and its controlled automated workflow has E3 evidence. It is not a working video editor: backend, upload, persistence, AI, real editing, rendering, and export do not exist. G1-01B remains in progress until the owner completes the real-video walkthrough and records feedback.
 
 Start every new or compacted session with [START_HERE.md](START_HERE.md).
+
+## Run the frontend
+
+```powershell
+cd "C:\Users\Lenovo\Music\Startups\YT Automations\A1 Talking Head Youtube Video\Sanverse YT Channel\Stage 2 Sanverse Editing Workflow"
+npm install
+npm run dev
+```
+
+Then open <http://localhost:2000>. See [DOCS/LOCAL_DEVELOPMENT.md](DOCS/LOCAL_DEVELOPMENT.md) for first-install versus later-run instructions, port-conflict help, local-video privacy details, and the owner walkthrough.
 
 ## Non-negotiable product principles
 
@@ -32,4 +42,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File hooks/verify_project_setup.p
 powershell -NoProfile -ExecutionPolicy Bypass -File hooks/verify_governance.ps1
 ```
 
-These checks validate the G0 governance foundation only. They are not evidence that the video editor itself exists or works.
+These checks validate the governance foundation only. Frontend tests and a production build are separate evidence, and neither proves that a working video editor exists.

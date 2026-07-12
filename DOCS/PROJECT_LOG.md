@@ -60,3 +60,14 @@
 - Owner asked to test how the application looks, works, and feels before HyperFrames work continues.
 - AOCS Omega Type 2/depth 1 analysis identified the missing runnable user loop as the current highest-impact bottleneck.
 - Renderer evidence remains preserved; HyperFrames runtime and hybrid evaluation are paused, not discarded.
+
+## 2026-07-12 — Runnable Home-to-Studio shell reached the owner review gate
+
+- Implemented the browser-only React/TypeScript/Vite shell on strict local port 2000 with typed screen state and local MP4 object-URL handling.
+- Added a calm Home, real browser video preview in Studio, a visible draft-not-executed state, disabled unavailable actions, recoverable media errors, Back cleanup, and a responsive grayscale visual system.
+- Verified 46 of 46 automated tests, the production build, HTTP 200 at `127.0.0.1:2000`, and an accessible live Home at 1280 by 720 with a uniquely labeled controlled prompt.
+- Verified a second server exits with status 1 and displays `Error: Port 2000 is already in use`.
+- The browser-control surface could not attach a local file to the native file input. No full manual browser Studio walkthrough was performed by the agent.
+- Fixed the governance verifier to scan Git-tracked and untracked non-ignored project files instead of recursively entering ignored dependencies and build output; a regression test proves both sides of that boundary.
+- G1-01B remains in progress. The owner must still choose a real MP4, check playback and workflow, and record feedback before the E4 owner gate can close.
+- No backend, upload, persistence, AI, real editing, render, or export exists.

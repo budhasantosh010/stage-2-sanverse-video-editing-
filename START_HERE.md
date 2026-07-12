@@ -10,9 +10,10 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 - Completed macro stage: **G0 — Foundation and continuity**
 - Active macro stage: **G1 — Runnable web UX validation and renderer feasibility**
-- Product code: **not started**; isolated G1 renderer-spike code exists and must not be mistaken for the production engine.
-- Immediate next slice: a real Home-to-Studio web shell at strict http://localhost:2000.
-- Owner direction: build the browser application and let the owner test its look, workflow, and feel before continuing HyperFrames/hybrid work.
+- Product code: a runnable browser-only Home-to-Studio frontend shell exists at strict http://localhost:2000; it must not be mistaken for a working editor or production engine.
+- Immediate next gate: the owner performs the real-video Home-to-Studio walkthrough and records workflow and visual feedback.
+- Verified boundary: live Home and strict-port behavior were checked; the controlled automated workflow has E3 evidence. Owner hands-on evidence (E4) is pending.
+- Absent capabilities: no backend, upload, persistence, AI, real editing, render, or export exists.
 - G1 boundary: validate the runnable workflow and renderer architecture; do not silently expand into G2's canonical project engine, AI, persistence, or real editing.
 
 ## Read in this order
@@ -25,6 +26,8 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 6. `DOCS/DECISIONS.md`
 7. The active plan in `DOCS/plans/`
 8. Relevant entries in `DOCS/PROJECT_LOG.md`, `DOCS/FAILURE_REGISTRY.md`, and `DOCS/changes/`
+
+For exact local startup and the pending owner walkthrough, read `DOCS/LOCAL_DEVELOPMENT.md`.
 
 ## Invariants
 

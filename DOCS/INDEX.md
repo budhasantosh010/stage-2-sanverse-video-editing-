@@ -12,6 +12,7 @@ This file maps each durable project question to one canonical answer.
 | What is the interface direction? | `DOCS/INTERFACE_PRINCIPLES.md` |
 | What interface flow and wireframes are under review? | `DOCS/design/2026-07-12-g1-first-edit-flow.md`, `DOCS/design/2026-07-12-g1-home-wireframe.svg`, and `DOCS/design/2026-07-12-g1-studio-wireframe.svg` |
 | What is being built next? | Latest approved file in `DOCS/plans/` |
+| How do I run and evaluate the local frontend? | `DOCS/LOCAL_DEVELOPMENT.md` |
 | Where is renderer-spike evidence? | `spikes/renderer/README.md` and `DOCS/runs/` |
 | What is complete, active, or blocked? | `DOCS/BUILD_TRACKER.md` |
 | How is work handed across sessions? | `DOCS/HANDOVER_RUNBOOK.md` |

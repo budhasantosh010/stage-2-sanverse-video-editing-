@@ -39,10 +39,29 @@ $trackedSecretPatterns = @(
     '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'
 )
 
-$relativeCandidates = & git -C $root ls-files --cached --others --exclude-standard
-if ($LASTEXITCODE -ne 0) {
-    throw 'Could not determine governance scope from Git.'
+$gitStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+$gitStartInfo.FileName = 'git'
+$gitStartInfo.Arguments = 'ls-files -z --cached --others --exclude-standard'
+$gitStartInfo.WorkingDirectory = $root
+$gitStartInfo.UseShellExecute = $false
+$gitStartInfo.RedirectStandardOutput = $true
+$gitStartInfo.RedirectStandardError = $true
+$gitStartInfo.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+
+$gitProcess = [System.Diagnostics.Process]::new()
+$gitProcess.StartInfo = $gitStartInfo
+if (-not $gitProcess.Start()) {
+    throw 'Could not start Git to determine governance scope.'
 }
+
+$rawCandidates = $gitProcess.StandardOutput.ReadToEnd()
+$gitError = $gitProcess.StandardError.ReadToEnd()
+$gitProcess.WaitForExit()
+if ($gitProcess.ExitCode -ne 0) {
+    throw "Could not determine governance scope from Git: $gitError"
+}
+
+$relativeCandidates = $rawCandidates.Split([char]0, [System.StringSplitOptions]::RemoveEmptyEntries)
 
 $candidateFiles = foreach ($relativePath in $relativeCandidates) {
     if ($relativePath -eq 'DOCS/_raw/user_messages.txt') {
