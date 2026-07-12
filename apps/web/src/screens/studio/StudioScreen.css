@@ -1,0 +1,338 @@
+.studio-screen {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 0 32px 32px;
+  color: #111111;
+  background: #eeeeeb;
+  font-family:
+    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.studio-screen *,
+.studio-screen *::before,
+.studio-screen *::after {
+  box-sizing: inherit;
+}
+
+.studio-screen button,
+.studio-screen textarea {
+  font: inherit;
+}
+
+.studio-screen__topbar {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(0, 2fr) minmax(160px, 1fr);
+  align-items: center;
+  max-width: 1600px;
+  min-height: 76px;
+  margin: 0 auto;
+  border-bottom: 1px solid #c8c8c3;
+}
+
+.studio-screen__back,
+.studio-screen__export,
+.studio-screen__conversation button {
+  min-height: 42px;
+  border: 1px solid #111111;
+  background: #111111;
+  color: #ffffff;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.studio-screen__back {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  justify-self: start;
+  border-color: transparent;
+  background: transparent;
+  color: #111111;
+}
+
+.studio-screen__back span {
+  font-size: 1.15rem;
+}
+
+.studio-screen__project {
+  min-width: 0;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.studio-screen__project-label {
+  display: block;
+  margin-bottom: 3px;
+  color: #6b6b67;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.studio-screen__project strong {
+  display: block;
+  overflow: hidden;
+  font-size: 0.92rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-screen__export {
+  min-width: 110px;
+  justify-self: end;
+}
+
+.studio-screen button:disabled,
+.studio-screen textarea:disabled {
+  border-color: #bdbdb8;
+  background: #ddddda;
+  color: #777773;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.studio-screen button:focus-visible,
+.studio-screen textarea:focus-visible,
+.studio-screen video:focus-visible {
+  outline: 3px solid #111111;
+  outline-offset: 3px;
+}
+
+.studio-screen__workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+  gap: 18px;
+  max-width: 1600px;
+  margin: 18px auto 0;
+}
+
+.studio-screen__canvas,
+.studio-screen__conversation,
+.studio-screen__time-strip {
+  border: 1px solid #c8c8c3;
+  background: #f8f8f6;
+}
+
+.studio-screen__canvas {
+  display: flex;
+  min-width: 0;
+  min-height: 540px;
+  flex-direction: column;
+  padding: 22px;
+}
+
+.studio-screen__canvas-heading,
+.studio-screen__panel-heading,
+.studio-screen__time-strip-heading {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.studio-screen__canvas-heading h1,
+.studio-screen__panel-heading h2,
+.studio-screen__time-strip-heading h2 {
+  margin: 4px 0 0;
+  font-size: 1rem;
+  letter-spacing: -0.025em;
+}
+
+.studio-screen__section-index {
+  color: #777773;
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+}
+
+.studio-screen__local-badge,
+.studio-screen__unavailable-tag {
+  padding: 6px 9px;
+  border: 1px solid #cecec9;
+  color: #61615d;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.studio-screen__video-frame {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20px;
+  padding: 18px;
+  background: #171717;
+}
+
+.studio-screen__video {
+  display: block;
+  width: 100%;
+  max-height: 67vh;
+  background: #000000;
+}
+
+.studio-screen__conversation {
+  display: flex;
+  min-height: 540px;
+  flex-direction: column;
+  padding: 22px;
+}
+
+.studio-screen__conversation h3,
+.studio-screen__chat label {
+  margin: 0 0 10px;
+  color: #5f5f5b;
+  font-size: 0.68rem;
+  font-weight: 760;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.studio-screen__draft,
+.studio-screen__proposal,
+.studio-screen__history {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #d4d4cf;
+}
+
+.studio-screen__draft p,
+.studio-screen__proposal p,
+.studio-screen__history p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.studio-screen__empty-copy,
+.studio-screen__availability-note {
+  color: #72726e;
+}
+
+.studio-screen__proposal button {
+  width: 100%;
+  margin-top: 15px;
+}
+
+.studio-screen__chat {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 9px;
+  margin-top: auto;
+  padding-top: 22px;
+}
+
+.studio-screen__chat label,
+.studio-screen__chat textarea {
+  grid-column: 1 / -1;
+}
+
+.studio-screen__chat textarea {
+  width: 100%;
+  resize: none;
+  border: 1px solid #bdbdb8;
+  padding: 12px;
+}
+
+.studio-screen__chat button {
+  grid-column: 2;
+  min-width: 76px;
+  padding: 0 16px;
+}
+
+.studio-screen__availability-note {
+  margin: 10px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.studio-screen__time-strip {
+  max-width: 1600px;
+  margin: 18px auto 0;
+  padding: 18px 22px 20px;
+}
+
+.studio-screen__time-strip-heading p {
+  margin: 4px 0 0;
+  color: #696965;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.studio-screen__static-track {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  margin-top: 16px;
+  border: 1px solid #bfbfba;
+  padding: 0 14px;
+  background: #e4e4e0;
+  color: #5f5f5b;
+  font-size: 0.74rem;
+  font-weight: 680;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 920px) {
+  .studio-screen {
+    padding: 0 20px 24px;
+  }
+
+  .studio-screen__workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-screen__canvas {
+    min-height: 440px;
+  }
+
+  .studio-screen__conversation {
+    min-height: 480px;
+  }
+}
+
+@media (max-width: 620px) {
+  .studio-screen__topbar {
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    padding: 12px 0;
+  }
+
+  .studio-screen__project {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    padding: 6px 0 0;
+    text-align: left;
+  }
+
+  .studio-screen__canvas,
+  .studio-screen__conversation {
+    min-height: auto;
+    padding: 16px;
+  }
+
+  .studio-screen__video-frame {
+    min-height: 260px;
+    padding: 8px;
+  }
+
+  .studio-screen__time-strip-heading {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-screen *,
+  .studio-screen *::before,
+  .studio-screen *::after {
+    scroll-behavior: auto;
+  }
+}
