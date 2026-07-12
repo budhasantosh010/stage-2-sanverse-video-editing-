@@ -1,17 +1,9 @@
 .studio-screen {
-  box-sizing: border-box;
   min-height: 100vh;
   padding: 0 32px 32px;
-  color: #111111;
-  background: #eeeeeb;
-  font-family:
-    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-.studio-screen *,
-.studio-screen *::before,
-.studio-screen *::after {
-  box-sizing: inherit;
+  color: var(--color-ink);
+  background: var(--color-workspace);
+  font-family: var(--font-body);
 }
 
 .studio-screen button,
@@ -26,16 +18,16 @@
   max-width: 1600px;
   min-height: 76px;
   margin: 0 auto;
-  border-bottom: 1px solid #c8c8c3;
+  border-bottom: var(--border-subtle);
 }
 
 .studio-screen__back,
 .studio-screen__export,
 .studio-screen__conversation button {
   min-height: 42px;
-  border: 1px solid #111111;
-  background: #111111;
-  color: #ffffff;
+  border: 1px solid var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-surface);
   font-weight: 680;
   cursor: pointer;
 }
@@ -47,7 +39,7 @@
   justify-self: start;
   border-color: transparent;
   background: transparent;
-  color: #111111;
+  color: var(--color-ink);
 }
 
 .studio-screen__back span {
@@ -63,7 +55,7 @@
 .studio-screen__project-label {
   display: block;
   margin-bottom: 3px;
-  color: #6b6b67;
+  color: var(--color-text-secondary);
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -85,9 +77,9 @@
 
 .studio-screen button:disabled,
 .studio-screen textarea:disabled {
-  border-color: #bdbdb8;
-  background: #ddddda;
-  color: #777773;
+  border-color: var(--color-border-strong);
+  background: var(--color-control-disabled);
+  color: var(--color-text-disabled);
   cursor: not-allowed;
   opacity: 1;
 }
@@ -95,8 +87,8 @@
 .studio-screen button:focus-visible,
 .studio-screen textarea:focus-visible,
 .studio-screen video:focus-visible {
-  outline: 3px solid #111111;
-  outline-offset: 3px;
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
 }
 
 .studio-screen__workspace {
@@ -110,8 +102,8 @@
 .studio-screen__canvas,
 .studio-screen__conversation,
 .studio-screen__time-strip {
-  border: 1px solid #c8c8c3;
-  background: #f8f8f6;
+  border: var(--border-subtle);
+  background: var(--color-surface-subtle);
 }
 
 .studio-screen__canvas {
@@ -140,7 +132,7 @@
 }
 
 .studio-screen__section-index {
-  color: #777773;
+  color: var(--color-text-disabled);
   font-size: 0.65rem;
   font-weight: 750;
   letter-spacing: 0.12em;
@@ -149,8 +141,8 @@
 .studio-screen__local-badge,
 .studio-screen__unavailable-tag {
   padding: 6px 9px;
-  border: 1px solid #cecec9;
-  color: #61615d;
+  border: 1px solid var(--color-border-muted);
+  color: var(--color-text-muted);
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.09em;
@@ -165,14 +157,14 @@
   justify-content: center;
   margin-top: 20px;
   padding: 18px;
-  background: #171717;
+  background: var(--color-video-frame);
 }
 
 .studio-screen__video {
   display: block;
   width: 100%;
   max-height: 67vh;
-  background: #000000;
+  background: var(--color-ink-strong);
 }
 
 .studio-screen__conversation {
@@ -185,7 +177,7 @@
 .studio-screen__conversation h3,
 .studio-screen__chat label {
   margin: 0 0 10px;
-  color: #5f5f5b;
+  color: var(--color-text-muted);
   font-size: 0.68rem;
   font-weight: 760;
   letter-spacing: 0.1em;
@@ -197,7 +189,7 @@
 .studio-screen__history {
   margin-top: 20px;
   padding-top: 18px;
-  border-top: 1px solid #d4d4cf;
+  border-top: 1px solid var(--color-border-soft);
 }
 
 .studio-screen__draft p,
@@ -210,7 +202,7 @@
 
 .studio-screen__empty-copy,
 .studio-screen__availability-note {
-  color: #72726e;
+  color: var(--color-text-subtle);
 }
 
 .studio-screen__proposal button {
@@ -234,7 +226,7 @@
 .studio-screen__chat textarea {
   width: 100%;
   resize: none;
-  border: 1px solid #bdbdb8;
+  border: 1px solid var(--color-border-strong);
   padding: 12px;
 }
 
@@ -258,7 +250,7 @@
 
 .studio-screen__time-strip-heading p {
   margin: 4px 0 0;
-  color: #696965;
+  color: var(--color-text-secondary);
   font-size: 0.72rem;
   font-weight: 650;
   letter-spacing: 0.05em;
@@ -270,10 +262,10 @@
   align-items: center;
   min-height: 48px;
   margin-top: 16px;
-  border: 1px solid #bfbfba;
+  border: 1px solid var(--color-border-strong);
   padding: 0 14px;
-  background: #e4e4e0;
-  color: #5f5f5b;
+  background: var(--color-track);
+  color: var(--color-text-muted);
   font-size: 0.74rem;
   font-weight: 680;
   letter-spacing: 0.06em;
@@ -326,13 +318,5 @@
   .studio-screen__time-strip-heading {
     flex-direction: column;
     gap: 8px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .studio-screen *,
-  .studio-screen *::before,
-  .studio-screen *::after {
-    scroll-behavior: auto;
   }
 }
