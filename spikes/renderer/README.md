@@ -17,7 +17,22 @@ Which rendering architecture best supports fast non-editor previews, expressive 
 - Common renderer-neutral static-nameplate contract: implemented and fail-closed for finite positive canvas/source values, supported kinds, canvas bounds, and source timing.
 - FFmpeg-native static nameplate: rendered, probed, visually inspected, repeated three times with identical output hashes, and tested against hostile drawtext/font-path characters.
 - HyperFrames: pinned-package static inspection complete; local-only static composition adapter passes tests and a system-Chrome layout sanity check. HyperFrames itself has not been installed or executed.
-- Hybrid: pending.
+- Hybrid static-nameplate adapter: the same validated request now produces a
+  byte-reproducible local browser preview document and a safe FFmpeg argument
+  list. Three measured preview generations and three measured exports were
+  repeatable on this Windows machine. Source bytes were unchanged.
+
+## First-loop decision
+
+ADR-001 selects the minimum hybrid architecture for the first closed edit
+loop: browser-native preview plus FFmpeg-native export behind renderer-neutral
+contracts. This is a narrow decision for the static nameplate, not a claim
+that one renderer will cover every future primitive.
+
+HyperFrames remains a candidate for later expressive motion. Its package was
+inspected and its generated layout received a system-Chrome sanity check, but
+the HyperFrames runtime itself has not been installed or executed. Preview to
+export pixel fidelity also remains unmeasured.
 
 ## Run tests
 

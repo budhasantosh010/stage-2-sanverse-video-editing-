@@ -81,3 +81,12 @@
 - Added a shared restrained motion system, browser-native Home/Studio transitions with fail-safe and reduced-motion fallbacks, softer surfaces, and a smaller Home heading through RED/GREEN tests.
 - Independent review found an asynchronous view-transition race that could reopen a revoked first video after a rapid second selection. Deferred-callback regression tests now prove stale transitions cannot commit, and transition-start failures fall back to a direct update.
 - AI keys remain intentionally unnecessary until a deterministic edit proposal can be validated, previewed, accepted, and undone.
+
+## 2026-07-13 - G1 renderer decision completed for the first loop
+
+- Added the static-nameplate hybrid adapter through RED/GREEN TDD: one validated request now produces an offline browser preview document and a safe FFmpeg export argument list.
+- Verified 3 focused hybrid tests and all 37 renderer tests, including the existing real FFmpeg and ffprobe integration coverage.
+- Three measured preview documents and three measured exports had identical hashes on this Windows machine; the five-second output preserved 1280 x 720 at 30 fps and the source hash did not change.
+- ADR-001 selects browser-native preview plus FFmpeg-native export for the first closed static-nameplate loop, behind renderer-neutral contracts.
+- HyperFrames runtime remains uninstalled and unverified. Preview-to-export pixel fidelity, real owner footage, audio preservation, advanced motion, and cross-machine determinism remain open evidence gates.
+- This closes G1-02 and G1-03 only. It does not implement a product renderer, editing primitive, backend, or export workflow, and it does not close the pending owner UX gate.
