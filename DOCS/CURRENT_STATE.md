@@ -16,8 +16,8 @@ Last updated: 2026-07-13
 - A runnable browser-only Home-to-Studio frontend shell now exists at strict `http://localhost:2000`. Live Home and port behavior were verified, and the controlled automated workflow has E3 evidence.
 - The shell uses a local browser object URL for the selected MP4; it does not upload or alter the source file, and cleanup occurs on Back or app unmount.
 - The owner completed the first real-video Home-to-Studio walkthrough. The flow reached Studio and video playback worked, but the owner found the Home heading too large, state changes abrupt, and Studio non-actionable because pointing, chat execution, and editing do not exist yet.
-- A tested UX refinement now caps the Home heading, softens the main surfaces, and adds shared button and Home/Studio transitions with a reduced-motion fallback. A fresh owner re-test is pending.
-- The G1 renderer spike now selects a minimum hybrid architecture for the first static-nameplate loop: browser-native preview plus FFmpeg-native export from the same renderer-neutral request. Three synthetic preview documents and three exports were repeatable on this Windows machine; preview-to-export pixel fidelity remains unmeasured.
+- The owner reported that the first refinement still felt abrupt. Live browser inspection verified that `document.startViewTransition` is unavailable on the current surface, so the prior direct-update fallback had no visible transition. A tested correction now gates a visible CSS entry transition to unsupported browsers, adds brief spring feedback to direct controls, and explicitly removes these transforms for reduced motion. A fresh owner re-test is pending.
+- The G1 renderer spike now selects a minimum hybrid architecture for the first static-nameplate loop: browser-native preview plus FFmpeg-native export from the same renderer-neutral request. Parsed generated outputs have equivalent text and timing, with placement differing only by bounded pixel rounding for the exact synthetic fixture. Preview-to-export pixel fidelity remains unmeasured.
 - No backend, upload, persistence, AI integration, database, real editing primitive, renderer integration, or export has been implemented.
 - The local `main` branch is connected to and pushed at `budhasantosh010/stage-2-sanverse-video-editing-`.
 - The owner explicitly authorized G1 to begin.
@@ -25,10 +25,11 @@ Last updated: 2026-07-13
 ## Currently being completed
 
 - Track A Home-to-Studio workflow and wireframes are owner-approved
-- Track A2 runnable Home-to-Studio web shell received its first owner real-video review; corrective motion/hierarchy work is implemented and awaits owner re-test
-- Renderer-neutral contract, FFmpeg-native export, and the bounded hybrid static candidate are measured; ADR-001 selects the hybrid boundary for the first loop
+- Track A2 runnable Home-to-Studio web shell received a second owner motion rejection; the diagnosed unsupported-browser fallback correction is implemented, independently reviewed once, corrected, and awaits final verification plus owner re-test
+- Renderer-neutral contract, FFmpeg-native export, and the bounded hybrid static candidate have narrow static-fixture evidence; ADR-001 selects the hybrid boundary only for the first loop
+- The broader G1 renderer comparison remains in progress until pixel fidelity, representative real-video/audio behavior, and the approved motion envelope have evidence
 - HyperFrames runtime remains uninstalled and unverified; it is deferred until a demonstrated motion need justifies its runtime and deployment cost
-- The first pointed-nameplate implementation plan is queued behind the remaining G1 owner UX gate rather than silently marking G2/G3 active
+- The owner explicitly instructed the team to continue building the real edit workflow while motion polish continues. The first pointed-nameplate plan may therefore begin after its renderer and motion reviews pass; G1-01B and owner motion acceptance remain open rather than being silently marked complete
 
 ## Next gated goal
 
@@ -47,4 +48,4 @@ G2 does not begin until G1's owner workflow review and measured renderer decisio
 
 ## Honest evidence level
 
-G0 governance is locally verified and remotely backed up. The runnable frontend's controlled automated Home-to-Studio workflow has **E3** evidence, and live Home/strict-port behavior is verified. Owner hands-on workflow evidence remains below E4. The isolated hybrid synthetic fixture has E3 integration evidence for repeatable document generation and FFmpeg output on this machine, but no preview/export pixel comparison. Product capability remains **E0: not implemented** for backend, AI, editing, persistence, render, and export.
+G0 governance is locally verified and remotely backed up. The runnable frontend's controlled automated Home-to-Studio workflow has **E3** evidence, and live Home/strict-port behavior is verified. Owner hands-on workflow evidence remains below E4. The isolated hybrid synthetic fixture has E3 integration evidence for structural translation, repeatable document generation, and FFmpeg output on this machine, but no preview/export pixel comparison. Product capability remains **E0: not implemented** for backend, AI, editing, persistence, render, and export.

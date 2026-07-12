@@ -83,6 +83,16 @@
   border-radius: var(--radius-panel);
   background: var(--color-surface);
   box-shadow: var(--shadow-editorial);
+  transition:
+    transform var(--motion-duration-fast) var(--motion-ease-spring),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-standard),
+    border-color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.home-screen__composer:focus-within {
+  border-color: var(--color-ink);
+  transform: translateY(-3px) scale(1.005);
+  box-shadow: 0 24px 58px rgba(17, 17, 17, 0.12);
 }
 
 .home-screen__prompt-label {
@@ -180,19 +190,19 @@
   transition:
     color var(--motion-duration-fast) var(--motion-ease-standard),
     background-color var(--motion-duration-fast) var(--motion-ease-standard),
-    transform var(--motion-duration-fast) var(--motion-ease-standard),
+    transform var(--motion-duration-fast) var(--motion-ease-spring),
     box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .home-screen__choose-button:hover {
   color: var(--color-ink);
   background: var(--color-surface);
-  transform: translateY(-1px);
+  transform: translateY(-2px) scale(1.025);
   box-shadow: 0 8px 20px rgba(17, 17, 17, 0.1);
 }
 
 .home-screen__choose-button:active {
-  transform: translateY(0);
+  transform: translateY(1px) scale(0.94);
   box-shadow: none;
 }
 

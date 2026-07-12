@@ -79,6 +79,6 @@ Only durable, approved decisions belong here. Proposals stay in plans or the bla
 
 - Status: Approved
 - Date: 2026-07-13
-- Decision: Use a small shared motion system for screen continuity and direct control feedback. Prefer browser-native view transitions with a deterministic no-animation fallback when unsupported or when reduced motion is requested.
-- Why: The owner found the first real-video flow abrupt. Motion must explain state change without becoming decoration or slowing a non-editor down.
+- Decision: Use a small shared motion system with smooth screen continuity and a separate brief spring token for direct control feedback. Prefer browser-native view transitions; when unsupported, use one explicitly gated CSS entry transition. Reduced-motion mode removes both page and control transforms.
+- Why: The owner found the first real-video flow abrupt and later clarified that buttons and input focus should have a noticeable but controlled bounce. Page navigation remains calm; only direct manipulation receives spring feedback.
 - Revisit trigger: Representative use shows the motion feels slow, distracting, or fails to clarify the action.

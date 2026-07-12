@@ -52,11 +52,7 @@
 }
 
 .studio-screen__back:hover {
-  transform: translateX(-2px);
-}
-
-.studio-screen__back:active {
-  transform: translateX(0);
+  transform: translateX(-3px) scale(1.025);
 }
 
 .studio-screen__project {
@@ -95,6 +91,15 @@
   color: var(--color-text-disabled);
   cursor: not-allowed;
   opacity: 1;
+}
+
+.studio-screen button:active:not(:disabled) {
+  transform: scale(0.94);
+  transition-timing-function: var(--motion-ease-spring);
+}
+
+.studio-screen button.studio-screen__back:active:not(:disabled) {
+  transform: translateX(0) scale(0.94);
 }
 
 .studio-screen button:focus-visible,

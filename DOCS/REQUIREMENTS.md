@@ -101,5 +101,6 @@ Status values: `Approved`, `Proposed`, `Deferred`, `Rejected`, `Superseded`.
 - Status: Approved
 - The Home question must guide the user without dominating the whole viewport.
 - Moving between Home and Studio, selecting a video, and pressing primary controls must feel continuous rather than like an abrupt cut.
-- Motion must use one restrained ease-in/ease-out system, reinforce the user's action, and honor reduced-motion preferences.
-- Source: owner real-video walkthrough on 2026-07-13.
+- Screen navigation must use one restrained smooth curve. Direct controls may use a brief, purposeful spring response so presses and focus changes feel physical rather than abrupt; this spring must not become decorative page motion.
+- Motion must reinforce the user's action and be explicitly removed when reduced motion is requested.
+- Source: owner real-video walkthrough and material correction on 2026-07-13.

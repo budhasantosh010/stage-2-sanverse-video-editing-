@@ -117,11 +117,35 @@ describe('shared visual and accessibility contract', () => {
     expect(Number(maximumRem)).toBeLessThanOrEqual(3.75)
   })
 
-  test('uses one shared, restrained motion system for interactive feedback', () => {
+  test('uses shared smooth navigation and purposeful spring feedback tokens', () => {
     expect(tokens).toContain('--motion-duration-fast:')
     expect(tokens).toContain('--motion-duration-screen:')
     expect(tokens).toContain('--motion-ease-standard:')
     expect(homeStyles).toMatch(/\.home-screen__choose-button\s*{[^}]*transition:/s)
     expect(studioStyles).toMatch(/\.studio-screen__back[^}]*transition:/s)
+  })
+
+  test('provides a visible screen-entry fallback and spring interaction feedback', () => {
+    expect(tokens).toContain('--motion-ease-spring:')
+    expect(main).toContain("dataset.viewTransition = supportsNativeViewTransitions() ? 'native' : 'fallback'")
+    expect(globalStyles).toMatch(
+      /\[data-view-transition='fallback'\]\s+\.home-screen,\s*\[data-view-transition='fallback'\]\s+\.studio-screen\s*{[^}]*animation:/s,
+    )
+    expect(globalStyles).toMatch(/@keyframes\s+sanverse-screen-enter/)
+    expect(homeStyles).toMatch(/\.home-screen__composer:focus-within\s*{[^}]*transform:/s)
+    expect(homeStyles).toMatch(/\.home-screen__choose-button:active\s*{[^}]*scale\(/s)
+    expect(studioStyles).toMatch(/\.studio-screen button:active[^}]*scale\(/s)
+    expect(studioStyles).toMatch(
+      /\.studio-screen\s+button\.studio-screen__back:active:not\(:disabled\)\s*{[^}]*translateX\(0\)[^}]*scale\(/s,
+    )
+  })
+
+  test('explicitly removes new transforms and entry animation for reduced motion', () => {
+    const reducedMotion = globalStyles.match(
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*{[\s\S]*\n}/,
+    )?.[0] ?? ''
+
+    expect(reducedMotion).toMatch(/\.home-screen,\s*\.studio-screen\s*{[^}]*animation:\s*none\s*!important/s)
+    expect(reducedMotion).toMatch(/\.home-screen__composer:focus-within[\s\S]*transform:\s*none\s*!important/)
   })
 })

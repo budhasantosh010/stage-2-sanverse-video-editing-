@@ -12,9 +12,9 @@ Last updated: 2026-07-13
 | G0-06 | G0 | Private GitHub repository | Complete | SSH push to `budhasantosh010/stage-2-sanverse-video-editing-` |
 | G0-07 | G0 | Owner approval to enter G1 | Complete | Explicit owner instruction on 2026-07-12 |
 | G1-01 | G1 | Two-screen user journey and low-fidelity Home/Studio design | Complete | Owner approved both screens |
-| G1-01B | G1 | Runnable Home-to-Studio web shell on strict port 2000 | In progress | First owner real-video walkthrough completed; oversized heading, abrupt transitions, and non-actionable Studio recorded; tested UX refinement awaits owner re-test |
-| G1-02 | G1 | Renderer comparison harness and fixtures | Complete | 37 renderer tests; repeatable hybrid static fixture; HyperFrames runtime limitation recorded |
-| G1-03 | G1 | Architecture decision record for renderer | Complete | `ADR-001-renderer-architecture.md` selects browser preview plus FFmpeg export for the first loop |
+| G1-01B | G1 | Runnable Home-to-Studio web shell on strict port 2000 | In progress | Owner rejected subtle motion twice; unsupported native transition API was verified and a gated fallback plus direct-control spring correction now awaits owner re-test |
+| G1-02 | G1 | Renderer comparison harness and fixtures | In progress | Static fixture has structural hybrid evidence; pixel fidelity, real-video/audio, motion, and HyperFrames runtime remain open |
+| G1-03 | G1 | Architecture decision record for renderer | Complete | ADR-001 narrowly selects browser preview plus FFmpeg export for the first static-nameplate loop |
 
 ## Status rules
 

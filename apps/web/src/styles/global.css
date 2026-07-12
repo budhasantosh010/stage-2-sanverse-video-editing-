@@ -37,6 +37,25 @@ input {
   background: var(--color-ink);
 }
 
+[data-view-transition='fallback'] .home-screen,
+[data-view-transition='fallback'] .studio-screen {
+  transform-origin: center top;
+  animation: sanverse-screen-enter var(--motion-duration-screen) var(--motion-ease-standard)
+    both;
+}
+
+@keyframes sanverse-screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 ::view-transition-old(root) {
   animation: sanverse-view-out var(--motion-duration-screen) var(--motion-ease-standard) both;
 }
@@ -72,5 +91,19 @@ input {
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation: none !important;
+  }
+
+  .home-screen,
+  .studio-screen {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .home-screen__composer:focus-within,
+  .home-screen__choose-button:hover,
+  .home-screen__choose-button:active,
+  .studio-screen button:hover:not(:disabled),
+  .studio-screen button:active:not(:disabled) {
+    transform: none !important;
   }
 }
