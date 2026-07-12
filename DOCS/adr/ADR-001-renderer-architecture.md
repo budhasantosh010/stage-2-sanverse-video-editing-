@@ -31,6 +31,8 @@ Use the minimum hybrid architecture for the first static-nameplate loop:
 - FFmpeg execution uses argument arrays with no shell invocation;
 - output resolves inside a caller-approved renderer workspace and cannot
   canonically identify the input file;
+- the returned command contains those validated absolute media paths rather
+  than the caller's potentially relative spelling;
 - the FFmpeg executable is resolved from trusted application configuration or
   the local executable path before a command is returned;
 - source media remains immutable.
@@ -86,9 +88,9 @@ HyperFrames:
 
 | Candidate surface | Project artifact | Already-installed runtime facts | Still unmeasured |
 |---|---|---|---|
-| FFmpeg-native export | 5,099-byte adapter | FFmpeg executable 540,672 bytes; version N-122089-g37858dc6bd-20251211; latest `-version` startup averaged 0.0752867s | deployment image, long-video cost |
+| FFmpeg-native export | 5,099-byte adapter | FFmpeg executable 540,672 bytes; version N-122089-g37858dc6bd-20251211; latest `-version` startup averaged 0.0575941s | deployment image, long-video cost |
 | Browser preview | 3,983-byte composition adapter; 1,864-byte generated fixture document | Chrome executable found; file size 3,985,048 bytes | browser startup, deployed web bundle, pixel fidelity |
-| Hybrid boundary | 13,660-byte orchestration/measurement adapter plus the two adapters above | reuses the existing browser and FFmpeg | production integration and operational cost |
+| Hybrid boundary | 13,776-byte orchestration/measurement adapter plus the two adapters above | reuses the existing browser and FFmpeg | production integration and operational cost |
 | HyperFrames candidate | project-owned composition adapter only | local Node v24.14.1, browser, and FFmpeg exist; static package metadata requires Node 22+, browser, and FFmpeg | package archive/install size, dependency tree, startup, render, determinism, deployment |
 
 The executable sizes are facts about already-installed files, not incremental

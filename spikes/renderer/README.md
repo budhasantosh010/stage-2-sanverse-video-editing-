@@ -28,6 +28,8 @@ Which rendering architecture best supports fast non-editor previews, expressive 
 - Hybrid export rejects canonical path collisions, existing hard-link aliases,
   and output outside its explicit trusted work directory. FFmpeg is resolved
   to an existing executable rather than left as a shell-resolved command.
+- Validated input/output paths are the absolute canonical paths returned in the
+  command, so changing the caller's working directory cannot redirect media.
 
 ## First-loop decision
 

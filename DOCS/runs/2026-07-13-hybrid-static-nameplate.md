@@ -40,6 +40,12 @@ escaped apostrophe and four exposed missing canonical path protections. After
 escape-aware inspection and bounded export validation, 10 focused tests and
 all 44 renderer tests passed.
 
+Final quality RED changed the process working directory after command
+construction and proved the validated paths were still emitted as relative
+arguments. The validator now returns its canonical paths and the command uses
+those exact absolute values. The focused suite passed 11 tests and the complete
+renderer suite passed 45 tests.
+
 ## Measured results
 
 The project-owned measurement loaded the validated fixture once, generated a
@@ -92,7 +98,7 @@ runtime would be newly shipped.
 
 | Field | Measured value |
 |---|---:|
-| Hybrid project-owned adapter source | 13,660 bytes |
+| Hybrid project-owned adapter source | 13,776 bytes |
 | Browser-composition adapter source | 3,983 bytes |
 | FFmpeg adapter source | 5,099 bytes |
 | Generated preview document | 1,864 bytes |
@@ -101,7 +107,7 @@ runtime would be newly shipped.
 | Existing FFmpeg executable | `C:\\ffmpeg-master-latest-win64-gpl-shared\\bin\\ffmpeg.exe` |
 | Existing FFmpeg executable file size | 540,672 bytes |
 | FFmpeg version | N-122089-g37858dc6bd-20251211 |
-| FFmpeg `-version` startup | 0.0734585s, 0.0719573s, 0.0804442s |
+| FFmpeg `-version` startup | 0.0624126s, 0.0533503s, 0.0570194s |
 | Existing Node executable | `C:\\Program Files\\nodejs\\node.exe` |
 | Existing Node executable file size | 91,426,304 bytes |
 | Node version | v24.14.1 |
@@ -112,7 +118,7 @@ Candidate comparison from these measurements:
 
 - FFmpeg-native export requires the existing FFmpeg runtime. Its project-owned
   adapter is 5,099 bytes; the latest executable startup measurement averaged
-  0.0752867 seconds.
+  0.0575941 seconds.
 - Browser preview uses the existing product browser. The generated fixture
   document is 1,864 bytes; browser startup and deployed bundle size were not
   measured.
@@ -132,6 +138,8 @@ making a production infrastructure claim.
 - Output must resolve inside the explicit trusted renderer work directory.
 - Canonically equal input/output paths, relative aliases, and existing hard
   links identifying the same file fail before a command is returned.
+- The returned `-i` and output arguments are the validated absolute canonical
+  paths and remain invariant if the process working directory later changes.
 - The default trusted root is `spikes/renderer/work`; tests may inject a
   temporary trusted root owned by the test.
 - FFmpeg resolves to an existing executable path from trusted application

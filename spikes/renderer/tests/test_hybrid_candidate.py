@@ -32,9 +32,9 @@ def test_builds_browser_preview_and_ffmpeg_export_from_same_request() -> None:
     assert Path(plan.export_command[0]).is_file()
     assert Path(plan.export_command[0]).name.lower() == "ffmpeg.exe"
     assert plan.export_command[plan.export_command.index("-i") + 1] == str(
-        Path("work/source.mp4")
+        Path("work/source.mp4").resolve()
     )
-    assert plan.export_command[-1] == str(Path("work/output.mp4"))
+    assert plan.export_command[-1] == str(Path("work/output.mp4").resolve())
     filter_graph = plan.export_command[plan.export_command.index("-vf") + 1]
     assert "text='Santosh'" in filter_graph
     assert "gte(t\\,1.000)*lt(t\\,4.000)" in filter_graph
@@ -72,9 +72,9 @@ def test_export_command_is_an_argument_list_not_a_shell_string() -> None:
     assert isinstance(command, list)
     assert all(isinstance(argument, str) for argument in command)
     assert command[command.index("-i") + 1] == str(
-        Path("work/source with spaces.mp4")
+        Path("work/source with spaces.mp4").resolve()
     )
-    assert command[-1] == str(Path("work/output with spaces.mp4"))
+    assert command[-1] == str(Path("work/output with spaces.mp4").resolve())
 
 
 def test_proves_structural_fidelity_from_generated_preview_and_export() -> None:
@@ -213,3 +213,29 @@ def test_rejects_output_outside_trusted_workspace(tmp_path: Path) -> None:
             Path("C:/Windows/Fonts/arial.ttf"),
             trusted_work_dir=trusted,
         )
+
+
+def test_export_media_paths_remain_canonical_after_cwd_change(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = importlib.import_module("spikes.renderer.hybrid_candidate")
+    source = Path("spikes/renderer/work/source.mp4")
+    output = Path("spikes/renderer/work/output.mp4")
+    expected_source = source.resolve()
+    expected_output = output.resolve()
+
+    command = candidate.build_export_command(
+        load_request(FIXTURE),
+        source,
+        output,
+        Path("C:/Windows/Fonts/arial.ttf"),
+    )
+    input_argument = Path(command[command.index("-i") + 1])
+    output_argument = Path(command[-1])
+    monkeypatch.chdir(tmp_path)
+
+    assert input_argument.is_absolute()
+    assert output_argument.is_absolute()
+    assert input_argument.resolve() == expected_source
+    assert output_argument.resolve() == expected_output

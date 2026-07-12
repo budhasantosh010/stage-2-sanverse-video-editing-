@@ -72,11 +72,15 @@ def build_export_command(
 ) -> list[str]:
     """Return safe arguments for a trusted executable and bounded output path."""
 
-    _validate_export_paths(input_path, output_path, trusted_work_dir)
-    command = build_nameplate_command(
-        request,
+    canonical_input, canonical_output = _validate_export_paths(
         input_path,
         output_path,
+        trusted_work_dir,
+    )
+    command = build_nameplate_command(
+        request,
+        canonical_input,
+        canonical_output,
         font_path,
     )
     command[0] = str(_resolve_ffmpeg_executable(ffmpeg_executable))
@@ -145,7 +149,7 @@ def _validate_export_paths(
     input_path: str | Path,
     output_path: str | Path,
     trusted_work_dir: str | Path,
-) -> None:
+) -> tuple[Path, Path]:
     source = _canonical_path(input_path)
     output = _canonical_path(output_path)
     workspace = _canonical_path(trusted_work_dir)
@@ -161,6 +165,7 @@ def _validate_export_paths(
         raise ValueError(
             "renderer output must be a file inside the trusted renderer workspace"
         )
+    return source, output
 
 
 def _resolve_ffmpeg_executable(
