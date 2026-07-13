@@ -16,6 +16,7 @@ Last updated: 2026-07-13
 | G1-02 | G1 | Renderer comparison harness and fixtures | In progress | 11 focused hybrid tests and 45 renderer tests; static fixture has structural hybrid evidence; pixel fidelity, real-video/audio, motion, and HyperFrames runtime remain open |
 | G1-03 | G1 | Architecture decision record for renderer | Complete | ADR-001 narrowly selects browser preview plus FFmpeg export for the first static-nameplate loop |
 | G2-01 | G2 | Canonical point/nameplate action and immutable history package | Complete | 34 edit-domain tests and workspace TypeScript build pass; no Studio integration yet |
+| G2-02 | G2 | Explicit rendered-video Point mode | Complete | 11 pure point-target tests plus 16 Studio tests (27 focused), 109 full workspace tests, both builds, governance, and diff checks pass; live owner workflow remains unverified |
 
 ## Status rules
 

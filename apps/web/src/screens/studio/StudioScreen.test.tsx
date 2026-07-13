@@ -1,11 +1,55 @@
 import type { ComponentProps } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { StudioScreen } from './StudioScreen'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
+
+let resizeObserverCallback: ResizeObserverCallback | null = null
+
+beforeEach(() => {
+  resizeObserverCallback = null
+  vi.stubGlobal(
+    'ResizeObserver',
+    class ResizeObserverMock {
+      constructor(callback: ResizeObserverCallback) {
+        resizeObserverCallback = callback
+      }
+
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  )
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+function prepareVideoForPointing(video: HTMLVideoElement, currentTime = 12.4) {
+  Object.defineProperties(video, {
+    videoWidth: { configurable: true, value: 1920 },
+    videoHeight: { configurable: true, value: 1080 },
+    currentTime: { configurable: true, value: currentTime, writable: true },
+  })
+  vi.spyOn(video, 'getBoundingClientRect').mockReturnValue({
+    x: 100,
+    y: 50,
+    left: 100,
+    top: 50,
+    right: 500,
+    bottom: 450,
+    width: 400,
+    height: 400,
+    toJSON: () => ({}),
+  })
+}
 
 function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = {}) {
   const props: ComponentProps<typeof StudioScreen> = {
@@ -112,5 +156,154 @@ describe('StudioScreen', () => {
     expect(screen.queryByText(/executed successfully/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/edit (?:was )?applied/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/export (?:is )?ready/i)).not.toBeInTheDocument()
+  })
+
+  it('offers Point mode without blocking ordinary video controls', () => {
+    const { container } = renderStudio()
+
+    expect(screen.getByRole('button', { name: /enter point mode/i })).toBeEnabled()
+    expect(container.querySelector('video')).toHaveAttribute('controls')
+    expect(screen.queryByRole('button', { name: /choose a point on the visible video/i })).not.toBeInTheDocument()
+  })
+
+  it('pauses playback and exposes a temporary accessible pointer layer in Point mode', async () => {
+    const user = userEvent.setup()
+    const { container } = renderStudio()
+    const video = container.querySelector('video') as HTMLVideoElement
+    const pause = vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+
+    await user.click(screen.getByRole('button', { name: /enter point mode/i }))
+
+    expect(pause).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: /choose a point on the visible video/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /cancel point mode/i })).toBeEnabled()
+    expect(screen.getByRole('status')).toHaveTextContent(/click or use arrow keys/i)
+  })
+
+  it('captures one point, displays its marker and time, then restores normal playback mode', async () => {
+    const user = userEvent.setup()
+    const { container } = renderStudio()
+    const video = container.querySelector('video') as HTMLVideoElement
+    vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+    prepareVideoForPointing(video)
+
+    await user.click(screen.getByRole('button', { name: /enter point mode/i }))
+    fireEvent.click(screen.getByRole('button', { name: /choose a point on the visible video/i }), {
+      clientX: 300,
+      clientY: 250,
+    })
+
+    expect(screen.getByRole('img', { name: /selected point/i })).toHaveStyle({ left: '50%', top: '50%' })
+    expect(screen.getByText('Here · 00:12.400')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /choose a point on the visible video/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /enter point mode/i })).toBeEnabled()
+    expect(video).toHaveAttribute('controls')
+  })
+
+  it('remaps a captured normalized target when the video element changes size', async () => {
+    const user = userEvent.setup()
+    const { container } = renderStudio()
+    const video = container.querySelector('video') as HTMLVideoElement
+    vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+    prepareVideoForPointing(video)
+
+    await user.click(screen.getByRole('button', { name: /enter point mode/i }))
+    fireEvent.click(screen.getByRole('button', { name: /choose a point on the visible video/i }), {
+      clientX: 200,
+      clientY: 193.75,
+    })
+
+    const marker = screen.getByRole('img', { name: /selected point/i })
+    expect(marker).toHaveStyle({ left: '25%', top: '35.9375%' })
+
+    vi.spyOn(video, 'getBoundingClientRect').mockReturnValue({
+      x: 100,
+      y: 50,
+      left: 100,
+      top: 50,
+      right: 700,
+      bottom: 350,
+      width: 600,
+      height: 300,
+      toJSON: () => ({}),
+    })
+    act(() => resizeObserverCallback?.([], {} as ResizeObserver))
+
+    expect(marker).toHaveStyle({ left: '27.777778%', top: '25%' })
+  })
+
+  it('focuses a keyboard cursor, moves it in normalized steps, and captures at the current time', async () => {
+    const user = userEvent.setup()
+    const { container } = renderStudio()
+    const video = container.querySelector('video') as HTMLVideoElement
+    vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+    prepareVideoForPointing(video, 7.25)
+
+    await user.click(screen.getByRole('button', { name: /enter point mode/i }))
+
+    const pointLayer = screen.getByRole('button', { name: /choose a point on the visible video/i })
+    const cursor = screen.getByRole('img', { name: /point cursor/i })
+    expect(pointLayer).toHaveFocus()
+    expect(cursor).toHaveStyle({ left: '50%', top: '50%' })
+
+    await user.keyboard('{ArrowRight}{ArrowDown}{Enter}')
+
+    expect(screen.getByRole('img', { name: /selected point/i })).toHaveStyle({
+      left: '55%',
+      top: '52.8125%',
+    })
+    expect(screen.getByText(/here .* 00:07\.250/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /enter point mode/i })).toHaveFocus()
+  })
+
+  it('rejects a click in letterboxing and keeps Point mode available for correction', async () => {
+    const user = userEvent.setup()
+    const { container } = renderStudio()
+    const video = container.querySelector('video') as HTMLVideoElement
+    vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+    prepareVideoForPointing(video)
+
+    await user.click(screen.getByRole('button', { name: /enter point mode/i }))
+    fireEvent.click(screen.getByRole('button', { name: /choose a point on the visible video/i }), {
+      clientX: 300,
+      clientY: 80,
+    })
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/inside the visible video/i)
+    expect(screen.getByRole('button', { name: /choose a point on the visible video/i })).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: /selected point/i })).not.toBeInTheDocument()
+  })
+
+  it('cancels Point mode with Escape and returns focus to the Point mode action', async () => {
+    const user = userEvent.setup()
+    const { container } = renderStudio()
+    const video = container.querySelector('video') as HTMLVideoElement
+    vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+
+    await user.click(screen.getByRole('button', { name: /enter point mode/i }))
+    await user.keyboard('{Escape}')
+
+    const pointButton = screen.getByRole('button', { name: /enter point mode/i })
+    expect(screen.queryByRole('button', { name: /choose a point on the visible video/i })).not.toBeInTheDocument()
+    expect(pointButton).toHaveFocus()
+  })
+
+  it('lets the visible Cancel button keep its native Enter behavior', async () => {
+    const user = userEvent.setup()
+    const { container } = renderStudio()
+    const video = container.querySelector('video') as HTMLVideoElement
+    vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+    prepareVideoForPointing(video)
+
+    await user.click(screen.getByRole('button', { name: /enter point mode/i }))
+    await user.tab()
+
+    const cancelButton = screen.getByRole('button', { name: /cancel point mode/i })
+    expect(cancelButton).toHaveFocus()
+    await user.keyboard('{Enter}')
+
+    expect(screen.queryByRole('button', { name: /choose a point on the visible video/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: /selected point/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /enter point mode/i })).toHaveFocus()
   })
 })
