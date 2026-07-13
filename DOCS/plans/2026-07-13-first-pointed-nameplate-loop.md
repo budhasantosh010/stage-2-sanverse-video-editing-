@@ -2,7 +2,7 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
-**Status:** In progress. Tasks 1 through 4 are complete; Tasks 5 through 8 remain pending. This does not mark the G2 or G3 macro exit gates complete.
+**Status:** In progress. Tasks 1 through 5 are complete; Tasks 6 through 8 remain pending. This does not mark the G2 or G3 macro exit gates complete.
 
 **Goal:** Let a non-editor open a real MP4, pause at a moment, point at a position, create a static nameplate through a bounded manual action, preview it, accept or undo it, and export a reproducible MP4.
 

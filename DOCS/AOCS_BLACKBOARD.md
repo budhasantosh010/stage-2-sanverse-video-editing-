@@ -26,19 +26,29 @@ This is a compact separation of facts, owner requirements, inferences, proposals
 
 ## Approved proposals not yet implemented
 
-- Modular monolith with ports/adapters.
-- Initial Studio layout.
-- Renderer feasibility spike.
-- Static nameplate as the first closed edit slice.
+- Immutable local project intake behind a replaceable repository port.
+- Product FFmpeg adapter behind the renderer port.
+- Completion of the first real exported nameplate vertical slice.
 
 ## Unknowns that must be measured
 
-- Renderer choice.
 - Exact preview/export fidelity requirements.
 - Real per-edit completion-time target.
 - Stage 1 optional artifact quality.
 - Free provider capability and limits.
 - Which advanced primitives real workflows need first.
+- Owner-approved click-to-nameplate anchor semantics and near-edge behavior.
+
+## AOCS Omega routing — 2026-07-13 typed preview and history loop
+
+- Classification: Type 2, medium risk, fractal depth 1.
+- Verified fact: typed pending and accepted nameplate actions now render in the browser only during their half-open time window.
+- Verified fact: acceptance, undo, and redo use the canonical immutable history domain; discard does not mutate accepted history.
+- Verified boundary: state is in memory only and is discarded on Back, reload, or project replacement.
+- Provisional compatibility assumption: point `x` and `y` currently place the overlay's top-left corner because the selected renderer spike uses that meaning.
+- Red-team risk: silently treating top-left placement as owner-approved would freeze a possibly awkward interaction and allow clipping near the right/bottom edge.
+- Accepted mitigation: document the assumption, preserve existing action meaning, and require owner validation or an explicit versioned anchor field before schema freeze or Task 7.
+- Next highest-leverage slice: Task 6 immutable local project intake, because real rendering cannot safely consume an arbitrary browser-local path or mutable source file.
 
 ## AOCS Omega routing — 2026-07-12 runnable web shell
 

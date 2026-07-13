@@ -1,5 +1,5 @@
 import { StrictMode } from 'react'
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -142,5 +142,68 @@ describe('App', () => {
     act(() => pendingUpdates[1]())
     expect(screen.getByText('second.mp4')).toBeInTheDocument()
     expect(container.querySelector('video')).toHaveAttribute('src', 'blob:second-video')
+  })
+
+  it('accepts, undoes, redoes, and resets one nameplate through App-owned state', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<App />)
+    await user.upload(
+      screen.getByLabelText(/choose video/i),
+      new File(['video'], 'first.mp4', { type: 'video/mp4' }),
+    )
+
+    const video = container.querySelector('video') as HTMLVideoElement
+    Object.defineProperties(video, {
+      videoWidth: { configurable: true, value: 1920 },
+      videoHeight: { configurable: true, value: 1080 },
+      currentTime: { configurable: true, value: 12.4, writable: true },
+    })
+    vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+    vi.spyOn(video, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 400,
+      bottom: 400,
+      width: 400,
+      height: 400,
+      toJSON: () => ({}),
+    })
+    fireEvent.loadedMetadata(video)
+
+    await user.click(screen.getByRole('button', { name: /enter point mode/i }))
+    fireEvent.click(screen.getByRole('button', { name: /choose a point/i }), {
+      clientX: 200,
+      clientY: 200,
+    })
+    await user.click(screen.getByRole('button', { name: /add text here/i }))
+    await user.type(screen.getByRole('textbox', { name: /^main text$/i }), 'Santosh')
+    await user.click(screen.getByRole('button', { name: /create proposal/i }))
+
+    fireEvent.timeUpdate(video)
+    expect(screen.getByTestId('nameplate-overlay')).toHaveTextContent('Santosh')
+    expect(screen.getByText(/no accepted edits/i)).toBeInTheDocument()
+
+    const accept = screen.getByRole('button', { name: /^accept proposal$/i })
+    await user.dblClick(accept)
+    expect(screen.getAllByText('Santosh')).toHaveLength(2)
+
+    await user.click(screen.getByRole('button', { name: /^undo edit$/i }))
+    expect(screen.queryByTestId('nameplate-overlay')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^redo edit$/i })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: /^redo edit$/i }))
+    expect(screen.getByTestId('nameplate-overlay')).toHaveTextContent('Santosh')
+
+    await user.click(screen.getByRole('button', { name: /back to home/i }))
+    createObjectURL.mockReturnValueOnce('blob:second-video')
+    await user.upload(
+      screen.getByLabelText(/choose video/i),
+      new File(['video'], 'second.mp4', { type: 'video/mp4' }),
+    )
+
+    expect(screen.getByText(/no pending proposal/i)).toBeInTheDocument()
+    expect(screen.getByText(/no accepted edits/i)).toBeInTheDocument()
   })
 })

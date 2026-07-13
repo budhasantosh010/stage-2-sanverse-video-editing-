@@ -10,10 +10,10 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 - Completed macro stage: **G0 — Foundation and continuity**
 - Active macro stage: **G1 — Runnable web UX validation and renderer feasibility**
-- Product code: a runnable browser-only Home-to-Studio frontend shell exists at strict http://localhost:2000; it must not be mistaken for a working editor or production engine.
-- Immediate next gate: finish the bounded nameplate-proposal verification, then connect proposal preview, acceptance, undo, and redo through canonical history. Motion acceptance remains open and must be re-tested rather than silently treated as complete.
+- Product code: a runnable browser-only Home-to-Studio frontend exists at strict http://localhost:2000. It can capture one point, create a bounded nameplate proposal, preview it at the typed time/position, accept it into canonical in-memory history, and undo/redo it. It is not yet a persisted editor or production render engine.
+- Immediate next gate: add immutable local project intake behind a same-origin API boundary, then connect accepted history to real FFmpeg export. Motion acceptance and the exact click-to-nameplate anchor meaning remain open owner gates.
 - Verified boundary: the first owner real-video walkthrough reached Studio and exposed concrete UX failures; the corrective code has automated evidence, while owner acceptance of the refinement is pending.
-- Absent capabilities: no backend, project upload, persistence, AI, accepted edit, nameplate preview, render, or export exists. Local pointing and bounded unaccepted proposal creation exist only as browser interaction slices.
+- Absent capabilities: no backend, project-owned media copy, persistence, database, AI, product renderer integration, rendered export, accounts, or SaaS operations exist. Browser state is discarded on Back, reload, or project replacement.
 - G1 boundary: validate the runnable workflow and renderer architecture; do not silently expand into G2's canonical project engine, AI, persistence, or real editing.
 
 ## Read in this order

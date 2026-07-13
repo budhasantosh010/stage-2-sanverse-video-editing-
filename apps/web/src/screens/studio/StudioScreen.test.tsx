@@ -2,6 +2,7 @@ import type { ComponentProps } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createHistory, type AddNameplateAction } from '@sanverse/edit-domain'
 
 import { StudioScreen } from './StudioScreen'
 
@@ -11,9 +12,13 @@ afterEach(() => {
 })
 
 let resizeObserverCallback: ResizeObserverCallback | null = null
+let videoFrameCallback: VideoFrameRequestCallback | null = null
+let cancelVideoFrameCallback: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   resizeObserverCallback = null
+  videoFrameCallback = null
+  cancelVideoFrameCallback = vi.fn()
   vi.stubGlobal(
     'ResizeObserver',
     class ResizeObserverMock {
@@ -26,9 +31,25 @@ beforeEach(() => {
       disconnect() {}
     },
   )
+
+  Object.defineProperties(HTMLVideoElement.prototype, {
+    requestVideoFrameCallback: {
+      configurable: true,
+      value: vi.fn((callback: VideoFrameRequestCallback) => {
+        videoFrameCallback = callback
+        return 7
+      }),
+    },
+    cancelVideoFrameCallback: {
+      configurable: true,
+      value: cancelVideoFrameCallback,
+    },
+  })
 })
 
 afterEach(() => {
+  delete (HTMLVideoElement.prototype as Partial<HTMLVideoElement>).requestVideoFrameCallback
+  delete (HTMLVideoElement.prototype as Partial<HTMLVideoElement>).cancelVideoFrameCallback
   vi.unstubAllGlobals()
 })
 
@@ -58,6 +79,14 @@ function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = 
       mediaUrl: 'blob:cleaned-interview',
       draftRequest: 'Tighten the opening pause.',
     },
+    proposal: null,
+    history: createHistory(),
+    editError: null,
+    onProposal: vi.fn(),
+    onDiscardProposal: vi.fn(),
+    onAcceptProposal: vi.fn(),
+    onUndo: vi.fn(),
+    onRedo: vi.fn(),
     onBack: vi.fn(),
     ...overrides,
   }
@@ -65,6 +94,17 @@ function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = 
   const view = render(<StudioScreen {...props} />)
 
   return { ...view, props }
+}
+
+const nameplate: AddNameplateAction = {
+  schemaVersion: 'sanverse.action/v1',
+  actionId: 'action-studio-1',
+  kind: 'add-nameplate',
+  target: { x: 0.25, y: 0.75, sourceTimeMs: 12_400 },
+  primaryText: 'Santosh',
+  secondaryText: 'Founder',
+  startMs: 12_400,
+  durationMs: 5_000,
 }
 
 describe('StudioScreen', () => {
@@ -309,7 +349,8 @@ describe('StudioScreen', () => {
 
   it('turns a captured point into one bounded text proposal without accepting it', async () => {
     const user = userEvent.setup()
-    const { container } = renderStudio()
+    const onProposal = vi.fn()
+    const { container } = renderStudio({ onProposal })
     const video = container.querySelector('video') as HTMLVideoElement
     vi.spyOn(video, 'pause').mockImplementation(() => undefined)
     prepareVideoForPointing(video, 12.4)
@@ -329,31 +370,29 @@ describe('StudioScreen', () => {
     await user.type(screen.getByRole('textbox', { name: /smaller line.*optional/i }), 'Founder')
     await user.click(screen.getByRole('button', { name: /create proposal/i }))
 
-    const proposalSection = screen.getByRole('heading', { name: /^proposal$/i }).closest('section')
-    expect(proposalSection).not.toBeNull()
-    expect(proposalSection).toHaveTextContent(/Santosh/i)
-    expect(proposalSection).toHaveTextContent(/Founder/i)
-    expect(proposalSection).toHaveTextContent(/00:12\.400.*5 seconds/i)
-    expect(proposalSection?.querySelector('[role="status"]')).toHaveFocus()
-    expect(screen.getByRole('button', { name: /accept proposal unavailable/i })).toBeDisabled()
+    expect(onProposal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        primaryText: 'Santosh',
+        secondaryText: 'Founder',
+        startMs: 12_400,
+        durationMs: 5_000,
+      }),
+    )
+    expect(screen.getByText(/no pending proposal/i)).toBeInTheDocument()
     expect(screen.getByText(/no accepted edits/i)).toBeInTheDocument()
   })
 
-  it('clears an unaccepted proposal when the user captures a different point', async () => {
+  it('discards an unaccepted proposal when the user captures a different point', async () => {
     const user = userEvent.setup()
-    const { container } = renderStudio()
+    const onDiscardProposal = vi.fn()
+    const { container } = renderStudio({
+      proposal: { ...nameplate, primaryText: 'Old proposal' },
+      onDiscardProposal,
+    })
     const video = container.querySelector('video') as HTMLVideoElement
     vi.spyOn(video, 'pause').mockImplementation(() => undefined)
     prepareVideoForPointing(video, 12.4)
 
-    await user.click(screen.getByRole('button', { name: /enter point mode/i }))
-    fireEvent.click(screen.getByRole('button', { name: /choose a point on the visible video/i }), {
-      clientX: 300,
-      clientY: 250,
-    })
-    await user.click(screen.getByRole('button', { name: /add text here/i }))
-    await user.type(screen.getByRole('textbox', { name: /^main text$/i }), 'Old proposal')
-    await user.click(screen.getByRole('button', { name: /create proposal/i }))
     expect(screen.getByText('Old proposal')).toBeInTheDocument()
 
     video.currentTime = 20
@@ -363,8 +402,209 @@ describe('StudioScreen', () => {
       clientY: 250,
     })
 
-    expect(screen.queryByText('Old proposal')).not.toBeInTheDocument()
-    expect(screen.getByText(/point at the video, then choose add text here/i)).toBeInTheDocument()
+    expect(onDiscardProposal).toHaveBeenCalledOnce()
     expect(screen.getByText(/here.*00:20\.000/i)).toBeInTheDocument()
+  })
+
+  it('previews a proposal only inside its exact time window over contain-fitted content', () => {
+    const { container } = renderStudio({ proposal: nameplate })
+    const video = container.querySelector('video') as HTMLVideoElement
+    prepareVideoForPointing(video, 12.4)
+
+    fireEvent.loadedMetadata(video)
+    act(() => {
+      videoFrameCallback?.(0, { mediaTime: 12.4 } as VideoFrameCallbackMetadata)
+    })
+
+    const contentLayer = screen.getByTestId('video-content-layer')
+    expect(contentLayer).toHaveStyle({
+      left: '0%',
+      top: '21.875%',
+      width: '100%',
+      height: '56.25%',
+    })
+    expect(screen.getByTestId('nameplate-overlay')).toHaveStyle({ left: '25%', top: '75%' })
+
+    video.currentTime = 17.4
+    act(() => {
+      videoFrameCallback?.(1, { mediaTime: 17.4 } as VideoFrameCallbackMetadata)
+    })
+    expect(screen.queryByTestId('nameplate-overlay')).not.toBeInTheDocument()
+  })
+
+  it('uses video frames as the only playback clock when frame callbacks are available', () => {
+    const { container } = renderStudio({ proposal: nameplate })
+    const video = container.querySelector('video') as HTMLVideoElement
+    prepareVideoForPointing(video, 0)
+    fireEvent.loadedMetadata(video)
+
+    video.currentTime = 12.4
+    fireEvent.timeUpdate(video)
+    fireEvent.seeked(video)
+    expect(screen.queryByTestId('nameplate-overlay')).not.toBeInTheDocument()
+
+    act(() => {
+      videoFrameCallback?.(0, { mediaTime: 12.4 } as VideoFrameCallbackMetadata)
+    })
+    expect(screen.getByTestId('nameplate-overlay')).toHaveTextContent('Santosh')
+  })
+
+  it('falls back to media events and removes them when frame callbacks are unavailable', () => {
+    delete (HTMLVideoElement.prototype as Partial<HTMLVideoElement>).requestVideoFrameCallback
+    delete (HTMLVideoElement.prototype as Partial<HTMLVideoElement>).cancelVideoFrameCallback
+    const removeEventListener = vi.spyOn(HTMLMediaElement.prototype, 'removeEventListener')
+    const { container, unmount } = renderStudio({ proposal: nameplate })
+    const video = container.querySelector('video') as HTMLVideoElement
+    prepareVideoForPointing(video, 12.4)
+    fireEvent.loadedMetadata(video)
+    fireEvent.timeUpdate(video)
+
+    expect(screen.getByTestId('nameplate-overlay')).toHaveTextContent('Santosh')
+
+    unmount()
+    expect(removeEventListener).toHaveBeenCalledWith('timeupdate', expect.any(Function))
+    expect(removeEventListener).toHaveBeenCalledWith('seeked', expect.any(Function))
+  })
+
+  it('synchronizes the exact preview window to presented video frames and cleans up', () => {
+    const { container, unmount } = renderStudio({ proposal: nameplate })
+    const video = container.querySelector('video') as HTMLVideoElement
+    prepareVideoForPointing(video, 0)
+    fireEvent.loadedMetadata(video)
+
+    expect(videoFrameCallback).not.toBeNull()
+
+    act(() => {
+      videoFrameCallback?.(0, { mediaTime: 12.399 } as VideoFrameCallbackMetadata)
+    })
+    expect(screen.queryByTestId('nameplate-overlay')).not.toBeInTheDocument()
+
+    act(() => {
+      videoFrameCallback?.(1, { mediaTime: 12.4 } as VideoFrameCallbackMetadata)
+    })
+    expect(screen.getByTestId('nameplate-overlay')).toHaveTextContent('Santosh')
+
+    act(() => {
+      videoFrameCallback?.(2, { mediaTime: 17.4 } as VideoFrameCallbackMetadata)
+    })
+    expect(screen.queryByTestId('nameplate-overlay')).not.toBeInTheDocument()
+
+    unmount()
+    expect(cancelVideoFrameCallback).toHaveBeenCalledWith(7)
+  })
+
+  it('describes the proposal duration from the typed action', () => {
+    renderStudio({ proposal: { ...nameplate, durationMs: 2_500 } })
+
+    const proposalSection = screen.getByRole('heading', { name: /^proposal$/i }).closest('section')
+    expect(proposalSection).toHaveTextContent(/2\.5 seconds/i)
+    expect(proposalSection).not.toHaveTextContent(/· 5 seconds/i)
+  })
+
+  it('offers explicit accept and discard actions for a pending proposal', async () => {
+    const user = userEvent.setup()
+    const onAcceptProposal = vi.fn()
+    const onDiscardProposal = vi.fn()
+    renderStudio({ proposal: nameplate, onAcceptProposal, onDiscardProposal })
+
+    await user.click(screen.getByRole('button', { name: /^accept proposal$/i }))
+    await user.click(screen.getByRole('button', { name: /^discard proposal$/i }))
+
+    expect(onAcceptProposal).toHaveBeenCalledOnce()
+    expect(onDiscardProposal).toHaveBeenCalledOnce()
+  })
+
+  it('moves focus to an announced result after a proposal is accepted', async () => {
+    const user = userEvent.setup()
+    const onAcceptProposal = vi.fn()
+    const { rerender } = renderStudio({ proposal: nameplate, onAcceptProposal })
+
+    await user.click(screen.getByRole('button', { name: /^accept proposal$/i }))
+    expect(onAcceptProposal).toHaveBeenCalledOnce()
+
+    rerender(
+      <StudioScreen
+        project={{
+          name: 'cleaned-interview.mp4',
+          mediaUrl: 'blob:cleaned-interview',
+          draftRequest: '',
+        }}
+        proposal={null}
+        history={{
+          accepted: [nameplate],
+          redoStack: [],
+          issuedActionIds: [nameplate.actionId],
+        }}
+        editError={null}
+        onProposal={vi.fn()}
+        onDiscardProposal={vi.fn()}
+        onAcceptProposal={onAcceptProposal}
+        onUndo={vi.fn()}
+        onRedo={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    )
+
+    const result = screen.getByRole('status', { name: /proposal result/i })
+    expect(result).toHaveTextContent(/^proposal accepted\.$/i)
+    expect(result).toHaveFocus()
+  })
+
+  it('renders accepted history but never renders the redo stack', () => {
+    const redoOnly = { ...nameplate, actionId: 'action-redo', primaryText: 'Redo only' }
+    const { container } = renderStudio({
+      history: {
+        accepted: [nameplate],
+        redoStack: [redoOnly],
+        issuedActionIds: [nameplate.actionId, redoOnly.actionId],
+      },
+    })
+    const video = container.querySelector('video') as HTMLVideoElement
+    prepareVideoForPointing(video, 12.4)
+    fireEvent.loadedMetadata(video)
+    fireEvent.timeUpdate(video)
+
+    expect(screen.getAllByText('Santosh').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Redo only')).not.toBeInTheDocument()
+  })
+
+  it('enables undo and redo from canonical history and blocks both while a proposal is pending', () => {
+    const history = {
+      accepted: [nameplate],
+      redoStack: [] as AddNameplateAction[],
+      issuedActionIds: [nameplate.actionId],
+    }
+    const { rerender } = renderStudio({ history })
+
+    expect(screen.getByRole('button', { name: /^undo edit$/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /^redo edit$/i })).toBeDisabled()
+
+    rerender(
+      <StudioScreen
+        project={{
+          name: 'cleaned-interview.mp4',
+          mediaUrl: 'blob:cleaned-interview',
+          draftRequest: '',
+        }}
+        proposal={nameplate}
+        history={history}
+        editError={null}
+        onProposal={vi.fn()}
+        onDiscardProposal={vi.fn()}
+        onAcceptProposal={vi.fn()}
+        onUndo={vi.fn()}
+        onRedo={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: /^undo edit$/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^redo edit$/i })).toBeDisabled()
+  })
+
+  it('shows edit transition failures visibly', () => {
+    renderStudio({ editError: 'This proposal could not be accepted.' })
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/could not be accepted/i)
   })
 })

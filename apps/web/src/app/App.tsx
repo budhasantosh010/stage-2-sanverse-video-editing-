@@ -2,9 +2,14 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 
 import {
+  acceptEditProposal,
   createInitialState,
+  discardEditProposal,
   openLocalProject,
+  queueEditProposal,
+  redoEdit,
   returnHome,
+  undoEdit,
   updateDraftRequest,
   type AppState,
 } from './app-state'
@@ -74,6 +79,34 @@ export function App() {
   return (
     <StudioScreen
       project={appState.project}
+      proposal={appState.proposal}
+      history={appState.history}
+      editError={appState.editError}
+      onProposal={(proposal) => {
+        setAppState((current) =>
+          current.screen === 'studio' ? queueEditProposal(current, proposal) : current,
+        )
+      }}
+      onDiscardProposal={() => {
+        setAppState((current) =>
+          current.screen === 'studio' ? discardEditProposal(current) : current,
+        )
+      }}
+      onAcceptProposal={() => {
+        setAppState((current) =>
+          current.screen === 'studio' ? acceptEditProposal(current) : current,
+        )
+      }}
+      onUndo={() => {
+        setAppState((current) =>
+          current.screen === 'studio' ? undoEdit(current) : current,
+        )
+      }}
+      onRedo={() => {
+        setAppState((current) =>
+          current.screen === 'studio' ? redoEdit(current) : current,
+        )
+      }}
       onBack={() => {
         const transitionSequence = transitionSequenceRef.current + 1
         transitionSequenceRef.current = transitionSequence

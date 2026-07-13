@@ -72,6 +72,9 @@ describe('shared visual and accessibility contract', () => {
   test('provides a visible shared keyboard focus treatment', () => {
     expect(globalStyles).toMatch(/:focus-visible\s*{[^}]*outline:\s*var\(--focus-ring\)/s)
     expect(globalStyles).toMatch(/outline-offset:\s*var\(--focus-offset\)/)
+    expect(studioStyles).toMatch(
+      /\.studio-screen__proposal-result:focus-visible\s*{[^}]*outline:\s*var\(--focus-ring\)/s,
+    )
   })
 
   test('removes non-essential motion for reduced-motion users', () => {

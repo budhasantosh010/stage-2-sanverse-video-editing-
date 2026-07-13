@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AddNameplateAction } from '@sanverse/edit-domain'
+import type { EditHistory } from '@sanverse/edit-domain/history'
 import type { StudioState } from '../../app/app-state'
 import { NameplateComposer } from '../../features/nameplate/NameplateComposer'
+import { NameplateOverlay } from '../../features/nameplate/NameplateOverlay'
 import {
   capturePointTarget,
   formatPointTargetTime,
@@ -12,6 +14,14 @@ import './StudioScreen.css'
 
 export type StudioScreenProps = {
   project: StudioState['project']
+  proposal: AddNameplateAction | null
+  history: EditHistory
+  editError: string | null
+  onProposal(proposal: AddNameplateAction): void
+  onDiscardProposal(): void
+  onAcceptProposal(): void
+  onUndo(): void
+  onRedo(): void
   onBack(): void
 }
 
@@ -35,6 +45,14 @@ function roundCssPercentage(value: number) {
   return Number(value.toFixed(6))
 }
 
+function formatDuration(durationMs: number) {
+  const seconds = durationMs / 1_000
+  const value = Number.isInteger(seconds)
+    ? String(seconds)
+    : seconds.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')
+  return `${value} ${seconds === 1 ? 'second' : 'seconds'}`
+}
+
 function projectPointOntoVideoElement(point: NormalizedPoint, video: HTMLVideoElement) {
   const elementBox = video.getBoundingClientRect()
   const contentBox = getRenderedVideoContentBox(elementBox, video.videoWidth, video.videoHeight)
@@ -51,7 +69,31 @@ function projectPointOntoVideoElement(point: NormalizedPoint, video: HTMLVideoEl
   }
 }
 
-export function StudioScreen({ project, onBack }: StudioScreenProps) {
+function getVideoContentLayerStyle(video: HTMLVideoElement) {
+  const elementBox = video.getBoundingClientRect()
+  const contentBox = getRenderedVideoContentBox(elementBox, video.videoWidth, video.videoHeight)
+  if (!contentBox) return null
+
+  return {
+    left: `${roundCssPercentage(((contentBox.left - elementBox.left) / elementBox.width) * 100)}%`,
+    top: `${roundCssPercentage(((contentBox.top - elementBox.top) / elementBox.height) * 100)}%`,
+    width: `${roundCssPercentage((contentBox.width / elementBox.width) * 100)}%`,
+    height: `${roundCssPercentage((contentBox.height / elementBox.height) * 100)}%`,
+  }
+}
+
+export function StudioScreen({
+  project,
+  proposal,
+  history,
+  editError,
+  onProposal,
+  onDiscardProposal,
+  onAcceptProposal,
+  onUndo,
+  onRedo,
+  onBack,
+}: StudioScreenProps) {
   const draftRequest = project.draftRequest.trim()
   const [hasPreviewError, setHasPreviewError] = useState(false)
   const [isPointMode, setIsPointMode] = useState(false)
@@ -59,11 +101,14 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
   const [draftPoint, setDraftPoint] = useState<NormalizedPoint>({ x: 0.5, y: 0.5 })
   const [, setVideoLayoutRevision] = useState(0)
   const [pointError, setPointError] = useState<string | null>(null)
-  const [proposal, setProposal] = useState<AddNameplateAction | null>(null)
+  const [playheadMs, setPlayheadMs] = useState(0)
+  const [proposalResult, setProposalResult] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const pointModeButtonRef = useRef<HTMLButtonElement>(null)
   const pointLayerRef = useRef<HTMLButtonElement>(null)
   const proposalSummaryRef = useRef<HTMLDivElement>(null)
+  const proposalResultRef = useRef<HTMLParagraphElement>(null)
+  const pendingProposalResolutionRef = useRef<'accepted' | 'discarded' | null>(null)
 
   useEffect(() => {
     if (isPointMode) pointLayerRef.current?.focus()
@@ -74,27 +119,89 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
   }, [proposal])
 
   useEffect(() => {
+    if (proposal) {
+      setProposalResult(null)
+      return
+    }
+
+    const resolution = pendingProposalResolutionRef.current
+    if (!resolution) return
+    pendingProposalResolutionRef.current = null
+    setProposalResult(
+      resolution === 'accepted'
+        ? 'Proposal accepted.'
+        : 'Proposal discarded. Accepted history was not changed.',
+    )
+  }, [proposal])
+
+  useEffect(() => {
+    if (proposalResult) proposalResultRef.current?.focus()
+  }, [proposalResult])
+
+  useEffect(() => {
+    if (editError) pendingProposalResolutionRef.current = null
+  }, [editError])
+
+  useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
     const refreshProjection = () => setVideoLayoutRevision((revision) => revision + 1)
+    const updatePlayhead = (currentTime: number) => {
+      setPlayheadMs(
+        Number.isFinite(currentTime) && currentTime >= 0 ? Math.round(currentTime * 1000) : -1,
+      )
+    }
+    const refreshPlayhead = () => updatePlayhead(video.currentTime)
+    const hasVideoFrameCallback = typeof video.requestVideoFrameCallback === 'function'
+    let videoFrameCallbackId: number | null = null
+    let stopped = false
+    const requestNextVideoFrame = () => {
+      if (typeof video.requestVideoFrameCallback !== 'function') return
+      videoFrameCallbackId = video.requestVideoFrameCallback((_now, metadata) => {
+        if (stopped) return
+        updatePlayhead(metadata.mediaTime)
+        requestNextVideoFrame()
+      })
+    }
     const observer =
       typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(refreshProjection)
 
     observer?.observe(video)
     video.addEventListener('loadedmetadata', refreshProjection)
     video.addEventListener('resize', refreshProjection)
+    if (hasVideoFrameCallback) {
+      requestNextVideoFrame()
+    } else {
+      video.addEventListener('loadedmetadata', refreshPlayhead)
+      video.addEventListener('timeupdate', refreshPlayhead)
+      video.addEventListener('seeked', refreshPlayhead)
+    }
 
     return () => {
+      stopped = true
+      if (
+        videoFrameCallbackId !== null &&
+        typeof video.cancelVideoFrameCallback === 'function'
+      ) {
+        video.cancelVideoFrameCallback(videoFrameCallbackId)
+      }
       observer?.disconnect()
       video.removeEventListener('loadedmetadata', refreshProjection)
       video.removeEventListener('resize', refreshProjection)
+      if (!hasVideoFrameCallback) {
+        video.removeEventListener('loadedmetadata', refreshPlayhead)
+        video.removeEventListener('timeupdate', refreshPlayhead)
+        video.removeEventListener('seeked', refreshPlayhead)
+      }
     }
   }, [])
 
   const video = videoRef.current
   const markerPosition = pointTarget && video ? projectPointOntoVideoElement(pointTarget, video) : null
   const draftPosition = isPointMode && video ? projectPointOntoVideoElement(draftPoint, video) : null
+  const videoContentLayerStyle = video ? getVideoContentLayerStyle(video) : null
+  const previewActions = proposal ? [...history.accepted, proposal] : history.accepted
 
   function cancelPointMode() {
     pointModeButtonRef.current?.focus()
@@ -111,7 +218,8 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
 
   function completePointCapture(target: CapturedPointTarget) {
     setPointTarget(target)
-    setProposal(null)
+    if (proposal) onDiscardProposal()
+    setPlayheadMs(target.timeMs)
     setPointError(null)
     setIsPointMode(false)
     pointModeButtonRef.current?.focus()
@@ -137,6 +245,16 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
     }
 
     completePointCapture(result.value)
+  }
+
+  function handleAcceptProposal() {
+    pendingProposalResolutionRef.current = 'accepted'
+    onAcceptProposal()
+  }
+
+  function handleDiscardProposal() {
+    pendingProposalResolutionRef.current = 'discarded'
+    onDiscardProposal()
   }
 
   function handlePointModeKeyDown(event: React.KeyboardEvent<HTMLElement>) {
@@ -233,6 +351,22 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
                 Your browser does not support video playback.
               </video>
 
+              {videoContentLayerStyle ? (
+                <div
+                  className="studio-screen__video-content-layer"
+                  data-testid="video-content-layer"
+                  style={videoContentLayerStyle}
+                >
+                  {previewActions.map((action) => (
+                    <NameplateOverlay
+                      key={action.actionId}
+                      action={action}
+                      currentTimeMs={playheadMs}
+                    />
+                  ))}
+                </div>
+              ) : null}
+
               {markerPosition ? (
                 <span
                   className="studio-screen__point-marker"
@@ -286,7 +420,7 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
           <NameplateComposer
             target={pointTarget}
             createActionId={createActionId}
-            onProposal={setProposal}
+            onProposal={onProposal}
           />
           {pointError ? <p role="alert" className="studio-screen__point-error">{pointError}</p> : null}
           {hasPreviewError ? (
@@ -326,26 +460,71 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
               >
                 <strong>{proposal.primaryText}</strong>
                 {proposal.secondaryText ? <span>{proposal.secondaryText}</span> : null}
-                <small>Here · {formatPointTargetTime(proposal.startMs)} · 5 seconds</small>
+                <small>
+                  Here · {formatPointTargetTime(proposal.startMs)} ·{' '}
+                  {formatDuration(proposal.durationMs)}
+                </small>
               </div>
             ) : (
-              <p className="studio-screen__empty-copy">
-                Point at the video, then choose Add text here.
-              </p>
+              <p className="studio-screen__empty-copy">No pending proposal.</p>
             )}
-            <button
-              type="button"
-              disabled
-              aria-label="Accept proposal unavailable"
-              aria-describedby={UNAVAILABLE_DESCRIPTION}
-            >
-              Accept proposal
-            </button>
+            <div className="studio-screen__proposal-actions">
+              <button
+                type="button"
+                disabled={!proposal}
+                aria-label={proposal ? 'Accept proposal' : 'Accept proposal unavailable'}
+                onClick={handleAcceptProposal}
+              >
+                Accept proposal
+              </button>
+              <button type="button" disabled={!proposal} onClick={handleDiscardProposal}>
+                Discard proposal
+              </button>
+            </div>
+            {editError ? <p role="alert" className="studio-screen__edit-error">{editError}</p> : null}
           </section>
+
+          {proposalResult ? (
+            <p
+              ref={proposalResultRef}
+              className="studio-screen__proposal-result"
+              role="status"
+              aria-label="Proposal result"
+              tabIndex={-1}
+            >
+              {proposalResult}
+            </p>
+          ) : null}
 
           <section className="studio-screen__history" aria-labelledby="studio-history-label">
             <h3 id="studio-history-label">History</h3>
-            <p className="studio-screen__empty-copy">No accepted edits.</p>
+            {history.accepted.length > 0 ? (
+              <ol className="studio-screen__history-list">
+                {history.accepted.map((action) => (
+                  <li key={action.actionId}>{action.primaryText}</li>
+                ))}
+              </ol>
+            ) : (
+              <p className="studio-screen__empty-copy">No accepted edits.</p>
+            )}
+            <div className="studio-screen__history-actions">
+              <button
+                type="button"
+                aria-label="Undo edit"
+                disabled={Boolean(proposal) || history.accepted.length === 0}
+                onClick={onUndo}
+              >
+                Undo
+              </button>
+              <button
+                type="button"
+                aria-label="Redo edit"
+                disabled={Boolean(proposal) || history.redoStack.length === 0}
+                onClick={onRedo}
+              >
+                Redo
+              </button>
+            </div>
           </section>
 
           <div className="studio-screen__chat">
@@ -369,7 +548,7 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
           </div>
 
           <p id={UNAVAILABLE_DESCRIPTION} className="studio-screen__availability-note">
-            Chat, proposal acceptance, and export are not available yet.
+            Chat and export are not available yet.
           </p>
         </aside>
       </div>

@@ -15,9 +15,10 @@ Last updated: 2026-07-13
 | G1-01B | G1 | Runnable Home-to-Studio web shell on strict port 2000 | In progress | Owner rejected subtle motion twice; unsupported native transition API was verified and a gated fallback plus direct-control spring correction now awaits owner re-test |
 | G1-02 | G1 | Renderer comparison harness and fixtures | In progress | 11 focused hybrid tests and 45 renderer tests; static fixture has structural hybrid evidence; pixel fidelity, real-video/audio, motion, and HyperFrames runtime remain open |
 | G1-03 | G1 | Architecture decision record for renderer | Complete | ADR-001 narrowly selects browser preview plus FFmpeg export for the first static-nameplate loop |
-| G2-01 | G2 | Canonical point/nameplate action and immutable history package | Complete | 34 edit-domain tests pass; Studio uses canonical proposal validation while accepted history, preview, renderer, and persistence remain unconnected |
+| G2-01 | G2 | Canonical point/nameplate action and immutable history package | Complete | 34 edit-domain tests pass; Studio now uses canonical proposal, acceptance, undo, and redo in memory while renderer and persistence remain unconnected |
 | G2-02 | G2 | Explicit rendered-video Point mode | Complete | 11 pure point-target tests plus 16 Studio tests (27 focused), 109 full workspace tests, both builds, governance, and diff checks pass; live owner workflow remains unverified |
-| G2-03 | G2 | Bounded manual nameplate proposal | Complete | 10 composer tests plus 18 Studio tests pass; 121 full workspace tests, both builds, governance, diff, spec, and quality reviews pass; proposal remains unaccepted and owner/live-browser verification is pending |
+| G2-03 | G2 | Bounded manual nameplate proposal | Complete | 10 composer tests plus 18 Studio tests pass; this independent slice creates a validated pending proposal without accepting it |
+| G2-04 | G2 | Typed nameplate preview and canonical in-memory history loop | Complete | 54 focused Task 5 tests and 147 full workspace tests pass; both builds, governance, diff, spec review, and quality re-review pass; persistence, render, export, owner placement approval, and owner live-browser verification remain pending |
 
 ## Status rules
 
