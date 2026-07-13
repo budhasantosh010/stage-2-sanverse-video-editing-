@@ -324,7 +324,8 @@
 
 .studio-screen__draft,
 .studio-screen__proposal,
-.studio-screen__history {
+.studio-screen__history,
+.studio-screen__export-result {
   margin-top: 20px;
   padding-top: 18px;
   border-top: 1px solid var(--color-border-soft);
@@ -332,7 +333,8 @@
 
 .studio-screen__draft p,
 .studio-screen__proposal p,
-.studio-screen__history p {
+.studio-screen__history p,
+.studio-screen__export-result p {
   margin: 0;
   font-size: 0.88rem;
   line-height: 1.55;
@@ -367,6 +369,46 @@
 .studio-screen__proposal-summary span,
 .studio-screen__proposal-summary small {
   display: block;
+}
+
+.studio-screen__export-progress,
+.studio-screen__export-error,
+.studio-screen__export-ready {
+  margin-top: 12px;
+  border-left: 3px solid var(--color-ink);
+  padding: 10px 0 10px 12px;
+}
+
+.studio-screen__export-error {
+  border-left-color: var(--color-danger, #8b1e1e);
+}
+
+.studio-screen__export-ready {
+  display: grid;
+  gap: 5px;
+  font-size: 0.78rem;
+}
+
+.studio-screen__export-ready a {
+  width: fit-content;
+  margin-top: 5px;
+  border: 1px solid var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-surface);
+  padding: 9px 12px;
+  text-decoration: none;
+  font-weight: 700;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-spring), box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.studio-screen__export-ready a:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 rgb(0 0 0 / 14%);
+}
+
+.studio-screen__export-ready a:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
 }
 
 .studio-screen__edit-error {

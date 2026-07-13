@@ -5,6 +5,8 @@ import './HomeScreen.css'
 
 export type HomeScreenProps = {
   draftRequest: string
+  isStarting: boolean
+  startError: string
   onDraftRequestChange(value: string): void
   onStartProject(file: File): void
 }
@@ -13,6 +15,8 @@ const MP4_ERROR = 'Choose an MP4 video.'
 
 export function HomeScreen({
   draftRequest,
+  isStarting,
+  startError,
   onDraftRequestChange,
   onStartProject,
 }: HomeScreenProps) {
@@ -20,6 +24,7 @@ export function HomeScreen({
   const [fileError, setFileError] = useState('')
 
   function startWithFile(file: File): void {
+    if (isStarting) return
     try {
       validateLocalVideo(file)
       setFileError('')
@@ -108,19 +113,27 @@ export function HomeScreen({
             </div>
 
             <label className="home-screen__choose-button">
-              Choose video
+              {isStarting ? 'Importing…' : 'Choose video'}
               <input
                 className="home-screen__file-input"
                 type="file"
+                aria-label="Choose video"
                 accept="video/mp4,.mp4"
+                disabled={isStarting}
                 onChange={handleFileChange}
               />
             </label>
           </div>
 
-          {fileError ? (
+          {isStarting ? (
+            <p className="home-screen__progress" role="status">
+              Importing video securely…
+            </p>
+          ) : null}
+
+          {fileError || startError ? (
             <p className="home-screen__error" role="alert">
-              {fileError}
+              {fileError || startError}
             </p>
           ) : null}
         </div>

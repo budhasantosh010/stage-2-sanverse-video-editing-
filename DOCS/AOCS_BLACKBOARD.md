@@ -26,9 +26,7 @@ This is a compact separation of facts, owner requirements, inferences, proposals
 
 ## Approved proposals not yet implemented
 
-- Immutable local project intake behind a replaceable repository port.
-- Product FFmpeg adapter behind the renderer port.
-- Completion of the first real exported nameplate vertical slice.
+- None inside the bounded first pointed-nameplate implementation. Owner validation remains a gate, not missing implementation.
 
 ## Unknowns that must be measured
 
@@ -47,8 +45,20 @@ This is a compact separation of facts, owner requirements, inferences, proposals
 - Verified boundary: state is in memory only and is discarded on Back, reload, or project replacement.
 - Provisional compatibility assumption: point `x` and `y` currently place the overlay's top-left corner because the selected renderer spike uses that meaning.
 - Red-team risk: silently treating top-left placement as owner-approved would freeze a possibly awkward interaction and allow clipping near the right/bottom edge.
-- Accepted mitigation: document the assumption, preserve existing action meaning, and require owner validation or an explicit versioned anchor field before schema freeze or Task 7.
-- Next highest-leverage slice: Task 6 immutable local project intake, because real rendering cannot safely consume an arbitrary browser-local path or mutable source file.
+- Accepted mitigation: document the assumption, preserve existing action meaning, clamp export placement inside the frame, and require owner validation or an explicit versioned anchor field before schema freeze or Task 8.
+- Completed leverage slice: Task 6 now provides immutable local project intake and a controlled media source; this does not persist edit history or render an output.
+- Runtime correction: a bounded real-video-derived HTTP check caught a Node strip-only syntax incompatibility missed by the earlier test/build boundary; the exact configured entry graph and MP4/hash/range path now pass.
+- Completed leverage slice: Task 7 translates validated accepted history through the replaceable FFmpeg renderer adapter and proves bounded real-video-derived reproducibility with audio.
+- Red-team corrections: user text/font paths are externalized into a private render directory; subprocess cancellation waits for close; hashing and the atomic commit point remain cancellable; lexical output aliases are canonicalized; private partial files reject symlink/hard-link substitution; publication cannot overwrite an existing export.
+- Completed leverage slice: Task 8 connects browser history and controlled project media to render progress, recoverable failure, and a downloadable result without pretending chat or AI exists.
+- Remaining human gate: the owner must run the representative upload, point, accept, export, download, and playback loop; automated composition does not establish usability or pixel fidelity.
+
+## Owner-authorized early vertical-slice sequencing
+
+- Owner requirement: continue building the real edit workflow while motion polish and owner re-test remain open.
+- Verified plan boundary: Tasks 2–8 form one approved manual vertical slice and include capabilities mapped to G2/G3.
+- Status rule: implementing those capabilities early does not close G1 and does not mark G2/G3 complete.
+- Prohibited inference: this authorization does not permit AI integration, broad editing primitives, accounts, billing, cloud operations, or any unsupported accuracy claim.
 
 ## AOCS Omega routing — 2026-07-12 runnable web shell
 

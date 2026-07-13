@@ -9,26 +9,26 @@ afterEach(() => {
 })
 
 describe('validateLocalVideo', () => {
-  it('accepts a file with the MP4 MIME type', () => {
-    const file = new File(['video'], 'cleaned-video.bin', { type: 'video/mp4' })
+  it('requires an MP4 filename and accepts its advisory MIME type', () => {
+    const file = new File(['video'], 'cleaned-video.mp4', { type: 'video/mp4' })
 
     expect(() => validateLocalVideo(file)).not.toThrow()
   })
 
-  it.each(['cleaned-video.mp4', 'CLEANED-VIDEO.MP4'])(
-    'accepts %s when the browser provides no MIME type',
-    (name) => {
-      const file = new File(['video'], name, { type: '' })
+  it.each([
+    ['cleaned-video.mp4', ''],
+    ['CLEANED-VIDEO.MP4', 'application/octet-stream'],
+  ])('accepts %s with advisory MIME type %s', (name, type) => {
+      const file = new File(['video'], name, { type })
 
       expect(() => validateLocalVideo(file)).not.toThrow()
-    },
-  )
+  })
 
   it.each([
     ['cleaned-video.mov', ''],
     ['cleaned-video', ''],
     ['notes.txt', 'text/plain'],
-    ['cleaned-video.mp4', 'application/octet-stream'],
+    ['cleaned-video.bin', 'video/mp4'],
     ['cleaned-video.webm', 'video/webm'],
   ])('rejects %s with MIME type %s', (name, type) => {
     const file = new File(['not-mp4'], name, { type })

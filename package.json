@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace apps/web",
+    "dev": "node scripts/dev.mjs",
     "test": "npm run test --workspaces --if-present --",
     "build": "npm run build --workspaces --if-present"
   }

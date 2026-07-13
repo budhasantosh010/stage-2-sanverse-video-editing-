@@ -16,6 +16,7 @@ export type HomeState = {
 export type StudioState = {
   screen: 'studio'
   project: {
+    id: string
     name: string
     mediaUrl: string
     draftRequest: string
@@ -28,6 +29,7 @@ export type StudioState = {
 export type AppState = HomeState | StudioState
 
 type LocalProjectInput = {
+  id: string
   name: string
   mediaUrl: string
   draftRequest?: string
@@ -67,6 +69,7 @@ export function openLocalProject(
   return {
     screen: 'studio',
     project: {
+      id: input.id,
       name: input.name,
       mediaUrl: input.mediaUrl,
       draftRequest: input.draftRequest ?? state.draftRequest,

@@ -26,6 +26,7 @@ const proposal = {
 
 function createStudioState() {
   return openLocalProject(createInitialState(), {
+    id: 'project_1234567890abcdef',
     name: 'cleaned.mp4',
     mediaUrl: 'blob:test',
   })
@@ -51,12 +52,14 @@ describe('app state', () => {
 
     expect(
       openLocalProject(home, {
+        id: 'project_1234567890abcdef',
         name: 'cleaned.mp4',
         mediaUrl: 'blob:test',
       }),
     ).toEqual({
       screen: 'studio',
       project: {
+        id: 'project_1234567890abcdef',
         name: 'cleaned.mp4',
         mediaUrl: 'blob:test',
         draftRequest: 'Add my name here',
@@ -74,6 +77,7 @@ describe('app state', () => {
   it('uses an explicitly supplied draft when opening a local project', () => {
     expect(
       openLocalProject(createInitialState(), {
+        id: 'project_1234567890abcdef',
         name: 'cleaned.mp4',
         mediaUrl: 'blob:test',
         draftRequest: 'Remove the long pause',
@@ -81,6 +85,7 @@ describe('app state', () => {
     ).toEqual({
       screen: 'studio',
       project: {
+        id: 'project_1234567890abcdef',
         name: 'cleaned.mp4',
         mediaUrl: 'blob:test',
         draftRequest: 'Remove the long pause',
@@ -97,6 +102,7 @@ describe('app state', () => {
 
   it('updates only the Studio project draft', () => {
     const studio = openLocalProject(createInitialState(), {
+      id: 'project_1234567890abcdef',
       name: 'cleaned.mp4',
       mediaUrl: 'blob:test',
     })
@@ -104,6 +110,7 @@ describe('app state', () => {
     expect(updateDraftRequest(studio, 'Add captions')).toEqual({
       screen: 'studio',
       project: {
+        id: 'project_1234567890abcdef',
         name: 'cleaned.mp4',
         mediaUrl: 'blob:test',
         draftRequest: 'Add captions',
@@ -120,6 +127,7 @@ describe('app state', () => {
 
   it('returns from Studio to a clean Home state', () => {
     const studio = openLocalProject(createInitialState(), {
+      id: 'project_1234567890abcdef',
       name: 'cleaned.mp4',
       mediaUrl: 'blob:test',
       draftRequest: 'Add my name here',
@@ -223,12 +231,14 @@ if (false) {
   void updateUnionDraft
 
   const studio = openLocalProject(createInitialState(), {
+    id: 'project_1234567890abcdef',
     name: 'cleaned.mp4',
     mediaUrl: 'blob:test',
   })
 
   // @ts-expect-error Opening a project is exclusively a Home-to-Studio transition.
   openLocalProject(studio, {
+    id: 'project_aaaaaaaaaaaaaaaa',
     name: 'replacement.mp4',
     mediaUrl: 'blob:replacement',
   })

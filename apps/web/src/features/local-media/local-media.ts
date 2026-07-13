@@ -1,10 +1,10 @@
 const MP4_ERROR = 'Choose an MP4 video.'
 
 export function validateLocalVideo(file: File): void {
-  const hasMp4MimeType = file.type === 'video/mp4'
-  const hasMp4NameWithoutMimeType = file.type === '' && /\.mp4$/i.test(file.name)
+  const hasMp4Name = /\.mp4$/i.test(file.name)
+  const hasAllowedMimeType = ['', 'video/mp4', 'application/octet-stream'].includes(file.type)
 
-  if (!hasMp4MimeType && !hasMp4NameWithoutMimeType) {
+  if (!hasMp4Name || !hasAllowedMimeType) {
     throw new Error(MP4_ERROR)
   }
 }

@@ -1,6 +1,6 @@
 # Build Tracker
 
-Last updated: 2026-07-13
+Last updated: 2026-07-14
 
 | ID | Goal | Deliverable | Status | Evidence |
 |---|---|---|---|---|
@@ -19,6 +19,9 @@ Last updated: 2026-07-13
 | G2-02 | G2 | Explicit rendered-video Point mode | Complete | 11 pure point-target tests plus 16 Studio tests (27 focused), 109 full workspace tests, both builds, governance, and diff checks pass; live owner workflow remains unverified |
 | G2-03 | G2 | Bounded manual nameplate proposal | Complete | 10 composer tests plus 18 Studio tests pass; this independent slice creates a validated pending proposal without accepting it |
 | G2-04 | G2 | Typed nameplate preview and canonical in-memory history loop | Complete | 54 focused Task 5 tests and 147 full workspace tests pass; both builds, governance, diff, spec review, and quality re-review pass; persistence, render, export, owner placement approval, and owner live-browser verification remain pending |
+| G2-05 | G2 | Immutable local project intake and controlled media API | Complete | 30 API + 118 web + 34 edit-domain tests (182 total), all three builds, spec review, and quality/security re-review pass; configured runtime smoke and a 142,738-byte real-video-derived HTTP/hash/range check pass; full-file performance, edit history, render, and export remain pending |
+| G3-01 | G3 | Replaceable deterministic FFmpeg renderer adapter | Complete | Two real-video-derived renders have identical hashes and preserve 640 by 360, two-second duration, and audio; API/domain builds, web type-check, direct cancellation/path/publication checks, governance, static scan, diff check, and independent final re-review pass |
+| G3-02 | G3 | Owner-facing accepted-history export and download | In progress | Implementation, direct HTTP composition, handle-bound serving checks, and independent final review pass; production FFmpeg has separate Task 7 real-media evidence; owner E4 workflow and pixel review remain open |
 
 ## Status rules
 

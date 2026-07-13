@@ -10,6 +10,8 @@ afterEach(cleanup)
 function renderHome(overrides: Partial<ComponentProps<typeof HomeScreen>> = {}) {
   const props: ComponentProps<typeof HomeScreen> = {
     draftRequest: '',
+    isStarting: false,
+    startError: '',
     onDraftRequestChange: vi.fn(),
     onStartProject: vi.fn(),
     ...overrides,
@@ -124,5 +126,13 @@ describe('HomeScreen', () => {
 
     expect(screen.getByRole('heading', { name: /recent projects/i })).toBeInTheDocument()
     expect(screen.getByText(/no recent projects yet/i)).toBeInTheDocument()
+  })
+
+  it('shows import progress, disables another selection, and exposes a recoverable failure', () => {
+    renderHome({ isStarting: true, startError: 'The video could not be imported. Try again.' })
+
+    expect(screen.getByRole('status')).toHaveTextContent(/importing video/i)
+    expect(screen.getByLabelText(/choose video/i)).toBeDisabled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/try again/i)
   })
 })

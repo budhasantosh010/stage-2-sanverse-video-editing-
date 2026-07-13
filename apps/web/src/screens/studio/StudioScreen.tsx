@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AddNameplateAction } from '@sanverse/edit-domain'
 import type { EditHistory } from '@sanverse/edit-domain/history'
 import type { StudioState } from '../../app/app-state'
+import type { ProjectExportState } from '../../features/project-export/project-export'
 import { NameplateComposer } from '../../features/nameplate/NameplateComposer'
 import { NameplateOverlay } from '../../features/nameplate/NameplateOverlay'
 import {
@@ -22,10 +23,13 @@ export type StudioScreenProps = {
   onAcceptProposal(): void
   onUndo(): void
   onRedo(): void
+  exportState: ProjectExportState
+  onExport(): void
   onBack(): void
 }
 
 const UNAVAILABLE_DESCRIPTION = 'studio-unavailable-description'
+const EXPORT_DESCRIPTION = 'studio-export-description'
 const KEYBOARD_POINT_STEP = 0.05
 
 function createActionId() {
@@ -92,6 +96,8 @@ export function StudioScreen({
   onAcceptProposal,
   onUndo,
   onRedo,
+  exportState,
+  onExport,
   onBack,
 }: StudioScreenProps) {
   const draftRequest = project.draftRequest.trim()
@@ -202,6 +208,8 @@ export function StudioScreen({
   const draftPosition = isPointMode && video ? projectPointOntoVideoElement(draftPoint, video) : null
   const videoContentLayerStyle = video ? getVideoContentLayerStyle(video) : null
   const previewActions = proposal ? [...history.accepted, proposal] : history.accepted
+  const isRendering = exportState.status === 'rendering'
+  const canExport = history.accepted.length > 0 && !proposal && !isRendering
 
   function cancelPointMode() {
     pointModeButtonRef.current?.focus()
@@ -319,11 +327,12 @@ export function StudioScreen({
         <button
           className="studio-screen__export"
           type="button"
-          disabled
-          aria-label="Export unavailable"
-          aria-describedby={UNAVAILABLE_DESCRIPTION}
+          disabled={!canExport}
+          aria-label={isRendering ? 'Exporting video' : canExport ? 'Export video' : 'Export unavailable'}
+          aria-describedby={!canExport && !isRendering ? EXPORT_DESCRIPTION : undefined}
+          onClick={onExport}
         >
-          Export
+          {isRendering ? 'Exporting…' : 'Export'}
         </button>
       </header>
 
@@ -527,6 +536,28 @@ export function StudioScreen({
             </div>
           </section>
 
+          <section className="studio-screen__export-result" aria-labelledby="studio-export-label">
+            <h3 id="studio-export-label">Export</h3>
+            <p id={EXPORT_DESCRIPTION} className="studio-screen__empty-copy">
+              {history.accepted.length === 0
+                ? 'Accept at least one edit before exporting.'
+                : proposal
+                  ? 'Accept or discard the pending proposal before exporting.'
+                  : 'Your accepted edits are ready to render.'}
+            </p>
+            {exportState.status === 'rendering' ? (
+              <p className="studio-screen__export-progress" role="status" aria-label="Export status">Rendering and verifying your MP4…</p>
+            ) : null}
+            {exportState.status === 'error' ? <p className="studio-screen__export-error" role="alert">{exportState.message}</p> : null}
+            {exportState.status === 'ready' ? (
+              <div className="studio-screen__export-ready" role="status" aria-label="Export status">
+                <strong>Export ready</strong>
+                <span>{exportState.result.width} × {exportState.result.height} · {Math.round(exportState.result.durationMs / 1000)}s</span>
+                <a href={exportState.result.mediaUrl} download="sanverse-edited.mp4">Download MP4</a>
+              </div>
+            ) : null}
+          </section>
+
           <div className="studio-screen__chat">
             <label htmlFor="studio-chat">Chat</label>
             <textarea
@@ -548,7 +579,7 @@ export function StudioScreen({
           </div>
 
           <p id={UNAVAILABLE_DESCRIPTION} className="studio-screen__availability-note">
-            Chat and export are not available yet.
+            Chat is not available yet.
           </p>
         </aside>
       </div>

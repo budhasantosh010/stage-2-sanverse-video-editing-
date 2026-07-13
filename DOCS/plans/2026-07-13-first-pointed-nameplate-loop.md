@@ -2,7 +2,9 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
-**Status:** In progress. Tasks 1 through 5 are complete; Tasks 6 through 8 remain pending. This does not mark the G2 or G3 macro exit gates complete.
+**Status:** Implementation complete for Tasks 1 through 8. Task 8's owner E4 workflow gate remains open, so this does not mark the G2 or G3 macro exit gates complete.
+
+**Owner-authorized sequencing:** The owner explicitly instructed the team to continue the real edit workflow while G1 motion and owner-acceptance gates remain open. Tasks 2–8 may therefore implement bounded capabilities that belong to later macro goals, but this early implementation does not change the macro-goal statuses or waive their exit evidence.
 
 **Goal:** Let a non-editor open a real MP4, pause at a moment, point at a position, create a static nameplate through a bounded manual action, preview it, accept or undo it, and export a reproducible MP4.
 

@@ -4,7 +4,7 @@ import {
   type ActionValidationError,
   type AddNameplateAction,
   type Result,
-} from './actions'
+} from './actions.ts'
 
 export type EditHistory = {
   readonly accepted: readonly AddNameplateAction[]

@@ -14,6 +14,20 @@ const originalStartViewTransition = Object.getOwnPropertyDescriptor(
 
 let createObjectURL: ReturnType<typeof vi.fn>
 let revokeObjectURL: ReturnType<typeof vi.fn>
+let fetchMock: ReturnType<typeof vi.fn>
+
+function projectResponse(name = 'cleaned.mp4', mediaUrl = '/api/projects/project_1234567890abcdef/media') {
+  const id = mediaUrl.split('/')[3]
+  return new Response(JSON.stringify({ id, originalFilename: name, mediaUrl, createdAt: '2026-07-13T00:00:00.000Z', sizeBytes: 24, sha256: 'a'.repeat(64) }), { status: 201, headers: { 'content-type': 'application/json' } })
+}
+
+function exportResponse() {
+  return new Response(JSON.stringify({
+    id: 'export_1234567890abcdef',
+    mediaUrl: '/api/projects/project_1234567890abcdef/exports/export_1234567890abcdef/media',
+    sha256: 'b'.repeat(64), width: 1920, height: 1080, durationMs: 60_000, hasAudio: true,
+  }), { status: 201, headers: { 'content-type': 'application/json' } })
+}
 
 function restoreUrlMethod(
   name: 'createObjectURL' | 'revokeObjectURL',
@@ -30,6 +44,8 @@ function restoreUrlMethod(
 beforeEach(() => {
   createObjectURL = vi.fn(() => 'blob:cleaned-video')
   revokeObjectURL = vi.fn()
+  fetchMock = vi.fn().mockResolvedValue(projectResponse())
+  vi.stubGlobal('fetch', fetchMock)
 
   Object.defineProperty(URL, 'createObjectURL', {
     configurable: true,
@@ -50,6 +66,7 @@ afterEach(() => {
   } else {
     Reflect.deleteProperty(document, 'startViewTransition')
   }
+  vi.unstubAllGlobals()
 })
 
 describe('App', () => {
@@ -64,10 +81,10 @@ describe('App', () => {
     await user.type(draft, 'Tighten the opening pause.')
     await user.upload(screen.getByLabelText(/choose video/i), file)
 
-    expect(createObjectURL).toHaveBeenCalledOnce()
-    expect(createObjectURL).toHaveBeenCalledWith(file)
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(createObjectURL).not.toHaveBeenCalled()
     expect(screen.getByText('cleaned.mp4')).toBeInTheDocument()
-    expect(container.querySelector('video')).toHaveAttribute('src', 'blob:cleaned-video')
+    expect(container.querySelector('video')).toHaveAttribute('src', '/api/projects/project_1234567890abcdef/media')
     expect(screen.getByText(/draft — not executed/i)).toBeInTheDocument()
     expect(screen.getByText('Tighten the opening pause.')).toBeInTheDocument()
 
@@ -79,8 +96,7 @@ describe('App', () => {
     expect(
       screen.getByRole('textbox', { name: /describe what you want to change/i }),
     ).toHaveValue('')
-    expect(revokeObjectURL).toHaveBeenCalledOnce()
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:cleaned-video')
+    expect(revokeObjectURL).not.toHaveBeenCalled()
   })
 
   it('releases the current local video exactly once when unmounted', async () => {
@@ -95,8 +111,7 @@ describe('App', () => {
     await user.upload(screen.getByLabelText(/choose video/i), file)
     unmount()
 
-    expect(revokeObjectURL).toHaveBeenCalledOnce()
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:cleaned-video')
+    expect(revokeObjectURL).not.toHaveBeenCalled()
   })
 
   it('keeps an invalid file on Home without allocating a local URL', async () => {
@@ -113,12 +128,15 @@ describe('App', () => {
       screen.getByRole('heading', { name: /what do you want to edit today/i }),
     ).toBeInTheDocument()
     expect(createObjectURL).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('lets only the latest pending video selection enter Studio', async () => {
-    const user = userEvent.setup()
+  it('allows only one project intake request at a time', async () => {
     const pendingUpdates: Array<() => void> = []
-    createObjectURL.mockReturnValueOnce('blob:first-video').mockReturnValueOnce('blob:second-video')
+    let resolveFirst!: (value: Response) => void
+    fetchMock
+      .mockReset()
+      .mockReturnValueOnce(new Promise<Response>((resolve) => { resolveFirst = resolve }))
     Object.defineProperty(document, 'startViewTransition', {
       configurable: true,
       value: vi.fn((update: () => void) => {
@@ -128,20 +146,19 @@ describe('App', () => {
     const { container } = render(<App />)
     const input = screen.getByLabelText(/choose video/i)
 
-    await user.upload(input, new File(['first'], 'first.mp4', { type: 'video/mp4' }))
-    await user.upload(input, new File(['second'], 'second.mp4', { type: 'video/mp4' }))
+    act(() => {
+      fireEvent.change(input, { target: { files: [new File(['first'], 'first.mp4', { type: 'video/mp4' })] } })
+      fireEvent.change(input, { target: { files: [new File(['second'], 'second.mp4', { type: 'video/mp4' })] } })
+    })
+    expect(fetchMock).toHaveBeenCalledOnce()
+    resolveFirst(projectResponse('first.mp4', '/api/projects/project_aaaaaaaaaaaaaaaa/media'))
+    await act(async () => undefined)
 
-    expect(pendingUpdates).toHaveLength(2)
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:first-video')
+    expect(pendingUpdates).toHaveLength(1)
 
     act(() => pendingUpdates[0]())
-    expect(
-      screen.getByRole('heading', { name: /what do you want to edit today/i }),
-    ).toBeInTheDocument()
-
-    act(() => pendingUpdates[1]())
-    expect(screen.getByText('second.mp4')).toBeInTheDocument()
-    expect(container.querySelector('video')).toHaveAttribute('src', 'blob:second-video')
+    expect(screen.getByText('first.mp4')).toBeInTheDocument()
+    expect(container.querySelector('video')).toHaveAttribute('src', '/api/projects/project_aaaaaaaaaaaaaaaa/media')
   })
 
   it('accepts, undoes, redoes, and resets one nameplate through App-owned state', async () => {
@@ -197,7 +214,7 @@ describe('App', () => {
     expect(screen.getByTestId('nameplate-overlay')).toHaveTextContent('Santosh')
 
     await user.click(screen.getByRole('button', { name: /back to home/i }))
-    createObjectURL.mockReturnValueOnce('blob:second-video')
+    fetchMock.mockResolvedValueOnce(projectResponse('second.mp4', '/api/projects/project_bbbbbbbbbbbbbbbb/media'))
     await user.upload(
       screen.getByLabelText(/choose video/i),
       new File(['video'], 'second.mp4', { type: 'video/mp4' }),
@@ -205,5 +222,55 @@ describe('App', () => {
 
     expect(screen.getByText(/no pending proposal/i)).toBeInTheDocument()
     expect(screen.getByText(/no accepted edits/i)).toBeInTheDocument()
+  })
+
+  it('stays on Home with visible progress and a recoverable import failure', async () => {
+    const user = userEvent.setup()
+    let rejectUpload!: (reason: Error) => void
+    fetchMock.mockReset().mockReturnValue(new Promise((_resolve, reject) => { rejectUpload = reject }))
+    render(<App />)
+
+    await user.upload(screen.getByLabelText(/choose video/i), new File(['video'], 'clip.mp4', { type: 'video/mp4' }))
+    expect(screen.getByRole('status')).toHaveTextContent(/importing video/i)
+    expect(screen.getByLabelText(/choose video/i)).toBeDisabled()
+
+    rejectUpload(new Error('offline'))
+    await act(async () => undefined)
+    expect(screen.getByRole('alert')).toHaveTextContent(/could not import/i)
+    expect(screen.getByLabelText(/choose video/i)).toBeEnabled()
+    expect(screen.getByRole('heading', { name: /what do you want to edit today/i })).toBeInTheDocument()
+  })
+
+  it('completes import, accepted edit, export progress, and downloadable MP4 as one loop', async () => {
+    const user = userEvent.setup()
+    let resolveExport!: (response: Response) => void
+    fetchMock.mockReset()
+      .mockResolvedValueOnce(projectResponse())
+      .mockReturnValueOnce(new Promise<Response>((resolve) => { resolveExport = resolve }))
+    const { container } = render(<App />)
+
+    await user.upload(screen.getByLabelText(/choose video/i), new File(['video'], 'cleaned.mp4', { type: 'video/mp4' }))
+    const video = container.querySelector('video') as HTMLVideoElement
+    Object.defineProperties(video, {
+      videoWidth: { configurable: true, value: 1920 }, videoHeight: { configurable: true, value: 1080 },
+      currentTime: { configurable: true, value: 1, writable: true },
+    })
+    vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+    vi.spyOn(video, 'getBoundingClientRect').mockReturnValue({ x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 400, width: 400, height: 400, toJSON: () => ({}) })
+    fireEvent.loadedMetadata(video)
+    await user.click(screen.getByRole('button', { name: /enter point mode/i }))
+    fireEvent.click(screen.getByRole('button', { name: /choose a point/i }), { clientX: 200, clientY: 200 })
+    await user.click(screen.getByRole('button', { name: /add text here/i }))
+    await user.type(screen.getByRole('textbox', { name: /^main text$/i }), 'Santosh')
+    await user.click(screen.getByRole('button', { name: /create proposal/i }))
+    await user.click(screen.getByRole('button', { name: /^accept proposal$/i }))
+
+    await user.click(screen.getByRole('button', { name: /export video/i }))
+    expect(screen.getByRole('status', { name: /export status/i })).toHaveTextContent(/rendering/i)
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/projects/project_1234567890abcdef/exports', expect.objectContaining({ method: 'POST' }))
+
+    resolveExport(exportResponse())
+    await act(async () => undefined)
+    expect(screen.getByRole('link', { name: /download mp4/i })).toHaveAttribute('href', '/api/projects/project_1234567890abcdef/exports/export_1234567890abcdef/media')
   })
 })

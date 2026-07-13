@@ -10,11 +10,12 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 - Completed macro stage: **G0 — Foundation and continuity**
 - Active macro stage: **G1 — Runnable web UX validation and renderer feasibility**
-- Product code: a runnable browser-only Home-to-Studio frontend exists at strict http://localhost:2000. It can capture one point, create a bounded nameplate proposal, preview it at the typed time/position, accept it into canonical in-memory history, and undo/redo it. It is not yet a persisted editor or production render engine.
-- Immediate next gate: add immutable local project intake behind a same-origin API boundary, then connect accepted history to real FFmpeg export. Motion acceptance and the exact click-to-nameplate anchor meaning remain open owner gates.
+- Product code: a runnable local web application exists at strict http://localhost:2000. It imports an MP4 through a loopback-only API into an immutable project-owned copy, supports point capture, a bounded nameplate proposal, typed preview, exactly-once acceptance, in-memory undo/redo, and now sends accepted history through the production FFmpeg adapter to a downloadable MP4.
+- Immediate next gate: the owner runs the complete upload-to-download workflow on representative footage. Motion acceptance, preview/export fidelity, render time, and the exact click-to-nameplate anchor meaning remain open owner gates.
 - Verified boundary: the first owner real-video walkthrough reached Studio and exposed concrete UX failures; the corrective code has automated evidence, while owner acceptance of the refinement is pending.
-- Absent capabilities: no backend, project-owned media copy, persistence, database, AI, product renderer integration, rendered export, accounts, or SaaS operations exist. Browser state is discarded on Back, reload, or project replacement.
-- G1 boundary: validate the runnable workflow and renderer architecture; do not silently expand into G2's canonical project engine, AI, persistence, or real editing.
+- Present persistence boundary: local project media and its integrity manifest persist under ignored `.sanverse-data/`; accepted edit history is still in memory and is discarded on Back, reload, or project replacement.
+- Absent capabilities: no persisted edit history, database, AI, accounts, or SaaS operations exist. Export is clickable, but owner usability and preview/export fidelity are not yet accepted.
+- Goal-status boundary: G1 remains open until its owner workflow and renderer evidence gates close. The owner has nevertheless explicitly authorized continuing Tasks 2–8 of the first manual vertical slice, including early canonical-project work, so implementation may proceed without claiming that G1 closed or that the G2/G3 macro exit gates were achieved. AI, accounts, and broad primitive work remain out of scope.
 
 ## Read in this order
 

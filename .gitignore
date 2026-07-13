@@ -20,6 +20,7 @@ __pycache__/
 .ruff_cache/
 
 # Local application state and generated media
+.sanverse-data/
 *.db
 *.db-shm
 *.db-wal

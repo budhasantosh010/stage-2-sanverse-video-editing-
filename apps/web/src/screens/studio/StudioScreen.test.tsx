@@ -2,7 +2,7 @@ import type { ComponentProps } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createHistory, type AddNameplateAction } from '@sanverse/edit-domain'
+import { accept, createHistory, type AddNameplateAction } from '@sanverse/edit-domain'
 
 import { StudioScreen } from './StudioScreen'
 
@@ -75,6 +75,7 @@ function prepareVideoForPointing(video: HTMLVideoElement, currentTime = 12.4) {
 function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = {}) {
   const props: ComponentProps<typeof StudioScreen> = {
     project: {
+      id: 'project_1234567890abcdef',
       name: 'cleaned-interview.mp4',
       mediaUrl: 'blob:cleaned-interview',
       draftRequest: 'Tighten the opening pause.',
@@ -87,6 +88,8 @@ function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = 
     onAcceptProposal: vi.fn(),
     onUndo: vi.fn(),
     onRedo: vi.fn(),
+    exportState: { status: 'idle' },
+    onExport: vi.fn(),
     onBack: vi.fn(),
     ...overrides,
   }
@@ -146,6 +149,7 @@ describe('StudioScreen', () => {
   it('shows an honest prompt placeholder when no draft was supplied', () => {
     renderStudio({
       project: {
+        id: 'project_1234567890abcdef',
         name: 'cleaned-interview.mp4',
         mediaUrl: 'blob:cleaned-interview',
         draftRequest: '   ',
@@ -155,7 +159,7 @@ describe('StudioScreen', () => {
     expect(screen.getByText(/no draft request yet/i)).toBeInTheDocument()
   })
 
-  it('keeps export and conversational editing controls explicitly unavailable', () => {
+  it('keeps export unavailable without accepted edits and chat explicitly unavailable', () => {
     renderStudio()
 
     const exportButton = screen.getByRole('button', { name: /export unavailable/i })
@@ -167,8 +171,34 @@ describe('StudioScreen', () => {
     expect(chat).toBeDisabled()
     expect(send).toBeDisabled()
     expect(accept).toBeDisabled()
-    expect(exportButton).toHaveAccessibleDescription(/not available yet/i)
+    expect(exportButton).toHaveAccessibleDescription(/accept at least one edit/i)
     expect(chat).toHaveAccessibleDescription(/not available yet/i)
+  })
+
+  it('presents export progress, recoverable failure, and a downloadable result', async () => {
+    const user = userEvent.setup()
+    const accepted = accept(createHistory(), nameplate)
+    if (!accepted.ok) throw new Error('fixture failed')
+    const onExport = vi.fn()
+    const { rerender, props } = renderStudio({ history: accepted.value, onExport })
+
+    await user.click(screen.getByRole('button', { name: /export video/i }))
+    expect(onExport).toHaveBeenCalledOnce()
+
+    rerender(<StudioScreen {...props} history={accepted.value} exportState={{ status: 'rendering' }} />)
+    expect(screen.getByRole('status', { name: /export status/i })).toHaveTextContent(/rendering/i)
+    expect(screen.getByRole('button', { name: /exporting video/i })).toBeDisabled()
+
+    rerender(<StudioScreen {...props} history={accepted.value} exportState={{ status: 'error', message: 'We could not export the video. Your accepted edits are still safe.' }} />)
+    expect(screen.getByRole('alert')).toHaveTextContent(/accepted edits are still safe/i)
+    expect(screen.getByRole('button', { name: /export video/i })).toBeEnabled()
+
+    rerender(<StudioScreen {...props} history={accepted.value} exportState={{ status: 'ready', result: {
+      id: 'export_1234567890abcdef',
+      mediaUrl: '/api/projects/project_1234567890abcdef/exports/export_1234567890abcdef/media',
+      sha256: 'b'.repeat(64), width: 1920, height: 1080, durationMs: 60_000, hasAudio: true,
+    } }} />)
+    expect(screen.getByRole('link', { name: /download mp4/i })).toHaveAttribute('href', '/api/projects/project_1234567890abcdef/exports/export_1234567890abcdef/media')
   })
 
   it('returns Home exactly once from the Back action', async () => {
@@ -525,6 +555,7 @@ describe('StudioScreen', () => {
     rerender(
       <StudioScreen
         project={{
+          id: 'project_1234567890abcdef',
           name: 'cleaned-interview.mp4',
           mediaUrl: 'blob:cleaned-interview',
           draftRequest: '',
@@ -541,6 +572,8 @@ describe('StudioScreen', () => {
         onAcceptProposal={onAcceptProposal}
         onUndo={vi.fn()}
         onRedo={vi.fn()}
+        exportState={{ status: 'idle' }}
+        onExport={vi.fn()}
         onBack={vi.fn()}
       />,
     )
@@ -582,6 +615,7 @@ describe('StudioScreen', () => {
     rerender(
       <StudioScreen
         project={{
+          id: 'project_1234567890abcdef',
           name: 'cleaned-interview.mp4',
           mediaUrl: 'blob:cleaned-interview',
           draftRequest: '',
@@ -594,6 +628,8 @@ describe('StudioScreen', () => {
         onAcceptProposal={vi.fn()}
         onUndo={vi.fn()}
         onRedo={vi.fn()}
+        exportState={{ status: 'idle' }}
+        onExport={vi.fn()}
         onBack={vi.fn()}
       />,
     )

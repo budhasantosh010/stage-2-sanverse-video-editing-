@@ -14,4 +14,17 @@ describe('development server contract', () => {
       },
     })
   })
+
+  it('keeps the loopback API internal behind the user-facing port', () => {
+    expect(config).toMatchObject({
+      server: {
+        proxy: {
+          '/api': {
+            target: 'http://127.0.0.1:2001',
+            changeOrigin: false,
+          },
+        },
+      },
+    })
+  })
 })

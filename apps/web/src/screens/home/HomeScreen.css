@@ -220,13 +220,23 @@
   white-space: nowrap;
 }
 
-.home-screen__error {
+.home-screen__error,
+.home-screen__progress {
   margin: 16px 0 0;
   padding-left: 13px;
   border-left: 3px solid var(--color-ink);
   color: var(--color-ink);
   font-size: 0.88rem;
   font-weight: 700;
+}
+
+.home-screen__progress {
+  color: var(--color-text-muted);
+}
+
+.home-screen__choose-button:has(input:disabled) {
+  cursor: wait;
+  opacity: 0.58;
 }
 
 .home-screen__recent {

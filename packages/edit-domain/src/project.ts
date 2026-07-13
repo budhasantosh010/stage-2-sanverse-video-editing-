@@ -1,5 +1,5 @@
-import type { Result } from './actions'
-import { validateHistory, type EditHistory, type HistoryValidationError } from './history'
+import type { Result } from './actions.ts'
+import { validateHistory, type EditHistory, type HistoryValidationError } from './history.ts'
 
 export type EditProject = {
   readonly schemaVersion: 'sanverse.project/v1'
@@ -53,6 +53,6 @@ export const serializeProject = (project: unknown): Result<string, ProjectError>
   return { ok: true, value: JSON.stringify(validated.value) }
 }
 
-export type { AddNameplateAction, PointTarget, Result } from './actions'
-export { proposeAddNameplate, validateAddNameplateAction } from './actions'
-export { accept, createHistory, redo, undo, validateHistory } from './history'
+export type { AddNameplateAction, PointTarget, Result } from './actions.ts'
+export { proposeAddNameplate, validateAddNameplateAction } from './actions.ts'
+export { accept, createHistory, redo, undo, validateHistory } from './history.ts'
