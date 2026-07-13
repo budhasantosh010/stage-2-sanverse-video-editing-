@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import type { AddNameplateAction } from '@sanverse/edit-domain'
 import type { StudioState } from '../../app/app-state'
+import { NameplateComposer } from '../../features/nameplate/NameplateComposer'
 import {
   capturePointTarget,
   formatPointTargetTime,
@@ -15,6 +17,13 @@ export type StudioScreenProps = {
 
 const UNAVAILABLE_DESCRIPTION = 'studio-unavailable-description'
 const KEYBOARD_POINT_STEP = 0.05
+
+function createActionId() {
+  if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID()
+  const bytes = new Uint32Array(4)
+  globalThis.crypto.getRandomValues(bytes)
+  return `action-${Array.from(bytes, (value) => value.toString(16).padStart(8, '0')).join('')}`
+}
 
 type NormalizedPoint = Pick<CapturedPointTarget, 'x' | 'y'>
 
@@ -50,13 +59,19 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
   const [draftPoint, setDraftPoint] = useState<NormalizedPoint>({ x: 0.5, y: 0.5 })
   const [, setVideoLayoutRevision] = useState(0)
   const [pointError, setPointError] = useState<string | null>(null)
+  const [proposal, setProposal] = useState<AddNameplateAction | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const pointModeButtonRef = useRef<HTMLButtonElement>(null)
   const pointLayerRef = useRef<HTMLButtonElement>(null)
+  const proposalSummaryRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (isPointMode) pointLayerRef.current?.focus()
   }, [isPointMode])
+
+  useEffect(() => {
+    if (proposal) proposalSummaryRef.current?.focus()
+  }, [proposal])
 
   useEffect(() => {
     const video = videoRef.current
@@ -96,6 +111,7 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
 
   function completePointCapture(target: CapturedPointTarget) {
     setPointTarget(target)
+    setProposal(null)
     setPointError(null)
     setIsPointMode(false)
     pointModeButtonRef.current?.focus()
@@ -267,6 +283,11 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
                   : 'Pause anywhere, then choose Point to mark an exact place.'}
             </p>
           </div>
+          <NameplateComposer
+            target={pointTarget}
+            createActionId={createActionId}
+            onProposal={setProposal}
+          />
           {pointError ? <p role="alert" className="studio-screen__point-error">{pointError}</p> : null}
           {hasPreviewError ? (
             <p role="alert">
@@ -296,7 +317,22 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
 
           <section className="studio-screen__proposal" aria-labelledby="studio-proposal-label">
             <h3 id="studio-proposal-label">Proposal</h3>
-            <p className="studio-screen__empty-copy">No edit proposal. Editing is unavailable.</p>
+            {proposal ? (
+              <div
+                ref={proposalSummaryRef}
+                className="studio-screen__proposal-summary"
+                role="status"
+                tabIndex={-1}
+              >
+                <strong>{proposal.primaryText}</strong>
+                {proposal.secondaryText ? <span>{proposal.secondaryText}</span> : null}
+                <small>Here · {formatPointTargetTime(proposal.startMs)} · 5 seconds</small>
+              </div>
+            ) : (
+              <p className="studio-screen__empty-copy">
+                Point at the video, then choose Add text here.
+              </p>
+            )}
             <button
               type="button"
               disabled
@@ -333,7 +369,7 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
           </div>
 
           <p id={UNAVAILABLE_DESCRIPTION} className="studio-screen__availability-note">
-            Editing and export are not available in this preview.
+            Chat, proposal acceptance, and export are not available yet.
           </p>
         </aside>
       </div>
@@ -344,7 +380,7 @@ export function StudioScreen({ project, onBack }: StudioScreenProps) {
             <span className="studio-screen__section-index">03</span>
             <h2>Simple time strip</h2>
           </div>
-          <p>Preview only — editing unavailable</p>
+          <p>Point targeting and text proposals available</p>
         </div>
         <div className="studio-screen__static-track" aria-hidden="true">
           <span>Source video</span>

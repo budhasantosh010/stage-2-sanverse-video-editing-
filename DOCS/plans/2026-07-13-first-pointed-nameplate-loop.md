@@ -2,7 +2,7 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
-**Status:** Queued after the G1 renderer decision. This plan does not silently mark G2 or G3 active.
+**Status:** In progress. Tasks 1 through 4 are complete; Tasks 5 through 8 remain pending. This does not mark the G2 or G3 macro exit gates complete.
 
 **Goal:** Let a non-editor open a real MP4, pause at a moment, point at a position, create a static nameplate through a bounded manual action, preview it, accept or undo it, and export a reproducible MP4.
 
@@ -137,9 +137,13 @@ export type AddNameplateAction = {
 **Files:**
 
 - Create: `apps/web/src/features/nameplate/NameplateComposer.tsx`
+- Create: `apps/web/src/features/nameplate/NameplateComposer.css`
 - Test: `apps/web/src/features/nameplate/NameplateComposer.test.tsx`
 - Modify: `apps/web/src/screens/studio/StudioScreen.tsx`
-- Modify: `apps/web/src/app/App.tsx`
+- Modify: `apps/web/src/screens/studio/StudioScreen.css`
+- Test: `apps/web/src/screens/studio/StudioScreen.test.tsx`
+- Modify: `apps/web/package.json`
+- Modify: `package-lock.json`
 
 **Steps:**
 

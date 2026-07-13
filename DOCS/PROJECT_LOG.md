@@ -118,3 +118,12 @@
 - Independent review found marker drift after responsive resize and a misleading nonfunctional keyboard button. Follow-up RED/GREEN work now reprojects the normalized target through `ResizeObserver`, provides focused arrow-key positioning plus Enter capture, preserves native Enter on Cancel, and keeps Escape cancellation.
 - Final evidence passes 11 pure point-target tests and 16 Studio tests (27 focused). The complete workspace passes 75 web tests plus 34 edit-domain tests (109 total); both builds, governance verification, and diff checks pass.
 - This remains an isolated E2 interaction slice. It does not create a nameplate proposal, connect canonical history, preview an edit, render, or export. Owner live-browser usability and perceived interaction quality remain pending.
+
+## 2026-07-13 — Bounded manual nameplate proposal added
+
+- Linked to REQ-003, REQ-004, REQ-012, DEC-003, and DEC-005.
+- Connected a captured point to canonical `proposeAddNameplate` validation without enabling free-form AI interpretation.
+- Added a plain-language composer with required main text, optional smaller text, exact point/time mapping, and a fixed five-second default.
+- Canonical validation fails closed; successful proposals are immutable and appear in Studio without entering accepted history.
+- Adversarial review exposed two unsafe edges: a new target could leave a stale proposal visible, and action-ID generation could throw through the UI. New RED/GREEN tests now prove that retargeting clears the unaccepted proposal and open draft, while ID failures remain visible and recoverable.
+- Ten composer tests and 18 Studio tests pass in the focused run. Preview, acceptance, undo/redo, renderer integration, export, and owner live-browser verification remain pending.

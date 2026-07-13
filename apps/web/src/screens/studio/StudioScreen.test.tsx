@@ -127,8 +127,8 @@ describe('StudioScreen', () => {
     expect(chat).toBeDisabled()
     expect(send).toBeDisabled()
     expect(accept).toBeDisabled()
-    expect(exportButton).toHaveAccessibleDescription(/not available in this preview/i)
-    expect(chat).toHaveAccessibleDescription(/not available in this preview/i)
+    expect(exportButton).toHaveAccessibleDescription(/not available yet/i)
+    expect(chat).toHaveAccessibleDescription(/not available yet/i)
   })
 
   it('returns Home exactly once from the Back action', async () => {
@@ -147,7 +147,7 @@ describe('StudioScreen', () => {
     expect(screen.getByRole('region', { name: 'Video canvas' })).toBeInTheDocument()
     expect(screen.getByRole('complementary', { name: 'Conversation' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Simple time strip' })).toBeInTheDocument()
-    expect(screen.getByText(/preview only — editing unavailable/i)).toBeInTheDocument()
+    expect(screen.getByText(/point targeting and text proposals available/i)).toBeInTheDocument()
   })
 
   it('never reports that a draft or edit was executed successfully', () => {
@@ -305,5 +305,66 @@ describe('StudioScreen', () => {
     expect(screen.queryByRole('button', { name: /choose a point on the visible video/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('img', { name: /selected point/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /enter point mode/i })).toHaveFocus()
+  })
+
+  it('turns a captured point into one bounded text proposal without accepting it', async () => {
+    const user = userEvent.setup()
+    const { container } = renderStudio()
+    const video = container.querySelector('video') as HTMLVideoElement
+    vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+    prepareVideoForPointing(video, 12.4)
+
+    const addText = screen.getByRole('button', { name: /add text here/i })
+    expect(addText).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: /enter point mode/i }))
+    fireEvent.click(screen.getByRole('button', { name: /choose a point on the visible video/i }), {
+      clientX: 300,
+      clientY: 250,
+    })
+
+    expect(addText).toBeEnabled()
+    await user.click(addText)
+    await user.type(screen.getByRole('textbox', { name: /^main text$/i }), 'Santosh')
+    await user.type(screen.getByRole('textbox', { name: /smaller line.*optional/i }), 'Founder')
+    await user.click(screen.getByRole('button', { name: /create proposal/i }))
+
+    const proposalSection = screen.getByRole('heading', { name: /^proposal$/i }).closest('section')
+    expect(proposalSection).not.toBeNull()
+    expect(proposalSection).toHaveTextContent(/Santosh/i)
+    expect(proposalSection).toHaveTextContent(/Founder/i)
+    expect(proposalSection).toHaveTextContent(/00:12\.400.*5 seconds/i)
+    expect(proposalSection?.querySelector('[role="status"]')).toHaveFocus()
+    expect(screen.getByRole('button', { name: /accept proposal unavailable/i })).toBeDisabled()
+    expect(screen.getByText(/no accepted edits/i)).toBeInTheDocument()
+  })
+
+  it('clears an unaccepted proposal when the user captures a different point', async () => {
+    const user = userEvent.setup()
+    const { container } = renderStudio()
+    const video = container.querySelector('video') as HTMLVideoElement
+    vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+    prepareVideoForPointing(video, 12.4)
+
+    await user.click(screen.getByRole('button', { name: /enter point mode/i }))
+    fireEvent.click(screen.getByRole('button', { name: /choose a point on the visible video/i }), {
+      clientX: 300,
+      clientY: 250,
+    })
+    await user.click(screen.getByRole('button', { name: /add text here/i }))
+    await user.type(screen.getByRole('textbox', { name: /^main text$/i }), 'Old proposal')
+    await user.click(screen.getByRole('button', { name: /create proposal/i }))
+    expect(screen.getByText('Old proposal')).toBeInTheDocument()
+
+    video.currentTime = 20
+    await user.click(screen.getByRole('button', { name: /enter point mode/i }))
+    fireEvent.click(screen.getByRole('button', { name: /choose a point on the visible video/i }), {
+      clientX: 400,
+      clientY: 250,
+    })
+
+    expect(screen.queryByText('Old proposal')).not.toBeInTheDocument()
+    expect(screen.getByText(/point at the video, then choose add text here/i)).toBeInTheDocument()
+    expect(screen.getByText(/here.*00:20\.000/i)).toBeInTheDocument()
   })
 })
