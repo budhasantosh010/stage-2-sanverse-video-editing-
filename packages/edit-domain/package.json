@@ -1,0 +1,15 @@
+{
+  "name": "@sanverse/edit-domain",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/project.ts",
+    "./actions": "./src/actions.ts",
+    "./history": "./src/history.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json"
+  }
+}

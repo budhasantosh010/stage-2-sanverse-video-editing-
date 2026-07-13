@@ -18,7 +18,8 @@ Last updated: 2026-07-13
 - The owner completed the first real-video Home-to-Studio walkthrough. The flow reached Studio and video playback worked, but the owner found the Home heading too large, state changes abrupt, and Studio non-actionable because pointing, chat execution, and editing do not exist yet.
 - The owner reported that the first refinement still felt abrupt. Live browser inspection verified that `document.startViewTransition` is unavailable on the current surface, so the prior direct-update fallback had no visible transition. A tested correction now gates a visible CSS entry transition to unsupported browsers, adds brief spring feedback to direct controls, and explicitly removes these transforms for reduced motion. A fresh owner re-test is pending.
 - The G1 renderer spike now selects a minimum hybrid architecture for the first static-nameplate loop: browser-native preview plus FFmpeg-native export from the same renderer-neutral request. Parsed generated outputs have equivalent text and timing, with placement differing only by bounded pixel rounding for the exact synthetic fixture. Preview-to-export pixel fidelity remains unmeasured.
-- No backend, upload, persistence, AI integration, database, real editing primitive, renderer integration, or export has been implemented.
+- A renderer-independent `@sanverse/edit-domain` workspace now defines the exact versioned point/nameplate contract plus pure validation, proposal, acceptance, undo, redo, and deterministic serialization. Its 34 unit tests provide E2 contract evidence only; the package is not yet connected to the Studio or renderer.
+- No backend, upload, persistence, AI integration, database, user-operable editing primitive, renderer integration, or export has been implemented.
 - The local `main` branch is connected to and pushed at `budhasantosh010/stage-2-sanverse-video-editing-`.
 - The owner explicitly authorized G1 to begin.
 
@@ -30,6 +31,7 @@ Last updated: 2026-07-13
 - The broader G1 renderer comparison remains in progress until pixel fidelity, representative real-video/audio behavior, and the approved motion envelope have evidence
 - HyperFrames runtime remains uninstalled and unverified; it is deferred until a demonstrated motion need justifies its runtime and deployment cost
 - The owner explicitly instructed the team to continue building the real edit workflow while motion polish continues. The first pointed-nameplate plan may therefore begin after its renderer and motion reviews pass; G1-01B and owner motion acceptance remain open rather than being silently marked complete
+- Task 2 of the pointed-nameplate plan is implemented in isolation: invalid or forged project/history/action state fails closed, issued action IDs can never be reused, and canonical project/history/actions are copied and frozen at runtime. Point mode and every later workflow task remain unimplemented
 
 ## Next gated goal
 
@@ -48,4 +50,4 @@ G2 does not begin until G1's owner workflow review and measured renderer decisio
 
 ## Honest evidence level
 
-G0 governance is locally verified and remotely backed up. The runnable frontend's controlled automated Home-to-Studio workflow has **E3** evidence, and live Home/strict-port behavior is verified. Owner hands-on workflow evidence remains below E4. The isolated hybrid synthetic fixture has E3 integration evidence for structural translation, repeatable document generation, and FFmpeg output on this machine, but no preview/export pixel comparison. Product capability remains **E0: not implemented** for backend, AI, editing, persistence, render, and export.
+G0 governance is locally verified and remotely backed up. The runnable frontend's controlled automated Home-to-Studio workflow has **E3** evidence, and live Home/strict-port behavior is verified. Owner hands-on workflow evidence remains below E4. The isolated hybrid synthetic fixture has E3 integration evidence for structural translation, repeatable document generation, and FFmpeg output on this machine, but no preview/export pixel comparison. The canonical edit-domain contract has **E2** unit evidence. Product capability remains **E0: not implemented** for user-operable editing, backend, AI, persistence, render, and export.
