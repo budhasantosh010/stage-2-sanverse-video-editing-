@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 
+import { createHistory, createProject, validateProject, validateHistory } from '@sanverse/edit-domain'
 import { createFilesystemProjectRepository } from './projects/filesystem-project-repository.ts'
 import { createProjectIntakeService, EXPORT_ID_PATTERN, PROJECT_ID_PATTERN, ProjectIntakeError, type ProjectRepository } from './projects/project-repository.ts'
 import { createFfmpegRenderAdapter } from './render/ffmpeg-render-adapter.ts'
@@ -51,19 +52,19 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   }
   if (declared > MAX_EXPORT_REQUEST_BYTES) {
     request.resume()
-    throw new ApiRequestError('REQUEST_TOO_LARGE', 'The export request is too large.')
+    throw new ApiRequestError('REQUEST_TOO_LARGE', 'The JSON request is too large.')
   }
   const chunks: Buffer[] = []
   let received = 0
   for await (const raw of request) {
     const chunk = Buffer.from(raw)
     received += chunk.byteLength
-    if (received > declared || received > MAX_EXPORT_REQUEST_BYTES) throw new ApiRequestError('REQUEST_TOO_LARGE', 'The export request is too large.')
+    if (received > declared || received > MAX_EXPORT_REQUEST_BYTES) throw new ApiRequestError('REQUEST_TOO_LARGE', 'The JSON request is too large.')
     chunks.push(chunk)
   }
-  if (received !== declared) throw new ApiRequestError('INVALID_JSON', 'The export request ended unexpectedly.')
+  if (received !== declared) throw new ApiRequestError('INVALID_JSON', 'The JSON request ended unexpectedly.')
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')) }
-  catch { throw new ApiRequestError('INVALID_JSON', 'The export request is not valid JSON.') }
+  catch { throw new ApiRequestError('INVALID_JSON', 'The request is not valid JSON.') }
 }
 
 function parseRange(value: string | undefined, size: number): { start: number; end: number } | undefined {
@@ -168,6 +169,53 @@ export function createSanverseServer(options: ServerOptions) {
           body: request,
         })
         json(response, 201, project)
+        return
+      }
+
+      if (request.method === 'GET' && requestUrl.pathname === '/api/projects') {
+        json(response, 200, { projects: await repository.listProjects() })
+        return
+      }
+
+      const projectMatch = /^\/api\/projects\/([^/]+)$/.exec(requestUrl.pathname)
+      if (request.method === 'GET' && projectMatch) {
+        const projectId = projectMatch[1]
+        if (!PROJECT_ID_PATTERN.test(projectId)) { json(response, 404, { error: 'Project was not found.' }); return }
+        const manifest = await repository.readProject(projectId)
+        const serialized = await repository.readProjectState(projectId)
+        let history = createHistory()
+        if (serialized !== null) {
+          let parsed: unknown
+          try { parsed = JSON.parse(serialized) }
+          catch { throw Object.assign(new Error('Saved project JSON is invalid.'), { code: 'PROJECT_STATE_INVALID' }) }
+          const project = validateProject(parsed)
+          if (!project.ok || project.value.projectId !== projectId) {
+            throw Object.assign(new Error('Saved project contract is invalid.'), { code: 'PROJECT_STATE_INVALID' })
+          }
+          history = project.value.history
+        }
+        json(response, 200, { ...manifest, history })
+        return
+      }
+
+      const historyMatch = /^\/api\/projects\/([^/]+)\/history$/.exec(requestUrl.pathname)
+      if (request.method === 'PUT' && historyMatch) {
+        const projectId = historyMatch[1]
+        if (!PROJECT_ID_PATTERN.test(projectId)) { request.resume(); json(response, 404, { error: 'Project was not found.' }); return }
+        await repository.readProject(projectId)
+        const payload = await readJsonBody(request)
+        const historyInput = typeof payload === 'object' && payload !== null && 'history' in payload
+          ? (payload as { history: unknown }).history
+          : undefined
+        const history = validateHistory(historyInput)
+        if (!history.ok) {
+          json(response, 400, { error: 'The project history is invalid.', code: 'PROJECT_HISTORY_INVALID' })
+          return
+        }
+        const project = createProject(projectId, history.value)
+        if (!project.ok) throw Object.assign(new Error('Canonical project creation failed.'), { code: 'PROJECT_STATE_INVALID' })
+        await repository.saveProjectState(projectId, JSON.stringify(project.value))
+        json(response, 200, { history: project.value.history })
         return
       }
 
@@ -287,8 +335,21 @@ export function createSanverseServer(options: ServerOptions) {
         json(response, 503, { error: 'The local renderer is unavailable.', code })
         return
       }
+      if (code === 'RENDER_PROCESS_BLOCKED') {
+        json(response, 503, { error: 'The local renderer process was blocked from starting.', code })
+        return
+      }
       if (code === 'RENDER_CANCELLED') {
         if (!response.destroyed) json(response, 408, { error: 'Export was cancelled.', code })
+        return
+      }
+      if (code === 'RENDER_PATH_INVALID' || code === 'RENDER_FAILED' || code === 'RENDER_OUTPUT_MISSING' || code === 'RENDER_OUTPUT_INVALID') {
+        console.error('Local renderer failed safely.', error)
+        json(response, 500, { error: 'The local renderer could not produce a verified MP4.', code })
+        return
+      }
+      if (code === 'PROJECT_STATE_INVALID') {
+        json(response, 500, { error: 'The saved project history is invalid.', code })
         return
       }
       if (error instanceof ProjectIntakeError) {

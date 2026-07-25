@@ -89,6 +89,7 @@ function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = 
     onUndo: vi.fn(),
     onRedo: vi.fn(),
     exportState: { status: 'idle' },
+    saveState: 'idle',
     onExport: vi.fn(),
     onBack: vi.fn(),
     ...overrides,
@@ -122,7 +123,7 @@ describe('StudioScreen', () => {
     expect(video).toHaveTextContent(/browser does not support video playback/i)
   })
 
-  it('shows a recoverable message when the browser cannot preview the MP4', async () => {
+  it('shows a recoverable message without blaming the video when playback fails', async () => {
     const user = userEvent.setup()
     const onBack = vi.fn()
     const { container } = renderStudio({ onBack })
@@ -132,7 +133,7 @@ describe('StudioScreen', () => {
     fireEvent.error(video as HTMLVideoElement)
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      /browser could not preview this mp4.*try another video.*go back/i,
+      /could not be played.*unavailable.*reload.*go back/i,
     )
 
     await user.click(screen.getByRole('button', { name: /back to home/i }))
@@ -192,6 +193,8 @@ describe('StudioScreen', () => {
     rerender(<StudioScreen {...props} history={accepted.value} exportState={{ status: 'error', message: 'We could not export the video. Your accepted edits are still safe.' }} />)
     expect(screen.getByRole('alert')).toHaveTextContent(/accepted edits are still safe/i)
     expect(screen.getByRole('button', { name: /export video/i })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: /retry export/i }))
+    expect(onExport).toHaveBeenCalledTimes(2)
 
     rerender(<StudioScreen {...props} history={accepted.value} exportState={{ status: 'ready', result: {
       id: 'export_1234567890abcdef',
@@ -199,6 +202,17 @@ describe('StudioScreen', () => {
       sha256: 'b'.repeat(64), width: 1920, height: 1080, durationMs: 60_000, hasAudio: true,
     } }} />)
     expect(screen.getByRole('link', { name: /download mp4/i })).toHaveAttribute('href', '/api/projects/project_1234567890abcdef/exports/export_1234567890abcdef/media')
+  })
+
+  it('shows whether canonical edit history is saving, saved, or unsafe to leave', () => {
+    const { rerender, props } = renderStudio({ saveState: 'saving' })
+    expect(screen.getByRole('status', { name: /project save status/i })).toHaveTextContent(/saving/i)
+
+    rerender(<StudioScreen {...props} saveState="saved" />)
+    expect(screen.getByRole('status', { name: /project save status/i })).toHaveTextContent(/saved locally/i)
+
+    rerender(<StudioScreen {...props} saveState="error" />)
+    expect(screen.getByRole('alert')).toHaveTextContent(/could not be saved locally/i)
   })
 
   it('returns Home exactly once from the Back action', async () => {
@@ -573,6 +587,7 @@ describe('StudioScreen', () => {
         onUndo={vi.fn()}
         onRedo={vi.fn()}
         exportState={{ status: 'idle' }}
+        saveState="idle"
         onExport={vi.fn()}
         onBack={vi.fn()}
       />,
@@ -629,6 +644,7 @@ describe('StudioScreen', () => {
         onUndo={vi.fn()}
         onRedo={vi.fn()}
         exportState={{ status: 'idle' }}
+        saveState="idle"
         onExport={vi.fn()}
         onBack={vi.fn()}
       />,

@@ -1,14 +1,18 @@
 import { useState, type ChangeEvent, type DragEvent } from 'react'
 
 import { validateLocalVideo } from '../../features/local-media/local-media'
+import type { RecentProject } from '../../features/project-library/project-library'
 import './HomeScreen.css'
 
 export type HomeScreenProps = {
   draftRequest: string
   isStarting: boolean
   startError: string
+  recentProjects: readonly RecentProject[]
+  isOpeningRecent: boolean
   onDraftRequestChange(value: string): void
   onStartProject(file: File): void
+  onOpenRecentProject(project: RecentProject): void
 }
 
 const MP4_ERROR = 'Choose an MP4 video.'
@@ -17,14 +21,17 @@ export function HomeScreen({
   draftRequest,
   isStarting,
   startError,
+  recentProjects,
+  isOpeningRecent,
   onDraftRequestChange,
   onStartProject,
+  onOpenRecentProject,
 }: HomeScreenProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [fileError, setFileError] = useState('')
 
   function startWithFile(file: File): void {
-    if (isStarting) return
+    if (isStarting || isOpeningRecent) return
     try {
       validateLocalVideo(file)
       setFileError('')
@@ -119,7 +126,7 @@ export function HomeScreen({
                 type="file"
                 aria-label="Choose video"
                 accept="video/mp4,.mp4"
-                disabled={isStarting}
+                disabled={isStarting || isOpeningRecent}
                 onChange={handleFileChange}
               />
             </label>
@@ -144,7 +151,23 @@ export function HomeScreen({
           <p className="home-screen__section-index">01</p>
           <h2 id="recent-projects-title">Recent projects</h2>
         </div>
-        <p className="home-screen__empty">No recent projects yet.</p>
+        {recentProjects.length === 0 ? (
+          <p className="home-screen__empty">No recent projects yet.</p>
+        ) : (
+          <ul className="home-screen__recent-list">
+            {recentProjects.map((project) => (
+              <li key={project.id}>
+                <div>
+                  <strong>{project.originalFilename}</strong>
+                  <span>{new Date(project.createdAt).toLocaleDateString()}</span>
+                </div>
+                <button type="button" disabled={isOpeningRecent} onClick={() => onOpenRecentProject(project)}>
+                  {isOpeningRecent ? 'Opening…' : `Open ${project.originalFilename}`}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </main>
   )

@@ -45,6 +45,10 @@ function readRepository(bytes: Uint8Array, bodyFactory: () => AsyncIterable<Uint
       const end = range?.end ?? bytes.length - 1
       return { body: bodyFactory(), size: bytes.length, start, end }
     },
+    async listProjects() { return [] },
+    async readProject() { throw new Error('not used') },
+    async readProjectState() { return null },
+    async saveProjectState() { throw new Error('not used') },
     async allocateExport(projectId, exportId) {
       return { sourcePath: `C:\\safe\\${projectId}\\source.mp4`, outputPath: `C:\\safe\\${projectId}\\exports\\${exportId}.mp4`, trustedWorkDir: `C:\\safe\\${projectId}` }
     },
@@ -207,5 +211,84 @@ describe('local API boundary', () => {
     const media = await call(port, { path: `/api/projects/${projectId}/exports/${exportId}/media`, headers: { range: 'bytes=0-7' } })
     expect(media.status).toBe(206)
     expect(new TextDecoder().decode(media.body)).toBe('rendered')
+  })
+
+  it('returns a safe actionable code when the operating system blocks the renderer process', async () => {
+    const spy = readRepository(new TextEncoder().encode('unused'))
+    const renderService = {
+      async exportAccepted() {
+        throw Object.assign(new Error('raw operating system detail must stay local'), { code: 'RENDER_PROCESS_BLOCKED' })
+      },
+    }
+    const projectId = 'project_1234567890abcdef'
+    const server = createSanverseServer({
+      dataRoot: 'unused',
+      maxUploadBytes: 100,
+      repository: spy.repository,
+      renderService,
+      exportIdGenerator: () => 'export_1234567890abcdef',
+    })
+    const port = await listen(server)
+    const history = {
+      accepted: [{ schemaVersion: 'sanverse.action/v1', actionId: 'action-1', kind: 'add-nameplate', target: { x: 0.2, y: 0.3, sourceTimeMs: 1_000 }, primaryText: 'Santosh', secondaryText: '', startMs: 1_000, durationMs: 5_000 }],
+      redoStack: [], issuedActionIds: ['action-1'],
+    }
+    const requestBody = new TextEncoder().encode(JSON.stringify({ history }))
+
+    const response = await call(port, {
+      method: 'POST',
+      path: `/api/projects/${projectId}/exports`,
+      headers: { 'content-type': 'application/json', 'content-length': String(requestBody.length) },
+      body: requestBody,
+    })
+
+    expect(response.status).toBe(503)
+    expect(JSON.parse(new TextDecoder().decode(response.body))).toEqual({
+      error: 'The local renderer process was blocked from starting.',
+      code: 'RENDER_PROCESS_BLOCKED',
+    })
+    expect(new TextDecoder().decode(response.body)).not.toContain('raw operating system detail')
+  })
+
+  it('lists recent projects, saves canonical history, and reopens it', async () => {
+    const projectId = 'project_1234567890abcdef'
+    const manifest = {
+      id: projectId,
+      originalFilename: 'owner.mp4',
+      createdAt: '2026-07-14T00:00:00.000Z',
+      sizeBytes: 24,
+      sha256: 'a'.repeat(64),
+      mediaUrl: `/api/projects/${projectId}/media`,
+    }
+    let serializedState: string | null = null
+    const spy = readRepository(mp4())
+    const repository: ProjectRepository = {
+      ...spy.repository,
+      async listProjects() { return [manifest] },
+      async readProject() { return manifest },
+      async readProjectState() { return serializedState },
+      async saveProjectState(_projectId, value) { serializedState = value },
+    }
+    const port = await listen(createSanverseServer({ dataRoot: 'unused', maxUploadBytes: 100, repository }))
+
+    const listed = await call(port, { path: '/api/projects' })
+    expect(listed.status).toBe(200)
+    expect(JSON.parse(new TextDecoder().decode(listed.body))).toEqual({ projects: [manifest] })
+
+    const empty = await call(port, { path: `/api/projects/${projectId}` })
+    expect(JSON.parse(new TextDecoder().decode(empty.body))).toMatchObject({ ...manifest, history: { accepted: [], redoStack: [], issuedActionIds: [] } })
+
+    const history = {
+      accepted: [{ schemaVersion: 'sanverse.action/v1', actionId: 'action-1', kind: 'add-nameplate', target: { x: 0.2, y: 0.3, sourceTimeMs: 1_000 }, primaryText: 'Santosh', secondaryText: '', startMs: 1_000, durationMs: 5_000 }],
+      redoStack: [], issuedActionIds: ['action-1'],
+    }
+    const requestBody = new TextEncoder().encode(JSON.stringify({ history }))
+    const saved = await call(port, { method: 'PUT', path: `/api/projects/${projectId}/history`, headers: { 'content-type': 'application/json', 'content-length': String(requestBody.length) }, body: requestBody })
+    expect(saved.status).toBe(200)
+    expect(JSON.parse(new TextDecoder().decode(saved.body))).toEqual({ history })
+
+    const reopened = await call(port, { path: `/api/projects/${projectId}` })
+    expect(JSON.parse(new TextDecoder().decode(reopened.body))).toMatchObject({ ...manifest, history })
+    expect(JSON.parse(serializedState ?? '{}')).toEqual({ schemaVersion: 'sanverse.project/v1', projectId, history })
   })
 })

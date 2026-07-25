@@ -46,6 +46,18 @@ function memoryRepository(): ProjectRepository & { published: unknown[]; aborted
     async openMedia() {
       throw new Error('not used')
     },
+    async listProjects() {
+      return []
+    },
+    async readProject() {
+      throw new Error('not used')
+    },
+    async readProjectState() {
+      return null
+    },
+    async saveProjectState() {
+      throw new Error('not used')
+    },
     async allocateExport() {
       throw new Error('not used')
     },

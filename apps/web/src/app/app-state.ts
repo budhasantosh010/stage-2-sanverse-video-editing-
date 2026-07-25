@@ -4,6 +4,7 @@ import {
   redo as redoHistory,
   undo as undoHistory,
   validateAddNameplateAction,
+  validateHistory,
   type AddNameplateAction,
 } from '@sanverse/edit-domain'
 import type { EditHistory } from '@sanverse/edit-domain/history'
@@ -33,6 +34,7 @@ type LocalProjectInput = {
   name: string
   mediaUrl: string
   draftRequest?: string
+  history?: unknown
 }
 
 export function createInitialState(): HomeState {
@@ -66,6 +68,8 @@ export function openLocalProject(
   state: HomeState,
   input: LocalProjectInput,
 ): StudioState {
+  const history = input.history === undefined ? { ok: true as const, value: createHistory() } : validateHistory(input.history)
+  if (!history.ok) throw new TypeError('Cannot open a project with invalid canonical history.')
   return {
     screen: 'studio',
     project: {
@@ -76,7 +80,7 @@ export function openLocalProject(
     },
     proposal: null,
     editError: null,
-    history: createHistory(),
+    history: history.value,
   }
 }
 

@@ -33,4 +33,16 @@ describe('project export client', () => {
     await expect(exportProject('project_1234567890abcdef', acceptedHistory(), vi.fn().mockResolvedValue(new Response('{}', { status: 500 })))).rejects.toThrow(/accepted edits are still safe/i)
     await expect(exportProject('project_1234567890abcdef', acceptedHistory(), vi.fn().mockResolvedValue(new Response('{}', { status: 201 })))).rejects.toThrow(/accepted edits are still safe/i)
   })
+
+  it('preserves an allowlisted renderer code and gives an actionable local recovery message', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: 'The local renderer process was blocked from starting.',
+      code: 'RENDER_PROCESS_BLOCKED',
+    }), { status: 503, headers: { 'content-type': 'application/json' } }))
+
+    await expect(exportProject('project_1234567890abcdef', acceptedHistory(), fetcher)).rejects.toMatchObject({
+      code: 'RENDER_PROCESS_BLOCKED',
+      message: expect.stringMatching(/restart Sanverse in PowerShell.*accepted edits are still safe/i),
+    })
+  })
 })

@@ -59,12 +59,37 @@ describe('FFmpeg render adapter', () => {
     expect(args).not.toContain('-y')
     expect(args.at(-1)).toBe(String.raw`C:\trusted output\render.mp4`)
     const filter = args[args.indexOf('-vf') + 1]
-    expect(filter).toContain('drawbox=x=922:y=605:w=358:h=115')
+    expect(filter).not.toContain('drawbox=')
+    expect(filter).toContain('fontcolor=0xffffff:fontsize=25')
+    expect(filter).toContain('box=1:boxcolor=0x000000@0.82:boxborderw=8')
     expect(filter).toContain("fontfile='font.ttf':textfile='primary-0.txt'")
     expect(filter).toContain("fontfile='font.ttf':textfile='secondary-0.txt'")
     expect(filter).not.toContain("O'Brien")
     expect(filter).toContain('expansion=none')
     expect(filter).toContain(String.raw`gte(t\,1.000)*lt(t\,6.000)`)
+  })
+
+  it('renders the compact dark preview style instead of a fixed light panel', () => {
+    const args = buildFfmpegArguments({
+      sourcePath: 'source.mp4',
+      outputPath: 'output.mp4',
+      fontPath: 'font.ttf',
+      width: 714,
+      height: 1280,
+      actions: [action({
+        target: { x: 0.25, y: 0.25, sourceTimeMs: 0 },
+        primaryText: 'hello text',
+        secondaryText: '',
+        startMs: 0,
+      })],
+    })
+
+    const filter = args[args.indexOf('-vf') + 1]
+    expect(filter).not.toContain('drawbox=')
+    expect(filter).toContain('fontcolor=0xffffff:fontsize=25')
+    expect(filter).toContain('box=1:boxcolor=0x000000@0.82:boxborderw=8')
+    expect(filter).toContain('x=187:y=328')
+    expect(filter).toContain('fix_bounds=1')
   })
 
   it('does not settle cancellation until the spawned process closes and catches the post-spawn abort race', async () => {
@@ -91,6 +116,28 @@ describe('FFmpeg render adapter', () => {
     child.emit('close', null)
     await expect(pending).rejects.toMatchObject({ code: 'RENDER_CANCELLED' })
     expect(settled).toBe(true)
+  })
+
+  it.each(['EPERM', 'EACCES'])('classifies a blocked renderer process as RENDER_PROCESS_BLOCKED for %s', async (code) => {
+    const child = new FakeChild()
+    const runner = createCommandRunner({ spawnProcess: vi.fn(() => child as never) })
+    const pending = runner({ executable: 'ffprobe', args: [], cwd: '.' })
+    const error = Object.assign(new Error('operating system denied process launch'), { code })
+
+    child.emit('error', error)
+    child.emit('close', null)
+
+    await expect(pending).rejects.toMatchObject({ code: 'RENDER_PROCESS_BLOCKED' })
+  })
+
+  it('classifies a synchronous renderer process launch denial', async () => {
+    const launchError = Object.assign(new Error('operating system denied process launch'), { code: 'EPERM' })
+    const runner = createCommandRunner({
+      spawnProcess: vi.fn(() => { throw launchError }),
+    })
+
+    await expect(runner({ executable: 'ffprobe', args: [], cwd: '.' }))
+      .rejects.toMatchObject({ code: 'RENDER_PROCESS_BLOCKED' })
   })
 
   it('rejects invalid runtime actions and bounded-resource violations before command creation', () => {

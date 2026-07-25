@@ -340,6 +340,17 @@
   line-height: 1.55;
 }
 
+.studio-screen__save-status,
+.studio-screen__save-error {
+  margin-top: 10px !important;
+  color: var(--color-text-muted);
+  font-size: 0.76rem !important;
+}
+
+.studio-screen__save-error {
+  color: var(--color-danger, #8b1e1e);
+}
+
 .studio-screen__empty-copy,
 .studio-screen__availability-note {
   color: var(--color-text-subtle);
@@ -381,6 +392,11 @@
 
 .studio-screen__export-error {
   border-left-color: var(--color-danger, #8b1e1e);
+}
+
+.studio-screen__export-error button {
+  margin-top: 10px;
+  padding: 8px 12px;
 }
 
 .studio-screen__export-ready {

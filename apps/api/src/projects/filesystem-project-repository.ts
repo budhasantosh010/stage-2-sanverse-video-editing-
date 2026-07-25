@@ -1,4 +1,5 @@
-import { chmod, lstat, mkdir, open, readFile, realpath, rename, rm, stat } from 'node:fs/promises'
+import { randomBytes } from 'node:crypto'
+import { chmod, lstat, mkdir, open, readFile, readdir, realpath, rename, rm, stat } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 
 import {
@@ -37,6 +38,25 @@ function assertExportId(exportId: string): void {
 
 function isCode(error: unknown, ...codes: string[]): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && codes.includes(String(error.code))
+}
+
+function parseManifest(value: unknown, projectId: string): ProjectManifest {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new RepositoryError('PROJECT_NOT_FOUND', 'Project metadata is invalid.')
+  }
+  const manifest = value as Record<string, unknown>
+  if (
+    Object.keys(manifest).length !== 6 ||
+    manifest.id !== projectId ||
+    typeof manifest.originalFilename !== 'string' || manifest.originalFilename.length === 0 ||
+    typeof manifest.createdAt !== 'string' || Number.isNaN(Date.parse(manifest.createdAt)) ||
+    typeof manifest.sizeBytes !== 'number' || !Number.isSafeInteger(manifest.sizeBytes) || manifest.sizeBytes <= 0 ||
+    typeof manifest.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(manifest.sha256) ||
+    manifest.mediaUrl !== `/api/projects/${projectId}/media`
+  ) {
+    throw new RepositoryError('PROJECT_NOT_FOUND', 'Project metadata is invalid.')
+  }
+  return Object.freeze(manifest as ProjectManifest)
 }
 
 async function syncDirectory(path: string): Promise<void> {
@@ -121,6 +141,47 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
     return { sourcePath, projectDir, exportsDir }
   }
 
+  async function readPublishedManifest(projectId: string): Promise<ProjectManifest> {
+    const { sourcePath, size } = await resolvePublishedMedia(projectId)
+    const manifestPath = join(dirname(sourcePath), 'project.json')
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(await readFile(manifestPath, 'utf8'))
+    } catch {
+      throw new RepositoryError('PROJECT_NOT_FOUND', 'Project metadata is invalid.')
+    }
+    const manifest = parseManifest(parsed, projectId)
+    if (manifest.sizeBytes !== size) throw new RepositoryError('PROJECT_NOT_FOUND', 'Project metadata does not match its source media.')
+    return manifest
+  }
+
+  async function readControlledProjectState(projectId: string): Promise<string | null> {
+    const { sourcePath } = await resolvePublishedMedia(projectId)
+    const statePath = join(dirname(sourcePath), 'edit-project.json')
+    let handle
+    try {
+      const before = await lstat(statePath, { bigint: true })
+      const actualBefore = await realpath(statePath)
+      if (!before.isFile() || before.size <= 0n || before.nlink !== 1n || resolve(actualBefore) !== resolve(statePath)) {
+        throw new RepositoryError('PROJECT_NOT_FOUND', 'Saved project state is unavailable.')
+      }
+      handle = await open(statePath, 'r')
+      const opened = await handle.stat({ bigint: true })
+      const after = await lstat(statePath, { bigint: true })
+      const actualAfter = await realpath(statePath)
+      const sameIdentity = before.dev === opened.dev && before.ino === opened.ino && opened.dev === after.dev && opened.ino === after.ino
+      if (!opened.isFile() || opened.size <= 0n || opened.nlink !== 1n || !sameIdentity || resolve(actualAfter) !== resolve(statePath)) {
+        throw new RepositoryError('PROJECT_NOT_FOUND', 'Saved project state is unavailable.')
+      }
+      return await handle.readFile('utf8')
+    } catch (error) {
+      if (isCode(error, 'ENOENT', 'ENOTDIR')) return null
+      throw error
+    } finally {
+      await handle?.close().catch(() => undefined)
+    }
+  }
+
   async function resolvePublishedExport(projectId: string, exportId: string): Promise<{ path: string; size: number }> {
     assertExportId(exportId)
     const { exportsDir } = await exportRoot(projectId)
@@ -147,15 +208,15 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
   ): Promise<OpenMediaResult> {
     let handle
     try {
-      const before = await lstat(path)
+      const before = await lstat(path, { bigint: true })
       const actualBefore = await realpath(path)
-      if (!before.isFile() || before.size <= 0 || before.nlink !== 1 || resolve(actualBefore) !== resolve(path)) {
+      if (!before.isFile() || before.size <= 0n || before.nlink !== 1n || resolve(actualBefore) !== resolve(path)) {
         throw new RepositoryError(notFoundCode, notFoundMessage)
       }
 
       handle = await open(path, 'r')
-      const opened = await handle.stat()
-      const after = await lstat(path)
+      const opened = await handle.stat({ bigint: true })
+      const after = await lstat(path, { bigint: true })
       const actualAfter = await realpath(path)
       const identityAvailable = (value: typeof opened) =>
         (typeof value.dev === 'bigint' || Number.isSafeInteger(value.dev)) &&
@@ -164,15 +225,15 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
         identityAvailable(left) && identityAvailable(right) && left.dev === right.dev && left.ino === right.ino
 
       if (
-        !opened.isFile() || opened.size <= 0 || opened.nlink !== 1 ||
-        !after.isFile() || after.size <= 0 || after.nlink !== 1 ||
+        !opened.isFile() || opened.size <= 0n || opened.nlink !== 1n ||
+        !after.isFile() || after.size <= 0n || after.nlink !== 1n ||
         resolve(actualAfter) !== resolve(path) ||
         !sameIdentity(before, opened) || !sameIdentity(opened, after)
       ) {
         throw new RepositoryError(notFoundCode, notFoundMessage)
       }
 
-      const size = opened.size
+      const size = Number(opened.size)
       const start = range?.start ?? 0
       const end = range?.end ?? size - 1
       if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end < start || start >= size || end >= size) {
@@ -279,6 +340,54 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
     async openMedia(projectId: string, range?: MediaRange): Promise<OpenMediaResult> {
       const { sourcePath } = await resolvePublishedMedia(projectId)
       return openControlledFile(sourcePath, 'PROJECT_NOT_FOUND', 'Project media is unavailable.', range)
+    },
+
+    async listProjects(): Promise<readonly ProjectManifest[]> {
+      await ensureRoot()
+      const entries = await readdir(projectsRoot, { withFileTypes: true })
+      const candidates = entries
+        .filter((entry) => entry.isDirectory() && PROJECT_ID_PATTERN.test(entry.name))
+        .map((entry) => readPublishedManifest(entry.name))
+      const settled = await Promise.allSettled(candidates)
+      return Object.freeze(settled
+        .filter((result): result is PromiseFulfilledResult<ProjectManifest> => result.status === 'fulfilled')
+        .map((result) => result.value)
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id)))
+    },
+
+    async readProject(projectId: string): Promise<ProjectManifest> {
+      assertProjectId(projectId)
+      return readPublishedManifest(projectId)
+    },
+
+    async readProjectState(projectId: string): Promise<string | null> {
+      assertProjectId(projectId)
+      return readControlledProjectState(projectId)
+    },
+
+    async saveProjectState(projectId: string, serializedProject: string): Promise<void> {
+      assertProjectId(projectId)
+      if (typeof serializedProject !== 'string' || serializedProject.length === 0 || Buffer.byteLength(serializedProject, 'utf8') > 1024 * 1024) {
+        throw new Error('Serialized project state must be non-empty bounded JSON text.')
+      }
+      const { sourcePath } = await resolvePublishedMedia(projectId)
+      const projectDir = dirname(sourcePath)
+      const statePath = join(projectDir, 'edit-project.json')
+      const temporaryPath = join(projectDir, `.edit-project-${randomBytes(12).toString('hex')}.tmp`)
+      let handle
+      try {
+        handle = await open(temporaryPath, 'wx', 0o600)
+        await handle.writeFile(serializedProject, 'utf8')
+        await handle.sync()
+        await handle.close()
+        handle = undefined
+        await rename(temporaryPath, statePath)
+        await syncDirectory(projectDir)
+      } catch (error) {
+        await handle?.close().catch(() => undefined)
+        await rm(temporaryPath, { force: true }).catch(() => undefined)
+        throw error
+      }
     },
 
     async allocateExport(projectId: string, exportId: string) {

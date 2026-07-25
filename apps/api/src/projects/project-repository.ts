@@ -40,6 +40,10 @@ export interface ProjectRepository {
   abortStage(stage: StagedSource): Promise<void>
   inspectMedia(projectId: string): Promise<{ size: number }>
   openMedia(projectId: string, range?: MediaRange): Promise<OpenMediaResult>
+  listProjects(): Promise<readonly ProjectManifest[]>
+  readProject(projectId: string): Promise<ProjectManifest>
+  readProjectState(projectId: string): Promise<string | null>
+  saveProjectState(projectId: string, serializedProject: string): Promise<void>
   allocateExport(projectId: string, exportId: string): Promise<ProjectExportPaths>
   inspectExport(projectId: string, exportId: string): Promise<{ size: number }>
   openExport(projectId: string, exportId: string, range?: MediaRange): Promise<OpenMediaResult>

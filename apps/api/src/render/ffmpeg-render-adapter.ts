@@ -9,8 +9,10 @@ import { RenderError, type RenderPort, type RenderRequest, type RenderResult } f
 
 const MAX_TOOL_OUTPUT_BYTES = 1024 * 1024
 const DURATION_TOLERANCE_MS = 100
-const NAMEPLATE_WIDTH_RATIO = 0.28
-const NAMEPLATE_HEIGHT_RATIO = 0.16
+const NAMEPLATE_PRIMARY_FONT_RATIO = 0.035
+const NAMEPLATE_SECONDARY_FONT_RATIO = 0.026
+const NAMEPLATE_PADDING_RATIO = 0.011
+const NAMEPLATE_BACKGROUND = '0x000000@0.82'
 const MAX_ACTIONS_PER_RENDER = 100
 const MAX_TEXT_BYTES = 4096
 
@@ -84,8 +86,10 @@ export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
     throw renderError('RENDER_INPUT_INVALID', 'The render font reference must be a fixed workspace filename.')
   }
 
-  const width = Math.max(1, Math.round(input.width * NAMEPLATE_WIDTH_RATIO))
-  const height = Math.max(1, Math.round(input.height * NAMEPLATE_HEIGHT_RATIO))
+  const shortestEdge = Math.min(input.width, input.height)
+  const primaryFontSize = Math.max(12, Math.round(shortestEdge * NAMEPLATE_PRIMARY_FONT_RATIO))
+  const secondaryFontSize = Math.max(10, Math.round(shortestEdge * NAMEPLATE_SECONDARY_FONT_RATIO))
+  const padding = Math.max(4, Math.round(shortestEdge * NAMEPLATE_PADDING_RATIO))
   const filters: string[] = []
 
   input.actions.forEach((action, index) => {
@@ -97,19 +101,18 @@ export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
     ) {
       throw renderError('RENDER_INPUT_INVALID', 'An accepted action is invalid or exceeds the render text limit.')
     }
-    const x = Math.min(Math.max(0, Math.round(action.target.x * input.width)), input.width - width)
-    const y = Math.min(Math.max(0, Math.round(action.target.y * input.height)), input.height - height)
+    const x = Math.min(Math.max(0, Math.round(action.target.x * input.width)), input.width - 1)
+    const y = Math.min(Math.max(0, Math.round(action.target.y * input.height)), input.height - 1)
     const start = action.startMs / 1000
     const end = (action.startMs + action.durationMs) / 1000
     const enable = `gte(t\\,${start.toFixed(3)})*lt(t\\,${end.toFixed(3)})`
 
     filters.push(
-      `drawbox=x=${x}:y=${y}:w=${width}:h=${height}:color=0xffffff@0.96:t=fill:enable='${enable}'`,
-      `drawtext=fontfile='${input.fontPath}':textfile='primary-${index}.txt':fontcolor=0x111111:fontsize=44:expansion=none:x=${x + 24}:y=${y + 16}:enable='${enable}'`,
+      `drawtext=fontfile='${input.fontPath}':textfile='primary-${index}.txt':fontcolor=0xffffff:fontsize=${primaryFontSize}:box=1:boxcolor=${NAMEPLATE_BACKGROUND}:boxborderw=${padding}:fix_bounds=1:expansion=none:x=${x + padding}:y=${y + padding}:enable='${enable}'`,
     )
     if (action.secondaryText.length > 0) {
       filters.push(
-        `drawtext=fontfile='${input.fontPath}':textfile='secondary-${index}.txt':fontcolor=0x555555:fontsize=24:expansion=none:x=${x + 24}:y=${y + 70}:enable='${enable}'`,
+        `drawtext=fontfile='${input.fontPath}':textfile='secondary-${index}.txt':fontcolor=0xffffff@0.78:fontsize=${secondaryFontSize}:box=1:boxcolor=${NAMEPLATE_BACKGROUND}:boxborderw=${padding}:fix_bounds=1:expansion=none:x=${x + padding}:y=${y + primaryFontSize + (padding * 3)}:enable='${enable}'`,
       )
     }
   })
@@ -179,12 +182,28 @@ export function createCommandRunner({
     let stderr = Buffer.alloc(0)
     let settled = false
     let terminalError: unknown
-    const child = spawnProcess(invocation.executable, [...invocation.args], {
-      cwd: invocation.cwd,
-      shell: false,
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
+    const classifyLaunchError = (error: unknown): unknown => {
+      const code = (error as NodeJS.ErrnoException)?.code
+      if (code === 'ENOENT') return renderError('RENDER_TOOL_UNAVAILABLE', `${invocation.executable} is not available.`)
+      if (code === 'EPERM' || code === 'EACCES') {
+        return renderError('RENDER_PROCESS_BLOCKED', `${invocation.executable} was blocked from starting.`)
+      }
+      return renderError('RENDER_FAILED', 'The renderer process could not start.')
+    }
+    let child: ReturnType<typeof spawn>
+    try {
+      child = spawnProcess(invocation.executable, [...invocation.args], {
+        cwd: invocation.cwd,
+        shell: false,
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+    } catch (error) {
+      reject(classifyLaunchError(error))
+      return
+    }
+    const childStdout = child.stdout!
+    const childStderr = child.stderr!
     const requestTermination = (error: unknown) => {
       if (terminalError === undefined) terminalError = error
       try { child.kill() } catch { /* close/error remains the settlement boundary */ }
@@ -197,10 +216,10 @@ export function createCommandRunner({
       }
       return next
     }
-    child.stdout.on('data', (chunk: Buffer) => {
+    childStdout.on('data', (chunk: Buffer) => {
       stdout = append(stdout, chunk)
     })
-    child.stderr.on('data', (chunk: Buffer) => {
+    childStderr.on('data', (chunk: Buffer) => {
       stderr = append(stderr, chunk)
     })
     const onAbort = () => {
@@ -210,10 +229,7 @@ export function createCommandRunner({
     if (invocation.signal?.aborted) onAbort()
     child.once('error', (error) => {
       if (terminalError === undefined) {
-        terminalError =
-        (error as NodeJS.ErrnoException).code === 'ENOENT'
-          ? renderError('RENDER_TOOL_UNAVAILABLE', `${invocation.executable} is not available.`)
-          : error
+        terminalError = classifyLaunchError(error)
       }
     })
     child.once('close', (exitCode) => {

@@ -100,6 +100,23 @@ describe('app state', () => {
     })
   })
 
+  it('reopens a local project with its validated canonical history', () => {
+    const history = {
+      accepted: [proposal],
+      redoStack: [],
+      issuedActionIds: [proposal.actionId],
+    }
+    const reopened = openLocalProject(createInitialState(), {
+      id: 'project_1234567890abcdef',
+      name: 'cleaned.mp4',
+      mediaUrl: '/api/projects/project_1234567890abcdef/media',
+      history,
+    })
+
+    expect(reopened.history).toEqual(history)
+    expect(reopened.history).not.toBe(history)
+  })
+
   it('updates only the Studio project draft', () => {
     const studio = openLocalProject(createInitialState(), {
       id: 'project_1234567890abcdef',

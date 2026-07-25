@@ -49,6 +49,18 @@ npm run dev
 
 Keep the PowerShell window open while using the app. Press `Ctrl+C` in that window to stop the server.
 
+## If Export says the renderer was blocked
+
+Your accepted edits are still in the open Studio session. Do not go Back or reload the page.
+
+1. Keep the browser tab open.
+2. In the PowerShell window running Sanverse, press `Ctrl+C` once and wait for both processes to stop.
+3. Start Sanverse again from a normal PowerShell window with `npm run dev` as shown above.
+4. Return to the same browser workflow, recreate the in-memory edit if the reload cleared it, then choose **Retry export**.
+5. If it fails again, copy both the exact Studio message and the red error text from the PowerShell window. The UI now reports an allowlisted error code instead of collapsing every renderer failure into one generic message.
+
+The managed Codex execution environment can prohibit child processes with `spawn EPERM`; that environment cannot prove a normal laptop PowerShell export succeeds. The owner PowerShell run is the acceptance test.
+
 ## If port 2000 is already in use
 
 The app deliberately uses port 2000 and will not silently move to a different port. A second startup currently fails with this visible message:

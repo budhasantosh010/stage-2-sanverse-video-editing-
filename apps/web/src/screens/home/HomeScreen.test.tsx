@@ -12,8 +12,11 @@ function renderHome(overrides: Partial<ComponentProps<typeof HomeScreen>> = {}) 
     draftRequest: '',
     isStarting: false,
     startError: '',
+    recentProjects: [],
+    isOpeningRecent: false,
     onDraftRequestChange: vi.fn(),
     onStartProject: vi.fn(),
+    onOpenRecentProject: vi.fn(),
     ...overrides,
   }
 
@@ -126,6 +129,21 @@ describe('HomeScreen', () => {
 
     expect(screen.getByRole('heading', { name: /recent projects/i })).toBeInTheDocument()
     expect(screen.getByText(/no recent projects yet/i)).toBeInTheDocument()
+  })
+
+  it('opens a selected recent local project', async () => {
+    const user = userEvent.setup()
+    const onOpenRecentProject = vi.fn()
+    const project = {
+      id: 'project_1234567890abcdef', originalFilename: 'owner.mp4', createdAt: '2026-07-14T00:00:00.000Z',
+      sizeBytes: 24, sha256: 'a'.repeat(64), mediaUrl: '/api/projects/project_1234567890abcdef/media',
+    }
+    renderHome({ recentProjects: [project], onOpenRecentProject })
+
+    await user.click(screen.getByRole('button', { name: /open owner\.mp4/i }))
+
+    expect(onOpenRecentProject).toHaveBeenCalledWith(project)
+    expect(screen.queryByText(/no recent projects yet/i)).not.toBeInTheDocument()
   })
 
   it('shows import progress, disables another selection, and exposes a recoverable failure', () => {

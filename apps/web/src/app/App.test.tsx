@@ -1,5 +1,5 @@
 import { StrictMode } from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -29,6 +29,29 @@ function exportResponse() {
   }), { status: 201, headers: { 'content-type': 'application/json' } })
 }
 
+const PROJECTS_URL = '/api/projects'
+
+function isRecentProjectsRequest(url: string, options?: RequestInit): boolean {
+  return url === PROJECTS_URL && options?.method === undefined
+}
+
+function recentProjectsResponse(projects: readonly unknown[] = []) {
+  return new Response(JSON.stringify({ projects }), { status: 200, headers: { 'content-type': 'application/json' } })
+}
+
+// Home lists recent projects whenever it renders, so each test only describes the request it asserts on.
+function exceptRecentProjects(
+  respond: (url: string, options?: RequestInit) => Response | Promise<Response>,
+): (url: string, options?: RequestInit) => Response | Promise<Response> {
+  return (url, options) => (isRecentProjectsRequest(url, options) ? recentProjectsResponse() : respond(url, options))
+}
+
+function intakeRequestCount(): number {
+  return fetchMock.mock.calls.filter(
+    ([url, options]) => url === PROJECTS_URL && (options as RequestInit | undefined)?.method === 'POST',
+  ).length
+}
+
 function restoreUrlMethod(
   name: 'createObjectURL' | 'revokeObjectURL',
   descriptor: PropertyDescriptor | undefined,
@@ -44,7 +67,7 @@ function restoreUrlMethod(
 beforeEach(() => {
   createObjectURL = vi.fn(() => 'blob:cleaned-video')
   revokeObjectURL = vi.fn()
-  fetchMock = vi.fn().mockResolvedValue(projectResponse())
+  fetchMock = vi.fn().mockImplementation(exceptRecentProjects(() => projectResponse()))
   vi.stubGlobal('fetch', fetchMock)
 
   Object.defineProperty(URL, 'createObjectURL', {
@@ -70,6 +93,36 @@ afterEach(() => {
 })
 
 describe('App', () => {
+  it('opens a recent project with saved history and persists the next history change', async () => {
+    const user = userEvent.setup()
+    const manifest = {
+      id: 'project_1234567890abcdef', originalFilename: 'owner.mp4', createdAt: '2026-07-14T00:00:00.000Z',
+      sizeBytes: 24, sha256: 'a'.repeat(64), mediaUrl: '/api/projects/project_1234567890abcdef/media',
+    }
+    const history = {
+      accepted: [{ schemaVersion: 'sanverse.action/v1', actionId: 'action-1', kind: 'add-nameplate', target: { x: 0.2, y: 0.3, sourceTimeMs: 1_000 }, primaryText: 'Saved nameplate', secondaryText: '', startMs: 1_000, durationMs: 5_000 }],
+      redoStack: [], issuedActionIds: ['action-1'],
+    }
+    fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url === '/api/projects' && !options?.method) return new Response(JSON.stringify({ projects: [manifest] }), { status: 200 })
+      if (url === `/api/projects/${manifest.id}`) return new Response(JSON.stringify({ ...manifest, history }), { status: 200 })
+      if (url === `/api/projects/${manifest.id}/history` && options?.method === 'PUT') {
+        return new Response(options.body as string, { status: 200 })
+      }
+      return new Response('{}', { status: 404 })
+    })
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /open owner\.mp4/i }))
+    expect(screen.getByText('Saved nameplate')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^undo edit$/i }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      `/api/projects/${manifest.id}/history`,
+      expect.objectContaining({ method: 'PUT' }),
+    ))
+  })
+
   it('runs one Home-to-Studio-to-Home loop and releases its local video', async () => {
     const user = userEvent.setup()
     const file = new File(['video'], 'cleaned.mp4', { type: 'video/mp4' })
@@ -81,7 +134,7 @@ describe('App', () => {
     await user.type(draft, 'Tighten the opening pause.')
     await user.upload(screen.getByLabelText(/choose video/i), file)
 
-    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(intakeRequestCount()).toBe(1)
     expect(createObjectURL).not.toHaveBeenCalled()
     expect(screen.getByText('cleaned.mp4')).toBeInTheDocument()
     expect(container.querySelector('video')).toHaveAttribute('src', '/api/projects/project_1234567890abcdef/media')
@@ -128,15 +181,14 @@ describe('App', () => {
       screen.getByRole('heading', { name: /what do you want to edit today/i }),
     ).toBeInTheDocument()
     expect(createObjectURL).not.toHaveBeenCalled()
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(intakeRequestCount()).toBe(0)
   })
 
   it('allows only one project intake request at a time', async () => {
     const pendingUpdates: Array<() => void> = []
     let resolveFirst!: (value: Response) => void
-    fetchMock
-      .mockReset()
-      .mockReturnValueOnce(new Promise<Response>((resolve) => { resolveFirst = resolve }))
+    const pendingIntake = new Promise<Response>((resolve) => { resolveFirst = resolve })
+    fetchMock.mockReset().mockImplementation(exceptRecentProjects(() => pendingIntake))
     Object.defineProperty(document, 'startViewTransition', {
       configurable: true,
       value: vi.fn((update: () => void) => {
@@ -150,7 +202,7 @@ describe('App', () => {
       fireEvent.change(input, { target: { files: [new File(['first'], 'first.mp4', { type: 'video/mp4' })] } })
       fireEvent.change(input, { target: { files: [new File(['second'], 'second.mp4', { type: 'video/mp4' })] } })
     })
-    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(intakeRequestCount()).toBe(1)
     resolveFirst(projectResponse('first.mp4', '/api/projects/project_aaaaaaaaaaaaaaaa/media'))
     await act(async () => undefined)
 
@@ -227,7 +279,8 @@ describe('App', () => {
   it('stays on Home with visible progress and a recoverable import failure', async () => {
     const user = userEvent.setup()
     let rejectUpload!: (reason: Error) => void
-    fetchMock.mockReset().mockReturnValue(new Promise((_resolve, reject) => { rejectUpload = reject }))
+    const pendingIntake = new Promise<Response>((_resolve, reject) => { rejectUpload = reject })
+    fetchMock.mockReset().mockImplementation(exceptRecentProjects(() => pendingIntake))
     render(<App />)
 
     await user.upload(screen.getByLabelText(/choose video/i), new File(['video'], 'clip.mp4', { type: 'video/mp4' }))
@@ -244,9 +297,13 @@ describe('App', () => {
   it('completes import, accepted edit, export progress, and downloadable MP4 as one loop', async () => {
     const user = userEvent.setup()
     let resolveExport!: (response: Response) => void
-    fetchMock.mockReset()
-      .mockResolvedValueOnce(projectResponse())
-      .mockReturnValueOnce(new Promise<Response>((resolve) => { resolveExport = resolve }))
+    const pendingExport = new Promise<Response>((resolve) => { resolveExport = resolve })
+    fetchMock.mockReset().mockImplementation(exceptRecentProjects((url, options) => {
+      if (url === PROJECTS_URL && options?.method === 'POST') return projectResponse()
+      if (url === '/api/projects/project_1234567890abcdef/exports') return pendingExport
+      if (url === '/api/projects/project_1234567890abcdef/history') return new Response(options?.body as string, { status: 200 })
+      return new Response('{}', { status: 404 })
+    }))
     const { container } = render(<App />)
 
     await user.upload(screen.getByLabelText(/choose video/i), new File(['video'], 'cleaned.mp4', { type: 'video/mp4' }))

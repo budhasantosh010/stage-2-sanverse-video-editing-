@@ -1,4 +1,4 @@
-import { validateLocalVideo } from '../local-media/local-media'
+import { validateLocalVideo } from '../local-media/local-media.ts'
 
 export type ImportedProject = {
   id: string
@@ -12,7 +12,7 @@ export type ImportedProject = {
 const IMPORT_ERROR = 'We could not import the video. Try again.'
 const PROJECT_ID = /^project_[a-z0-9]{16,64}$/
 
-function isImportedProject(value: unknown): value is ImportedProject {
+export function isImportedProject(value: unknown): value is ImportedProject {
   if (typeof value !== 'object' || value === null) return false
   const project = value as Record<string, unknown>
   return (

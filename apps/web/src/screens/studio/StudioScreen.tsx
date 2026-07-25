@@ -24,6 +24,7 @@ export type StudioScreenProps = {
   onUndo(): void
   onRedo(): void
   exportState: ProjectExportState
+  saveState: 'idle' | 'saving' | 'saved' | 'error'
   onExport(): void
   onBack(): void
 }
@@ -97,6 +98,7 @@ export function StudioScreen({
   onUndo,
   onRedo,
   exportState,
+  saveState,
   onExport,
   onBack,
 }: StudioScreenProps) {
@@ -434,8 +436,9 @@ export function StudioScreen({
           {pointError ? <p role="alert" className="studio-screen__point-error">{pointError}</p> : null}
           {hasPreviewError ? (
             <p role="alert">
-              This browser could not preview this MP4. Try another video, or go back to Home
-              to choose one.
+              This video could not be played. It may be unavailable right now, or in a format
+              this browser cannot show. Reload to try again, or go back to Home to choose
+              another video.
             </p>
           ) : null}
         </section>
@@ -534,6 +537,9 @@ export function StudioScreen({
                 Redo
               </button>
             </div>
+            {saveState === 'saving' ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">Saving locally…</p> : null}
+            {saveState === 'saved' ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">Saved locally</p> : null}
+            {saveState === 'error' ? <p className="studio-screen__save-error" role="alert">This edit is open, but it could not be saved locally.</p> : null}
           </section>
 
           <section className="studio-screen__export-result" aria-labelledby="studio-export-label">
@@ -548,7 +554,12 @@ export function StudioScreen({
             {exportState.status === 'rendering' ? (
               <p className="studio-screen__export-progress" role="status" aria-label="Export status">Rendering and verifying your MP4…</p>
             ) : null}
-            {exportState.status === 'error' ? <p className="studio-screen__export-error" role="alert">{exportState.message}</p> : null}
+            {exportState.status === 'error' ? (
+              <div className="studio-screen__export-error" role="alert">
+                <p>{exportState.message}</p>
+                <button type="button" onClick={onExport}>Retry export</button>
+              </div>
+            ) : null}
             {exportState.status === 'ready' ? (
               <div className="studio-screen__export-ready" role="status" aria-label="Export status">
                 <strong>Export ready</strong>

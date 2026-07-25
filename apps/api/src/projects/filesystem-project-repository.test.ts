@@ -14,7 +14,7 @@ async function collect(body: AsyncIterable<Uint8Array>): Promise<Uint8Array> {
 }
 
 function manifest(id: string) {
-  return { id, originalFilename: 'owner.mp4', createdAt: '2026-07-13T00:00:00.000Z', sizeBytes: 4, sha256: 'hash', mediaUrl: `/api/projects/${id}/media` }
+  return { id, originalFilename: 'owner.mp4', createdAt: '2026-07-13T00:00:00.000Z', sizeBytes: 4, sha256: 'a'.repeat(64), mediaUrl: `/api/projects/${id}/media` }
 }
 
 describe('filesystem project repository', () => {
@@ -97,6 +97,30 @@ describe('filesystem project repository', () => {
     await expect(repository.openExport(projectId, exportId, { start: 1, end: 2 })).resolves.toMatchObject({ size: 3, start: 1, end: 2 })
     await expect(repository.allocateExport('../outside', exportId)).rejects.toMatchObject({ code: 'INVALID_PROJECT_ID' })
     await expect(repository.openExport(projectId, '../outside')).rejects.toMatchObject({ code: 'INVALID_EXPORT_ID' })
+  })
+
+  it('lists published projects and atomically persists canonical project state', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sanverse-repo-'))
+    const repository = createFilesystemProjectRepository(root)
+    const olderId = 'project_1111111111111111'
+    const newerId = 'project_2222222222222222'
+    for (const [projectId, createdAt] of [
+      [olderId, '2026-07-13T00:00:00.000Z'],
+      [newerId, '2026-07-14T00:00:00.000Z'],
+    ] as const) {
+      const stage = await repository.stageSource({ projectId, body: body(new Uint8Array([1, 2, 3, 4])) })
+      await repository.publishProject(stage, { ...manifest(projectId), createdAt })
+    }
+
+    await expect(repository.listProjects()).resolves.toEqual([
+      expect.objectContaining({ id: newerId }),
+      expect.objectContaining({ id: olderId }),
+    ])
+    await expect(repository.readProjectState(newerId)).resolves.toBeNull()
+
+    const state = JSON.stringify({ schemaVersion: 'sanverse.project/v1', projectId: newerId, history: { accepted: [], redoStack: [], issuedActionIds: [] } })
+    await repository.saveProjectState(newerId, state)
+    await expect(repository.readProjectState(newerId)).resolves.toBe(state)
   })
 
   it('streams export bytes from the validated open file when its pathname is replaced', async () => {
