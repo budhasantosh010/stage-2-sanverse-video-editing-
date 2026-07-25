@@ -1,12 +1,31 @@
 # Current State
 
-Last updated: 2026-07-14
+Last updated: 2026-07-25
 
 ## Active goal
 
-**G1 — Runnable web UX validation and renderer feasibility**
+**G1 closing / G4 next — the manual edit loop is verified; the first AI-operated edit is the next capability**
 
-## State summary
+## Verified as of 2026-07-25 (read this first)
+
+A real-browser end-to-end walkthrough on a 30-second 1080p clip completed the
+entire manual loop: upload, reopen from Recent projects, point, nameplate,
+preview, accept, undo, redo, export, download, and a correct exported MP4
+confirmed by probe and extracted frames. Accepted history persists to disk and
+survives reload. The exported nameplate matches the preview and appears only
+inside its time window. The source file is byte-identical after import.
+
+That walkthrough found and fixed a defect that was silently blocking **every
+new upload** — the media identity guard rejected Windows 64-bit NTFS file IDs
+(FAIL-006) — plus misleading failure copy (FAIL-008) and 5 stale test contracts.
+Evidence: 220/220 tests, all three builds, live re-verification, commit
+`fcc41eb` pushed. Full detail: `DOCS/changes/2026-07-25-claude-e2e-test-and-identity-fix.md`.
+
+Still absent: AI/chat interpretation, cut/trim/split, timeline, motion, effects,
+captions, other component types, accounts, and SaaS operations. Render of a 30s
+1080p clip takes roughly 60–85 seconds; the owner has deprioritized speed.
+
+## State summary (historical detail below)
 
 - The Stage 2 workspace began without product files or valid Git metadata.
 - The Stage 1 project and the prior anti-drift template were inspected read-only.
