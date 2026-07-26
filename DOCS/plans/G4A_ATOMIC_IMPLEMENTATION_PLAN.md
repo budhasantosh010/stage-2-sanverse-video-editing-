@@ -63,10 +63,17 @@ changes one, update this plan and the corresponding decision before code.
 
 ### 2.1 JSON-safe rational time
 
+> **OWNER DECISION 2026-07-27 (amendment).** One timescale is fixed for the
+> whole project at creation. Per-value timescales are rejected. See rationale
+> below.
+
 ```ts
+/** Fixed for the life of a project. Chosen at project creation. */
+export const PROJECT_TIMESCALE = 1_440_000 as const
+
 export type MediaTime = Readonly<{
   ticks: number
-  timescale: number
+  timescale: typeof PROJECT_TIMESCALE
 }>
 
 export type TimeRange = Readonly<{
@@ -78,8 +85,13 @@ export type TimeRange = Readonly<{
 Rules:
 
 - `ticks` is a safe integer.
-- `timescale` is a positive safe integer.
-- Different timescales compare through checked rational arithmetic.
+- `timescale` is always `PROJECT_TIMESCALE`. Any other value is invalid input.
+- Because the timescale is uniform, comparison is integer comparison of
+  `ticks`. No cross-multiplication, no rational arithmetic, no overflow path,
+  and no rounding policy inside the domain.
+- Media whose native timebase does not divide `PROJECT_TIMESCALE` is converted
+  **once, at import**, by the asset adapter, which records the conversion and
+  the residual error on the asset. The domain never rounds.
 - Ranges are half-open: `[start, start + duration)`.
 - Duration is positive unless a specific contract explicitly permits zero.
 - UI seconds and milliseconds are derived views, never canonical truth.
@@ -162,11 +174,20 @@ export type Anchor =
   | 'bottom-right'
 
 export type SpatialTarget = Readonly<{
-  coordinateSpace: 'source-normalized'
+  coordinateSpace: 'source-normalized' | 'composition-normalized'
   point: NormalizedPoint
   anchor: Anchor
 }>
 ```
+
+> **OWNER DECISION 2026-07-27 (amendment).** `composition-normalized` is added
+> and the nameplate uses it. Rationale: a nameplate is a graphic placed on the
+> finished frame, not a marker attached to something inside the footage. The
+> two spaces are numerically identical today because output dimensions equal
+> source dimensions; they diverge the first time G6 produces a portrait crop of
+> landscape source. `source-normalized` is retained for future edits that must
+> stick to filmed content (object tracking, "circle that microphone").
+> Every `SpatialTarget` must state its space explicitly; there is no default.
 
 G4-A must not silently preserve the current top-left assumption. The owner
 must approve the default anchor and near-edge placement behavior before the
@@ -384,6 +405,14 @@ normal PowerShell and record the actual result.
 - Create: `DOCS/adr/ADR-002-project-v2-and-time-model.md`
 - Create: `DOCS/adr/ADR-003-canonical-render-contract.md`
 
+**Already decided on 2026-07-27 — carry into ADR-002 as settled, do not reopen:**
+
+- **Time:** one fixed `PROJECT_TIMESCALE = 1_440_000` per project (§2.1).
+- **Space:** `SpatialTarget.coordinateSpace` supports both
+  `source-normalized` and `composition-normalized`; the nameplate uses
+  `composition-normalized` (§2.5).
+- **Evidence:** Task G4A-07b runs before G4A-08.
+
 **Steps:**
 
 1. Review the proposed time representation in plain language.
@@ -516,6 +545,41 @@ composition, overlong text, invalid anchor, unknown fields, unknown operations.
 clip/composition IDs with bounded text and explicit interval.
 
 **Commit:** `feat(domain): add scale-ready nameplate operation`
+
+### Task G4A-07b: Throwaway real-media proof spike
+
+> **OWNER DECISION 2026-07-27 (amendment).** Added task. Rationale below.
+
+**Objective:** Prove the new time, asset, composition, and nameplate contracts
+survive contact with real media **before** eleven further tasks are built on
+top of them — without forcing a second migration of real user data.
+
+**Why this task exists.** Tasks G4A-02 through G4A-10 all change serialized
+shape, so migration must run once, after all of them. That ordering is correct
+and is not being changed. The risk it creates is different: roughly eleven
+tasks of pure contract work would complete with zero evidence that the model
+matches how real MP4s actually behave. This task buys that evidence early at
+low cost.
+
+**Files:**
+
+- Create: `scripts/spike-g4a-real-media.mjs` *(deleted at G4A-19; never imported
+  by product code)*
+- Create: `DOCS/evidence/g4a-spike-<date>.md`
+
+**Steps:**
+
+1. Probe a real Stage 1 MP4 and a real 29.97 fps clip with ffprobe.
+2. Convert both to `MediaTime` at `PROJECT_TIMESCALE`; record residual error.
+3. Build a single-clip `Composition` in memory. No persistence. No migration.
+4. Build one nameplate operation and one `RenderPlan` from it.
+5. Run FFmpeg from that plan. Play the output. Look at it.
+6. Record what held and what broke in the evidence file.
+
+**Stop condition:** If the model cannot express real media exactly, amend the
+contracts before G4A-08, not after G4A-18.
+
+**Commit:** `chore(evidence): prove G4-A contracts against real media`
 
 ### Task G4A-08: Add capabilities
 
