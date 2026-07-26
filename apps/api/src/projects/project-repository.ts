@@ -46,6 +46,8 @@ export interface ProjectRepository {
   readProject(projectId: string): Promise<ProjectManifest>
   readProjectState(projectId: string): Promise<string | null>
   saveProjectState(projectId: string, serializedProject: string): Promise<void>
+  /** Where the controlled source media lives, for probing without exporting. */
+  resolveMediaPaths(projectId: string): Promise<{ sourcePath: string; trustedWorkDir: string }>
   allocateExport(projectId: string, exportId: string): Promise<ProjectExportPaths>
   inspectExport(projectId: string, exportId: string): Promise<{ size: number }>
   openExport(projectId: string, exportId: string, range?: MediaRange): Promise<OpenMediaResult>

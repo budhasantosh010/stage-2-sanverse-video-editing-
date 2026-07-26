@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { AddNameplateAction } from '@sanverse/edit-domain/actions'
+import { ms, probeJson, testOverlayNode, testPlan } from '../test-fixtures.ts'
 import {
   buildFfmpegArguments,
   createCommandRunner,
@@ -20,25 +20,8 @@ class FakeChild extends EventEmitter {
   kill = vi.fn(() => true)
 }
 
-const action = (overrides: Partial<AddNameplateAction> = {}): AddNameplateAction => ({
-  schemaVersion: 'sanverse.action/v1',
-  actionId: 'action-1',
-  kind: 'add-nameplate',
-  target: { x: 1, y: 1, sourceTimeMs: 1_000 },
-  primaryText: String.raw`O'Brien, CEO: C:\clips\[safe]`,
-  secondaryText: '50% %{pts}; safe',
-  startMs: 1_000,
-  durationMs: 5_000,
-  ...overrides,
-})
-
-const probe = (durationSeconds = 8, hasAudio = true) => JSON.stringify({
-  streams: [
-    { codec_type: 'video', width: 1280, height: 720 },
-    ...(hasAudio ? [{ codec_type: 'audio' }] : []),
-  ],
-  format: { duration: String(durationSeconds) },
-})
+const probe = probeJson
+const PRIMARY_TEXT = String.raw`O'Brien, CEO: C:\clips\[safe]`
 
 describe('FFmpeg render adapter', () => {
   it('builds an argument array with externalized text, copied audio, bounded placement, and no shell string', () => {
@@ -46,9 +29,7 @@ describe('FFmpeg render adapter', () => {
       sourcePath: String.raw`C:\source video.mp4`,
       outputPath: String.raw`C:\trusted output\render.mp4`,
       fontPath: 'font.ttf',
-      width: 1280,
-      height: 720,
-      actions: [action()],
+      plan: testPlan(),
     })
 
     expect(args[args.indexOf('-i') + 1]).toBe(String.raw`C:\source video.mp4`)
@@ -60,36 +41,53 @@ describe('FFmpeg render adapter', () => {
     expect(args.at(-1)).toBe(String.raw`C:\trusted output\render.mp4`)
     const filter = args[args.indexOf('-vf') + 1]
     expect(filter).not.toContain('drawbox=')
-    expect(filter).toContain('fontcolor=0xffffff:fontsize=25')
+    expect(filter).toContain('fontcolor=0xffffff@1:fontsize=25')
+    expect(filter).toContain('fontcolor=0xffffff@0.78')
     expect(filter).toContain('box=1:boxcolor=0x000000@0.82:boxborderw=8')
-    expect(filter).toContain("fontfile='font.ttf':textfile='primary-0.txt'")
-    expect(filter).toContain("fontfile='font.ttf':textfile='secondary-0.txt'")
+    expect(filter).toContain("textfile='primary-0.txt'")
+    expect(filter).toContain("textfile='secondary-0.txt'")
+    expect(filter).toContain("fontfile='font.ttf'")
     expect(filter).not.toContain("O'Brien")
     expect(filter).toContain('expansion=none')
-    expect(filter).toContain(String.raw`gte(t\,1.000)*lt(t\,6.000)`)
+    expect(filter).toContain(String.raw`gte(t\,1.000000000)*lt(t\,6.000000000)`)
   })
 
-  it('renders the compact dark preview style instead of a fixed light panel', () => {
+  it('takes every visual number from the shared style contract, scaled to the video', () => {
     const args = buildFfmpegArguments({
       sourcePath: 'source.mp4',
       outputPath: 'output.mp4',
       fontPath: 'font.ttf',
-      width: 714,
-      height: 1280,
-      actions: [action({
-        target: { x: 0.25, y: 0.25, sourceTimeMs: 0 },
-        primaryText: 'hello text',
-        secondaryText: '',
-        startMs: 0,
-      })],
+      plan: testPlan({
+        width: 714,
+        height: 1280,
+        nodes: [testOverlayNode({
+          target: { coordinateSpace: 'composition-normalized', point: { x: 0.25, y: 0.25 }, anchor: 'center' },
+          primaryText: 'hello text',
+          secondaryText: '',
+          interval: { start: ms(0), duration: ms(5_000) },
+        })],
+      }),
     })
 
     const filter = args[args.indexOf('-vf') + 1]
     expect(filter).not.toContain('drawbox=')
-    expect(filter).toContain('fontcolor=0xffffff:fontsize=25')
-    expect(filter).toContain('box=1:boxcolor=0x000000@0.82:boxborderw=8')
-    expect(filter).toContain('x=187:y=328')
+    // 714 is the shortest edge here, so sizes follow it rather than the height.
+    expect(filter).toContain(`fontsize=${Math.round(714 * 0.035)}`)
+    expect(filter).toContain(`boxborderw=${Math.round(714 * 0.011)}`)
     expect(filter).toContain('fix_bounds=1')
+    // Placement is an expression so FFmpeg applies the shared clamp using the
+    // real measured text box, exactly as the browser does.
+    expect(filter).toContain('text_w')
+    expect(filter).not.toContain("textfile='secondary-0.txt'")
+  })
+
+  it('rejects a plan whose overlay runs past the end of the video', () => {
+    expect(() => buildFfmpegArguments({
+      sourcePath: 'source.mp4',
+      outputPath: 'output.mp4',
+      fontPath: 'font.ttf',
+      plan: testPlan({ nodes: [testOverlayNode({ interval: { start: ms(7_000), duration: ms(5_000) } })] }),
+    })).toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
   })
 
   it('does not settle cancellation until the spawned process closes and catches the post-spawn abort race', async () => {
@@ -145,21 +143,28 @@ describe('FFmpeg render adapter', () => {
       sourcePath: 'source.mp4',
       outputPath: 'output.mp4',
       fontPath: 'font.ttf',
-      width: 1280,
-      height: 720,
     }
 
     expect(() => buildFfmpegArguments({
       ...base,
-      actions: [action({ durationMs: -1 })],
+      plan: testPlan({ nodes: [testOverlayNode({ interval: { start: ms(0), duration: ms(0) } })] }),
     })).toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
     expect(() => buildFfmpegArguments({
       ...base,
-      actions: [action({ primaryText: 'x'.repeat(4097) })],
+      plan: testPlan({ nodes: [testOverlayNode({ primaryText: 'x'.repeat(4097) })] }),
     })).toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
     expect(() => buildFfmpegArguments({
       ...base,
-      actions: Array.from({ length: 101 }, (_, index) => action({ actionId: `action-${index}` })),
+      plan: testPlan({
+        nodes: Array.from({ length: 513 }, (_, index) => testOverlayNode({ nodeId: `operation_${index}` })),
+      }),
+    })).toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
+    expect(() => buildFfmpegArguments({ ...base, plan: testPlan({ nodes: [] }) }))
+      .toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
+    // An unrecognised node is refused, never skipped.
+    expect(() => buildFfmpegArguments({
+      ...base,
+      plan: testPlan({ nodes: [{ ...testOverlayNode(), kind: 'colour-grade' } as never] }),
     })).toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
   })
 
@@ -188,14 +193,14 @@ describe('FFmpeg render adapter', () => {
       sourcePath,
       outputPath,
       trustedWorkDir: work,
-      actions: [action()],
+      plan: testPlan(),
     })
 
     expect(result).toMatchObject({ outputPath, width: 1280, height: 720, durationMs: 8_000, hasAudio: true })
     expect(await readFile(outputPath, 'utf8')).toBe('rendered')
     expect(calls).toHaveLength(3)
     expect(calls[1].args.at(-1)).not.toBe(outputPath)
-    expect(externalizedPrimary).toBe(action().primaryText)
+    expect(externalizedPrimary).toBe(PRIMARY_TEXT)
   })
 
   it('rebuilds output from the canonical parent instead of publishing through a junction spelling', async () => {
@@ -219,7 +224,7 @@ describe('FFmpeg render adapter', () => {
       sourcePath,
       outputPath: join(outputAlias, 'export.mp4'),
       trustedWorkDir: work,
-      actions: [action()],
+      plan: testPlan(),
     })
 
     expect(result.outputPath).toBe(join(actualOutputDir, 'export.mp4'))
@@ -241,7 +246,7 @@ describe('FFmpeg render adapter', () => {
     }
     const renderer = createFfmpegRenderAdapter({ fontPath, runCommand })
 
-    await expect(renderer.render({ sourcePath, outputPath, trustedWorkDir: work, actions: [action()] }))
+    await expect(renderer.render({ sourcePath, outputPath, trustedWorkDir: work, plan: testPlan() }))
       .rejects.toMatchObject({ code: 'RENDER_OUTPUT_INVALID' })
     expect(await readFile(outside, 'utf8')).toBe('outside')
   })
@@ -264,7 +269,7 @@ describe('FFmpeg render adapter', () => {
       sourcePath,
       outputPath,
       trustedWorkDir: work,
-      actions: [action({ startMs: 2_050, durationMs: 10 })],
+      plan: testPlan({ nodes: [testOverlayNode({ interval: { start: ms(2_050), duration: ms(10) } })] }),
     })).rejects.toMatchObject({ code: 'RENDER_INPUT_INVALID' })
     expect(runCommand).toHaveBeenCalledOnce()
   })
@@ -287,7 +292,7 @@ describe('FFmpeg render adapter', () => {
     await writeFile(fontPath, 'font')
     const renderer = createFfmpegRenderAdapter({ fontPath, runCommand })
 
-    await expect(renderer.render({ sourcePath, outputPath, trustedWorkDir: work, actions: [action()] }))
+    await expect(renderer.render({ sourcePath, outputPath, trustedWorkDir: work, plan: testPlan() }))
       .rejects.toMatchObject({ code })
     await expect(readFile(outputPath)).rejects.toMatchObject({ code: 'ENOENT' })
   })
@@ -307,13 +312,13 @@ describe('FFmpeg render adapter', () => {
       sourcePath,
       outputPath: join(work, '..', 'outside.mp4'),
       trustedWorkDir: work,
-      actions: [action()],
+      plan: testPlan(),
     })).rejects.toMatchObject({ code: 'RENDER_PATH_INVALID' })
     await expect(renderer.render({
       sourcePath,
       outputPath: join(work, 'cancelled.mp4'),
       trustedWorkDir: work,
-      actions: [action()],
+      plan: testPlan(),
       signal: controller.signal,
     })).rejects.toMatchObject({ code: 'RENDER_CANCELLED' })
     expect(runCommand).not.toHaveBeenCalled()
@@ -339,7 +344,7 @@ describe('FFmpeg render adapter', () => {
     }
     const renderer = createFfmpegRenderAdapter({ fontPath, runCommand })
 
-    await expect(renderer.render({ sourcePath, outputPath, trustedWorkDir: work, actions: [action()] }))
+    await expect(renderer.render({ sourcePath, outputPath, trustedWorkDir: work, plan: testPlan() }))
       .rejects.toMatchObject({ code: 'RENDER_OUTPUT_INVALID' })
     await expect(readFile(outputPath)).rejects.toMatchObject({ code: 'ENOENT' })
   })
@@ -368,7 +373,7 @@ describe('FFmpeg render adapter', () => {
       sourcePath,
       outputPath,
       trustedWorkDir: work,
-      actions: [action()],
+      plan: testPlan(),
       signal: controller.signal,
     })).rejects.toMatchObject({ code: 'RENDER_CANCELLED' })
     await expect(readFile(outputPath)).rejects.toMatchObject({ code: 'ENOENT' })

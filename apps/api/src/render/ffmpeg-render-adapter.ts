@@ -2,56 +2,40 @@ import { createHash, randomUUID } from 'node:crypto'
 import { constants, createReadStream } from 'node:fs'
 import { chmod, copyFile, link, lstat, mkdir, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
-import { spawn } from 'node:child_process'
 
-import { validateAddNameplateAction, type AddNameplateAction } from '@sanverse/edit-domain/actions'
+import { PROJECT_TIMESCALE } from '@sanverse/edit-domain/time'
+import { validateRenderPlan, type RenderPlan, type TextOverlayNode } from '@sanverse/render-contract'
+import {
+  NAMEPLATE_STYLE_V1,
+  anchorFraction,
+  ffmpegPlacementExpression,
+  resolveNameplateMetrics,
+  toFfmpegColor,
+} from '@sanverse/render-contract/nameplate-style'
+
+import { createCommandRunner, type CommandRunner } from '../process/command-runner.ts'
+import { createFfprobeMediaProbe, type MediaProbePort } from '../media/media-probe.ts'
 import { RenderError, type RenderPort, type RenderRequest, type RenderResult } from './render-port.ts'
 
-const MAX_TOOL_OUTPUT_BYTES = 1024 * 1024
 const DURATION_TOLERANCE_MS = 100
-const NAMEPLATE_PRIMARY_FONT_RATIO = 0.035
-const NAMEPLATE_SECONDARY_FONT_RATIO = 0.026
-const NAMEPLATE_PADDING_RATIO = 0.011
-const NAMEPLATE_BACKGROUND = '0x000000@0.82'
-const MAX_ACTIONS_PER_RENDER = 100
 const MAX_TEXT_BYTES = 4096
 
-export type CommandInvocation = {
-  readonly executable: string
-  readonly args: readonly string[]
-  readonly cwd: string
-  readonly signal?: AbortSignal
-}
-
-export type CommandResult = {
-  readonly exitCode: number
-  readonly stdout: string
-  readonly stderr: string
-}
-
-export type CommandRunner = (invocation: CommandInvocation) => Promise<CommandResult>
+export type { CommandInvocation, CommandResult, CommandRunner } from '../process/command-runner.ts'
+export { createCommandRunner } from '../process/command-runner.ts'
 
 type AdapterOptions = {
   readonly fontPath: string
   readonly ffmpegExecutable?: string
   readonly ffprobeExecutable?: string
   readonly runCommand?: CommandRunner
-}
-
-type MediaProbe = {
-  readonly width: number
-  readonly height: number
-  readonly durationMs: number
-  readonly hasAudio: boolean
+  readonly mediaProbe?: MediaProbePort
 }
 
 type BuildArgumentsInput = {
   readonly sourcePath: string
   readonly outputPath: string
   readonly fontPath: string
-  readonly width: number
-  readonly height: number
-  readonly actions: readonly AddNameplateAction[]
+  readonly plan: RenderPlan
 }
 
 function renderError(code: RenderError['code'], message: string): RenderError {
@@ -67,54 +51,90 @@ function isInside(root: string, candidate: string): boolean {
   return path === '' || (!path.startsWith('..') && !isAbsolute(path))
 }
 
-function finitePositiveInteger(value: number, label: string): void {
-  if (!Number.isSafeInteger(value) || value <= 0) {
-    throw renderError('RENDER_INPUT_INVALID', `${label} must be a positive integer.`)
+/**
+ * Nine decimals is finer than one tick (about 0.69 microseconds), so the
+ * conversion to FFmpeg's seconds cannot lose a tick at the boundary.
+ */
+const ticksToSeconds = (ticks: number): string => (ticks / PROJECT_TIMESCALE).toFixed(9)
+
+/**
+ * Build the drawtext filters for one nameplate.
+ *
+ * Every number here comes from the shared style contract. This file decides
+ * nothing about how a nameplate looks; it only translates the contract into
+ * FFmpeg's dialect. The browser preview translates the same contract into CSS,
+ * and a test evaluates both and fails if they disagree.
+ */
+function nameplateFilters(node: TextOverlayNode, index: number, plan: RenderPlan, fontPath: string): string[] {
+  const metrics = resolveNameplateMetrics(plan.width, plan.height)
+  const fraction = anchorFraction(node.target.anchor)
+  const startSeconds = ticksToSeconds(node.interval.start.ticks)
+  const endSeconds = ticksToSeconds(node.interval.start.ticks + node.interval.duration.ticks)
+  const enable = `gte(t\\,${startSeconds})*lt(t\\,${endSeconds})`
+
+  const hasSecondary = node.secondaryText.length > 0
+
+  // The whole block is anchored as one unit, then each line is drawn inside it,
+  // so the two lines cannot drift apart from each other.
+  const blockX = ffmpegPlacementExpression({
+    axis: 'x',
+    point: node.target.point.x,
+    anchorFraction: fraction.x,
+    frameSize: plan.width,
+    safeMargin: metrics.safeMargin,
+  })
+  const blockY = ffmpegPlacementExpression({
+    axis: 'y',
+    point: node.target.point.y,
+    anchorFraction: fraction.y,
+    frameSize: plan.height,
+    safeMargin: metrics.safeMargin,
+  })
+
+  const background = toFfmpegColor(NAMEPLATE_STYLE_V1.backgroundColor, NAMEPLATE_STYLE_V1.backgroundOpacity)
+  const shared =
+    `fontfile='${fontPath}':box=1:boxcolor=${background}:boxborderw=${metrics.padding}` +
+    `:fix_bounds=1:expansion=none:enable='${enable}'`
+
+  const filters = [
+    `drawtext=${shared}:textfile='primary-${index}.txt'` +
+      `:fontcolor=${toFfmpegColor(NAMEPLATE_STYLE_V1.primaryColor, NAMEPLATE_STYLE_V1.primaryOpacity)}` +
+      `:fontsize=${metrics.primaryFontSize}:x=${blockX}:y=${blockY}`,
+  ]
+  if (hasSecondary) {
+    // The second line sits a fixed gap below the first, using the same anchored
+    // block origin rather than a separately anchored position.
+    const secondaryY = `(${blockY})+${metrics.primaryFontSize + metrics.lineGap}`
+    filters.push(
+      `drawtext=${shared}:textfile='secondary-${index}.txt'` +
+        `:fontcolor=${toFfmpegColor(NAMEPLATE_STYLE_V1.secondaryColor, NAMEPLATE_STYLE_V1.secondaryOpacity)}` +
+        `:fontsize=${metrics.secondaryFontSize}:x=${blockX}:y=${secondaryY}`,
+    )
   }
+  return filters
 }
 
 export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
-  finitePositiveInteger(input.width, 'Render width')
-  finitePositiveInteger(input.height, 'Render height')
-  if (input.actions.length === 0) {
-    throw renderError('RENDER_INPUT_INVALID', 'At least one accepted action is required.')
+  const plan = validateRenderPlan(input.plan)
+  if (!plan.ok) {
+    throw renderError('RENDER_INPUT_INVALID', 'The render plan is invalid.')
   }
-  if (input.actions.length > MAX_ACTIONS_PER_RENDER) {
-    throw renderError('RENDER_INPUT_INVALID', 'The render contains too many accepted actions.')
+  if (plan.value.nodes.length === 0) {
+    throw renderError('RENDER_INPUT_INVALID', 'At least one accepted edit is required.')
   }
   if (!/^[a-zA-Z0-9._-]+$/.test(input.fontPath)) {
     throw renderError('RENDER_INPUT_INVALID', 'The render font reference must be a fixed workspace filename.')
   }
 
-  const shortestEdge = Math.min(input.width, input.height)
-  const primaryFontSize = Math.max(12, Math.round(shortestEdge * NAMEPLATE_PRIMARY_FONT_RATIO))
-  const secondaryFontSize = Math.max(10, Math.round(shortestEdge * NAMEPLATE_SECONDARY_FONT_RATIO))
-  const padding = Math.max(4, Math.round(shortestEdge * NAMEPLATE_PADDING_RATIO))
   const filters: string[] = []
-
-  input.actions.forEach((action, index) => {
-    const validated = validateAddNameplateAction(action)
+  plan.value.nodes.forEach((node, index) => {
     if (
-      !validated.ok ||
-      Buffer.byteLength(action.primaryText, 'utf8') > MAX_TEXT_BYTES ||
-      Buffer.byteLength(action.secondaryText, 'utf8') > MAX_TEXT_BYTES
+      Buffer.byteLength(node.primaryText, 'utf8') > MAX_TEXT_BYTES ||
+      Buffer.byteLength(node.secondaryText, 'utf8') > MAX_TEXT_BYTES
     ) {
-      throw renderError('RENDER_INPUT_INVALID', 'An accepted action is invalid or exceeds the render text limit.')
+      throw renderError('RENDER_INPUT_INVALID', 'A nameplate exceeds the render text limit.')
     }
-    const x = Math.min(Math.max(0, Math.round(action.target.x * input.width)), input.width - 1)
-    const y = Math.min(Math.max(0, Math.round(action.target.y * input.height)), input.height - 1)
-    const start = action.startMs / 1000
-    const end = (action.startMs + action.durationMs) / 1000
-    const enable = `gte(t\\,${start.toFixed(3)})*lt(t\\,${end.toFixed(3)})`
-
-    filters.push(
-      `drawtext=fontfile='${input.fontPath}':textfile='primary-${index}.txt':fontcolor=0xffffff:fontsize=${primaryFontSize}:box=1:boxcolor=${NAMEPLATE_BACKGROUND}:boxborderw=${padding}:fix_bounds=1:expansion=none:x=${x + padding}:y=${y + padding}:enable='${enable}'`,
-    )
-    if (action.secondaryText.length > 0) {
-      filters.push(
-        `drawtext=fontfile='${input.fontPath}':textfile='secondary-${index}.txt':fontcolor=0xffffff@0.78:fontsize=${secondaryFontSize}:box=1:boxcolor=${NAMEPLATE_BACKGROUND}:boxborderw=${padding}:fix_bounds=1:expansion=none:x=${x + padding}:y=${y + primaryFontSize + (padding * 3)}:enable='${enable}'`,
-      )
-    }
+    filters.push(...nameplateFilters(node, index, plan.value, input.fontPath))
   })
 
   return [
@@ -129,151 +149,20 @@ export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
     '-c:v', 'libx264',
     '-preset', 'medium',
     '-crf', '18',
+    // Pinned so a rendered file's hash is reproducible. Raising this changes
+    // output bytes, so it is a deliberate contract, not a performance dial to
+    // be turned casually. See ADR-003.
     '-threads', '1',
     '-pix_fmt', 'yuv420p',
+    // Audio is copied untouched. This is correct only while nothing cuts the
+    // timeline. The first cut operation (G5-B) must replace this with a real
+    // audio conform step, because copied audio can only be cut at its own
+    // block boundaries and will drift out of sync.
     '-c:a', 'copy',
     '-map_metadata', '-1',
     '-movflags', '+faststart',
     input.outputPath,
   ]
-}
-
-function parseProbe(stdout: string): MediaProbe {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(stdout)
-  } catch {
-    throw renderError('RENDER_OUTPUT_INVALID', 'FFprobe returned invalid JSON.')
-  }
-  if (typeof parsed !== 'object' || parsed === null) {
-    throw renderError('RENDER_OUTPUT_INVALID', 'FFprobe returned an invalid media description.')
-  }
-  const record = parsed as { streams?: unknown; format?: { duration?: unknown } }
-  if (!Array.isArray(record.streams)) {
-    throw renderError('RENDER_OUTPUT_INVALID', 'FFprobe did not report media streams.')
-  }
-  const streams = record.streams.filter((stream): stream is Record<string, unknown> =>
-    typeof stream === 'object' && stream !== null,
-  )
-  const video = streams.find((stream) => stream.codec_type === 'video')
-  const durationSeconds = Number(record.format?.duration)
-  const width = Number(video?.width)
-  const height = Number(video?.height)
-  if (!Number.isSafeInteger(width) || width <= 0 || !Number.isSafeInteger(height) || height <= 0 || !Number.isFinite(durationSeconds) || durationSeconds <= 0) {
-    throw renderError('RENDER_OUTPUT_INVALID', 'FFprobe did not report finite video dimensions and duration.')
-  }
-  return {
-    width,
-    height,
-    durationMs: Math.round(durationSeconds * 1000),
-    hasAudio: streams.some((stream) => stream.codec_type === 'audio'),
-  }
-}
-
-export function createCommandRunner({
-  spawnProcess = spawn,
-}: {
-  spawnProcess?: typeof spawn
-} = {}): CommandRunner {
-  return async (invocation: CommandInvocation): Promise<CommandResult> => {
-    if (invocation.signal?.aborted) throw renderError('RENDER_CANCELLED', 'Export was cancelled.')
-    return new Promise((resolvePromise, reject) => {
-    let stdout = Buffer.alloc(0)
-    let stderr = Buffer.alloc(0)
-    let settled = false
-    let terminalError: unknown
-    const classifyLaunchError = (error: unknown): unknown => {
-      const code = (error as NodeJS.ErrnoException)?.code
-      if (code === 'ENOENT') return renderError('RENDER_TOOL_UNAVAILABLE', `${invocation.executable} is not available.`)
-      if (code === 'EPERM' || code === 'EACCES') {
-        return renderError('RENDER_PROCESS_BLOCKED', `${invocation.executable} was blocked from starting.`)
-      }
-      return renderError('RENDER_FAILED', 'The renderer process could not start.')
-    }
-    let child: ReturnType<typeof spawn>
-    try {
-      child = spawnProcess(invocation.executable, [...invocation.args], {
-        cwd: invocation.cwd,
-        shell: false,
-        windowsHide: true,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      })
-    } catch (error) {
-      reject(classifyLaunchError(error))
-      return
-    }
-    const childStdout = child.stdout!
-    const childStderr = child.stderr!
-    const requestTermination = (error: unknown) => {
-      if (terminalError === undefined) terminalError = error
-      try { child.kill() } catch { /* close/error remains the settlement boundary */ }
-    }
-    const append = (current: Buffer, chunk: Buffer): Buffer => {
-      const next = Buffer.concat([current, chunk])
-      if (next.byteLength > MAX_TOOL_OUTPUT_BYTES) {
-        requestTermination(renderError('RENDER_FAILED', 'Renderer diagnostic output exceeded the safe limit.'))
-        return current
-      }
-      return next
-    }
-    childStdout.on('data', (chunk: Buffer) => {
-      stdout = append(stdout, chunk)
-    })
-    childStderr.on('data', (chunk: Buffer) => {
-      stderr = append(stderr, chunk)
-    })
-    const onAbort = () => {
-      requestTermination(renderError('RENDER_CANCELLED', 'Export was cancelled.'))
-    }
-    invocation.signal?.addEventListener('abort', onAbort, { once: true })
-    if (invocation.signal?.aborted) onAbort()
-    child.once('error', (error) => {
-      if (terminalError === undefined) {
-        terminalError = classifyLaunchError(error)
-      }
-    })
-    child.once('close', (exitCode) => {
-      invocation.signal?.removeEventListener('abort', onAbort)
-      if (settled) return
-      settled = true
-      if (terminalError !== undefined) {
-        reject(terminalError)
-        return
-      }
-      resolvePromise({
-        exitCode: exitCode ?? -1,
-        stdout: stdout.toString('utf8'),
-        stderr: stderr.toString('utf8'),
-      })
-    })
-    })
-  }
-}
-
-const defaultRunCommand = createCommandRunner()
-
-async function probeMedia(
-  executable: string,
-  path: string,
-  cwd: string,
-  runCommand: CommandRunner,
-  signal?: AbortSignal,
-): Promise<MediaProbe> {
-  const result = await runCommand({
-    executable,
-    args: [
-      '-v', 'error',
-      '-show_entries', 'stream=codec_type,width,height:format=duration',
-      '-of', 'json',
-      path,
-    ],
-    cwd,
-    signal,
-  })
-  if (result.exitCode !== 0) {
-    throw renderError('RENDER_OUTPUT_INVALID', 'FFprobe could not validate the media file.')
-  }
-  return parseProbe(result.stdout)
 }
 
 function throwIfCancelled(signal?: AbortSignal): void {
@@ -334,19 +223,34 @@ async function cleanupPrivatePartial(path: string): Promise<void> {
 
 export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
   const ffmpegExecutable = options.ffmpegExecutable ?? 'ffmpeg'
-  const ffprobeExecutable = options.ffprobeExecutable ?? 'ffprobe'
-  const runCommand = options.runCommand ?? defaultRunCommand
+  const runCommand = options.runCommand ?? createCommandRunner()
+  const mediaProbe = options.mediaProbe ?? createFfprobeMediaProbe({
+    ffprobeExecutable: options.ffprobeExecutable,
+    runCommand,
+  })
 
   return {
     async render(request): Promise<RenderResult> {
       if (request.signal?.aborted) throw renderError('RENDER_CANCELLED', 'Export was cancelled.')
+      const plan = validateRenderPlan(request.plan)
+      if (!plan.ok) throw renderError('RENDER_INPUT_INVALID', 'The render plan is invalid.')
+
       const paths = await validatePaths(request, options.fontPath)
-      const sourceProbe = await probeMedia(ffprobeExecutable, paths.sourcePath, paths.work, runCommand, request.signal)
-      for (const action of request.actions) {
-        if (action.startMs >= sourceProbe.durationMs || action.startMs + action.durationMs > sourceProbe.durationMs) {
-          throw renderError('RENDER_INPUT_INVALID', 'An accepted action extends beyond the source duration.')
+      const sourceProbe = await mediaProbe.probe({ path: paths.sourcePath, cwd: paths.work, signal: request.signal })
+
+      // The plan was compiled against the project's own record of the media.
+      // If the file on disk disagrees, something replaced it, and rendering
+      // would silently produce a video that does not match what was approved.
+      if (sourceProbe.width !== plan.value.width || sourceProbe.height !== plan.value.height) {
+        throw renderError('RENDER_INPUT_INVALID', 'The source media no longer matches the project composition.')
+      }
+      for (const node of plan.value.nodes) {
+        const endTicks = node.interval.start.ticks + node.interval.duration.ticks
+        if (endTicks > sourceProbe.duration.ticks) {
+          throw renderError('RENDER_INPUT_INVALID', 'An accepted edit extends beyond the source duration.')
         }
       }
+
       const renderTempDir = resolve(paths.work, `.render-${randomUUID()}`)
       const partialPath = resolve(renderTempDir, 'output.mp4')
       try {
@@ -356,12 +260,12 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
           throw renderError('RENDER_PATH_INVALID', 'The private render workspace is not safe.')
         }
         await copyFile(paths.fontPath, resolve(renderTempDir, 'font.ttf'), constants.COPYFILE_EXCL)
-        await Promise.all(request.actions.flatMap((action, index) => {
+        await Promise.all(plan.value.nodes.flatMap((node, index) => {
           const files = [
-            writeFile(resolve(renderTempDir, `primary-${index}.txt`), action.primaryText, { encoding: 'utf8', flag: 'wx', mode: 0o600 }),
+            writeFile(resolve(renderTempDir, `primary-${index}.txt`), node.primaryText, { encoding: 'utf8', flag: 'wx', mode: 0o600 }),
           ]
-          if (action.secondaryText.length > 0) {
-            files.push(writeFile(resolve(renderTempDir, `secondary-${index}.txt`), action.secondaryText, { encoding: 'utf8', flag: 'wx', mode: 0o600 }))
+          if (node.secondaryText.length > 0) {
+            files.push(writeFile(resolve(renderTempDir, `secondary-${index}.txt`), node.secondaryText, { encoding: 'utf8', flag: 'wx', mode: 0o600 }))
           }
           return files
         }))
@@ -369,9 +273,7 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
           sourcePath: paths.sourcePath,
           outputPath: partialPath,
           fontPath: 'font.ttf',
-          width: sourceProbe.width,
-          height: sourceProbe.height,
-          actions: request.actions,
+          plan: plan.value,
         })
         const rendered = await runCommand({
           executable: ffmpegExecutable,
@@ -390,7 +292,7 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
         if (!outputInfo.isFile() || outputInfo.size <= 0 || outputInfo.nlink !== 1 || canonicalPartial !== partialPath) {
           throw renderError('RENDER_OUTPUT_INVALID', 'FFmpeg did not produce a private regular output file.')
         }
-        const outputProbe = await probeMedia(ffprobeExecutable, partialPath, paths.work, runCommand, request.signal)
+        const outputProbe = await mediaProbe.probe({ path: partialPath, cwd: paths.work, signal: request.signal })
         if (
           outputProbe.width !== sourceProbe.width ||
           outputProbe.height !== sourceProbe.height ||
@@ -416,6 +318,7 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
           durationMs: outputProbe.durationMs,
           hasAudio: outputProbe.hasAudio,
           sha256: outputSha256,
+          projectRevision: plan.value.projectRevision,
         })
       } catch (error) {
         await cleanupPrivatePartial(partialPath).catch(() => undefined)

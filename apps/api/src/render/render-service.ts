@@ -1,8 +1,9 @@
-import { copyAddNameplateAction } from '@sanverse/edit-domain/actions'
-import { validateHistory } from '@sanverse/edit-domain/history'
+import type { EditProject } from '@sanverse/edit-domain'
+import { compileProjectToRenderPlan } from '@sanverse/render-contract/compile-project'
+
 import type { RenderPort, RenderResult } from './render-port.ts'
 
-export type RenderServiceErrorCode = 'RENDER_HISTORY_INVALID' | 'NOTHING_TO_RENDER'
+export type RenderServiceErrorCode = 'RENDER_PROJECT_INVALID' | 'NOTHING_TO_RENDER'
 
 export class RenderServiceError extends Error {
   readonly code: RenderServiceErrorCode
@@ -14,8 +15,8 @@ export class RenderServiceError extends Error {
   }
 }
 
-type ExportAcceptedInput = {
-  readonly history: unknown
+type ExportProjectInput = {
+  readonly project: EditProject
   readonly sourcePath: string
   readonly outputPath: string
   readonly trustedWorkDir: string
@@ -24,19 +25,26 @@ type ExportAcceptedInput = {
 
 export function createRenderService({ renderer }: { renderer: RenderPort }) {
   return {
-    async exportAccepted(input: ExportAcceptedInput): Promise<RenderResult> {
-      const history = validateHistory(input.history)
-      if (!history.ok) {
-        throw new RenderServiceError('RENDER_HISTORY_INVALID', 'Accepted edit history is invalid.')
+    /**
+     * Export what the project actually says, compiled here on the server.
+     *
+     * The browser no longer sends a list of edits to render. It cannot, which
+     * means a tampered or stale client can never cause an export that differs
+     * from the saved project the user approved.
+     */
+    async exportProject(input: ExportProjectInput): Promise<RenderResult> {
+      const plan = compileProjectToRenderPlan(input.project)
+      if (!plan.ok) {
+        throw new RenderServiceError('RENDER_PROJECT_INVALID', 'The project could not be compiled for rendering.')
       }
-      if (history.value.accepted.length === 0) {
+      if (plan.value.nodes.length === 0) {
         throw new RenderServiceError('NOTHING_TO_RENDER', 'Accept at least one edit before exporting.')
       }
       return renderer.render({
         sourcePath: input.sourcePath,
         outputPath: input.outputPath,
         trustedWorkDir: input.trustedWorkDir,
-        actions: Object.freeze(history.value.accepted.map(copyAddNameplateAction)),
+        plan: plan.value,
         signal: input.signal,
       })
     },

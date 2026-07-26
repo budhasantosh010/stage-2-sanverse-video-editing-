@@ -3,9 +3,13 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 
-import { createHistory, createProject, validateProject, validateHistory } from '@sanverse/edit-domain'
+import { createReadStream } from 'node:fs'
+import { stat } from 'node:fs/promises'
+
 import { createFilesystemProjectRepository } from './projects/filesystem-project-repository.ts'
 import { createProjectIntakeService, EXPORT_ID_PATTERN, PROJECT_ID_PATTERN, ProjectIntakeError, type ProjectRepository } from './projects/project-repository.ts'
+import { createProjectStateService, ProjectStateError, type ProjectStateService } from './projects/project-state-service.ts'
+import { createFfprobeMediaProbe, type MediaProbePort } from './media/media-probe.ts'
 import { createFfmpegRenderAdapter } from './render/ffmpeg-render-adapter.ts'
 import { createRenderService } from './render/render-service.ts'
 
@@ -15,9 +19,13 @@ type ServerOptions = {
   allowedOrigins?: readonly string[]
   repository?: ProjectRepository
   renderService?: ReturnType<typeof createRenderService>
+  projectStateService?: ProjectStateService
+  mediaProbe?: MediaProbePort
   exportIdGenerator?: () => string
   fontPath?: string
 }
+
+const CHANGE_SET_ID_ROUTE_PATTERN = /^changeset_[a-z0-9]{8,64}$/
 
 const MAX_EXPORT_REQUEST_BYTES = 1024 * 1024
 
@@ -142,7 +150,9 @@ export function createSanverseServer(options: ServerOptions) {
     idGenerator: () => `project_${randomBytes(16).toString('hex')}`,
   })
   const allowedOrigins = new Set(options.allowedOrigins ?? ['http://127.0.0.1:2000', 'http://localhost:2000'])
-  const renderService = options.renderService ?? (options.fontPath ? createRenderService({ renderer: createFfmpegRenderAdapter({ fontPath: options.fontPath }) }) : undefined)
+  const mediaProbe = options.mediaProbe ?? createFfprobeMediaProbe()
+  const projectState = options.projectStateService ?? createProjectStateService({ repository, mediaProbe })
+  const renderService = options.renderService ?? (options.fontPath ? createRenderService({ renderer: createFfmpegRenderAdapter({ fontPath: options.fontPath, mediaProbe }) }) : undefined)
   const generateExportId = options.exportIdGenerator ?? (() => `export_${randomBytes(16).toString('hex')}`)
 
   return createServer(async (request, response) => {
@@ -177,45 +187,69 @@ export function createSanverseServer(options: ServerOptions) {
         return
       }
 
+      // The exact font the exporter will use, so the browser preview can draw
+      // with the same glyphs instead of whatever font the operating system
+      // happens to supply.
+      if (request.method === 'GET' && requestUrl.pathname === '/api/render-assets/nameplate-font') {
+        if (!options.fontPath) { json(response, 503, { error: 'The render font is not configured.' }); return }
+        const info = await stat(options.fontPath).catch(() => undefined)
+        if (!info?.isFile()) { json(response, 503, { error: 'The render font is not available.' }); return }
+        response.writeHead(200, {
+          'content-type': 'font/ttf',
+          'content-length': info.size,
+          'cache-control': 'private, max-age=3600',
+        })
+        await streamMedia(response, createReadStream(options.fontPath))
+        return
+      }
+
       const projectMatch = /^\/api\/projects\/([^/]+)$/.exec(requestUrl.pathname)
       if (request.method === 'GET' && projectMatch) {
         const projectId = projectMatch[1]
         if (!PROJECT_ID_PATTERN.test(projectId)) { json(response, 404, { error: 'Project was not found.' }); return }
         const manifest = await repository.readProject(projectId)
-        const serialized = await repository.readProjectState(projectId)
-        let history = createHistory()
-        if (serialized !== null) {
-          let parsed: unknown
-          try { parsed = JSON.parse(serialized) }
-          catch { throw Object.assign(new Error('Saved project JSON is invalid.'), { code: 'PROJECT_STATE_INVALID' }) }
-          const project = validateProject(parsed)
-          if (!project.ok || project.value.projectId !== projectId) {
-            throw Object.assign(new Error('Saved project contract is invalid.'), { code: 'PROJECT_STATE_INVALID' })
-          }
-          history = project.value.history
-        }
-        json(response, 200, { ...manifest, history })
+        json(response, 200, { ...manifest, project: await projectState.load(projectId) })
         return
       }
 
-      const historyMatch = /^\/api\/projects\/([^/]+)\/history$/.exec(requestUrl.pathname)
-      if (request.method === 'PUT' && historyMatch) {
-        const projectId = historyMatch[1]
+      // Editing routes are server-authoritative: the browser asks for a change
+      // and is told the resulting project. It never declares the new state, so
+      // a stale or tampered client cannot overwrite work it did not see.
+      const changeSetsMatch = /^\/api\/projects\/([^/]+)\/change-sets$/.exec(requestUrl.pathname)
+      if (request.method === 'POST' && changeSetsMatch) {
+        const projectId = changeSetsMatch[1]
         if (!PROJECT_ID_PATTERN.test(projectId)) { request.resume(); json(response, 404, { error: 'Project was not found.' }); return }
-        await repository.readProject(projectId)
         const payload = await readJsonBody(request)
-        const historyInput = typeof payload === 'object' && payload !== null && 'history' in payload
-          ? (payload as { history: unknown }).history
-          : undefined
-        const history = validateHistory(historyInput)
-        if (!history.ok) {
-          json(response, 400, { error: 'The project history is invalid.', code: 'PROJECT_HISTORY_INVALID' })
-          return
+        if (typeof payload !== 'object' || payload === null || !('changeSet' in payload)) {
+          throw new ApiRequestError('INVALID_JSON', 'A change set is required.')
         }
-        const project = createProject(projectId, history.value)
-        if (!project.ok) throw Object.assign(new Error('Canonical project creation failed.'), { code: 'PROJECT_STATE_INVALID' })
-        await repository.saveProjectState(projectId, JSON.stringify(project.value))
-        json(response, 200, { history: project.value.history })
+        const project = await projectState.accept(projectId, (payload as { changeSet: unknown }).changeSet)
+        json(response, 201, { project })
+        return
+      }
+
+      const activeMatch = /^\/api\/projects\/([^/]+)\/change-sets\/([^/]+)\/active$/.exec(requestUrl.pathname)
+      if (request.method === 'PUT' && activeMatch) {
+        const [projectId, changeSetId] = activeMatch.slice(1)
+        if (!PROJECT_ID_PATTERN.test(projectId) || !CHANGE_SET_ID_ROUTE_PATTERN.test(changeSetId)) {
+          request.resume(); json(response, 404, { error: 'That edit was not found.' }); return
+        }
+        const payload = await readJsonBody(request)
+        const active = typeof payload === 'object' && payload !== null ? (payload as { active?: unknown }).active : undefined
+        if (typeof active !== 'boolean') throw new ApiRequestError('INVALID_JSON', 'A boolean "active" value is required.')
+        json(response, 200, { project: await projectState.setActive(projectId, changeSetId, active) })
+        return
+      }
+
+      const undoRedoMatch = /^\/api\/projects\/([^/]+)\/(undo|redo)$/.exec(requestUrl.pathname)
+      if (request.method === 'POST' && undoRedoMatch) {
+        const [projectId, operation] = undoRedoMatch.slice(1)
+        request.resume()
+        if (!PROJECT_ID_PATTERN.test(projectId)) { json(response, 404, { error: 'Project was not found.' }); return }
+        const project = operation === 'undo'
+          ? await projectState.undo(projectId)
+          : await projectState.redo(projectId)
+        json(response, 200, { project })
         return
       }
 
@@ -224,8 +258,11 @@ export function createSanverseServer(options: ServerOptions) {
         const projectId = createExportMatch[1]
         if (!PROJECT_ID_PATTERN.test(projectId)) { request.resume(); json(response, 404, { error: 'Project was not found.' }); return }
         if (!renderService) { request.resume(); json(response, 503, { error: 'The local renderer is not configured.' }); return }
-        const payload = await readJsonBody(request)
-        if (typeof payload !== 'object' || payload === null || !('history' in payload)) throw new ApiRequestError('INVALID_JSON', 'Accepted edit history is required.')
+        request.resume()
+        // The export renders the saved project, compiled on the server. The
+        // browser cannot supply the edit list, so what is exported is always
+        // what was accepted and stored.
+        const project = await projectState.load(projectId)
         const exportId = generateExportId()
         if (!EXPORT_ID_PATTERN.test(exportId)) throw new Error('exportIdGenerator returned an invalid opaque export ID.')
         const paths = await repository.allocateExport(projectId, exportId)
@@ -234,7 +271,7 @@ export function createSanverseServer(options: ServerOptions) {
         request.once('aborted', cancelDisconnectedRender)
         response.once('close', cancelDisconnectedRender)
         try {
-          const result = await renderService.exportAccepted({ history: (payload as { history: unknown }).history, ...paths, signal: controller.signal })
+          const result = await renderService.exportProject({ project, ...paths, signal: controller.signal })
           if (resolve(result.outputPath) !== resolve(paths.outputPath)) throw new Error('Renderer returned an unexpected output path.')
           if (controller.signal.aborted || response.destroyed) return
           json(response, 201, {
@@ -245,6 +282,7 @@ export function createSanverseServer(options: ServerOptions) {
             height: result.height,
             durationMs: result.durationMs,
             hasAudio: result.hasAudio,
+            projectRevision: result.projectRevision,
           })
         } finally {
           request.off('aborted', cancelDisconnectedRender)
@@ -335,7 +373,25 @@ export function createSanverseServer(options: ServerOptions) {
         json(response, error.code === 'REQUEST_TOO_LARGE' ? 413 : 400, { error: error.message, code: error.code })
         return
       }
-      if (code === 'RENDER_HISTORY_INVALID' || code === 'NOTHING_TO_RENDER' || code === 'RENDER_INPUT_INVALID') {
+      if (error instanceof ProjectStateError) {
+        // A stale edit is the client's problem to retry, not a server fault.
+        if (error.code === 'REVISION_CONFLICT') {
+          json(response, 409, { error: error.message, code: error.code })
+          return
+        }
+        if (error.code === 'CHANGE_SET_REJECTED') {
+          json(response, 400, { error: error.message, code: error.code })
+          return
+        }
+        if (error.code === 'NOTHING_TO_UNDO' || error.code === 'NOTHING_TO_REDO' || error.code === 'CHANGE_SET_UNKNOWN') {
+          json(response, 409, { error: error.message, code: error.code })
+          return
+        }
+        console.error('Project state failed safely.', error)
+        json(response, 500, { error: error.message, code: error.code })
+        return
+      }
+      if (code === 'RENDER_PROJECT_INVALID' || code === 'NOTHING_TO_RENDER' || code === 'RENDER_INPUT_INVALID') {
         json(response, 400, { error: 'The accepted edits cannot be exported.', code })
         return
       }

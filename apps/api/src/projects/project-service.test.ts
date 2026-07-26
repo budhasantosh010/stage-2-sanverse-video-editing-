@@ -58,6 +58,9 @@ function memoryRepository(): ProjectRepository & { published: unknown[]; aborted
     async saveProjectState() {
       throw new Error('not used')
     },
+    async resolveMediaPaths() {
+      throw new Error('not used')
+    },
     async allocateExport() {
       throw new Error('not used')
     },

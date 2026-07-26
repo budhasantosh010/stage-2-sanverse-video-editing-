@@ -370,6 +370,12 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
       return readControlledProjectState(projectId)
     },
 
+    async resolveMediaPaths(projectId: string) {
+      assertProjectId(projectId)
+      const { sourcePath } = await resolvePublishedMedia(projectId)
+      return { sourcePath, trustedWorkDir: dirname(sourcePath) }
+    },
+
     async saveProjectState(projectId: string, serializedProject: string): Promise<void> {
       assertProjectId(projectId)
       if (typeof serializedProject !== 'string' || serializedProject.length === 0 || Buffer.byteLength(serializedProject, 'utf8') > 1024 * 1024) {

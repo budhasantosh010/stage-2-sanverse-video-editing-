@@ -1,10 +1,13 @@
 import { once } from 'node:events'
 import { request } from 'node:http'
-import { mkdtemp } from 'node:fs/promises'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import type { EditProject } from '@sanverse/edit-domain'
+
+import { stubMediaProbe } from './test-fixtures.ts'
 import { createSanverseServer } from './server.ts'
 import type { ProjectRepository } from './projects/project-repository.ts'
 
@@ -50,6 +53,9 @@ function readRepository(bytes: Uint8Array, bodyFactory: () => AsyncIterable<Uint
     async readProject() { throw new Error('not used') },
     async readProjectState() { return null },
     async saveProjectState() { throw new Error('not used') },
+    async resolveMediaPaths(projectId) {
+      return { sourcePath: `C:\safe\${projectId}\source.mp4`, trustedWorkDir: `C:\safe\${projectId}` }
+    },
     async allocateExport(projectId, exportId) {
       return { sourcePath: `C:\\safe\\${projectId}\\source.mp4`, outputPath: `C:\\safe\\${projectId}\\exports\\${exportId}.mp4`, trustedWorkDir: `C:\\safe\\${projectId}` }
     },
@@ -76,6 +82,66 @@ async function listen(server: ReturnType<typeof createSanverseServer>): Promise<
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('missing address')
   return address.port
+}
+
+const PROJECT_ID = 'project_1234567890abcdef'
+
+const MANIFEST = {
+  id: PROJECT_ID,
+  originalFilename: 'owner.mp4',
+  createdAt: '2026-07-14T00:00:00.000Z',
+  sizeBytes: 24,
+  sha256: 'a'.repeat(64),
+  mediaUrl: `/api/projects/${PROJECT_ID}/media`,
+}
+
+const EXPORT_OUTPUT_PATH = (exportId: string) => `C:\\safe\\${PROJECT_ID}\\exports\\${exportId}.mp4`
+
+/** An in-memory stand-in for the one file that holds a project's edits. */
+function savedProjectState(initial: string | null = null) {
+  let serialized = initial
+  return {
+    serialized: () => serialized,
+    repository: {
+      async listProjects() { return [MANIFEST] },
+      async readProject() { return MANIFEST },
+      async readProjectState() { return serialized },
+      async saveProjectState(_projectId: string, value: string) { serialized = value },
+    } satisfies Partial<ProjectRepository>,
+  }
+}
+
+const ms = (milliseconds: number) => ({ ticks: milliseconds * 1_440, timescale: 1_440_000 })
+
+const changeSet = (baseRevision: number, changeSetId = 'changeset_aaaaaaaa') => ({
+  schemaVersion: 'sanverse.change-set/v1',
+  changeSetId,
+  baseRevision,
+  operations: [{
+    schemaVersion: 'sanverse.operation/v2',
+    operationId: `operation_${changeSetId.slice(-8)}`,
+    kind: 'add-nameplate',
+    capabilityId: 'sanverse.nameplate.component/v1',
+    clipId: 'clip_1234567890ab',
+    sampledClipTime: ms(1_000),
+    compositionInterval: { start: ms(1_000), duration: ms(5_000) },
+    target: { coordinateSpace: 'composition-normalized', point: { x: 0.2, y: 0.3 }, anchor: 'center' },
+    primaryText: 'Santosh',
+    secondaryText: 'Founder',
+    extensions: {},
+  }],
+  provenance: { source: 'direct', requestId: null },
+  extensions: {},
+})
+
+async function sendJson(port: number, method: string, path: string, payload: unknown) {
+  const body = new TextEncoder().encode(JSON.stringify(payload))
+  return call(port, {
+    method,
+    path,
+    headers: { 'content-type': 'application/json', 'content-length': String(body.length) },
+    body,
+  })
 }
 
 describe('local API boundary', () => {
@@ -209,32 +275,41 @@ describe('local API boundary', () => {
     expect((await call(address.port, { method: 'POST', path: '/api/projects', headers: { 'content-length': String(mp4().length) }, body: mp4() })).status).toBe(400)
   })
 
-  it('renders accepted history through controlled project paths and serves the export', async () => {
+  it('renders the saved project through controlled paths and serves the export', async () => {
     const rendered = new TextEncoder().encode('rendered-mp4')
     const spy = readRepository(rendered)
-    const exportCalls: unknown[] = []
+    const exportCalls: Array<{ project: EditProject; outputPath: string }> = []
     const renderService = {
-      async exportAccepted(input: { outputPath: string }) {
+      async exportProject(input: { project: EditProject; outputPath: string }) {
         exportCalls.push(input)
-        return { outputPath: input.outputPath, width: 1920, height: 1080, durationMs: 60_000, hasAudio: true, sha256: 'b'.repeat(64) }
+        return { outputPath: input.outputPath, width: 1280, height: 720, durationMs: 8_000, hasAudio: true, sha256: 'b'.repeat(64), projectRevision: input.project.revision }
       },
     }
-    const projectId = 'project_1234567890abcdef'
     const exportId = 'export_1234567890abcdef'
-    const server = createSanverseServer({ dataRoot: 'unused', maxUploadBytes: 100, repository: spy.repository, renderService, exportIdGenerator: () => exportId })
-    const port = await listen(server)
-    const history = {
-      accepted: [{ schemaVersion: 'sanverse.action/v1', actionId: 'action-1', kind: 'add-nameplate', target: { x: 0.2, y: 0.3, sourceTimeMs: 1_000 }, primaryText: 'Santosh', secondaryText: 'Founder', startMs: 1_000, durationMs: 5_000 }],
-      redoStack: [], issuedActionIds: ['action-1'],
-    }
-    const requestBody = new TextEncoder().encode(JSON.stringify({ history }))
+    const state = savedProjectState()
+    const port = await listen(createSanverseServer({
+      dataRoot: 'unused',
+      maxUploadBytes: 100,
+      repository: { ...spy.repository, ...state.repository },
+      mediaProbe: stubMediaProbe(),
+      renderService,
+      exportIdGenerator: () => exportId,
+    }))
 
-    const created = await call(port, { method: 'POST', path: `/api/projects/${projectId}/exports`, headers: { 'content-type': 'application/json', 'content-length': String(requestBody.length) }, body: requestBody })
+    // No edit list is sent. The server compiles what it has stored, so a
+    // tampered or stale client cannot cause an export that differs from the
+    // project the user approved.
+    const created = await call(port, { method: 'POST', path: `/api/projects/${PROJECT_ID}/exports` })
     expect(created.status).toBe(201)
-    expect(JSON.parse(new TextDecoder().decode(created.body))).toMatchObject({ id: exportId, mediaUrl: `/api/projects/${projectId}/exports/${exportId}/media`, sha256: 'b'.repeat(64) })
-    expect(exportCalls).toEqual([expect.objectContaining({ history, sourcePath: `C:\\safe\\${projectId}\\source.mp4`, outputPath: `C:\\safe\\${projectId}\\exports\\${exportId}.mp4` })])
+    expect(JSON.parse(new TextDecoder().decode(created.body))).toMatchObject({
+      id: exportId,
+      mediaUrl: `/api/projects/${PROJECT_ID}/exports/${exportId}/media`,
+      sha256: 'b'.repeat(64),
+    })
+    expect(exportCalls).toHaveLength(1)
+    expect(exportCalls[0].outputPath).toBe(EXPORT_OUTPUT_PATH(exportId))
 
-    const media = await call(port, { path: `/api/projects/${projectId}/exports/${exportId}/media`, headers: { range: 'bytes=0-7' } })
+    const media = await call(port, { path: `/api/projects/${PROJECT_ID}/exports/${exportId}/media`, headers: { range: 'bytes=0-7' } })
     expect(media.status).toBe(206)
     expect(new TextDecoder().decode(media.body)).toBe('rendered')
   })
@@ -242,31 +317,21 @@ describe('local API boundary', () => {
   it('returns a safe actionable code when the operating system blocks the renderer process', async () => {
     const spy = readRepository(new TextEncoder().encode('unused'))
     const renderService = {
-      async exportAccepted() {
+      async exportProject() {
         throw Object.assign(new Error('raw operating system detail must stay local'), { code: 'RENDER_PROCESS_BLOCKED' })
       },
     }
-    const projectId = 'project_1234567890abcdef'
-    const server = createSanverseServer({
+    const state = savedProjectState()
+    const port = await listen(createSanverseServer({
       dataRoot: 'unused',
       maxUploadBytes: 100,
-      repository: spy.repository,
+      repository: { ...spy.repository, ...state.repository },
+      mediaProbe: stubMediaProbe(),
       renderService,
       exportIdGenerator: () => 'export_1234567890abcdef',
-    })
-    const port = await listen(server)
-    const history = {
-      accepted: [{ schemaVersion: 'sanverse.action/v1', actionId: 'action-1', kind: 'add-nameplate', target: { x: 0.2, y: 0.3, sourceTimeMs: 1_000 }, primaryText: 'Santosh', secondaryText: '', startMs: 1_000, durationMs: 5_000 }],
-      redoStack: [], issuedActionIds: ['action-1'],
-    }
-    const requestBody = new TextEncoder().encode(JSON.stringify({ history }))
+    }))
 
-    const response = await call(port, {
-      method: 'POST',
-      path: `/api/projects/${projectId}/exports`,
-      headers: { 'content-type': 'application/json', 'content-length': String(requestBody.length) },
-      body: requestBody,
-    })
+    const response = await call(port, { method: 'POST', path: `/api/projects/${PROJECT_ID}/exports` })
 
     expect(response.status).toBe(503)
     expect(JSON.parse(new TextDecoder().decode(response.body))).toEqual({
@@ -276,45 +341,93 @@ describe('local API boundary', () => {
     expect(new TextDecoder().decode(response.body)).not.toContain('raw operating system detail')
   })
 
-  it('lists recent projects, saves canonical history, and reopens it', async () => {
-    const projectId = 'project_1234567890abcdef'
-    const manifest = {
-      id: projectId,
-      originalFilename: 'owner.mp4',
-      createdAt: '2026-07-14T00:00:00.000Z',
-      sizeBytes: 24,
-      sha256: 'a'.repeat(64),
-      mediaUrl: `/api/projects/${projectId}/media`,
-    }
-    let serializedState: string | null = null
+  it('creates, edits, undoes, and reopens a project with the server owning the revision', async () => {
     const spy = readRepository(mp4())
-    const repository: ProjectRepository = {
-      ...spy.repository,
-      async listProjects() { return [manifest] },
-      async readProject() { return manifest },
-      async readProjectState() { return serializedState },
-      async saveProjectState(_projectId, value) { serializedState = value },
-    }
-    const port = await listen(createSanverseServer({ dataRoot: 'unused', maxUploadBytes: 100, repository }))
+    const state = savedProjectState()
+    const port = await listen(createSanverseServer({
+      dataRoot: 'unused',
+      maxUploadBytes: 100,
+      repository: { ...spy.repository, ...state.repository },
+      mediaProbe: stubMediaProbe(),
+    }))
 
     const listed = await call(port, { path: '/api/projects' })
     expect(listed.status).toBe(200)
-    expect(JSON.parse(new TextDecoder().decode(listed.body))).toEqual({ projects: [manifest] })
+    expect(JSON.parse(new TextDecoder().decode(listed.body))).toEqual({ projects: [MANIFEST] })
 
-    const empty = await call(port, { path: `/api/projects/${projectId}` })
-    expect(JSON.parse(new TextDecoder().decode(empty.body))).toMatchObject({ ...manifest, history: { accepted: [], redoStack: [], issuedActionIds: [] } })
+    // Opening a project with no saved state builds one from the real media, so
+    // the engine finally knows how long the video actually is.
+    const opened = await call(port, { path: `/api/projects/${PROJECT_ID}` })
+    const openedBody = JSON.parse(new TextDecoder().decode(opened.body))
+    expect(openedBody).toMatchObject({ ...MANIFEST, project: { schemaVersion: 'sanverse.project/v2', revision: 0 } })
+    expect(openedBody.project.composition.width).toBe(1280)
 
-    const history = {
-      accepted: [{ schemaVersion: 'sanverse.action/v1', actionId: 'action-1', kind: 'add-nameplate', target: { x: 0.2, y: 0.3, sourceTimeMs: 1_000 }, primaryText: 'Santosh', secondaryText: '', startMs: 1_000, durationMs: 5_000 }],
-      redoStack: [], issuedActionIds: ['action-1'],
-    }
-    const requestBody = new TextEncoder().encode(JSON.stringify({ history }))
-    const saved = await call(port, { method: 'PUT', path: `/api/projects/${projectId}/history`, headers: { 'content-type': 'application/json', 'content-length': String(requestBody.length) }, body: requestBody })
-    expect(saved.status).toBe(200)
-    expect(JSON.parse(new TextDecoder().decode(saved.body))).toEqual({ history })
+    const accepted = await sendJson(port, 'POST', `/api/projects/${PROJECT_ID}/change-sets`, { changeSet: changeSet(0) })
+    expect(accepted.status).toBe(201)
+    expect(JSON.parse(new TextDecoder().decode(accepted.body)).project.revision).toBe(1)
 
-    const reopened = await call(port, { path: `/api/projects/${projectId}` })
-    expect(JSON.parse(new TextDecoder().decode(reopened.body))).toMatchObject({ ...manifest, history })
-    expect(JSON.parse(serializedState ?? '{}')).toEqual({ schemaVersion: 'sanverse.project/v1', projectId, history })
+    // A change set built against a revision that has moved on fails closed
+    // rather than overwriting newer work.
+    const stale = await sendJson(port, 'POST', `/api/projects/${PROJECT_ID}/change-sets`, { changeSet: changeSet(0, 'changeset_bbbbbbbb') })
+    expect(stale.status).toBe(409)
+    expect(JSON.parse(new TextDecoder().decode(stale.body)).code).toBe('REVISION_CONFLICT')
+
+    const undone = await call(port, { method: 'POST', path: `/api/projects/${PROJECT_ID}/undo` })
+    expect(undone.status).toBe(200)
+    expect(JSON.parse(new TextDecoder().decode(undone.body)).project.changeSets).toHaveLength(0)
+
+    const redone = await call(port, { method: 'POST', path: `/api/projects/${PROJECT_ID}/redo` })
+    expect(redone.status).toBe(200)
+    expect(JSON.parse(new TextDecoder().decode(redone.body)).project.changeSets).toHaveLength(1)
+
+    const switchedOff = await sendJson(port, 'PUT', `/api/projects/${PROJECT_ID}/change-sets/changeset_aaaaaaaa/active`, { active: false })
+    expect(switchedOff.status).toBe(200)
+    expect(JSON.parse(new TextDecoder().decode(switchedOff.body)).project.changeSets[0].active).toBe(false)
+
+    const reopened = await call(port, { path: `/api/projects/${PROJECT_ID}` })
+    expect(JSON.parse(new TextDecoder().decode(reopened.body)).project.changeSets[0].active).toBe(false)
+    expect(JSON.parse(state.serialized() ?? '{}').schemaVersion).toBe('sanverse.project/v2')
+  })
+
+  it('upgrades a saved v1 project on open without losing or moving an edit', async () => {
+    const spy = readRepository(mp4())
+    const state = savedProjectState(JSON.stringify({
+      schemaVersion: 'sanverse.project/v1',
+      projectId: PROJECT_ID,
+      history: {
+        accepted: [{ schemaVersion: 'sanverse.action/v1', actionId: 'action-1', kind: 'add-nameplate', target: { x: 0.2, y: 0.3, sourceTimeMs: 1_000 }, primaryText: 'Santosh', secondaryText: '', startMs: 1_000, durationMs: 5_000 }],
+        redoStack: [],
+        issuedActionIds: ['action-1'],
+      },
+    }))
+    const port = await listen(createSanverseServer({
+      dataRoot: 'unused',
+      maxUploadBytes: 100,
+      repository: { ...spy.repository, ...state.repository },
+      mediaProbe: stubMediaProbe(),
+    }))
+
+    const opened = await call(port, { path: `/api/projects/${PROJECT_ID}` })
+    const project = JSON.parse(new TextDecoder().decode(opened.body)).project
+    expect(project.schemaVersion).toBe('sanverse.project/v2')
+    expect(project.changeSets).toHaveLength(1)
+    expect(project.changeSets[0].changeSet.operations[0].primaryText).toBe('Santosh')
+    // v1 put the corner on the clicked point. Migrating to the new centre
+    // default would shift a nameplate in a video the owner already approved.
+    expect(project.changeSets[0].changeSet.operations[0].target.anchor).toBe('top-left')
+    expect(JSON.parse(state.serialized() ?? '{}').schemaVersion).toBe('sanverse.project/v2')
+  })
+
+  it('serves the exact font the exporter uses so the preview can match it', async () => {
+    const fontDir = await mkdtemp(join(tmpdir(), 'sanverse-font-'))
+    const fontPath = join(fontDir, 'font.ttf')
+    await writeFile(fontPath, 'font-bytes')
+    const spy = readRepository(mp4())
+    const port = await listen(createSanverseServer({ dataRoot: 'unused', maxUploadBytes: 100, repository: spy.repository, fontPath }))
+
+    const response = await call(port, { path: '/api/render-assets/nameplate-font' })
+    expect(response.status).toBe(200)
+    expect(response.headers['content-type']).toBe('font/ttf')
+    expect(new TextDecoder().decode(response.body)).toBe('font-bytes')
   })
 })

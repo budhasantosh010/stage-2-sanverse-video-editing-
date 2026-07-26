@@ -1,10 +1,14 @@
-import type { AddNameplateAction } from '@sanverse/edit-domain/actions'
+import type { RenderPlan } from '@sanverse/render-contract'
 
 export type RenderRequest = {
   readonly sourcePath: string
   readonly outputPath: string
   readonly trustedWorkDir: string
-  readonly actions: readonly AddNameplateAction[]
+  /**
+   * The renderer is handed a finished plan, not a project and not a list of
+   * user actions. It makes no editing decisions of its own.
+   */
+  readonly plan: RenderPlan
   readonly signal?: AbortSignal
 }
 
@@ -15,6 +19,8 @@ export type RenderResult = {
   readonly durationMs: number
   readonly hasAudio: boolean
   readonly sha256: string
+  /** Ties the exported file back to the exact project state that produced it. */
+  readonly projectRevision: number
 }
 
 export interface RenderPort {
