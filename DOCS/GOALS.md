@@ -1,61 +1,83 @@
 # Goal Map
 
-The macro goal stays stable. Medium-to-large micro goals are the only roadmap units shown here; individual coding tasks live in plans and the build tracker.
+This is the compact roadmap view. The full definitions, dependencies, consequences, and exit gates live in `MASTER_PLAN.md`. Every tickable item lives in `plans/PLAN_CHECKLIST.md`; implementation detail lives in the linked micro plans.
 
 ```mermaid
 flowchart LR
-  M["Macro goal: finished talking-head video in minutes through chat, point, and draw"]
-  G0["G0 Foundation and continuity"]
-  G1["G1 Interface design and renderer spike"]
-  G2["G2 Canonical project foundation"]
-  G3["G3 First closed manual vertical slice"]
-  G4["G4 First AI-operated edit"]
-  G5["G5 Editorial timeline primitives"]
-  G6["G6 Motion, effects, and composition primitives"]
-  G7["G7 Versioned component platform"]
+  M["Macro: a non-editor finishes a verified talking-head video in minutes"]
+  G0["G0 Foundation"]
+  G1["G1 UX and renderer evidence"]
+  G2["G2 Project foundation"]
+  G3["G3 Manual closed loop"]
+  G4A["G4-A Scale-ready Project v2 chassis"]
+  G4B["G4-B First AI proposal"]
+  G5A["G5-A Captions"]
+  G5B["G5-B Timeline primitives"]
+  G5C["G5-C Useful talking-head workflow"]
+  G6["G6 Motion and effects"]
+  G7["G7 Components and compound AI"]
   G8["G8 Trustworthy local alpha"]
-  G9["G9 API and MCP surfaces"]
-  G10["G10 Full production SaaS operations"]
-  G11["G11 Advanced vision and tracking"]
-  G12["G12 Data flywheel and specialized models"]
+  G9["G9 External API/MCP if justified"]
+  G10["G10 Production SaaS"]
+  G11["G11 Advanced vision"]
+  G12["G12 Data and specialized models"]
 
-  M --> G0 --> G1 --> G2 --> G3 --> G4 --> G5 --> G6 --> G7 --> G8 --> G9 --> G10 --> G11 --> G12
+  M --> G0 --> G1
+  G1 --> G2 --> G3 --> G4A
+  G4A --> G4B
+  G4A --> G5A
+  G4A --> G5B
+  G4B --> G5C
+  G5A --> G5C
+  G5B --> G5C
+  G5C --> G6 --> G7 --> G8
+  G8 -. conditional .-> G9
+  G8 -. conditional .-> G10
+  G9 -. may support .-> G10
+  G8 -. evidence .-> G11 --> G12
 ```
 
 ## Status
 
-Legend: ✅ complete · 🟡 partly complete/open evidence gate · ⬜ not started
+Legend: `[x]` complete, `[~]` partly complete or awaiting owner evidence, `[ ]` not started, `[?]` conditional.
 
-| Goal | Outcome | Status | Exit evidence |
-|---|---|---|---|
-| G0 | Durable product truth, governance, architecture constraints, and approved next plan | ✅ Complete | Local verification, coherent commits, remote baseline, and owner approval |
-| G1 | Owner-tested runnable Home-to-Studio workflow plus measured renderer decision | 🟡 In progress | The application and renderer decision work; final owner approval of motion, native drag-and-drop, and overall Studio UX remains open |
-| G2 | Minimal typed project/action/history/render foundation | ✅ Complete | Typed/versioned nameplate actions, validation, immutable history, undo/redo, persisted project state, renderer boundary, and 220 passing workspace tests |
-| G3 | Upload → select time/region → static nameplate → preview → accept/undo → persist → export | ✅ Complete | Real-video browser workflow, reopened history, correct downloaded MP4, preserved source, and preview/export nameplate fidelity evidence |
-| G4 | Natural-language request becomes a safe structured edit proposal | ⬜ Next — not started | Requires a provider-independent intent boundary, structured validation, clarification, fail-closed behavior, preview, and owner approval before execution |
-| G5 | Cut, trim, split, ripple, reorder, and simple timeline operations | ⬜ Not started | Exact timeline invariants and end-to-end workflows |
-| G6 | Transform, keyframes, easing, spring/bounce, transitions, and basic effects | ⬜ Not started | Deterministic render comparisons and usable controls |
-| G7 | Reusable versioned editing components and templates | ⬜ Not started | Compatibility and migration tests |
-| G8 | Reliable local product used on real videos | ⬜ Not started | Measured completion time, recovery, and quality data |
-| G9 | Stable API/MCP access over the same domain engine | ⬜ Not started | Contract, auth-boundary, and idempotency tests |
-| G10 | Auth, tenancy, billing, queues, cloud storage/rendering, security, and operations | ⬜ Not started | Production readiness and operational evidence |
-| G11 | Object understanding, tracking, segmentation, and advanced spatial edits | ⬜ Not started | Dataset-backed quality and failure-mode evidence |
-| G12 | Learning loop and specialized models where data proves value | ⬜ Not started | Privacy, evaluation, and measurable improvement |
+| Goal | Outcome | Status |
+|---|---|---|
+| G0 | Durable product truth, governance, architecture constraints, and rollback baseline | [x] |
+| G1 | Owner-tested Home-to-Studio workflow and renderer evidence | [~] Owner motion, native drag-and-drop, and final Studio UX evidence remain open |
+| G2 | Minimal typed project/action/history/render foundation | [x] |
+| G3 | Upload through persisted accepted edit and downloadable MP4 | [x] |
+| G4-A | Project v2 semantics, capability registry, change sets, render plan, and migration seam | [ ] Proposed next implementation goal; not approved or started |
+| G4-B | Natural language becomes a safe pending edit proposal | [ ] |
+| G5-A | Correct, reviewable captions | [ ] |
+| G5-B | Cut, trim, split, ripple, reorder, audio level, and fades | [ ] |
+| G5-C | A genuinely useful talking-head workflow combining AI, captions, and timeline work | [ ] |
+| G6 | Transform, keyframes, easing, bounce, transitions, and basic effects | [ ] |
+| G7 | Versioned reusable components and compound AI plans | [ ] |
+| G8 | Recoverable, measurable local alpha used on real videos | [ ] |
+| G9 | Stable external API/MCP over the same engine | [?] Build only when an external-client use case is proven |
+| G10 | Identity, tenancy, cloud jobs/storage/rendering, billing, security, and operations | [?] Enter when local-alpha evidence and distribution intent justify SaaS |
+| G11 | Tracking, segmentation, occlusion, and advanced spatial editing | [?] Evidence-driven |
+| G12 | Evaluation flywheel, routing, and specialized models | [?] Consent- and data-driven |
 
 ## Current position
 
-- ✅ The deterministic manual nameplate loop is complete from upload through persisted history and downloaded export.
-- 🟡 G1 remains open only for the owner's final interaction and motion-quality acceptance; this must not be misreported as finished.
-- ⬜ G4 is the next major implementation goal: one natural-language request must become one safe, validated, previewable nameplate proposal that cannot execute without user approval.
-- ⬜ Timeline primitives, motion/effects, reusable components, local-alpha hardening, external APIs, SaaS operations, advanced vision, and the learning loop remain later goals.
+- The deterministic manual nameplate loop is complete and verified with real media.
+- G1 has an owner-only evidence gap; automation cannot truthfully close it.
+- The complete roadmap is **proposed and awaiting owner approval**.
+- If approved, G4-A is the next implementation goal. It comes before provider integration because current v1 semantics are too narrow to support the later timeline, caption, motion, component, and AI layers safely.
+- No G4-A or later product implementation has started merely because these plans now exist.
 
 ## Anti-drift measurement
 
-At every goal exit, compare the observed result against the macro goal using four measures:
+At every goal exit, record:
 
-1. Time-to-finished-video
-2. Amount of editor knowledge required
-3. Percentage of requested edits accepted without manual repair
-4. Recovery quality when interpretation or rendering fails
+1. Median time from import to acceptable export.
+2. Editor knowledge the user needed.
+3. Proposal acceptance without manual repair.
+4. Preview/export agreement.
+5. Failure recovery quality.
+6. Preservation of source media, history, and project reopenability.
+7. Exact evidence level: unit, integration, real media, real browser, or owner acceptance.
 
-Do not use a single invented “percentage complete.” Each goal closes only on its own evidence gate.
+Never publish one invented percentage-complete number. A box closes only when its named evidence exists.

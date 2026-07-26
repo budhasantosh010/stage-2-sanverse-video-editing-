@@ -6,12 +6,17 @@ This file maps each durable project question to one canonical answer.
 |---|---|
 | Where do I resume? | `START_HERE.md` |
 | What are we building and why? | `DOCS/MACRO_GOAL.md` |
+| What is the complete proposed macro roadmap? | `DOCS/MASTER_PLAN.md` |
 | Where are we on the roadmap? | `DOCS/GOALS.md` and `DOCS/CURRENT_STATE.md` |
+| Where is the single tickable checklist? | `DOCS/plans/PLAN_CHECKLIST.md` |
+| Where are all later micro plans? | `DOCS/plans/COMPLETE_MICRO_PLAN.md` |
+| Where is the atomic next-goal plan? | `DOCS/plans/G4A_ATOMIC_IMPLEMENTATION_PLAN.md` |
+| Where are the cross-cutting quality and evidence tracks? | `DOCS/plans/CROSS_CUTTING_VALIDATION_PLAN.md` |
 | What exactly has the owner required? | `DOCS/REQUIREMENTS.md` |
 | What architecture/product choices are approved? | `DOCS/DECISIONS.md` |
 | What is the interface direction? | `DOCS/INTERFACE_PRINCIPLES.md` |
 | What interface flow and wireframes are under review? | `DOCS/design/2026-07-12-g1-first-edit-flow.md`, `DOCS/design/2026-07-12-g1-home-wireframe.svg`, and `DOCS/design/2026-07-12-g1-studio-wireframe.svg` |
-| What is being built next? | Latest approved file in `DOCS/plans/` |
+| What is being built next? | Latest owner-approved file in `DOCS/plans/`; currently none |
 | How will pointing become the first real edit loop? | `DOCS/plans/2026-07-13-first-pointed-nameplate-loop.md` (queued after the G1 renderer decision) |
 | How do I run and evaluate the local frontend? | `DOCS/LOCAL_DEVELOPMENT.md` |
 | Where is renderer-spike evidence? | `spikes/renderer/README.md` and `DOCS/runs/` |

@@ -1,0 +1,240 @@
+# Stage 2 Roll-Up Plan Checklist
+
+Status: **Proposed for owner approval**
+
+This is the compact ticking surface. Do not put implementation explanations
+here; link evidence and use `COMPLETE_MICRO_PLAN.md` for the atomic work.
+
+Legend:
+
+- `[x]` complete with recorded evidence
+- `[ ]` not complete
+- `E0-E5` use `DOCS/CHANGE_POLICY.md`
+
+## Completed foundation
+
+- [x] G0 requirements, decisions, anti-drift, Git, and remote baseline
+- [ ] G1 final owner motion, native drag-and-drop, and Studio UX acceptance
+- [x] G2 narrow v1 typed nameplate domain, history, persistence, and renderer boundary
+- [x] G3 real manual nameplate loop through verified MP4 download
+
+## G4-A - Scale-ready chassis
+
+- [ ] G4A-01 Approve the G4-A specification and scope
+- [ ] G4A-02 Freeze rational time and half-open range semantics
+- [ ] G4A-03 Freeze asset identity and metadata contract
+- [ ] G4A-04 Freeze composition, track, and clip contract
+- [ ] G4A-05 Freeze geometry and anchor contract
+- [ ] G4A-06 Freeze project revision and stale-proposal contract
+- [ ] G4A-07 Freeze atomic change-set and dependency contract
+- [ ] G4A-08 Freeze strict-core and preserved-extension policy
+- [ ] G4A-09 Freeze three-level capability contract
+- [ ] G4A-10 Freeze canonical render specification
+- [ ] G4A-11 Implement Project v2 domain through TDD
+- [ ] G4A-12 Implement v1-to-v2 migration, backup, idempotency, and rollback
+- [ ] G4A-13 Persist and reopen Project v2 safely
+- [ ] G4A-14 Compile accepted change sets to the canonical render plan
+- [ ] G4A-15 Adapt browser preview to the canonical render plan
+- [ ] G4A-16 Adapt FFmpeg export to the canonical render plan
+- [ ] G4A-17 Prove invalid times/text cannot enter accepted state
+- [ ] G4A-18 Prove stale proposals and unsupported actions fail closed
+- [ ] G4A-19 Prove one change set equals one undo
+- [ ] G4A-20 Prove selective removal preserves or explicitly invalidates dependent work
+- [ ] G4A-21 Run real migration, reopen, preview, export, and rollback evidence
+- [ ] G4A-22 Owner approves G4-A exit
+
+## G4-B - First safe AI edit
+
+- [ ] G4B-01 Approve the AI nameplate prompt/intent contract
+- [ ] G4B-02 Add provider-independent intent candidate types
+- [ ] G4B-03 Add deterministic fake provider
+- [ ] G4B-04 Add capability selection and argument validation
+- [ ] G4B-05 Add ambiguity detection and clarification
+- [ ] G4B-06 Add stale-revision and unsupported-capability rejection
+- [ ] G4B-07 Add preview-only proposal creation
+- [ ] G4B-08 Add direct manual repair
+- [ ] G4B-09 Add atomic approval and audit provenance
+- [ ] G4B-10 Build representative prompt/adversarial evaluation corpus
+- [ ] G4B-11 Add provider outbound-data allowlist and secret boundary
+- [ ] G4B-12 Connect one real provider
+- [ ] G4B-13 Run provider-switch and failure-recovery evidence
+- [ ] G4B-14 Owner completes the real AI nameplate workflow
+
+## G5-A - Captions and speech metadata
+
+- [ ] G5A-01 Approve caption workflow and creative references
+- [ ] G5A-02 Define transcript/word-timing sidecar contract
+- [ ] G5A-03 Implement Stage 1 sidecar import adapter
+- [ ] G5A-04 Implement optional transcription adapter boundary
+- [ ] G5A-05 Define caption segment and style operations
+- [ ] G5A-06 Implement deterministic segmentation and correction
+- [ ] G5A-07 Implement caption timing repair
+- [ ] G5A-08 Compile captions to canonical render nodes
+- [ ] G5A-09 Implement browser preview
+- [ ] G5A-10 Implement export rendering
+- [ ] G5A-11 Implement timeline-change invalidation/reflow
+- [ ] G5A-12 Run readability, timing, fidelity, and owner visual gates
+- [ ] G5A-13 Owner exports a publishable captioned video
+
+## G5-B - Timeline and editorial primitives
+
+- [ ] G5B-01 Approve non-editor timeline workflow and terminology
+- [ ] G5B-02 Implement time selection
+- [ ] G5B-03 Implement split
+- [ ] G5B-04 Implement trim
+- [ ] G5B-05 Implement remove-with-gap
+- [ ] G5B-06 Implement ripple delete
+- [ ] G5B-07 Implement reorder
+- [ ] G5B-08 Implement enable/disable
+- [ ] G5B-09 Implement basic audio level and fades
+- [ ] G5B-10 Implement dependent-edit revalidation
+- [ ] G5B-11 Implement simple Studio time-strip controls
+- [ ] G5B-12 Compile timeline state to preview/export
+- [ ] G5B-13 Run VFR, rational-frame-rate, audio, and boundary fixtures
+- [ ] G5B-14 Owner completes a pacing edit without NLE terminology
+
+## G5-C - Useful talking-head workflow
+
+- [ ] G5C-01 Approve the representative full-video job story
+- [ ] G5C-02 Implement multi-asset intake
+- [ ] G5C-02A Implement point/circle/box/arrow/freehand annotation as non-executable intent
+- [ ] G5C-02B Prove annotation coordinates across portrait, landscape, letterboxing, resizing, and fullscreen
+- [ ] G5C-02C Prove annotation marks never enter export unless explicitly converted
+- [ ] G5C-03 Implement image and B-roll overlay clips
+- [ ] G5C-04 Implement title and callout operations
+- [ ] G5C-05 Implement basic audio workflow
+- [ ] G5C-06 Combine cuts, captions, titles, callouts, audio, and B-roll
+- [ ] G5C-07 Add plain-language proposals and direct repair for each family
+- [ ] G5C-08 Add progressive disclosure to Studio
+- [ ] G5C-09 Run complete real-video workflow and output inspection
+- [ ] G5C-10 Measure time saved against the manual baseline
+- [ ] G5C-11 Owner approves first genuinely useful prototype
+
+## G6 - Composition, motion, and effects
+
+- [ ] G6-01 Approve motion reference fixtures and quality rubric
+- [ ] G6-02 Implement position/scale/rotation/opacity
+- [ ] G6-03 Implement crop, layer order, and masks
+- [ ] G6-04 Implement property tracks and keyframes
+- [ ] G6-05 Implement easing curves
+- [ ] G6-06 Implement spring/bounce
+- [ ] G6-07 Implement transitions
+- [ ] G6-08 Implement bounded basic effects
+- [ ] G6-09 Re-run renderer architecture spike on motion fixtures
+- [ ] G6-10 Implement winning preview/export adapter path
+- [ ] G6-11 Prove seek, timing, reduced-motion controls, and fidelity
+- [ ] G6-12 Owner approves motion feel and exported result
+
+## G7 - Components and compound AI
+
+- [ ] G7-01 Approve component and recipe contract
+- [ ] G7-02 Implement component versions and compatibility
+- [ ] G7-03 Implement nameplate, caption, callout, title, and motion recipes
+- [ ] G7-04 Implement component migration tests
+- [ ] G7-05 Implement outcome-workflow registry
+- [ ] G7-06 Implement multi-action planning
+- [ ] G7-07 Implement dependency-aware clarification
+- [ ] G7-08 Implement compound preview and repair
+- [ ] G7-09 Prove one request/one approval/one undo
+- [ ] G7-10 Prove old projects retain component appearance
+- [ ] G7-11 Owner completes a compound natural-language edit
+
+## G8 - Trustworthy local alpha
+
+- [ ] G8-01 Approve representative workflow/evidence matrix and budgets
+- [ ] G8-02 Implement autosave and crash recovery
+- [ ] G8-03 Implement resumable local jobs and progress
+- [ ] G8-04 Implement project portability and integrity verification
+- [ ] G8-05 Implement proxies, caches, and invalidation where measured
+- [ ] G8-06 Implement local diagnostics and observable errors
+- [ ] G8-07 Implement safe media cleanup and retention controls
+- [ ] G8-08 Complete accessibility and keyboard audit
+- [ ] G8-09 Complete malicious/corrupt media and recovery tests
+- [ ] G8-10 Profile and remove the largest measured bottleneck
+- [ ] G8-11 Run repeated owner full-video workflows
+- [ ] G8-12 Run bounded representative non-editor smoke tests
+- [ ] G8-13 Reach agreed E5 reliability, time, quality, and recovery budgets
+
+## Continuous tracks applied at every visible goal
+
+- [ ] H1 Select only the highest-impact task blocking the active evidence gate
+- [ ] H2 Apply the eight-question architecture-quality gate without speculative overbuilding
+- [ ] Q1 Create and owner-approve the Sanverse creative-quality contract
+- [ ] Q2 Add a reference fixture and visual verdict for each visual capability
+- [ ] U1 Record owner task, wrong turns, repairs, completion time, and verdict
+- [ ] U2 Run bounded non-editor smoke tests when a slice is stable
+- [ ] R1 Grow the licensed real-media matrix only as capabilities require
+- [ ] F1 Define preview/export fidelity tolerance for every primitive
+- [ ] F2 Compare canonical preview states with extracted export frames
+- [ ] S1 Preserve immutable media, opaque IDs, bounded input, and safe subprocess rules
+- [ ] S2 Preserve provider outbound allowlists, secret safety, and redacted logs
+- [ ] A1 Verify keyboard, focus, screen-reader names, contrast, and reduced motion
+- [ ] A2 Verify plain language and progressive disclosure
+- [ ] C1 Version every serialized schema and prove migration/rollback
+- [ ] P1 Measure before optimizing and attack only the largest observed bottleneck
+- [ ] O1 Give every failure a stable code, safe user truth, recovery, and cleanup proof
+- [ ] E1 Record the exact E0-E5 evidence level and remaining limitations
+- [ ] D1 Update checklist, current state, project log, failure registry, and change record at each goal exit
+
+## Evidence-driven branches
+
+### G9 - API and MCP
+
+- [ ] G9-ENTRY Confirm stable G8 contracts and a real external-client need
+- [ ] G9-01 Version public project, capability, proposal, job, and result schemas
+- [ ] G9-02 Add authentication and authorization boundary
+- [ ] G9-03 Add idempotent job semantics
+- [ ] G9-04 Add capability discovery
+- [ ] G9-05 Add audit and rate/abuse boundaries
+- [ ] G9-06 Prove external clients cannot bypass validation or approval policy
+
+### G10 - Production SaaS operations
+
+- [ ] G10-ENTRY Confirm G8 evidence and owner approval for multi-user launch
+- [ ] G10-01 Threat and trust model
+- [ ] G10-02 Identity and session contracts
+- [ ] G10-03 Tenancy and deny-by-default authorization
+- [ ] G10-04 Transactional metadata persistence and migrations
+- [ ] G10-05 Integrity-checked cloud object storage
+- [ ] G10-06 Durable idempotent render jobs and workers
+- [ ] G10-07 Secrets, encryption, rotation, and leak prevention
+- [ ] G10-08 Redacted end-to-end production observability
+- [ ] G10-09 Backup, restore, and disaster-recovery drills
+- [ ] G10-10 Quotas, malicious-media handling, and abuse controls
+- [ ] G10-11 Deployment provenance, staged rollout, and rollback
+- [ ] G10-12 Data export, deletion, retention, and processor lifecycle
+- [ ] G10-13 Incident-response tabletop and technical drills
+- [ ] G10-14 Production-readiness review and explicit launch approval
+
+### G11 - Vision and tracking
+
+- [ ] G11-ENTRY Confirm repeated moving-object user need
+- [ ] G11-01 Create representative licensed evaluation set
+- [ ] G11-02 Implement detection adapter
+- [ ] G11-03 Implement tracking and coordinate transforms
+- [ ] G11-04 Implement segmentation and occlusion handling
+- [ ] G11-05 Implement confidence and tracking-loss behavior
+- [ ] G11-06 Implement direct user correction
+- [ ] G11-07 Prove dataset-backed quality and safe failure
+
+### G12 - Evaluation and specialized models
+
+- [ ] G12-ENTRY Confirm consent and a repeatable general-model weakness
+- [ ] G12-01 Define privacy-preserving event and provenance contract
+- [ ] G12-02 Implement consent, export, and deletion
+- [ ] G12-03 Build representative evaluation datasets
+- [ ] G12-04 Implement model routing and shadow evaluation
+- [ ] G12-05 Prove measurable benefit before specialized training
+- [ ] G12-06 Implement rollout, monitoring, and rollback
+
+## Macro completion
+
+- [ ] Representative users finish acceptable videos in measured minutes
+- [ ] Default workflows require no professional editor knowledge
+- [ ] Ambiguity clarifies or fails closed
+- [ ] Accepted work survives reload, crash, provider failure, and render failure
+- [ ] Preview/export fidelity meets agreed budgets
+- [ ] Creative output meets the owner-approved reference contract
+- [ ] Source media remains immutable
+- [ ] Projects remain migratable and portable
+- [ ] Repeated workflows reach E5

@@ -1,5 +1,16 @@
 # Project Log
 
+## 2026-07-27 — Complete macro and micro planning set drafted
+
+- Added the proposed canonical macro roadmap, dependency graph, goal entry/exit gates, and first- through fourth-order consequence analysis.
+- Added one tickable checklist spanning completed foundations, G4-A through G12, continuous quality tracks, and macro completion.
+- Added the atomic G4-A implementation plan and detailed later-goal micro plans.
+- Added cross-cutting creative-quality, real-user, real-media, fidelity, security, accessibility, migration, performance, observability, recovery, and evidence plans.
+- Reconciled goal, current-state, plan-index, and start documents so planning is not misreported as implementation or approval.
+- Preserved older plans as historical evidence.
+- Product implementation changed: **none**.
+- Approval state: **proposed; owner review required before implementation**.
+
 ## 2026-07-12 — G0 initiated
 
 - Owner approved starting Stage 2 as a separate production-grade project.

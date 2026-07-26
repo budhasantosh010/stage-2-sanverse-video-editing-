@@ -1,6 +1,6 @@
 # Build Tracker
 
-Last updated: 2026-07-26
+Last updated: 2026-07-27
 
 | ID | Goal | Deliverable | Status | Evidence |
 |---|---|---|---|---|
@@ -25,6 +25,7 @@ Last updated: 2026-07-26
 | G2-06 | G2 | Persisted project history and recent projects | Complete | Accept, undo, and redo write serialized history to `.sanverse-data/projects/<id>/edit-project.json`, verified on disk after each action; Home lists recent projects and reopening restores saved history in a live browser |
 | G3-03 | G3 | Real-user end-to-end verification of the manual loop | Complete | Full browser walkthrough with console, network, server-log, disk, and exported-media inspection. Found and fixed FAIL-006 (64-bit inode rejection blocking all new uploads) and FAIL-008 (misleading copy); repaired 5 stale App tests. 220/220 tests and all three builds pass at `fcc41eb` |
 | G2-07 | G2 | Explicit media-handle ownership and authority-document cleanup | Complete | Direct RED/GREEN HTTP and real-filesystem checks pass; API/domain/web TypeScript builds pass; independent re-review passes. Full Vitest/Vite execution is blocked only by FAIL-011 and retains the prior 220/220 baseline |
+| PLAN-01 | Planning | Complete macro roadmap, micro plans, atomic G4-A plan, cross-cutting validation, and one tickable checklist | Proposed | Planning documents exist and were reconciled with authority docs; owner approval is still required and no G4-A product code has started |
 
 ## Status rules
 
@@ -32,3 +33,4 @@ Last updated: 2026-07-26
 - `In progress`: active work exists but the acceptance gate is open.
 - `Complete`: acceptance evidence exists and limitations are recorded.
 - `Blocked`: progress requires owner authority or external state.
+- `Proposed`: planning exists but is not approved or active implementation.

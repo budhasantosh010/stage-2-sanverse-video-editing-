@@ -1,6 +1,8 @@
 # Stage 2 Master Plan
 
-Status: Approved direction; each goal requires its own entry approval.
+Status: Historical approved direction. It remains evidence of earlier decisions, not the current detailed sequencing authority.
+
+The proposed refined roadmap is `../MASTER_PLAN.md`. It separates the scale-ready G4-A chassis from G4-B AI, adds the caption and useful-workflow slices, and makes G9-G12 conditional. Do not infer the old linear order as a new approval.
 
 ## Planning rule
 

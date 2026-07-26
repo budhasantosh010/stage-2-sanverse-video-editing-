@@ -1,10 +1,12 @@
 # Current State
 
-Last updated: 2026-07-26
+Last updated: 2026-07-27
 
 ## Active goal
 
-**G4 next — build the first AI-operated edit over the verified deterministic nameplate loop.**
+**Planning gate — review and approve or correct the complete proposed roadmap.**
+
+No G4-A or later implementation has started. If the proposed roadmap is approved, G4-A is the next implementation goal; G4-B AI follows it.
 
 G1 remains partly open for the owner's final motion, native drag-and-drop, and overall Studio UX acceptance. That owner-only evidence gate must not be silently marked complete, but it does not erase the completed G2/G3 technical foundation.
 
@@ -28,18 +30,21 @@ G1 remains partly open for the owner's final motion, native drag-and-drop, and o
 - Owner evidence still open: perform a native human drag-and-drop upload and decide whether the current interaction motion feels acceptable.
 - Owner evidence still open: complete one final personal end-to-end acceptance run. Automated or scripted browser interaction cannot substitute for that judgment.
 
-## Next implementation gate
+## Proposed next implementation gate
 
-G4 must support one narrow outcome first:
+G4-A must establish the minimum scale-ready chassis without implementing broad features:
 
-1. The user describes a nameplate change naturally, optionally after pointing at the video.
-2. A provider-independent intent adapter returns an untrusted structured candidate.
-3. Deterministic code validates capability, schema, timing, coordinates, and bounded text.
-4. Ambiguous intent produces clarification; invalid or unsupported intent fails closed.
-5. A valid result becomes a pending previewable proposal only.
-6. Nothing enters accepted history or rendering until the user explicitly approves it.
+1. Explicit rational media time and half-open ranges.
+2. Immutable media assets plus composition, track, and clip identity.
+3. Explicit target and anchor semantics instead of implicit top-left placement.
+4. Atomic change sets with revision and provenance.
+5. A layered capability registry.
+6. Strict executable core fields plus safely preserved namespaced extensions.
+7. Deterministic v1-to-v2 migration.
+8. One canonical renderer-neutral render plan used by preview and export.
+9. Migration, contract, invariant, persistence, and preview/export evidence.
 
-No provider API key is required to establish this boundary; a deterministic fake provider should prove the contract before NVIDIA or OpenCode Zen is connected.
+G4-B then adds the provider-independent intent boundary, deterministic fake provider, structured validation, clarification, bounded repair, fail-closed behavior, and explicit approval. No provider key is needed until those deterministic boundaries pass.
 
 ## Not built
 
@@ -62,4 +67,4 @@ No provider API key is required to establish this boundary; a deterministic fake
 
 ## Evidence boundary
 
-The complete manual nameplate slice has real-media and browser evidence. G4 and every later product capability remain unimplemented until their own tests and owner evidence exist. Historical detail belongs in `PROJECT_LOG.md`, `FAILURE_REGISTRY.md`, and `changes/`; it must not be copied back here as contradictory current state.
+The complete manual nameplate slice has real-media and browser evidence. G4-A and every later product capability remain unimplemented until their own tests and owner evidence exist. The new planning files are proposals, not implementation evidence. Historical detail belongs in `PROJECT_LOG.md`, `FAILURE_REGISTRY.md`, and `changes/`; it must not be copied back here as contradictory current state.

@@ -26,7 +26,18 @@ This is a compact separation of facts, owner requirements, inferences, proposals
 
 ## Approved proposals not yet implemented
 
-- None inside the bounded first pointed-nameplate implementation. Owner validation remains a gate, not missing implementation.
+- None. The complete G4-A through G12 planning set drafted on 2026-07-27 is proposed and awaits owner approval.
+
+## Proposed roadmap awaiting approval — 2026-07-27
+
+- First build a narrow Project v2 chassis (G4-A), then the first AI proposal boundary (G4-B).
+- Build captions (G5-A) and timeline primitives (G5-B) on the same contracts, then prove one useful talking-head workflow (G5-C).
+- Add motion/effects only after editorial semantics are stable (G6).
+- Add versioned components and compound AI plans after atomic primitives are trustworthy (G7).
+- Prove recovery, portability, performance, and repeated real-video value in local alpha (G8).
+- Treat API/MCP (G9), SaaS operations (G10), advanced vision (G11), and specialized models (G12) as evidence-gated branches, not automatic promises.
+- Keep correctness, creative quality, user evidence, security/privacy, accessibility, continuity, performance, and recovery as continuous tracks.
+- Full detail and decision consequences: `MASTER_PLAN.md`, `plans/COMPLETE_MICRO_PLAN.md`, and `plans/CROSS_CUTTING_VALIDATION_PLAN.md`.
 
 ## Unknowns that must be measured
 
