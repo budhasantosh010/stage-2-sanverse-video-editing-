@@ -6,6 +6,10 @@ Build a production-grade AI-native video editor that lets a non-editor upload a 
 
 The owner is a non-technical founder and the primary product tester. Explain architecture and tradeoffs in plain language without hiding important technical facts.
 
+## Highest-impact execution rule
+
+**DO ONLY THE HIGHEST-IMPACT WORK THAT DIRECTLY ADVANCES THE ACTIVE GOAL. DO NOT EXPAND SCOPE, CHASE OPTIONAL IMPROVEMENTS, OR SPEND TOKENS FIXING NON-BLOCKING FAILURES. RECORD NON-BLOCKING FAILURES WITH WHAT/WHERE/WHEN/WHO/WHY/HOW, ATTEMPTS, STATUS, AND A ONE-LINE SOLUTION; THEN RETURN TO THE ACTIVE GOAL.**
+
 ## Required reload protocol
 
 At the start of work, and again after context compaction, material owner corrections, three implementation commits, integration failures, or any destructive/external action:

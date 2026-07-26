@@ -34,6 +34,7 @@ For exact local startup and the pending owner walkthrough, read `DOCS/LOCAL_DEVE
 
 ## Invariants
 
+- **DO ONLY THE HIGHEST-IMPACT WORK THAT DIRECTLY ADVANCES THE ACTIVE GOAL. DO NOT EXPAND SCOPE, CHASE OPTIONAL IMPROVEMENTS, OR SPEND TOKENS FIXING NON-BLOCKING FAILURES. RECORD NON-BLOCKING FAILURES WITH WHAT/WHERE/WHEN/WHO/WHY/HOW, ATTEMPTS, STATUS, AND A ONE-LINE SOLUTION; THEN RETURN TO THE ACTIVE GOAL.**
 - No Chinese whispers: preserve the owner's exact intent and call out uncertainty.
 - Explain decisions in plain language for a non-technical founder.
 - Do not silently expand scope.

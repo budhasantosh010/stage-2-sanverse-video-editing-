@@ -2,6 +2,10 @@
 
 Drift is prevented by durable truth, explicit gates, and reproducible evidence—not by assuming a model remembers a long conversation.
 
+## Highest-impact execution rule
+
+**DO ONLY THE HIGHEST-IMPACT WORK THAT DIRECTLY ADVANCES THE ACTIVE GOAL. DO NOT EXPAND SCOPE, CHASE OPTIONAL IMPROVEMENTS, OR SPEND TOKENS FIXING NON-BLOCKING FAILURES. RECORD NON-BLOCKING FAILURES WITH WHAT/WHERE/WHEN/WHO/WHY/HOW, ATTEMPTS, STATUS, AND A ONE-LINE SOLUTION; THEN RETURN TO THE ACTIVE GOAL.**
+
 ## Four-layer continuity spine
 
 1. **Intent:** `MACRO_GOAL`, `REQUIREMENTS`, and owner corrections
