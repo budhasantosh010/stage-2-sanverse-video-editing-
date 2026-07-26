@@ -22,6 +22,8 @@ export type MediaRange = { start: number; end: number }
 
 export type OpenMediaResult = {
   body: AsyncIterable<Uint8Array>
+  /** Idempotent. Call when the body is not fully consumed; full iteration closes it automatically. */
+  close(): Promise<void>
   size: number
   start: number
   end: number

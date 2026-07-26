@@ -31,6 +31,7 @@ async function call(port: number, options: { method?: string; path?: string; hea
 function readRepository(bytes: Uint8Array, bodyFactory: () => AsyncIterable<Uint8Array> = async function* () { yield bytes }) {
   const inspectCalls: string[] = []
   const openCalls: Array<{ projectId: string; range?: { start: number; end: number } }> = []
+  const closeCalls: Array<'media' | 'export'> = []
   const repository: ProjectRepository = {
     async stageSource() { throw new Error('not used') },
     async publishProject() { throw new Error('not used') },
@@ -43,7 +44,7 @@ function readRepository(bytes: Uint8Array, bodyFactory: () => AsyncIterable<Uint
       openCalls.push({ projectId, range })
       const start = range?.start ?? 0
       const end = range?.end ?? bytes.length - 1
-      return { body: bodyFactory(), size: bytes.length, start, end }
+      return { body: bodyFactory(), close: async () => { closeCalls.push('media') }, size: bytes.length, start, end }
     },
     async listProjects() { return [] },
     async readProject() { throw new Error('not used') },
@@ -56,10 +57,16 @@ function readRepository(bytes: Uint8Array, bodyFactory: () => AsyncIterable<Uint
     async openExport(_projectId, _exportId, range) {
       const start = range?.start ?? 0
       const end = range?.end ?? bytes.length - 1
-      return { body: async function* () { yield bytes.subarray(start, end + 1) }(), size: bytes.length, start, end }
+      return {
+        body: async function* () { yield bytes.subarray(start, end + 1) }(),
+        close: async () => { closeCalls.push('export') },
+        size: bytes.length,
+        start,
+        end,
+      }
     },
   }
-  return { repository, inspectCalls, openCalls }
+  return { repository, inspectCalls, openCalls, closeCalls }
 }
 
 async function listen(server: ReturnType<typeof createSanverseServer>): Promise<number> {
@@ -112,6 +119,25 @@ describe('local API boundary', () => {
     expect(response.headers['content-range']).toBe(`bytes 4-${source.length - 1}/${source.length}`)
     expect(spy.inspectCalls).toEqual(['project_1234567890abcdef'])
     expect(spy.openCalls).toEqual([{ projectId: 'project_1234567890abcdef', range: { start: 4, end: source.length - 1 } }])
+    expect(spy.closeCalls).toEqual(['media'])
+  })
+
+  it('closes opened media when response metadata fails before streaming starts', async () => {
+    let closeCalls = 0
+    const spy = readRepository(mp4())
+    spy.repository.openMedia = async () => ({
+      body: async function* () { yield mp4() }(),
+      close: async () => { closeCalls += 1 },
+      size: mp4().length,
+      start: 0,
+      get end(): number { throw new Error('response metadata failed') },
+    })
+    const port = await listen(createSanverseServer({ dataRoot: 'unused', maxUploadBytes: 100, repository: spy.repository }))
+
+    const response = await call(port, { path: '/api/projects/project_1234567890abcdef/media' })
+
+    expect(response.status).toBe(500)
+    expect(closeCalls).toBe(1)
   })
 
   it('cancels the media iterable when the client closes during backpressure', async () => {

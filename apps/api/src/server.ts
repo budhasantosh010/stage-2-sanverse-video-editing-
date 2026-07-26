@@ -272,15 +272,19 @@ export function createSanverseServer(options: ServerOptions) {
           return
         }
         const media = await repository.openMedia(projectId, range)
-        response.writeHead(range ? 206 : 200, {
-          'content-type': 'video/mp4',
-          'content-length': media.end - media.start + 1,
-          'accept-ranges': 'bytes',
-          ...(range ? { 'content-range': `bytes ${media.start}-${media.end}/${media.size}` } : {}),
-          'cache-control': 'private, no-store',
-        })
-        response.flushHeaders()
-        await streamMedia(response, media.body)
+        try {
+          response.writeHead(range ? 206 : 200, {
+            'content-type': 'video/mp4',
+            'content-length': media.end - media.start + 1,
+            'accept-ranges': 'bytes',
+            ...(range ? { 'content-range': `bytes ${media.start}-${media.end}/${media.size}` } : {}),
+            'cache-control': 'private, no-store',
+          })
+          response.flushHeaders()
+          await streamMedia(response, media.body)
+        } finally {
+          await media.close()
+        }
         return
       }
 
@@ -296,14 +300,18 @@ export function createSanverseServer(options: ServerOptions) {
           response.end(); return
         }
         const media = await repository.openExport(projectId, exportId, range)
-        response.writeHead(range ? 206 : 200, {
-          'content-type': 'video/mp4', 'content-length': media.end - media.start + 1, 'accept-ranges': 'bytes',
-          ...(range ? { 'content-range': `bytes ${media.start}-${media.end}/${media.size}` } : {}),
-          'cache-control': 'private, no-store',
-          'content-disposition': `attachment; filename="sanverse-${exportId}.mp4"`,
-        })
-        response.flushHeaders()
-        await streamMedia(response, media.body)
+        try {
+          response.writeHead(range ? 206 : 200, {
+            'content-type': 'video/mp4', 'content-length': media.end - media.start + 1, 'accept-ranges': 'bytes',
+            ...(range ? { 'content-range': `bytes ${media.start}-${media.end}/${media.size}` } : {}),
+            'cache-control': 'private, no-store',
+            'content-disposition': `attachment; filename="sanverse-${exportId}.mp4"`,
+          })
+          response.flushHeaders()
+          await streamMedia(response, media.body)
+        } finally {
+          await media.close()
+        }
         return
       }
 

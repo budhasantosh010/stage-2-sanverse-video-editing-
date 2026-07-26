@@ -242,6 +242,11 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
 
       const openedHandle = handle
       handle = undefined
+      let closePromise: Promise<void> | undefined
+      const close = (): Promise<void> => {
+        closePromise ??= openedHandle.close()
+        return closePromise
+      }
       const body = {
         async *[Symbol.asyncIterator](): AsyncGenerator<Uint8Array> {
           const stream = openedHandle.createReadStream({ start, end, autoClose: false })
@@ -249,11 +254,11 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
             for await (const chunk of stream) yield chunk
           } finally {
             stream.destroy()
-            await openedHandle.close().catch(() => undefined)
+            await close()
           }
         },
       }
-      return { body, size, start, end }
+      return { body, close, size, start, end }
     } catch (error) {
       await handle?.close().catch(() => undefined)
       if (error instanceof RepositoryError) throw error

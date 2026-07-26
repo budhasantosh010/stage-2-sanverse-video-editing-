@@ -74,8 +74,14 @@ describe('filesystem project repository', () => {
     await repository.publishProject(stage, manifest(stage.projectId))
 
     await expect(repository.inspectMedia(stage.projectId)).resolves.toEqual({ size: 5 })
-    await expect(repository.openMedia(stage.projectId)).resolves.toMatchObject({ size: 5, start: 0, end: 4 })
-    await expect(repository.openMedia(stage.projectId, { start: 1, end: 3 })).resolves.toMatchObject({ size: 5, start: 1, end: 3 })
+    const full = await repository.openMedia(stage.projectId)
+    expect(full).toMatchObject({ size: 5, start: 0, end: 4 })
+    await full.close()
+    await expect(full.close()).resolves.toBeUndefined()
+
+    const ranged = await repository.openMedia(stage.projectId, { start: 1, end: 3 })
+    expect(ranged).toMatchObject({ size: 5, start: 1, end: 3 })
+    await ranged.close()
     await expect(repository.openMedia(stage.projectId, { start: 5, end: 6 })).rejects.toMatchObject({ code: 'INVALID_RANGE' })
   })
 
@@ -94,7 +100,9 @@ describe('filesystem project repository', () => {
 
     await writeFile(paths.outputPath, new Uint8Array([9, 8, 7]))
     await expect(repository.inspectExport(projectId, exportId)).resolves.toEqual({ size: 3 })
-    await expect(repository.openExport(projectId, exportId, { start: 1, end: 2 })).resolves.toMatchObject({ size: 3, start: 1, end: 2 })
+    const opened = await repository.openExport(projectId, exportId, { start: 1, end: 2 })
+    expect(opened).toMatchObject({ size: 3, start: 1, end: 2 })
+    await opened.close()
     await expect(repository.allocateExport('../outside', exportId)).rejects.toMatchObject({ code: 'INVALID_PROJECT_ID' })
     await expect(repository.openExport(projectId, '../outside')).rejects.toMatchObject({ code: 'INVALID_EXPORT_ID' })
   })

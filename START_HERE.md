@@ -8,15 +8,16 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 ## Current gate
 
-- Completed macro stage: **G0 — Foundation and continuity**
-- Active macro stage: **G1 — Runnable web UX validation and renderer feasibility**
-- Product code: a runnable local web application exists at strict http://localhost:2000. It imports an MP4 through a loopback-only API into an immutable project-owned copy, supports point capture, a bounded nameplate proposal, typed preview, exactly-once acceptance, in-memory undo/redo, and now sends accepted history through the production FFmpeg adapter to a downloadable MP4.
+- Completed technical stages: **G0 — Foundation**, **G2 — Canonical project foundation**, and **G3 — First closed manual vertical slice**.
+- Open owner-evidence stage: **G1 — final motion, native drag-and-drop, and overall Studio UX acceptance**.
+- Next implementation stage: **G4 — First AI-operated edit**.
+- Product code: a runnable local web application exists at strict http://localhost:2000. It imports an MP4 through a loopback-only API into an immutable project-owned copy, supports point capture, a bounded nameplate proposal, typed preview, exactly-once acceptance, persisted undo/redo history, recent-project reopening, and production FFmpeg export to a downloadable MP4.
 - **2026-07-25 — the manual loop is now verified end to end in a real browser.** A full walkthrough on a 30-second 1080p clip completed: upload, reopen from Recent projects, point, nameplate, preview, accept, undo, redo, export, download, and correct exported output (probe plus frames). Read `DOCS/changes/2026-07-25-claude-e2e-test-and-identity-fix.md` before doing anything else.
 - That walkthrough found and fixed a defect that was blocking **every new upload**: the media identity guard rejected Windows 64-bit NTFS file IDs, so each newly created project returned 404 for its own video. See FAIL-006. Both guards now read bigint stats.
 - Present persistence boundary: local project media, its integrity manifest, **and accepted edit history** persist under ignored `.sanverse-data/`. History survives reload and reopen; Home lists recent projects.
-- Immediate next gate: **the first AI-operated edit (Task 10)**. The deterministic foundation beneath it is proven, so chat interpretation is now the correct next capability. Render speed is explicitly deprioritized by the owner. Open cosmetic/UX gaps are listed in section 9 of the 2026-07-25 change record.
+- Immediate next gate: **G4, the first AI-operated edit**. Natural language may create only a validated pending nameplate proposal; ambiguity must clarify or fail closed, and execution still requires explicit user approval. Render speed is explicitly deprioritized by the owner.
 - Absent capabilities: no AI/chat interpretation, no cut/trim/split, no timeline, no motion or effects, no captions, no additional component types, no accounts, and no SaaS operations. Chat in Studio is a visible disabled placeholder.
-- Goal-status boundary: G1 remains open until its owner workflow and renderer evidence gates close. The owner has nevertheless explicitly authorized continuing Tasks 2–8 of the first manual vertical slice, including early canonical-project work, so implementation may proceed without claiming that G1 closed or that the G2/G3 macro exit gates were achieved. AI, accounts, and broad primitive work remain out of scope.
+- Goal-status boundary: G1 remains open only for owner judgment that automation cannot supply. G2/G3 are technically complete. G4 has not started. Later primitives, accounts, and SaaS operations remain out of scope until their own goal gates are entered.
 
 ## Read in this order
 
@@ -26,7 +27,7 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 4. `DOCS/GOALS.md`
 5. `DOCS/REQUIREMENTS.md`
 6. `DOCS/DECISIONS.md`
-7. The active plan in `DOCS/plans/`
+7. The active plan in `DOCS/plans/` when one has been approved
 8. Relevant entries in `DOCS/PROJECT_LOG.md`, `DOCS/FAILURE_REGISTRY.md`, and `DOCS/changes/`
 
 For exact local startup and the pending owner walkthrough, read `DOCS/LOCAL_DEVELOPMENT.md`.
