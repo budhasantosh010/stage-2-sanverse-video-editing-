@@ -14,7 +14,8 @@ function renderComposer(
   const props: React.ComponentProps<typeof NameplateComposer> = {
     target,
     onProposal: vi.fn(),
-    createActionId: () => 'action-test-1',
+    clipId: 'clip_aaaaaaaa',
+    createOperationId: () => 'operation_test0001',
     ...overrides,
   }
 
@@ -76,14 +77,27 @@ describe('NameplateComposer', () => {
     await user.click(screen.getByRole('button', { name: /create proposal/i }))
 
     expect(props.onProposal).toHaveBeenCalledWith({
-      schemaVersion: 'sanverse.action/v1',
-      actionId: 'action-test-1',
+      schemaVersion: 'sanverse.operation/v2',
+      operationId: 'operation_test0001',
       kind: 'add-nameplate',
-      target: { x: 0.25, y: 0.75, sourceTimeMs: 12_400 },
+      capabilityId: 'sanverse.nameplate.component/v1',
+      clipId: 'clip_aaaaaaaa',
+      // Evidence: where the user pointed, on this clip's own timeline.
+      sampledClipTime: { ticks: 12_400 * 1_440, timescale: 1_440_000 },
+      // Instruction: when it is visible, in finished-video time.
+      compositionInterval: {
+        start: { ticks: 12_400 * 1_440, timescale: 1_440_000 },
+        duration: { ticks: 5_000 * 1_440, timescale: 1_440_000 },
+      },
+      // A click means "put the middle here", which is what pointing implies.
+      target: {
+        coordinateSpace: 'composition-normalized',
+        point: { x: 0.25, y: 0.75 },
+        anchor: 'center',
+      },
       primaryText: 'Santosh',
       secondaryText: 'Founder',
-      startMs: 12_400,
-      durationMs: 5_000,
+      extensions: {},
     })
 
     const proposal = vi.mocked(props.onProposal).mock.calls[0][0]
@@ -135,11 +149,12 @@ describe('NameplateComposer', () => {
   it('closes and clears an open draft when the selected point changes', async () => {
     const user = userEvent.setup()
     const onProposal = vi.fn()
-    const createActionId = () => 'action-test-1'
+    const createOperationId = () => 'operation_test0001'
     const { rerender } = render(
       <NameplateComposer
         target={target}
-        createActionId={createActionId}
+        clipId="clip_aaaaaaaa"
+        createOperationId={createOperationId}
         onProposal={onProposal}
       />,
     )
@@ -149,7 +164,8 @@ describe('NameplateComposer', () => {
     rerender(
       <NameplateComposer
         target={{ x: 0.5, y: 0.5, timeMs: 20_000 }}
-        createActionId={createActionId}
+        clipId="clip_aaaaaaaa"
+        createOperationId={createOperationId}
         onProposal={onProposal}
       />,
     )
@@ -160,7 +176,7 @@ describe('NameplateComposer', () => {
 
   it('fails closed when canonical validation rejects the proposal', async () => {
     const user = userEvent.setup()
-    const { props } = renderComposer({ createActionId: () => '   ' })
+    const { props } = renderComposer({ createOperationId: () => '   ' })
 
     await user.click(screen.getByRole('button', { name: /add text here/i }))
     await user.type(screen.getByRole('textbox', { name: /^main text$/i }), 'Santosh')
@@ -174,7 +190,7 @@ describe('NameplateComposer', () => {
   it('fails visibly when action ID generation is unavailable', async () => {
     const user = userEvent.setup()
     const { props } = renderComposer({
-      createActionId: () => {
+      createOperationId: () => {
         throw new Error('Web Crypto unavailable')
       },
     })

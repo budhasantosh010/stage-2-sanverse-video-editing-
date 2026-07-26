@@ -1,62 +1,104 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import type { AddNameplateAction } from '@sanverse/edit-domain'
-import { NameplateOverlay } from './NameplateOverlay'
+import { resolveNameplateMetrics, resolveNameplatePlacement } from '@sanverse/render-contract/nameplate-style'
 
-const action: AddNameplateAction = {
-  schemaVersion: 'sanverse.action/v1',
-  actionId: 'action-overlay-1',
-  kind: 'add-nameplate',
-  target: { x: 0.25, y: 0.75, sourceTimeMs: 12_400 },
-  primaryText: 'Santosh',
-  secondaryText: 'Founder',
-  startMs: 12_400,
-  durationMs: 5_000,
+import { NameplateOverlay } from './NameplateOverlay'
+import { compilePreviewPlan, isNodeVisible, millisecondsToTicks } from '../render-plan/render-plan-preview'
+import { ms, testOperation, testProjectWithNameplate } from '../../test-fixtures'
+
+const plan = () => {
+  const compiled = compilePreviewPlan(testProjectWithNameplate())
+  if (!compiled) throw new Error('fixture failed')
+  return compiled
 }
 
 afterEach(cleanup)
 
 describe('NameplateOverlay', () => {
-  it('renders at the start instant using top-left normalized coordinates', () => {
-    render(<NameplateOverlay action={action} currentTimeMs={12_400} />)
+  it('renders both lines of the node it is given', () => {
+    render(
+      <NameplateOverlay node={plan().nodes[0]} compositionWidth={1920} compositionHeight={1080} scale={1} />,
+    )
 
     const overlay = screen.getByTestId('nameplate-overlay')
     expect(overlay).toHaveTextContent('Santosh')
     expect(overlay).toHaveTextContent('Founder')
-    expect(overlay).toHaveStyle({ left: '25%', top: '75%' })
-  })
-
-  it('does not render before its start instant', () => {
-    render(<NameplateOverlay action={action} currentTimeMs={12_399} />)
-
-    expect(screen.queryByTestId('nameplate-overlay')).not.toBeInTheDocument()
-  })
-
-  it('does not render at its end instant', () => {
-    render(<NameplateOverlay action={action} currentTimeMs={17_400} />)
-
-    expect(screen.queryByTestId('nameplate-overlay')).not.toBeInTheDocument()
   })
 
   it('omits the optional line when it is empty', () => {
+    const compiled = compilePreviewPlan(testProjectWithNameplate('changeset_aaaaaaaa', { secondaryText: '' }))
+    if (!compiled) throw new Error('fixture failed')
+
     render(
-      <NameplateOverlay
-        action={{ ...action, secondaryText: '' }}
-        currentTimeMs={12_400}
-      />,
+      <NameplateOverlay node={compiled.nodes[0]} compositionWidth={1920} compositionHeight={1080} scale={1} />,
     )
 
     expect(screen.getByText('Santosh')).toBeInTheDocument()
     expect(screen.queryByText('Founder')).not.toBeInTheDocument()
   })
 
-  it.each([Number.NaN, Number.POSITIVE_INFINITY, -1])(
-    'fails closed for invalid current time %s',
-    (currentTimeMs) => {
-      render(<NameplateOverlay action={action} currentTimeMs={currentTimeMs} />)
+  it('stays hidden until it has measured itself, so it is never seen in the wrong place', () => {
+    render(
+      <NameplateOverlay node={plan().nodes[0]} compositionWidth={1920} compositionHeight={1080} scale={0} />,
+    )
 
-      expect(screen.queryByTestId('nameplate-overlay')).not.toBeInTheDocument()
-    },
-  )
+    expect(screen.getByTestId('nameplate-overlay')).toHaveStyle({ visibility: 'hidden' })
+  })
+})
+
+describe('when a nameplate is on screen', () => {
+  it('includes its start instant and excludes its end instant', () => {
+    // Half-open, identical to the exporter's enable expression. Back-to-back
+    // nameplates therefore never overlap by a frame or leave a frame's gap.
+    const node = plan().nodes[0]
+    expect(isNodeVisible(node, millisecondsToTicks(1_000))).toBe(true)
+    expect(isNodeVisible(node, millisecondsToTicks(999))).toBe(false)
+    expect(isNodeVisible(node, millisecondsToTicks(5_999))).toBe(true)
+    expect(isNodeVisible(node, millisecondsToTicks(6_000))).toBe(false)
+  })
+
+  it('measures visibility in exact ticks rather than rounded milliseconds', () => {
+    const node = plan().nodes[0]
+    expect(node.interval.start).toEqual(ms(1_000))
+    expect(node.interval.duration).toEqual(ms(5_000))
+  })
+})
+
+describe('placement follows the shared rule the exporter uses', () => {
+  it('centres the box on the point the user chose', () => {
+    const metrics = resolveNameplateMetrics(1920, 1080)
+    const placement = resolveNameplatePlacement({
+      pointX: 0.5,
+      pointY: 0.5,
+      anchor: 'center',
+      frameWidth: 1920,
+      frameHeight: 1080,
+      boxWidth: 200,
+      boxHeight: 60,
+      safeMargin: metrics.safeMargin,
+    })
+
+    expect(placement).toEqual({ x: 860, y: 510 })
+  })
+
+  it('keeps a nameplate clicked at the very edge inside the safe area', () => {
+    const metrics = resolveNameplateMetrics(1920, 1080)
+    const operation = testOperation({
+      target: { coordinateSpace: 'composition-normalized', point: { x: 1, y: 1 }, anchor: 'center' },
+    })
+    const placement = resolveNameplatePlacement({
+      pointX: operation.target.point.x,
+      pointY: operation.target.point.y,
+      anchor: operation.target.anchor,
+      frameWidth: 1920,
+      frameHeight: 1080,
+      boxWidth: 200,
+      boxHeight: 60,
+      safeMargin: metrics.safeMargin,
+    })
+
+    expect(placement.x + 200).toBeLessThanOrEqual(1920 - metrics.safeMargin)
+    expect(placement.y + 60).toBeLessThanOrEqual(1080 - metrics.safeMargin)
+  })
 })

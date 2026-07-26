@@ -3,7 +3,69 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import {
+  acceptChangeSet as applyChangeSet,
+  redoChangeSet,
+  undoChangeSet,
+  type EditProject,
+} from '@sanverse/edit-domain'
+
 import { App } from './App'
+import { testAsset, testProject } from '../test-fixtures'
+
+/**
+ * A stand-in for the local API that keeps real project state.
+ *
+ * The server is authoritative in v2: the browser asks for a change and adopts
+ * whatever comes back. A fake that just echoed requests would not exercise
+ * that at all, so this one applies edits with the real domain functions.
+ */
+function fakeApi(projectId = 'project_1234567890abcdef') {
+  const asset = { ...testAsset(), assetId: 'asset_aaaaaaaa' }
+  let project: EditProject = testProject(asset, projectId)
+  const manifest = {
+    id: projectId,
+    originalFilename: 'cleaned.mp4',
+    createdAt: '2026-07-13T00:00:00.000Z',
+    sizeBytes: 24,
+    sha256: 'a'.repeat(64),
+    mediaUrl: `/api/projects/${projectId}/media`,
+  }
+
+  const json = (value: unknown, status = 200) =>
+    new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } })
+
+  return {
+    manifest,
+    current: () => project,
+    setProject(next: EditProject) { project = next },
+    handle(url: string, options?: RequestInit): Response | undefined {
+      if (url === '/api/projects' && !options?.method) return json({ projects: [manifest] })
+      if (url === '/api/projects' && options?.method === 'POST') return json(manifest, 201)
+      if (url === `/api/projects/${projectId}`) return json({ ...manifest, project })
+      if (url === `/api/projects/${projectId}/change-sets` && options?.method === 'POST') {
+        const body = JSON.parse(String(options.body)) as { changeSet: unknown }
+        const next = applyChangeSet(project, body.changeSet)
+        if (!next.ok) return json({ code: 'CHANGE_SET_REJECTED' }, 400)
+        project = next.value
+        return json({ project }, 201)
+      }
+      if (url === `/api/projects/${projectId}/undo` && options?.method === 'POST') {
+        const next = undoChangeSet(project)
+        if (!next.ok) return json({ code: 'NOTHING_TO_UNDO' }, 409)
+        project = next.value
+        return json({ project })
+      }
+      if (url === `/api/projects/${projectId}/redo` && options?.method === 'POST') {
+        const next = redoChangeSet(project)
+        if (!next.ok) return json({ code: 'NOTHING_TO_REDO' }, 409)
+        project = next.value
+        return json({ project })
+      }
+      return undefined
+    },
+  }
+}
 
 const originalCreateObjectURL = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
 const originalRevokeObjectURL = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL')
@@ -67,7 +129,11 @@ function restoreUrlMethod(
 beforeEach(() => {
   createObjectURL = vi.fn(() => 'blob:cleaned-video')
   revokeObjectURL = vi.fn()
-  fetchMock = vi.fn().mockImplementation(exceptRecentProjects(() => projectResponse()))
+  const api = fakeApi()
+  fetchMock = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+    if (url === PROJECTS_URL && options?.method === 'POST') return projectResponse()
+    return api.handle(url, options) ?? new Response('{}', { status: 404 })
+  })
   vi.stubGlobal('fetch', fetchMock)
 
   Object.defineProperty(URL, 'createObjectURL', {
@@ -93,34 +159,49 @@ afterEach(() => {
 })
 
 describe('App', () => {
-  it('opens a recent project with saved history and persists the next history change', async () => {
+  it('opens a recent project with saved edits and undoes through the server', async () => {
     const user = userEvent.setup()
-    const manifest = {
-      id: 'project_1234567890abcdef', originalFilename: 'owner.mp4', createdAt: '2026-07-14T00:00:00.000Z',
-      sizeBytes: 24, sha256: 'a'.repeat(64), mediaUrl: '/api/projects/project_1234567890abcdef/media',
-    }
-    const history = {
-      accepted: [{ schemaVersion: 'sanverse.action/v1', actionId: 'action-1', kind: 'add-nameplate', target: { x: 0.2, y: 0.3, sourceTimeMs: 1_000 }, primaryText: 'Saved nameplate', secondaryText: '', startMs: 1_000, durationMs: 5_000 }],
-      redoStack: [], issuedActionIds: ['action-1'],
-    }
-    fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
-      if (url === '/api/projects' && !options?.method) return new Response(JSON.stringify({ projects: [manifest] }), { status: 200 })
-      if (url === `/api/projects/${manifest.id}`) return new Response(JSON.stringify({ ...manifest, history }), { status: 200 })
-      if (url === `/api/projects/${manifest.id}/history` && options?.method === 'PUT') {
-        return new Response(options.body as string, { status: 200 })
-      }
-      return new Response('{}', { status: 404 })
+    const api = fakeApi()
+    const base = api.current()
+    const accepted = applyChangeSet(base, {
+      schemaVersion: 'sanverse.change-set/v1',
+      changeSetId: 'changeset_saved001',
+      baseRevision: base.revision,
+      operations: [{
+        schemaVersion: 'sanverse.operation/v2',
+        operationId: 'operation_saved001',
+        kind: 'add-nameplate',
+        capabilityId: 'sanverse.nameplate.component/v1',
+        clipId: base.composition.tracks[0].clips[0].clipId,
+        sampledClipTime: { ticks: 1_000 * 1_440, timescale: 1_440_000 },
+        compositionInterval: {
+          start: { ticks: 1_000 * 1_440, timescale: 1_440_000 },
+          duration: { ticks: 5_000 * 1_440, timescale: 1_440_000 },
+        },
+        target: { coordinateSpace: 'composition-normalized', point: { x: 0.2, y: 0.3 }, anchor: 'center' },
+        primaryText: 'Saved nameplate',
+        secondaryText: '',
+        extensions: {},
+      }],
+      provenance: { source: 'direct', requestId: null },
+      extensions: {},
     })
+    if (!accepted.ok) throw new Error('fixture failed')
+    api.setProject(accepted.value)
+    fetchMock.mockImplementation((url: string, options?: RequestInit) =>
+      api.handle(url, options) ?? new Response('{}', { status: 404 }))
     render(<App />)
 
-    await user.click(await screen.findByRole('button', { name: /open owner\.mp4/i }))
-    expect(screen.getByText('Saved nameplate')).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /open cleaned\.mp4/i }))
+    expect(await screen.findByText('Saved nameplate')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /^undo edit$/i }))
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      `/api/projects/${manifest.id}/history`,
-      expect.objectContaining({ method: 'PUT' }),
+      `/api/projects/${api.manifest.id}/undo`,
+      expect.objectContaining({ method: 'POST' }),
     ))
+    // The browser adopts the server's answer rather than deciding for itself.
+    await waitFor(() => expect(screen.queryByText('Saved nameplate')).not.toBeInTheDocument())
   })
 
   it('runs one Home-to-Studio-to-Home loop and releases its local video', async () => {
@@ -136,7 +217,7 @@ describe('App', () => {
 
     expect(intakeRequestCount()).toBe(1)
     expect(createObjectURL).not.toHaveBeenCalled()
-    expect(screen.getByText('cleaned.mp4')).toBeInTheDocument()
+    expect(await screen.findByText('cleaned.mp4')).toBeInTheDocument()
     expect(container.querySelector('video')).toHaveAttribute('src', '/api/projects/project_1234567890abcdef/media')
     expect(screen.getByText(/draft — not executed/i)).toBeInTheDocument()
     expect(screen.getByText('Tighten the opening pause.')).toBeInTheDocument()
@@ -188,7 +269,11 @@ describe('App', () => {
     const pendingUpdates: Array<() => void> = []
     let resolveFirst!: (value: Response) => void
     const pendingIntake = new Promise<Response>((resolve) => { resolveFirst = resolve })
-    fetchMock.mockReset().mockImplementation(exceptRecentProjects(() => pendingIntake))
+    const api = fakeApi('project_aaaaaaaaaaaaaaaa')
+    fetchMock.mockReset().mockImplementation((url: string, options?: RequestInit) => {
+      if (url === PROJECTS_URL && options?.method === 'POST') return pendingIntake
+      return api.handle(url, options) ?? recentProjectsResponse()
+    })
     Object.defineProperty(document, 'startViewTransition', {
       configurable: true,
       value: vi.fn((update: () => void) => {
@@ -204,22 +289,35 @@ describe('App', () => {
     })
     expect(intakeRequestCount()).toBe(1)
     resolveFirst(projectResponse('first.mp4', '/api/projects/project_aaaaaaaaaaaaaaaa/media'))
-    await act(async () => undefined)
-
-    expect(pendingUpdates).toHaveLength(1)
+    // The upload resolves, then the project state is read, then the view
+    // transition is queued.
+    await waitFor(() => expect(pendingUpdates).toHaveLength(1))
 
     act(() => pendingUpdates[0]())
     expect(screen.getByText('first.mp4')).toBeInTheDocument()
     expect(container.querySelector('video')).toHaveAttribute('src', '/api/projects/project_aaaaaaaaaaaaaaaa/media')
   })
 
-  it('accepts, undoes, redoes, and resets one nameplate through App-owned state', async () => {
+  it('accepts, undoes, redoes, and resets one nameplate with the server owning the project', async () => {
     const user = userEvent.setup()
+    const first = fakeApi('project_1234567890abcdef')
+    const second = fakeApi('project_bbbbbbbbbbbbbbbb')
+    let uploads = 0
+    fetchMock.mockReset().mockImplementation((url: string, options?: RequestInit) => {
+      if (url === PROJECTS_URL && options?.method === 'POST') {
+        uploads += 1
+        return uploads === 1
+          ? projectResponse('first.mp4', '/api/projects/project_1234567890abcdef/media')
+          : projectResponse('second.mp4', '/api/projects/project_bbbbbbbbbbbbbbbb/media')
+      }
+      return first.handle(url, options) ?? second.handle(url, options) ?? recentProjectsResponse()
+    })
     const { container } = render(<App />)
     await user.upload(
       screen.getByLabelText(/choose video/i),
       new File(['video'], 'first.mp4', { type: 'video/mp4' }),
     )
+    await screen.findByText('first.mp4')
 
     const video = container.querySelector('video') as HTMLVideoElement
     Object.defineProperties(video, {
@@ -254,24 +352,29 @@ describe('App', () => {
     expect(screen.getByTestId('nameplate-overlay')).toHaveTextContent('Santosh')
     expect(screen.getByText(/no accepted edits/i)).toBeInTheDocument()
 
-    const accept = screen.getByRole('button', { name: /^accept proposal$/i })
-    await user.dblClick(accept)
-    expect(screen.getAllByText('Santosh')).toHaveLength(2)
+    // Double-click: the second click must not create a second edit, because
+    // one approved request is exactly one change set.
+    await user.dblClick(screen.getByRole('button', { name: /^accept proposal$/i }))
+    await waitFor(() => expect(screen.getAllByText('Santosh').length).toBeGreaterThan(0))
+    await waitFor(() => expect(first.current().changeSets).toHaveLength(1))
+    expect(first.current().revision).toBe(1)
 
     await user.click(screen.getByRole('button', { name: /^undo edit$/i }))
-    expect(screen.queryByTestId('nameplate-overlay')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByTestId('nameplate-overlay')).not.toBeInTheDocument())
     expect(screen.getByRole('button', { name: /^redo edit$/i })).toBeEnabled()
 
     await user.click(screen.getByRole('button', { name: /^redo edit$/i }))
-    expect(screen.getByTestId('nameplate-overlay')).toHaveTextContent('Santosh')
+    fireEvent.timeUpdate(video)
+    await waitFor(() => expect(screen.getByTestId('nameplate-overlay')).toHaveTextContent('Santosh'))
 
     await user.click(screen.getByRole('button', { name: /back to home/i }))
-    fetchMock.mockResolvedValueOnce(projectResponse('second.mp4', '/api/projects/project_bbbbbbbbbbbbbbbb/media'))
     await user.upload(
       screen.getByLabelText(/choose video/i),
       new File(['video'], 'second.mp4', { type: 'video/mp4' }),
     )
+    await screen.findByText('second.mp4')
 
+    // A different project starts clean; the first project's edits do not leak.
     expect(screen.getByText(/no pending proposal/i)).toBeInTheDocument()
     expect(screen.getByText(/no accepted edits/i)).toBeInTheDocument()
   })
@@ -298,15 +401,16 @@ describe('App', () => {
     const user = userEvent.setup()
     let resolveExport!: (response: Response) => void
     const pendingExport = new Promise<Response>((resolve) => { resolveExport = resolve })
-    fetchMock.mockReset().mockImplementation(exceptRecentProjects((url, options) => {
+    const api = fakeApi()
+    fetchMock.mockReset().mockImplementation((url: string, options?: RequestInit) => {
       if (url === PROJECTS_URL && options?.method === 'POST') return projectResponse()
       if (url === '/api/projects/project_1234567890abcdef/exports') return pendingExport
-      if (url === '/api/projects/project_1234567890abcdef/history') return new Response(options?.body as string, { status: 200 })
-      return new Response('{}', { status: 404 })
-    }))
+      return api.handle(url, options) ?? recentProjectsResponse()
+    })
     const { container } = render(<App />)
 
     await user.upload(screen.getByLabelText(/choose video/i), new File(['video'], 'cleaned.mp4', { type: 'video/mp4' }))
+    await screen.findByText('cleaned.mp4')
     const video = container.querySelector('video') as HTMLVideoElement
     Object.defineProperties(video, {
       videoWidth: { configurable: true, value: 1920 }, videoHeight: { configurable: true, value: 1080 },
@@ -321,10 +425,14 @@ describe('App', () => {
     await user.type(screen.getByRole('textbox', { name: /^main text$/i }), 'Santosh')
     await user.click(screen.getByRole('button', { name: /create proposal/i }))
     await user.click(screen.getByRole('button', { name: /^accept proposal$/i }))
+    await waitFor(() => expect(api.current().changeSets).toHaveLength(1))
 
-    await user.click(screen.getByRole('button', { name: /export video/i }))
+    await user.click(await screen.findByRole('button', { name: /export video/i }))
     expect(screen.getByRole('status', { name: /export status/i })).toHaveTextContent(/rendering/i)
+    // No edit list is sent: the server compiles the project it has stored.
     expect(fetchMock).toHaveBeenLastCalledWith('/api/projects/project_1234567890abcdef/exports', expect.objectContaining({ method: 'POST' }))
+    const exportInit = fetchMock.mock.calls.at(-1)?.[1] as RequestInit
+    expect(exportInit.body).toBeUndefined()
 
     resolveExport(exportResponse())
     await act(async () => undefined)

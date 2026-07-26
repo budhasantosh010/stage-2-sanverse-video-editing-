@@ -1,28 +1,50 @@
+/*
+ * Every value here comes from the shared style contract, passed in as CSS
+ * variables by the video content layer. This file defines no product semantics
+ * of its own: it must not introduce a font, size, colour, or wrapping rule the
+ * exporter does not also apply.
+ */
+
+/*
+ * The exact font the exporter uses, served by the local API. Without this the
+ * preview draws with whatever font the operating system supplies while the
+ * export draws with something else.
+ */
+@font-face {
+  font-family: 'SanverseNameplate';
+  src: url('/api/render-assets/nameplate-font');
+  font-display: block;
+}
+
 .nameplate-overlay {
   position: absolute;
   z-index: 4;
   display: grid;
-  gap: 3px;
-  max-width: min(320px, 72%);
-  border-left: 4px solid var(--color-surface);
-  padding: 8px 10px;
-  background: rgb(0 0 0 / 82%);
-  color: var(--color-surface);
+  gap: var(--nameplate-line-gap, 4px);
+  padding: var(--nameplate-padding, 8px);
+  background: var(--nameplate-background, rgb(0 0 0 / 82%));
+  color: var(--nameplate-primary-color, #fff);
+  font-family: 'SanverseNameplate', sans-serif;
+  font-weight: 400;
   pointer-events: none;
-}
 
-.nameplate-overlay strong,
-.nameplate-overlay span {
-  overflow-wrap: anywhere;
+  /*
+   * Single line, never wrapped. FFmpeg's drawtext cannot wrap, so a wrapping
+   * preview would promise something the export cannot deliver.
+   */
+  width: max-content;
+  max-width: none;
+  white-space: pre;
 }
 
 .nameplate-overlay strong {
-  font-size: clamp(0.8rem, 2vw, 1.1rem);
-  line-height: 1.15;
+  font-size: var(--nameplate-primary-size, 1rem);
+  font-weight: 400;
+  line-height: 1;
 }
 
 .nameplate-overlay span {
-  color: rgb(255 255 255 / 78%);
-  font-size: clamp(0.65rem, 1.5vw, 0.82rem);
-  line-height: 1.2;
+  color: var(--nameplate-secondary-color, rgb(255 255 255 / 78%));
+  font-size: var(--nameplate-secondary-size, 0.8rem);
+  line-height: 1;
 }

@@ -2,9 +2,10 @@ import type { ComponentProps } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { accept, createHistory, type AddNameplateAction } from '@sanverse/edit-domain'
+import { acceptChangeSet, undoChangeSet, type EditProject } from '@sanverse/edit-domain'
 
 import { StudioScreen } from './StudioScreen'
+import { ms, testChangeSet, testOperation, testProject } from '../../test-fixtures'
 
 afterEach(() => {
   cleanup()
@@ -81,7 +82,7 @@ function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = 
       draftRequest: 'Tighten the opening pause.',
     },
     proposal: null,
-    history: createHistory(),
+    editProject: testProject(),
     editError: null,
     onProposal: vi.fn(),
     onDiscardProposal: vi.fn(),
@@ -100,15 +101,25 @@ function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = 
   return { ...view, props }
 }
 
-const nameplate: AddNameplateAction = {
-  schemaVersion: 'sanverse.action/v1',
-  actionId: 'action-studio-1',
-  kind: 'add-nameplate',
-  target: { x: 0.25, y: 0.75, sourceTimeMs: 12_400 },
-  primaryText: 'Santosh',
-  secondaryText: 'Founder',
-  startMs: 12_400,
-  durationMs: 5_000,
+const nameplate = testOperation({
+  operationId: 'operation_studio01',
+  sampledClipTime: ms(12_400),
+  compositionInterval: { start: ms(12_400), duration: ms(5_000) },
+})
+
+/** A project with one accepted nameplate visible from 12.4s to 17.4s. */
+function projectWithNameplate(
+  changeSetId = 'changeset_studio01',
+  overrides: Parameters<typeof testOperation>[0] = {},
+): EditProject {
+  const base = testProject()
+  const accepted = acceptChangeSet(base, testChangeSet(base.revision, changeSetId, {
+    sampledClipTime: ms(12_400),
+    compositionInterval: { start: ms(12_400), duration: ms(5_000) },
+    ...overrides,
+  }))
+  if (!accepted.ok) throw new Error(`fixture failed: ${JSON.stringify(accepted.error)}`)
+  return accepted.value
 }
 
 describe('StudioScreen', () => {
@@ -178,25 +189,24 @@ describe('StudioScreen', () => {
 
   it('presents export progress, recoverable failure, and a downloadable result', async () => {
     const user = userEvent.setup()
-    const accepted = accept(createHistory(), nameplate)
-    if (!accepted.ok) throw new Error('fixture failed')
+    const accepted = projectWithNameplate()
     const onExport = vi.fn()
-    const { rerender, props } = renderStudio({ history: accepted.value, onExport })
+    const { rerender, props } = renderStudio({ editProject: accepted, onExport })
 
     await user.click(screen.getByRole('button', { name: /export video/i }))
     expect(onExport).toHaveBeenCalledOnce()
 
-    rerender(<StudioScreen {...props} history={accepted.value} exportState={{ status: 'rendering' }} />)
+    rerender(<StudioScreen {...props} editProject={accepted} exportState={{ status: 'rendering' }} />)
     expect(screen.getByRole('status', { name: /export status/i })).toHaveTextContent(/rendering/i)
     expect(screen.getByRole('button', { name: /exporting video/i })).toBeDisabled()
 
-    rerender(<StudioScreen {...props} history={accepted.value} exportState={{ status: 'error', message: 'We could not export the video. Your accepted edits are still safe.' }} />)
+    rerender(<StudioScreen {...props} editProject={accepted} exportState={{ status: 'error', message: 'We could not export the video. Your accepted edits are still safe.' }} />)
     expect(screen.getByRole('alert')).toHaveTextContent(/accepted edits are still safe/i)
     expect(screen.getByRole('button', { name: /export video/i })).toBeEnabled()
     await user.click(screen.getByRole('button', { name: /retry export/i }))
     expect(onExport).toHaveBeenCalledTimes(2)
 
-    rerender(<StudioScreen {...props} history={accepted.value} exportState={{ status: 'ready', result: {
+    rerender(<StudioScreen {...props} editProject={accepted} exportState={{ status: 'ready', result: {
       id: 'export_1234567890abcdef',
       mediaUrl: '/api/projects/project_1234567890abcdef/exports/export_1234567890abcdef/media',
       sha256: 'b'.repeat(64), width: 1920, height: 1080, durationMs: 60_000, hasAudio: true,
@@ -418,8 +428,13 @@ describe('StudioScreen', () => {
       expect.objectContaining({
         primaryText: 'Santosh',
         secondaryText: 'Founder',
-        startMs: 12_400,
-        durationMs: 5_000,
+        // The nameplate attaches to a clip, not to raw source time, so it
+        // moves with that clip when the timeline is cut later.
+        clipId: expect.stringMatching(/^clip_/),
+        compositionInterval: {
+          start: ms(12_400),
+          duration: ms(5_000),
+        },
       }),
     )
     expect(screen.getByText(/no pending proposal/i)).toBeInTheDocument()
@@ -467,7 +482,10 @@ describe('StudioScreen', () => {
       width: '100%',
       height: '56.25%',
     })
-    expect(screen.getByTestId('nameplate-overlay')).toHaveStyle({ left: '25%', top: '75%' })
+    // Position now comes from the shared placement rule after the box measures
+    // itself. jsdom reports a zero-sized box, so the overlay stays hidden here
+    // rather than being drawn somewhere it does not belong.
+    expect(screen.getByTestId('nameplate-overlay')).toHaveStyle({ visibility: 'hidden' })
 
     video.currentTime = 17.4
     act(() => {
@@ -538,7 +556,13 @@ describe('StudioScreen', () => {
   })
 
   it('describes the proposal duration from the typed action', () => {
-    renderStudio({ proposal: { ...nameplate, durationMs: 2_500 } })
+    renderStudio({
+      proposal: testOperation({
+        operationId: 'operation_studio02',
+        sampledClipTime: ms(12_400),
+        compositionInterval: { start: ms(12_400), duration: ms(2_500) },
+      }),
+    })
 
     const proposalSection = screen.getByRole('heading', { name: /^proposal$/i }).closest('section')
     expect(proposalSection).toHaveTextContent(/2\.5 seconds/i)
@@ -575,11 +599,7 @@ describe('StudioScreen', () => {
           draftRequest: '',
         }}
         proposal={null}
-        history={{
-          accepted: [nameplate],
-          redoStack: [],
-          issuedActionIds: [nameplate.actionId],
-        }}
+        editProject={projectWithNameplate()}
         editError={null}
         onProposal={vi.fn()}
         onDiscardProposal={vi.fn()}
@@ -599,14 +619,20 @@ describe('StudioScreen', () => {
   })
 
   it('renders accepted history but never renders the redo stack', () => {
-    const redoOnly = { ...nameplate, actionId: 'action-redo', primaryText: 'Redo only' }
-    const { container } = renderStudio({
-      history: {
-        accepted: [nameplate],
-        redoStack: [redoOnly],
-        issuedActionIds: [nameplate.actionId, redoOnly.actionId],
-      },
-    })
+    // Accept two edits, then undo one so it sits on the redo stack. An edit
+    // waiting to be redone must not appear as if it were applied.
+    const first = projectWithNameplate()
+    const second = acceptChangeSet(first, testChangeSet(first.revision, 'changeset_studio02', {
+      operationId: 'operation_studio02',
+      primaryText: 'Redo only',
+      sampledClipTime: ms(12_400),
+      compositionInterval: { start: ms(12_400), duration: ms(5_000) },
+    }))
+    if (!second.ok) throw new Error('fixture failed')
+    const undone = undoChangeSet(second.value)
+    if (!undone.ok) throw new Error('fixture failed')
+
+    const { container } = renderStudio({ editProject: undone.value })
     const video = container.querySelector('video') as HTMLVideoElement
     prepareVideoForPointing(video, 12.4)
     fireEvent.loadedMetadata(video)
@@ -617,12 +643,8 @@ describe('StudioScreen', () => {
   })
 
   it('enables undo and redo from canonical history and blocks both while a proposal is pending', () => {
-    const history = {
-      accepted: [nameplate],
-      redoStack: [] as AddNameplateAction[],
-      issuedActionIds: [nameplate.actionId],
-    }
-    const { rerender } = renderStudio({ history })
+    const editProject = projectWithNameplate()
+    const { rerender } = renderStudio({ editProject })
 
     expect(screen.getByRole('button', { name: /^undo edit$/i })).toBeEnabled()
     expect(screen.getByRole('button', { name: /^redo edit$/i })).toBeDisabled()
@@ -636,7 +658,7 @@ describe('StudioScreen', () => {
           draftRequest: '',
         }}
         proposal={nameplate}
-        history={history}
+        editProject={editProject}
         editError={null}
         onProposal={vi.fn()}
         onDiscardProposal={vi.fn()}

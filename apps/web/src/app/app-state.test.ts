@@ -1,262 +1,149 @@
 import { describe, expect, it } from 'vitest'
 
-import type { AppState } from './app-state'
 import {
-  acceptEditProposal,
+  applyServerProject,
+  buildChangeSet,
+  canRedoProject,
+  canUndoProject,
   createInitialState,
   discardEditProposal,
   openLocalProject,
   queueEditProposal,
-  redoEdit,
+  reportEditError,
   returnHome,
-  undoEdit,
   updateDraftRequest,
+  type StudioState,
 } from './app-state'
+import {
+  TEST_PROJECT_ID,
+  ms,
+  testOperation,
+  testProject,
+  testProjectWithNameplate,
+} from '../test-fixtures'
 
-const proposal = {
-  schemaVersion: 'sanverse.action/v1' as const,
-  actionId: 'action-state-1',
-  kind: 'add-nameplate' as const,
-  target: { x: 0.25, y: 0.75, sourceTimeMs: 12_400 },
-  primaryText: 'Santosh',
-  secondaryText: 'Founder',
-  startMs: 12_400,
-  durationMs: 5_000,
-}
-
-function createStudioState() {
-  return openLocalProject(createInitialState(), {
-    id: 'project_1234567890abcdef',
+const studio = (editProject = testProject()): StudioState =>
+  openLocalProject(createInitialState(), {
+    id: TEST_PROJECT_ID,
     name: 'cleaned.mp4',
-    mediaUrl: 'blob:test',
-  })
-}
-
-describe('app state', () => {
-  it('starts at Home with an empty draft request', () => {
-    expect(createInitialState()).toEqual({
-      screen: 'home',
-      draftRequest: '',
-    })
+    mediaUrl: `/api/projects/${TEST_PROJECT_ID}/media`,
+    editProject,
   })
 
-  it('updates the Home draft without changing screens', () => {
-    expect(updateDraftRequest(createInitialState(), 'Add my name here')).toEqual({
-      screen: 'home',
-      draftRequest: 'Add my name here',
-    })
+describe('home state', () => {
+  it('starts on Home with an empty draft', () => {
+    expect(createInitialState()).toEqual({ screen: 'home', draftRequest: '' })
   })
 
-  it('opens a local project with the current Home draft', () => {
-    const home = updateDraftRequest(createInitialState(), 'Add my name here')
-
-    expect(
-      openLocalProject(home, {
-        id: 'project_1234567890abcdef',
-        name: 'cleaned.mp4',
-        mediaUrl: 'blob:test',
-      }),
-    ).toEqual({
-      screen: 'studio',
-      project: {
-        id: 'project_1234567890abcdef',
-        name: 'cleaned.mp4',
-        mediaUrl: 'blob:test',
-        draftRequest: 'Add my name here',
-      },
-      proposal: null,
-      editError: null,
-      history: {
-        accepted: [],
-        redoStack: [],
-        issuedActionIds: [],
-      },
-    })
-  })
-
-  it('uses an explicitly supplied draft when opening a local project', () => {
-    expect(
-      openLocalProject(createInitialState(), {
-        id: 'project_1234567890abcdef',
-        name: 'cleaned.mp4',
-        mediaUrl: 'blob:test',
-        draftRequest: 'Remove the long pause',
-      }),
-    ).toEqual({
-      screen: 'studio',
-      project: {
-        id: 'project_1234567890abcdef',
-        name: 'cleaned.mp4',
-        mediaUrl: 'blob:test',
-        draftRequest: 'Remove the long pause',
-      },
-      proposal: null,
-      editError: null,
-      history: {
-        accepted: [],
-        redoStack: [],
-        issuedActionIds: [],
-      },
-    })
-  })
-
-  it('reopens a local project with its validated canonical history', () => {
-    const history = {
-      accepted: [proposal],
-      redoStack: [],
-      issuedActionIds: [proposal.actionId],
-    }
-    const reopened = openLocalProject(createInitialState(), {
-      id: 'project_1234567890abcdef',
+  it('carries the Home draft into the Studio', () => {
+    const home = updateDraftRequest(createInitialState(), 'add my name')
+    const state = openLocalProject(home, {
+      id: TEST_PROJECT_ID,
       name: 'cleaned.mp4',
-      mediaUrl: '/api/projects/project_1234567890abcdef/media',
-      history,
+      mediaUrl: '/media',
+      editProject: testProject(),
     })
-
-    expect(reopened.history).toEqual(history)
-    expect(reopened.history).not.toBe(history)
+    expect(state.project.draftRequest).toBe('add my name')
+    expect(state.proposal).toBeNull()
+    expect(state.editProject.revision).toBe(0)
   })
 
-  it('updates only the Studio project draft', () => {
-    const studio = openLocalProject(createInitialState(), {
-      id: 'project_1234567890abcdef',
-      name: 'cleaned.mp4',
-      mediaUrl: 'blob:test',
-    })
-
-    expect(updateDraftRequest(studio, 'Add captions')).toEqual({
-      screen: 'studio',
-      project: {
-        id: 'project_1234567890abcdef',
-        name: 'cleaned.mp4',
-        mediaUrl: 'blob:test',
-        draftRequest: 'Add captions',
-      },
-      proposal: null,
-      editError: null,
-      history: {
-        accepted: [],
-        redoStack: [],
-        issuedActionIds: [],
-      },
-    })
+  it('updates the Studio draft without touching the project', () => {
+    const state = studio()
+    const next = updateDraftRequest(state, 'later')
+    expect(next.project.draftRequest).toBe('later')
+    expect(next.editProject).toBe(state.editProject)
   })
 
-  it('returns from Studio to a clean Home state', () => {
-    const studio = openLocalProject(createInitialState(), {
-      id: 'project_1234567890abcdef',
-      name: 'cleaned.mp4',
-      mediaUrl: 'blob:test',
-      draftRequest: 'Add my name here',
-    })
-
-    expect(returnHome(studio)).toEqual({
-      screen: 'home',
-      draftRequest: '',
-    })
-  })
-
-  it('queues a validated proposal without changing canonical history', () => {
-    const state = createStudioState()
-    const next = queueEditProposal(state, proposal)
-
-    expect(next.proposal).toEqual(proposal)
-    expect(next.proposal).not.toBe(proposal)
-    expect(next.history).toBe(state.history)
-    expect(next.history.accepted).toHaveLength(0)
-    expect(next.editError).toBeNull()
-  })
-
-  it('fails visibly when a proposal is invalid', () => {
-    const state = createStudioState()
-    const next = queueEditProposal(state, { ...proposal, primaryText: '   ' })
-
-    expect(next.proposal).toBeNull()
-    expect(next.history).toBe(state.history)
-    expect(next.editError).toMatch(/could not preview/i)
-  })
-
-  it('accepts one proposal atomically and clears the pending proposal', () => {
-    const queued = queueEditProposal(createStudioState(), proposal)
-    const accepted = acceptEditProposal(queued)
-
-    expect(accepted.proposal).toBeNull()
-    expect(accepted.history.accepted).toEqual([proposal])
-    expect(accepted.history.issuedActionIds).toEqual(['action-state-1'])
-    expect(accepted.editError).toBeNull()
-  })
-
-  it('does not accept a rapid second time', () => {
-    const acceptedOnce = acceptEditProposal(
-      queueEditProposal(createStudioState(), proposal),
-    )
-    const acceptedTwice = acceptEditProposal(acceptedOnce)
-
-    expect(acceptedTwice.history.accepted).toHaveLength(1)
-    expect(acceptedTwice.history.accepted[0]?.actionId).toBe('action-state-1')
-  })
-
-  it('rejects a proposal whose action ID has already been issued', () => {
-    const accepted = acceptEditProposal(queueEditProposal(createStudioState(), proposal))
-    const next = queueEditProposal(accepted, proposal)
-
-    expect(next.proposal).toBeNull()
-    expect(next.history.accepted).toHaveLength(1)
-    expect(next.editError).toMatch(/already been used/i)
-  })
-
-  it('discards only the pending proposal', () => {
-    const accepted = acceptEditProposal(queueEditProposal(createStudioState(), proposal))
-    const secondProposal = { ...proposal, actionId: 'action-state-2' }
-    const queued = queueEditProposal(accepted, secondProposal)
-    const discarded = discardEditProposal(queued)
-
-    expect(discarded.proposal).toBeNull()
-    expect(discarded.history).toBe(accepted.history)
-    expect(discarded.history.accepted).toHaveLength(1)
-  })
-
-  it('undoes and redoes accepted history', () => {
-    const accepted = acceptEditProposal(queueEditProposal(createStudioState(), proposal))
-    const undone = undoEdit(accepted)
-    const redone = redoEdit(undone)
-
-    expect(undone.history.accepted).toHaveLength(0)
-    expect(undone.history.redoStack).toEqual([proposal])
-    expect(redone.history.accepted).toEqual([proposal])
-    expect(redone.history.redoStack).toHaveLength(0)
-  })
-
-  it('blocks undo and redo while a proposal is pending', () => {
-    const accepted = acceptEditProposal(queueEditProposal(createStudioState(), proposal))
-    const queued = queueEditProposal(accepted, { ...proposal, actionId: 'action-state-2' })
-
-    const undoBlocked = undoEdit(queued)
-    const redoBlocked = redoEdit(queued)
-
-    expect(undoBlocked.history).toBe(queued.history)
-    expect(redoBlocked.history).toBe(queued.history)
-    expect(undoBlocked.editError).toMatch(/discard or accept/i)
-    expect(redoBlocked.editError).toMatch(/discard or accept/i)
+  it('returns to a clean Home', () => {
+    expect(returnHome(studio())).toEqual({ screen: 'home', draftRequest: '' })
   })
 })
 
-if (false) {
-  const updateUnionDraft = (state: AppState): AppState =>
-    updateDraftRequest(state, 'Keep the draft editable')
-
-  void updateUnionDraft
-
-  const studio = openLocalProject(createInitialState(), {
-    id: 'project_1234567890abcdef',
-    name: 'cleaned.mp4',
-    mediaUrl: 'blob:test',
+describe('queueing a proposal', () => {
+  it('accepts a well-formed proposal for preview', () => {
+    const next = queueEditProposal(studio(), testOperation())
+    expect(next.proposal?.primaryText).toBe('Santosh')
+    expect(next.editError).toBeNull()
   })
 
-  // @ts-expect-error Opening a project is exclusively a Home-to-Studio transition.
-  openLocalProject(studio, {
-    id: 'project_aaaaaaaaaaaaaaaa',
-    name: 'replacement.mp4',
-    mediaUrl: 'blob:replacement',
+  it('refuses a malformed proposal without changing saved state', () => {
+    const state = studio()
+    const next = queueEditProposal(state, { kind: 'add-nameplate' })
+    expect(next.proposal).toBeNull()
+    expect(next.editError).toMatch(/invalid/i)
+    expect(next.editProject).toBe(state.editProject)
   })
-}
+
+  it('refuses a nameplate that runs past the end of this video, before it is previewed', () => {
+    // The v1 defect: this was previewed, accepted, and saved, then failed only
+    // at export, long after the user believed the edit was done.
+    const next = queueEditProposal(studio(), testOperation({
+      compositionInterval: { start: ms(29_000), duration: ms(5_000) },
+    }))
+    expect(next.proposal).toBeNull()
+    expect(next.editError).toMatch(/past the end/i)
+  })
+
+  it('refuses a proposal whose ID is already used', () => {
+    const state = studio(testProjectWithNameplate())
+    const next = queueEditProposal(state, testOperation({ operationId: 'operation_aaaaaaaa' }))
+    expect(next.proposal).toBeNull()
+    expect(next.editError).toMatch(/already been used/i)
+  })
+
+  it('discards a pending proposal without touching saved state', () => {
+    const queued = queueEditProposal(studio(), testOperation())
+    const discarded = discardEditProposal(queued)
+    expect(discarded.proposal).toBeNull()
+    expect(discarded.editError).toBeNull()
+    expect(discarded.editProject).toBe(queued.editProject)
+  })
+})
+
+describe('adopting what the server reports', () => {
+  it('replaces the project and clears the pending proposal', () => {
+    const queued = queueEditProposal(studio(), testOperation())
+    const served = testProjectWithNameplate()
+
+    const next = applyServerProject(queued, served)
+    expect(next.editProject).toBe(served)
+    expect(next.proposal).toBeNull()
+    expect(next.editError).toBeNull()
+  })
+
+  it('surfaces an edit failure without discarding the project', () => {
+    const state = studio()
+    const next = reportEditError(state, 'This project changed while that edit was being prepared.')
+    expect(next.editError).toMatch(/changed while/i)
+    expect(next.editProject).toBe(state.editProject)
+  })
+})
+
+describe('undo and redo availability', () => {
+  it('is unavailable on a fresh project and while a proposal is pending', () => {
+    expect(canUndoProject(studio())).toBe(false)
+    expect(canRedoProject(studio())).toBe(false)
+
+    const withEdit = studio(testProjectWithNameplate())
+    expect(canUndoProject(withEdit)).toBe(true)
+
+    const pending = queueEditProposal(withEdit, testOperation({ operationId: 'operation_bbbbbbbb' }))
+    expect(canUndoProject(pending)).toBe(false)
+  })
+})
+
+describe('building a change set', () => {
+  it('carries the revision the user was looking at', () => {
+    const state = studio(testProjectWithNameplate())
+    const changeSet = buildChangeSet(testOperation({ operationId: 'operation_bbbbbbbb' }), state.editProject.revision)
+
+    expect(changeSet.baseRevision).toBe(state.editProject.revision)
+    expect(changeSet.provenance).toEqual({ source: 'direct', requestId: null })
+    expect(changeSet.changeSetId).toMatch(/^changeset_[a-z0-9]{8,64}$/)
+  })
+
+  it('gives one approved request exactly one change set, so one Undo reverses it', () => {
+    expect(buildChangeSet(testOperation(), 0).operations).toHaveLength(1)
+  })
+})

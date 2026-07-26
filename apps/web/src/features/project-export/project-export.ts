@@ -1,5 +1,3 @@
-import type { EditHistory } from '@sanverse/edit-domain/history'
-
 export type ProjectExportResult = {
   id: string
   mediaUrl: string
@@ -20,7 +18,7 @@ const PROJECT_ID = /^project_[a-z0-9]{16,64}$/
 const EXPORT_ID = /^export_[a-z0-9]{16,64}$/
 const EXPORT_ERROR = 'We could not export the video. Your accepted edits are still safe.'
 const EXPORT_ERROR_CODES = [
-  'RENDER_HISTORY_INVALID',
+  'RENDER_PROJECT_INVALID',
   'NOTHING_TO_RENDER',
   'RENDER_INPUT_INVALID',
   'RENDER_TOOL_UNAVAILABLE',
@@ -55,7 +53,7 @@ function exportErrorMessage(code: ProjectExportErrorCode): string {
   if (code === 'RENDER_TOOL_UNAVAILABLE') {
     return 'The local renderer is unavailable. Restart Sanverse after checking FFmpeg, then retry. Your accepted edits are still safe. Code: RENDER_TOOL_UNAVAILABLE.'
   }
-  if (code === 'RENDER_INPUT_INVALID' || code === 'RENDER_HISTORY_INVALID' || code === 'NOTHING_TO_RENDER') {
+  if (code === 'RENDER_INPUT_INVALID' || code === 'RENDER_PROJECT_INVALID' || code === 'NOTHING_TO_RENDER') {
     return `The accepted edit cannot be rendered as requested. Adjust it, then retry. Your accepted edits are still safe. Code: ${code}.`
   }
   if (code === 'RENDER_CANCELLED') {
@@ -83,9 +81,15 @@ function isExportResult(value: unknown, projectId: string): value is ProjectExpo
   )
 }
 
+/**
+ * Ask the server to export.
+ *
+ * No edit list is sent. The server compiles what it has stored, so what is
+ * exported is always the project the user accepted — a stale or tampered
+ * browser cannot cause a different video to be produced.
+ */
 export async function exportProject(
   projectId: string,
-  history: EditHistory,
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal,
 ): Promise<ProjectExportResult> {
@@ -93,8 +97,6 @@ export async function exportProject(
   try {
     const response = await fetcher(`/api/projects/${projectId}/exports`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ history }),
       signal,
     })
     if (response.status !== 201) {

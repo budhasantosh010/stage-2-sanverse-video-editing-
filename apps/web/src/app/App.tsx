@@ -1,23 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import type { EditHistory } from '@sanverse/edit-domain/history'
+import type { EditProject } from '@sanverse/edit-domain'
 
 import {
-  acceptEditProposal,
+  applyServerProject,
+  buildChangeSet,
   createInitialState,
   discardEditProposal,
   openLocalProject,
   queueEditProposal,
-  redoEdit,
+  reportEditError,
   returnHome,
-  undoEdit,
   updateDraftRequest,
   type AppState,
-  type StudioState,
 } from './app-state'
 import { uploadProject } from '../features/project-intake/project-intake'
 import { exportProject, type ProjectExportState } from '../features/project-export/project-export'
-import { listRecentProjects, loadProject, saveProjectHistory, type RecentProject } from '../features/project-library/project-library'
+import {
+  acceptChangeSet,
+  listRecentProjects,
+  loadProject,
+  redoProject,
+  undoProject,
+  type RecentProject,
+} from '../features/project-library/project-library'
 import { transitionView } from '../features/view-transition/view-transition'
 import { HomeScreen } from '../screens/home/HomeScreen'
 import { StudioScreen } from '../screens/studio/StudioScreen'
@@ -77,26 +83,34 @@ export function App() {
     }
   }, [appState.screen])
 
-  function queueHistorySave(projectId: string, history: EditHistory): void {
+  /**
+   * Every edit is applied by the server, one at a time, and the browser adopts
+   * whatever the server reports back. The browser never decides the new state,
+   * so it can never overwrite work it did not see.
+   */
+  function requestEdit(run: (projectId: string) => Promise<EditProject>): void {
+    if (appState.screen !== 'studio') return
+    const projectId = appState.project.id
     const sequence = saveSequenceRef.current + 1
     saveSequenceRef.current = sequence
-    setSaveState('saving')
-    const save = saveQueueRef.current
-      .catch(() => undefined)
-      .then(() => saveProjectHistory(projectId, history))
-    saveQueueRef.current = save.then(() => undefined, () => undefined)
-    void save.then(
-      () => { if (saveSequenceRef.current === sequence) setSaveState('saved') },
-      () => { if (saveSequenceRef.current === sequence) setSaveState('error') },
-    )
-  }
-
-  function applyHistoryChange(change: (state: StudioState) => StudioState): void {
-    if (appState.screen !== 'studio') return
     resetExport()
-    const next = change(appState)
-    setAppState(next)
-    if (next.history !== appState.history) queueHistorySave(next.project.id, next.history)
+    setSaveState('saving')
+
+    const request = saveQueueRef.current.catch(() => undefined).then(() => run(projectId))
+    saveQueueRef.current = request.then(() => undefined, () => undefined)
+    void request.then(
+      (editProject) => {
+        if (saveSequenceRef.current !== sequence) return
+        setAppState((current) => (current.screen === 'studio' ? applyServerProject(current, editProject) : current))
+        setSaveState('saved')
+      },
+      (error: unknown) => {
+        if (saveSequenceRef.current !== sequence) return
+        setSaveState('error')
+        const message = error instanceof Error ? error.message : 'This edit could not be saved. Nothing was changed.'
+        setAppState((current) => (current.screen === 'studio' ? reportEditError(current, message) : current))
+      },
+    )
   }
 
   if (appState.screen === 'home') {
@@ -122,7 +136,9 @@ export function App() {
           setIsStarting(true)
           setStartError('')
           void uploadProject(file, fetch, controller.signal)
-            .then((project) => {
+            .then(async (summary) => ({ summary, opened: await loadProject(summary.id, fetch, controller.signal) }))
+            .then(({ summary, opened }) => {
+              const project = { ...summary, editProject: opened.project }
               if (transitionSequence !== transitionSequenceRef.current || controller.signal.aborted) return
               intakeAbortRef.current = null
               intakeInFlightRef.current = false
@@ -133,6 +149,7 @@ export function App() {
                     id: project.id,
                     name: project.originalFilename,
                     mediaUrl: project.mediaUrl,
+                    editProject: project.editProject,
                   }) : current)
                   setIsStarting(false)
                   setExportState({ status: 'idle' })
@@ -171,7 +188,7 @@ export function App() {
                     id: project.id,
                     name: project.originalFilename,
                     mediaUrl: project.mediaUrl,
-                    history: project.history,
+                    editProject: project.project,
                   }) : current)
                   setIsOpeningRecent(false)
                   setExportState({ status: 'idle' })
@@ -196,7 +213,7 @@ export function App() {
     <StudioScreen
       project={appState.project}
       proposal={appState.proposal}
-      history={appState.history}
+      editProject={appState.editProject}
       editError={appState.editError}
       exportState={exportState}
       saveState={saveState}
@@ -213,21 +230,23 @@ export function App() {
         )
       }}
       onAcceptProposal={() => {
-        applyHistoryChange(acceptEditProposal)
+        if (appState.screen !== 'studio' || !appState.proposal) return
+        const changeSet = buildChangeSet(appState.proposal, appState.editProject.revision)
+        requestEdit((projectId) => acceptChangeSet(projectId, changeSet, fetch))
       }}
       onUndo={() => {
-        applyHistoryChange(undoEdit)
+        requestEdit((projectId) => undoProject(projectId, fetch))
       }}
       onRedo={() => {
-        applyHistoryChange(redoEdit)
+        requestEdit((projectId) => redoProject(projectId, fetch))
       }}
       onExport={() => {
-        if (exportInFlightRef.current || appState.proposal || appState.history.accepted.length === 0) return
+        if (exportInFlightRef.current || appState.proposal || appState.editProject.changeSets.length === 0) return
         exportInFlightRef.current = true
         const controller = new AbortController()
         exportAbortRef.current = controller
         setExportState({ status: 'rendering' })
-        void exportProject(appState.project.id, appState.history, fetch, controller.signal)
+        void exportProject(appState.project.id, fetch, controller.signal)
           .then((result) => {
             if (exportAbortRef.current !== controller || controller.signal.aborted) return
             exportAbortRef.current = null

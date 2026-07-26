@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  proposeAddNameplate,
-  type AddNameplateAction,
+  DEFAULT_NAMEPLATE_ANCHOR,
+  NAMEPLATE_COMPONENT_ID,
+  mediaTimeFromMilliseconds,
+  validateOperation,
+  type AddNameplateOperation,
 } from '@sanverse/edit-domain'
 
 import {
@@ -12,15 +15,19 @@ import './NameplateComposer.css'
 
 export type NameplateComposerProps = {
   target: CapturedPointTarget | null
-  createActionId(): string
-  onProposal(proposal: AddNameplateAction): void
+  /** The clip this nameplate attaches to, so it survives later cuts. */
+  clipId: string
+  createOperationId(): string
+  onProposal(proposal: AddNameplateOperation): void
 }
 
 const PRIMARY_ERROR_ID = 'nameplate-primary-error'
+const DEFAULT_VISIBLE_MS = 5_000
 
 export function NameplateComposer({
   target,
-  createActionId,
+  clipId,
+  createOperationId,
   onProposal,
 }: NameplateComposerProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -67,28 +74,42 @@ export function NameplateComposer({
       return
     }
 
-    let actionId: string
+    let operationId: string
     try {
-      actionId = createActionId()
+      operationId = createOperationId()
     } catch {
       setError('We could not create this proposal. Try again.')
       primaryRef.current?.focus()
       return
     }
 
-    const result = proposeAddNameplate({
-      schemaVersion: 'sanverse.action/v1',
-      actionId,
+    const sampledClipTime = mediaTimeFromMilliseconds(target.timeMs)
+    const start = mediaTimeFromMilliseconds(target.timeMs)
+    const duration = mediaTimeFromMilliseconds(DEFAULT_VISIBLE_MS)
+    if (!sampledClipTime.ok || !start.ok || !duration.ok) {
+      setError('We could not create this proposal. Try again.')
+      primaryRef.current?.focus()
+      return
+    }
+
+    const result = validateOperation({
+      schemaVersion: 'sanverse.operation/v2',
+      operationId,
       kind: 'add-nameplate',
+      capabilityId: NAMEPLATE_COMPONENT_ID,
+      clipId,
+      // Evidence: where the user was pointing, on this clip's own timeline.
+      sampledClipTime: sampledClipTime.value,
+      // Instruction: when it is on screen, in finished-video time.
+      compositionInterval: { start: start.value, duration: duration.value },
       target: {
-        x: target.x,
-        y: target.y,
-        sourceTimeMs: target.timeMs,
+        coordinateSpace: 'composition-normalized',
+        point: { x: target.x, y: target.y },
+        anchor: DEFAULT_NAMEPLATE_ANCHOR,
       },
       primaryText: primary,
       secondaryText: secondaryText.trim(),
-      startMs: target.timeMs,
-      durationMs: 5_000,
+      extensions: {},
     })
 
     if (!result.ok) {

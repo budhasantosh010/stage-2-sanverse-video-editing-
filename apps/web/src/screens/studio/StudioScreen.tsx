@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AddNameplateAction } from '@sanverse/edit-domain'
-import type { EditHistory } from '@sanverse/edit-domain/history'
+import type { AddNameplateOperation, EditProject } from '@sanverse/edit-domain'
+import { toMilliseconds } from '@sanverse/edit-domain'
 import type { StudioState } from '../../app/app-state'
+import {
+  compilePreviewPlan,
+  millisecondsToTicks,
+  nameplateCssVariables,
+  visibleNodes,
+  withPendingProposal,
+} from '../../features/render-plan/render-plan-preview'
 import type { ProjectExportState } from '../../features/project-export/project-export'
 import { NameplateComposer } from '../../features/nameplate/NameplateComposer'
 import { NameplateOverlay } from '../../features/nameplate/NameplateOverlay'
@@ -15,10 +22,10 @@ import './StudioScreen.css'
 
 export type StudioScreenProps = {
   project: StudioState['project']
-  proposal: AddNameplateAction | null
-  history: EditHistory
+  proposal: AddNameplateOperation | null
+  editProject: EditProject
   editError: string | null
-  onProposal(proposal: AddNameplateAction): void
+  onProposal(proposal: AddNameplateOperation): void
   onDiscardProposal(): void
   onAcceptProposal(): void
   onUndo(): void
@@ -33,11 +40,10 @@ const UNAVAILABLE_DESCRIPTION = 'studio-unavailable-description'
 const EXPORT_DESCRIPTION = 'studio-export-description'
 const KEYBOARD_POINT_STEP = 0.05
 
-function createActionId() {
-  if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID()
+function createOperationId() {
   const bytes = new Uint32Array(4)
   globalThis.crypto.getRandomValues(bytes)
-  return `action-${Array.from(bytes, (value) => value.toString(16).padStart(8, '0')).join('')}`
+  return `operation_${Array.from(bytes, (value) => value.toString(16).padStart(8, '0')).join('')}`.slice(0, 42)
 }
 
 type NormalizedPoint = Pick<CapturedPointTarget, 'x' | 'y'>
@@ -90,7 +96,7 @@ function getVideoContentLayerStyle(video: HTMLVideoElement) {
 export function StudioScreen({
   project,
   proposal,
-  history,
+  editProject,
   editError,
   onProposal,
   onDiscardProposal,
@@ -209,9 +215,23 @@ export function StudioScreen({
   const markerPosition = pointTarget && video ? projectPointOntoVideoElement(pointTarget, video) : null
   const draftPosition = isPointMode && video ? projectPointOntoVideoElement(draftPoint, video) : null
   const videoContentLayerStyle = video ? getVideoContentLayerStyle(video) : null
-  const previewActions = proposal ? [...history.accepted, proposal] : history.accepted
+
+  // The preview is compiled from the project by the same compiler the exporter
+  // uses. A pending proposal is layered on top without touching saved state.
+  const composition = editProject.composition
+  const previewPlan = compilePreviewPlan(
+    proposal ? withPendingProposal(editProject, proposal) : editProject,
+  )
+  const previewNodes = previewPlan ? visibleNodes(previewPlan, millisecondsToTicks(playheadMs)) : []
+  const contentBox = video ? getRenderedVideoContentBox(video.getBoundingClientRect(), video.videoWidth, video.videoHeight) : null
+  const previewScale = contentBox && composition.width > 0 ? contentBox.width / composition.width : 0
+  const nameplateVariables = nameplateCssVariables(composition.width, composition.height, previewScale)
+
+  const acceptedRecords = editProject.changeSets
+  const acceptedCount = acceptedRecords.length
+  const firstClipId = composition.tracks[0]?.clips[0]?.clipId ?? ''
   const isRendering = exportState.status === 'rendering'
-  const canExport = history.accepted.length > 0 && !proposal && !isRendering
+  const canExport = acceptedCount > 0 && !proposal && !isRendering
 
   function cancelPointMode() {
     pointModeButtonRef.current?.focus()
@@ -366,13 +386,15 @@ export function StudioScreen({
                 <div
                   className="studio-screen__video-content-layer"
                   data-testid="video-content-layer"
-                  style={videoContentLayerStyle}
+                  style={{ ...videoContentLayerStyle, ...nameplateVariables }}
                 >
-                  {previewActions.map((action) => (
+                  {previewNodes.map((node) => (
                     <NameplateOverlay
-                      key={action.actionId}
-                      action={action}
-                      currentTimeMs={playheadMs}
+                      key={node.nodeId}
+                      node={node}
+                      compositionWidth={composition.width}
+                      compositionHeight={composition.height}
+                      scale={previewScale}
                     />
                   ))}
                 </div>
@@ -430,7 +452,8 @@ export function StudioScreen({
           </div>
           <NameplateComposer
             target={pointTarget}
-            createActionId={createActionId}
+            clipId={firstClipId}
+            createOperationId={createOperationId}
             onProposal={onProposal}
           />
           {pointError ? <p role="alert" className="studio-screen__point-error">{pointError}</p> : null}
@@ -473,8 +496,8 @@ export function StudioScreen({
                 <strong>{proposal.primaryText}</strong>
                 {proposal.secondaryText ? <span>{proposal.secondaryText}</span> : null}
                 <small>
-                  Here · {formatPointTargetTime(proposal.startMs)} ·{' '}
-                  {formatDuration(proposal.durationMs)}
+                  Here · {formatPointTargetTime(toMilliseconds(proposal.compositionInterval.start))} ·{' '}
+                  {formatDuration(toMilliseconds(proposal.compositionInterval.duration))}
                 </small>
               </div>
             ) : (
@@ -510,10 +533,13 @@ export function StudioScreen({
 
           <section className="studio-screen__history" aria-labelledby="studio-history-label">
             <h3 id="studio-history-label">History</h3>
-            {history.accepted.length > 0 ? (
+            {acceptedCount > 0 ? (
               <ol className="studio-screen__history-list">
-                {history.accepted.map((action) => (
-                  <li key={action.actionId}>{action.primaryText}</li>
+                {acceptedRecords.map((record) => (
+                  <li key={record.changeSet.changeSetId}>
+                    {record.changeSet.operations.map((operation) => operation.primaryText).join(', ')}
+                    {record.blockedReason ? <span className="studio-screen__history-blocked"> · needs attention</span> : null}
+                  </li>
                 ))}
               </ol>
             ) : (
@@ -523,7 +549,7 @@ export function StudioScreen({
               <button
                 type="button"
                 aria-label="Undo edit"
-                disabled={Boolean(proposal) || history.accepted.length === 0}
+                disabled={Boolean(proposal) || acceptedCount === 0}
                 onClick={onUndo}
               >
                 Undo
@@ -531,7 +557,7 @@ export function StudioScreen({
               <button
                 type="button"
                 aria-label="Redo edit"
-                disabled={Boolean(proposal) || history.redoStack.length === 0}
+                disabled={Boolean(proposal) || editProject.redoStack.length === 0}
                 onClick={onRedo}
               >
                 Redo
@@ -545,7 +571,7 @@ export function StudioScreen({
           <section className="studio-screen__export-result" aria-labelledby="studio-export-label">
             <h3 id="studio-export-label">Export</h3>
             <p id={EXPORT_DESCRIPTION} className="studio-screen__empty-copy">
-              {history.accepted.length === 0
+              {acceptedCount === 0
                 ? 'Accept at least one edit before exporting.'
                 : proposal
                   ? 'Accept or discard the pending proposal before exporting.'
