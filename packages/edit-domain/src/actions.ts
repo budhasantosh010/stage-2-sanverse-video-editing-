@@ -15,9 +15,8 @@ export type AddNameplateAction = {
   durationMs: number
 }
 
-export type Result<T, E> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly error: E }
+export type { Result } from './result.ts'
+import type { Result } from './result.ts'
 
 export type ActionValidationIssue = {
   readonly path: string
