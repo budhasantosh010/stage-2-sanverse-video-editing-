@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { acceptChangeSet, undoChangeSet, type EditProject } from '@sanverse/edit-domain'
 
 import { StudioScreen } from './StudioScreen'
-import { ms, testChangeSet, testOperation, testProject } from '../../test-fixtures'
+import { TEST_CLIP_ID, ms, testChangeSet, testOperation, testProject } from '../../test-fixtures'
 
 afterEach(() => {
   cleanup()
@@ -82,11 +82,14 @@ function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = 
       draftRequest: 'Tighten the opening pause.',
     },
     proposal: null,
+    conversation: { status: 'ready', lastMessage: '', question: null, notice: null },
     editProject: testProject(),
     editError: null,
     onProposal: vi.fn(),
     onDiscardProposal: vi.fn(),
     onAcceptProposal: vi.fn(),
+    onRepairProposal: vi.fn(),
+    onSendMessage: vi.fn(),
     onUndo: vi.fn(),
     onRedo: vi.fn(),
     exportState: { status: 'idle' },
@@ -100,6 +103,12 @@ function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = 
 
   return { ...view, props }
 }
+
+/** A hand-made pending proposal, as the app state would hold it. */
+const directProposal = (operation = nameplate) => ({
+  operation,
+  origin: { source: 'direct' as const, requestId: null, explanation: null, note: null },
+})
 
 const nameplate = testOperation({
   operationId: 'operation_studio01',
@@ -171,20 +180,95 @@ describe('StudioScreen', () => {
     expect(screen.getByText(/no draft request yet/i)).toBeInTheDocument()
   })
 
-  it('keeps export unavailable without accepted edits and chat explicitly unavailable', () => {
+  it('keeps export unavailable without accepted edits, but the assistant is open for business', () => {
     renderStudio()
 
     const exportButton = screen.getByRole('button', { name: /export unavailable/i })
-    const chat = screen.getByRole('textbox', { name: /chat unavailable/i })
-    const send = screen.getByRole('button', { name: /send unavailable/i })
+    const chat = screen.getByRole('textbox', { name: /ask for an edit/i })
     const accept = screen.getByRole('button', { name: /accept proposal unavailable/i })
 
     expect(exportButton).toBeDisabled()
-    expect(chat).toBeDisabled()
-    expect(send).toBeDisabled()
     expect(accept).toBeDisabled()
+    expect(chat).toBeEnabled()
     expect(exportButton).toHaveAccessibleDescription(/accept at least one edit/i)
-    expect(chat).toHaveAccessibleDescription(/not available yet/i)
+  })
+
+  it('closes the assistant while a proposal is pending, so only one thing is decided at a time', () => {
+    renderStudio({ proposal: directProposal() })
+
+    expect(screen.getByRole('textbox', { name: /ask for an edit/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^send$/i })).toBeDisabled()
+  })
+
+  it('sends what the user typed together with where they are in the video', async () => {
+    const user = userEvent.setup()
+    const onSendMessage = vi.fn()
+    renderStudio({ onSendMessage })
+
+    await user.type(screen.getByRole('textbox', { name: /ask for an edit/i }), 'put my name here')
+    await user.click(screen.getByRole('button', { name: /^send$/i }))
+
+    expect(onSendMessage).toHaveBeenCalledOnce()
+    const [message, context] = onSendMessage.mock.calls[0]
+    expect(message).toBe('put my name here')
+    expect(context.clipId).toBe(TEST_CLIP_ID)
+    expect(context.compositionWidth).toBe(1920)
+    // Nobody pointed, so the assistant is told that plainly instead of being
+    // given a made-up position.
+    expect(context.point).toBeNull()
+  })
+
+  it('shows the assistant question instead of guessing', () => {
+    renderStudio({
+      conversation: {
+        status: 'clarification',
+        lastMessage: 'add a nameplate',
+        question: 'What should the text say?',
+        notice: null,
+      },
+    })
+
+    expect(screen.getByText('What should the text say?')).toBeInTheDocument()
+  })
+
+  it('says plainly when an edit is not supported yet', () => {
+    renderStudio({
+      conversation: {
+        status: 'unsupported',
+        lastMessage: 'add background music',
+        question: null,
+        notice: 'This version can add text to your video. It cannot do that yet.',
+      },
+    })
+
+    expect(screen.getByText(/cannot do that yet/i)).toBeInTheDocument()
+  })
+
+  it('marks an assistant proposal as coming from the assistant', () => {
+    renderStudio({
+      proposal: {
+        operation: nameplate,
+        origin: { source: 'ai', requestId: 'request_aaaaaaaa', explanation: 'Shows "Santosh".', note: 'Placed where you pointed.' },
+      },
+    })
+
+    expect(screen.getByText(/suggested by the assistant/i)).toBeInTheDocument()
+    expect(screen.getByText(/placed where you pointed/i)).toBeInTheDocument()
+  })
+
+  it('repairs a pending proposal by hand without asking the assistant again', async () => {
+    const user = userEvent.setup()
+    const onRepairProposal = vi.fn()
+    const onSendMessage = vi.fn()
+    renderStudio({ proposal: directProposal(), onRepairProposal, onSendMessage })
+
+    const primary = screen.getByLabelText(/main text/i)
+    await user.clear(primary)
+    await user.type(primary, 'Santosh Budha')
+    await user.tab()
+
+    expect(onRepairProposal).toHaveBeenCalledWith({ primaryText: 'Santosh Budha' })
+    expect(onSendMessage).not.toHaveBeenCalled()
   })
 
   it('presents export progress, recoverable failure, and a downloadable result', async () => {
@@ -271,7 +355,7 @@ describe('StudioScreen', () => {
     expect(pause).toHaveBeenCalledOnce()
     expect(screen.getByRole('button', { name: /choose a point on the visible video/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /cancel point mode/i })).toBeEnabled()
-    expect(screen.getByRole('status')).toHaveTextContent(/click or use arrow keys/i)
+    expect(screen.getByRole('status', { name: /point guidance/i })).toHaveTextContent(/click or use arrow keys/i)
   })
 
   it('captures one point, displays its marker and time, then restores normal playback mode', async () => {
@@ -445,7 +529,7 @@ describe('StudioScreen', () => {
     const user = userEvent.setup()
     const onDiscardProposal = vi.fn()
     const { container } = renderStudio({
-      proposal: { ...nameplate, primaryText: 'Old proposal' },
+      proposal: directProposal({ ...nameplate, primaryText: 'Old proposal' }),
       onDiscardProposal,
     })
     const video = container.querySelector('video') as HTMLVideoElement
@@ -466,7 +550,7 @@ describe('StudioScreen', () => {
   })
 
   it('previews a proposal only inside its exact time window over contain-fitted content', () => {
-    const { container } = renderStudio({ proposal: nameplate })
+    const { container } = renderStudio({ proposal: directProposal() })
     const video = container.querySelector('video') as HTMLVideoElement
     prepareVideoForPointing(video, 12.4)
 
@@ -502,7 +586,7 @@ describe('StudioScreen', () => {
     // browser on 2026-07-27, where it fired zero times and the preview showed
     // nothing at all while looking perfectly healthy. Media events are the
     // safety net that stops the preview from silently going blank.
-    const { container } = renderStudio({ proposal: nameplate })
+    const { container } = renderStudio({ proposal: directProposal() })
     const video = container.querySelector('video') as HTMLVideoElement
     prepareVideoForPointing(video, 0)
     fireEvent.loadedMetadata(video)
@@ -518,7 +602,7 @@ describe('StudioScreen', () => {
   })
 
   it('prefers the exact frame time when frame callbacks do fire', () => {
-    const { container } = renderStudio({ proposal: nameplate })
+    const { container } = renderStudio({ proposal: directProposal() })
     const video = container.querySelector('video') as HTMLVideoElement
     prepareVideoForPointing(video, 0)
     fireEvent.loadedMetadata(video)
@@ -535,7 +619,7 @@ describe('StudioScreen', () => {
     delete (HTMLVideoElement.prototype as Partial<HTMLVideoElement>).requestVideoFrameCallback
     delete (HTMLVideoElement.prototype as Partial<HTMLVideoElement>).cancelVideoFrameCallback
     const removeEventListener = vi.spyOn(HTMLMediaElement.prototype, 'removeEventListener')
-    const { container, unmount } = renderStudio({ proposal: nameplate })
+    const { container, unmount } = renderStudio({ proposal: directProposal() })
     const video = container.querySelector('video') as HTMLVideoElement
     prepareVideoForPointing(video, 12.4)
     fireEvent.loadedMetadata(video)
@@ -549,7 +633,7 @@ describe('StudioScreen', () => {
   })
 
   it('synchronizes the exact preview window to presented video frames and cleans up', () => {
-    const { container, unmount } = renderStudio({ proposal: nameplate })
+    const { container, unmount } = renderStudio({ proposal: directProposal() })
     const video = container.querySelector('video') as HTMLVideoElement
     prepareVideoForPointing(video, 0)
     fireEvent.loadedMetadata(video)
@@ -577,11 +661,11 @@ describe('StudioScreen', () => {
 
   it('describes the proposal duration from the typed action', () => {
     renderStudio({
-      proposal: testOperation({
+      proposal: directProposal(testOperation({
         operationId: 'operation_studio02',
         sampledClipTime: ms(12_400),
         compositionInterval: { start: ms(12_400), duration: ms(2_500) },
-      }),
+      })),
     })
 
     const proposalSection = screen.getByRole('heading', { name: /^proposal$/i }).closest('section')
@@ -593,7 +677,7 @@ describe('StudioScreen', () => {
     const user = userEvent.setup()
     const onAcceptProposal = vi.fn()
     const onDiscardProposal = vi.fn()
-    renderStudio({ proposal: nameplate, onAcceptProposal, onDiscardProposal })
+    renderStudio({ proposal: directProposal(), onAcceptProposal, onDiscardProposal })
 
     await user.click(screen.getByRole('button', { name: /^accept proposal$/i }))
     await user.click(screen.getByRole('button', { name: /^discard proposal$/i }))
@@ -605,7 +689,7 @@ describe('StudioScreen', () => {
   it('moves focus to an announced result after a proposal is accepted', async () => {
     const user = userEvent.setup()
     const onAcceptProposal = vi.fn()
-    const { rerender } = renderStudio({ proposal: nameplate, onAcceptProposal })
+    const { rerender } = renderStudio({ proposal: directProposal(), onAcceptProposal })
 
     await user.click(screen.getByRole('button', { name: /^accept proposal$/i }))
     expect(onAcceptProposal).toHaveBeenCalledOnce()
@@ -621,6 +705,9 @@ describe('StudioScreen', () => {
         proposal={null}
         editProject={projectWithNameplate()}
         editError={null}
+        conversation={{ status: 'ready', lastMessage: '', question: null, notice: null }}
+        onRepairProposal={vi.fn()}
+        onSendMessage={vi.fn()}
         onProposal={vi.fn()}
         onDiscardProposal={vi.fn()}
         onAcceptProposal={onAcceptProposal}
@@ -677,9 +764,12 @@ describe('StudioScreen', () => {
           mediaUrl: 'blob:cleaned-interview',
           draftRequest: '',
         }}
-        proposal={nameplate}
+        proposal={directProposal()}
         editProject={editProject}
         editError={null}
+        conversation={{ status: 'ready', lastMessage: '', question: null, notice: null }}
+        onRepairProposal={vi.fn()}
+        onSendMessage={vi.fn()}
         onProposal={vi.fn()}
         onDiscardProposal={vi.fn()}
         onAcceptProposal={vi.fn()}

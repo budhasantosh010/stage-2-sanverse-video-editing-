@@ -9,6 +9,8 @@ import {
   discardEditProposal,
   openLocalProject,
   queueEditProposal,
+  repairProposal,
+  DIRECT_ORIGIN,
   reportEditError,
   returnHome,
   updateDraftRequest,
@@ -63,7 +65,7 @@ describe('home state', () => {
 describe('queueing a proposal', () => {
   it('accepts a well-formed proposal for preview', () => {
     const next = queueEditProposal(studio(), testOperation())
-    expect(next.proposal?.primaryText).toBe('Santosh')
+    expect(next.proposal?.operation.primaryText).toBe('Santosh')
     expect(next.editError).toBeNull()
   })
 
@@ -136,7 +138,7 @@ describe('undo and redo availability', () => {
 describe('building a change set', () => {
   it('carries the revision the user was looking at', () => {
     const state = studio(testProjectWithNameplate())
-    const changeSet = buildChangeSet(testOperation({ operationId: 'operation_bbbbbbbb' }), state.editProject.revision)
+    const changeSet = buildChangeSet({ operation: testOperation({ operationId: 'operation_bbbbbbbb' }), origin: DIRECT_ORIGIN }, state.editProject.revision)
 
     expect(changeSet.baseRevision).toBe(state.editProject.revision)
     expect(changeSet.provenance).toEqual({ source: 'direct', requestId: null })
@@ -144,6 +146,80 @@ describe('building a change set', () => {
   })
 
   it('gives one approved request exactly one change set, so one Undo reverses it', () => {
-    expect(buildChangeSet(testOperation(), 0).operations).toHaveLength(1)
+    expect(buildChangeSet({ operation: testOperation(), origin: DIRECT_ORIGIN }, 0).operations).toHaveLength(1)
+  })
+})
+
+describe('assistant proposals', () => {
+  const aiOrigin = {
+    source: 'ai' as const,
+    requestId: 'request_aaaaaaaa',
+    explanation: 'Shows “Santosh”.',
+    note: null,
+  }
+
+  it('records that the assistant proposed the edit', () => {
+    const state = queueEditProposal(studio(), testOperation(), aiOrigin)
+    expect(state.proposal?.origin).toEqual(aiOrigin)
+    expect(state.proposal?.operation.primaryText).toBe('Santosh')
+  })
+
+  it('checks an assistant proposal exactly as it checks a hand-made one', () => {
+    const state = queueEditProposal(
+      studio(),
+      testOperation({ compositionInterval: { start: ms(29_000), duration: ms(5_000) } }),
+      aiOrigin,
+    )
+    expect(state.proposal).toBeNull()
+    expect(state.editError).toMatch(/past the end/i)
+  })
+
+  it('carries provenance into the change set, so history shows who proposed it', () => {
+    const state = queueEditProposal(studio(), testOperation(), aiOrigin)
+    if (!state.proposal) throw new Error('expected a proposal')
+    const changeSet = buildChangeSet(state.proposal, state.editProject.revision)
+    expect(changeSet.provenance).toEqual({ source: 'ai', requestId: 'request_aaaaaaaa' })
+  })
+
+  it('clears the pending proposal, and its origin cannot outlive it', () => {
+    const state = discardEditProposal(queueEditProposal(studio(), testOperation(), aiOrigin))
+    expect(state.proposal).toBeNull()
+  })
+})
+
+describe('repairing a proposal by hand', () => {
+  const pending = () => queueEditProposal(studio(), testOperation())
+
+  it('changes the wording and keeps the same edit identity', () => {
+    const repaired = repairProposal(pending(), { primaryText: 'Santosh Budha' })
+    expect(repaired.proposal?.operation.primaryText).toBe('Santosh Budha')
+    expect(repaired.proposal?.operation.operationId).toBe('operation_aaaaaaaa')
+    expect(repaired.editError).toBeNull()
+  })
+
+  it('moves the nameplate to a new point without touching anything else', () => {
+    const repaired = repairProposal(pending(), { point: { x: 0.1, y: 0.9 } })
+    expect(repaired.proposal?.operation.target.point).toEqual({ x: 0.1, y: 0.9 })
+    expect(repaired.proposal?.operation.primaryText).toBe('Santosh')
+  })
+
+  it('shortens a new length so it still ends with the video', () => {
+    const repaired = repairProposal(pending(), { startMs: 28_000, durationMs: 10_000 })
+    const interval = repaired.proposal?.operation.compositionInterval
+    expect(interval?.start.ticks).toBe(ms(28_000).ticks)
+    expect((interval?.start.ticks ?? 0) + (interval?.duration.ticks ?? 0)).toBe(ms(30_000).ticks)
+  })
+
+  it('refuses a moment outside the video and leaves the proposal untouched', () => {
+    const before = pending()
+    const repaired = repairProposal(before, { startMs: 90_000 })
+    expect(repaired.proposal).toEqual(before.proposal)
+    expect(repaired.editError).toMatch(/outside this video/i)
+  })
+
+  it('refuses empty main text rather than saving a blank nameplate', () => {
+    const repaired = repairProposal(pending(), { primaryText: '   ' })
+    expect(repaired.editError).toMatch(/could not be applied/i)
+    expect(repaired.proposal?.operation.primaryText).toBe('Santosh')
   })
 })

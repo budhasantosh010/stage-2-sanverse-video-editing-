@@ -418,6 +418,73 @@ describe('local API boundary', () => {
     expect(JSON.parse(state.serialized() ?? '{}').schemaVersion).toBe('sanverse.project/v2')
   })
 
+  it('returns a pending AI proposal without changing the saved project', async () => {
+    const spy = readRepository(mp4())
+    const state = savedProjectState()
+    const port = await listen(createSanverseServer({
+      dataRoot: 'unused',
+      maxUploadBytes: 100,
+      repository: { ...spy.repository, ...state.repository },
+      mediaProbe: stubMediaProbe(),
+    }))
+
+    // Opening the project creates and saves revision 0.
+    await call(port, { path: `/api/projects/${PROJECT_ID}` })
+    const before = state.serialized()
+
+    const response = await sendJson(port, 'POST', `/api/projects/${PROJECT_ID}/intents`, {
+      message: 'add a nameplate saying "Santosh" "Founder"',
+      baseRevision: 0,
+      context: {
+        clipId: 'clip_1234567890ab',
+        sampledClipTimeTicks: 2_000 * 1_440,
+        point: { x: 0.4, y: 0.7 },
+        playheadTicks: 2_000 * 1_440,
+        compositionDurationTicks: 8_000 * 1_440,
+        compositionWidth: 1280,
+        compositionHeight: 720,
+      },
+    })
+
+    expect(response.status).toBe(200)
+    const { outcome } = JSON.parse(new TextDecoder().decode(response.body))
+    expect(outcome.kind).toBe('proposal')
+    expect(outcome.changeSet.provenance.source).toBe('ai')
+    expect(outcome.changeSet.operations[0].primaryText).toBe('Santosh')
+    // The whole point: asking changed nothing on disk.
+    expect(state.serialized()).toBe(before)
+  })
+
+  it('refuses an AI proposal built against a revision the project has moved past', async () => {
+    const spy = readRepository(mp4())
+    const state = savedProjectState()
+    const port = await listen(createSanverseServer({
+      dataRoot: 'unused',
+      maxUploadBytes: 100,
+      repository: { ...spy.repository, ...state.repository },
+      mediaProbe: stubMediaProbe(),
+    }))
+    await call(port, { path: `/api/projects/${PROJECT_ID}` })
+
+    const response = await sendJson(port, 'POST', `/api/projects/${PROJECT_ID}/intents`, {
+      message: 'add "Santosh"',
+      baseRevision: 99,
+      context: {
+        clipId: 'clip_1234567890ab',
+        sampledClipTimeTicks: null,
+        point: { x: 0.4, y: 0.7 },
+        playheadTicks: 0,
+        compositionDurationTicks: 8_000 * 1_440,
+        compositionWidth: 1280,
+        compositionHeight: 720,
+      },
+    })
+
+    const { outcome } = JSON.parse(new TextDecoder().decode(response.body))
+    expect(outcome.kind).toBe('rejected')
+    expect(outcome.code).toBe('STALE_REVISION')
+  })
+
   it('serves the exact font the exporter uses so the preview can match it', async () => {
     const fontDir = await mkdtemp(join(tmpdir(), 'sanverse-font-'))
     const fontPath = join(fontDir, 'font.ttf')

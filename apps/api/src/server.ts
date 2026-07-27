@@ -8,8 +8,12 @@ import { stat } from 'node:fs/promises'
 
 import { createFilesystemProjectRepository } from './projects/filesystem-project-repository.ts'
 import { createProjectIntakeService, EXPORT_ID_PATTERN, PROJECT_ID_PATTERN, ProjectIntakeError, type ProjectRepository } from './projects/project-repository.ts'
-import { createProjectStateService, ProjectStateError, type ProjectStateService } from './projects/project-state-service.ts'
+import { createProjectStateService, type ProjectStateService } from './projects/project-state-service.ts'
+import { NAMEPLATE_COMPONENT_ID } from '@sanverse/edit-domain'
 import { createFfprobeMediaProbe, type MediaProbePort } from './media/media-probe.ts'
+import { describeFailure, errorCode } from './http/failure-response.ts'
+import { createFakeIntentAdapter } from './intent/fake-intent-adapter.ts'
+import { createIntentService, type IntentService } from './intent/intent-service.ts'
 import { createFfmpegRenderAdapter } from './render/ffmpeg-render-adapter.ts'
 import { createRenderService } from './render/render-service.ts'
 
@@ -23,6 +27,7 @@ type ServerOptions = {
   mediaProbe?: MediaProbePort
   exportIdGenerator?: () => string
   fontPath?: string
+  intentService?: IntentService
 }
 
 const CHANGE_SET_ID_ROUTE_PATTERN = /^changeset_[a-z0-9]{8,64}$/
@@ -138,10 +143,6 @@ async function streamMedia(response: ServerResponse, body: AsyncIterable<Uint8Ar
   }
 }
 
-function errorCode(error: unknown): string | undefined {
-  return typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : undefined
-}
-
 export function createSanverseServer(options: ServerOptions) {
   const repository = options.repository ?? createFilesystemProjectRepository(options.dataRoot)
   const intake = createProjectIntakeService({
@@ -154,6 +155,14 @@ export function createSanverseServer(options: ServerOptions) {
   const projectState = options.projectStateService ?? createProjectStateService({ repository, mediaProbe })
   const renderService = options.renderService ?? (options.fontPath ? createRenderService({ renderer: createFfmpegRenderAdapter({ fontPath: options.fontPath, mediaProbe }) }) : undefined)
   const generateExportId = options.exportIdGenerator ?? (() => `export_${randomBytes(16).toString('hex')}`)
+  // The fake provider is the default on purpose. Nothing leaves this machine
+  // until a real provider is deliberately configured and the owner has approved
+  // what the outbound allowlist sends.
+  const intentService = options.intentService ?? createIntentService({
+    provider: createFakeIntentAdapter(),
+    loadProject: (projectId) => projectState.load(projectId),
+    createOperationId: () => `operation_${randomBytes(16).toString('hex')}`,
+  })
 
   return createServer(async (request, response) => {
     const origin = firstHeader(request, 'origin')
@@ -225,6 +234,37 @@ export function createSanverseServer(options: ServerOptions) {
         }
         const project = await projectState.accept(projectId, (payload as { changeSet: unknown }).changeSet)
         json(response, 201, { project })
+        return
+      }
+
+      // Asking the assistant for an edit. This route NEVER changes the project.
+      // It returns a proposal the user has to accept through the ordinary
+      // change-set route, which is what keeps "AI proposes, code executes"
+      // true by construction rather than by discipline.
+      const intentMatch = /^\/api\/projects\/([^/]+)\/intents$/.exec(requestUrl.pathname)
+      if (request.method === 'POST' && intentMatch) {
+        const projectId = intentMatch[1]
+        if (!PROJECT_ID_PATTERN.test(projectId)) { request.resume(); json(response, 404, { error: 'Project was not found.' }); return }
+        const payload = await readJsonBody(request)
+        if (typeof payload !== 'object' || payload === null) {
+          throw new ApiRequestError('INVALID_JSON', 'A request body is required.')
+        }
+        const body = payload as { message?: unknown; baseRevision?: unknown; context?: unknown; locale?: unknown }
+        // The request ID is issued here, not by the browser, so one client
+        // cannot replay or forge another's request identity.
+        const outcome = await intentService.propose({
+          schemaVersion: 'sanverse.intent-request/v1',
+          requestId: `request_${randomBytes(16).toString('hex')}`,
+          projectId,
+          baseRevision: body.baseRevision,
+          message: body.message,
+          context: body.context,
+          capabilityIds: [NAMEPLATE_COMPONENT_ID],
+          locale: typeof body.locale === 'string' ? body.locale : 'en',
+        })
+        // Clarification, unsupported and rejected are ordinary product answers,
+        // not transport failures, so they are all 200 with a typed outcome.
+        json(response, 200, { outcome })
         return
       }
 
@@ -355,75 +395,33 @@ export function createSanverseServer(options: ServerOptions) {
 
       json(response, 404, { error: 'Not found.' })
     } catch (error) {
+      // Once bytes have gone out there is no honest way to change the status,
+      // so the connection is broken rather than a truncated body being passed
+      // off as a complete one.
       if (response.headersSent) {
         if (!response.destroyed) response.destroy(error instanceof Error ? error : undefined)
         return
       }
-      const code = errorCode(error)
-      if (code === 'INVALID_RANGE') {
-        response.writeHead(416, { 'content-range': 'bytes */0', 'cache-control': 'no-store' })
+      // An upload that failed mid-body still has bytes queued behind it.
+      if (error instanceof ProjectIntakeError) request.resume()
+
+      const answer = error instanceof ApiRequestError
+        ? { status: error.code === 'REQUEST_TOO_LARGE' ? 413 : 400, message: error.message, code: error.code }
+        : describeFailure(error)
+
+      if (!answer) {
+        console.error('Local API request failed.', error)
+        json(response, 500, { error: 'The local API could not complete the request.' })
+        return
+      }
+      if (answer.log) console.error('Local API failed safely.', error)
+      if (response.destroyed) return
+      if (answer.emptyBody) {
+        response.writeHead(answer.status, answer.headers ?? {})
         response.end()
         return
       }
-      if (code === 'PROJECT_NOT_FOUND' || code === 'INVALID_PROJECT_ID' || code === 'EXPORT_NOT_FOUND' || code === 'INVALID_EXPORT_ID') {
-        json(response, 404, { error: 'Project media was not found.' })
-        return
-      }
-      if (error instanceof ApiRequestError) {
-        json(response, error.code === 'REQUEST_TOO_LARGE' ? 413 : 400, { error: error.message, code: error.code })
-        return
-      }
-      if (error instanceof ProjectStateError) {
-        // A stale edit is the client's problem to retry, not a server fault.
-        if (error.code === 'REVISION_CONFLICT') {
-          json(response, 409, { error: error.message, code: error.code })
-          return
-        }
-        if (error.code === 'CHANGE_SET_REJECTED') {
-          json(response, 400, { error: error.message, code: error.code })
-          return
-        }
-        if (error.code === 'NOTHING_TO_UNDO' || error.code === 'NOTHING_TO_REDO' || error.code === 'CHANGE_SET_UNKNOWN') {
-          json(response, 409, { error: error.message, code: error.code })
-          return
-        }
-        console.error('Project state failed safely.', error)
-        json(response, 500, { error: error.message, code: error.code })
-        return
-      }
-      if (code === 'RENDER_PROJECT_INVALID' || code === 'NOTHING_TO_RENDER' || code === 'RENDER_INPUT_INVALID') {
-        json(response, 400, { error: 'The accepted edits cannot be exported.', code })
-        return
-      }
-      if (code === 'RENDER_TOOL_UNAVAILABLE') {
-        json(response, 503, { error: 'The local renderer is unavailable.', code })
-        return
-      }
-      if (code === 'RENDER_PROCESS_BLOCKED') {
-        json(response, 503, { error: 'The local renderer process was blocked from starting.', code })
-        return
-      }
-      if (code === 'RENDER_CANCELLED') {
-        if (!response.destroyed) json(response, 408, { error: 'Export was cancelled.', code })
-        return
-      }
-      if (code === 'RENDER_PATH_INVALID' || code === 'RENDER_FAILED' || code === 'RENDER_OUTPUT_MISSING' || code === 'RENDER_OUTPUT_INVALID') {
-        console.error('Local renderer failed safely.', error)
-        json(response, 500, { error: 'The local renderer could not produce a verified MP4.', code })
-        return
-      }
-      if (code === 'PROJECT_STATE_INVALID') {
-        json(response, 500, { error: 'The saved project history is invalid.', code })
-        return
-      }
-      if (error instanceof ProjectIntakeError) {
-        request.resume()
-        const status = error.code === 'UPLOAD_TOO_LARGE' ? 413 : error.code === 'PROJECT_COLLISION' ? 409 : 400
-        json(response, status, { error: error.message, code: error.code })
-        return
-      }
-      console.error('Local API request failed.', error)
-      json(response, 500, { error: 'The local API could not complete the request.' })
+      json(response, answer.status, { error: answer.message, ...(answer.code ? { code: answer.code } : {}) })
     }
   })
 }

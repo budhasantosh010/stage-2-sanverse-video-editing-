@@ -1,5 +1,48 @@
 # Project Log
 
+## 2026-07-27 — G4-B tasks 01–09: the first AI-proposed edit, on a fake provider
+
+- Added `@sanverse/intent-domain`: a closed request shape, an untrusted candidate
+  shape with exactly four states, six bounded clarification fields, and the
+  evaluation contract. 27 tests.
+- Added the API intent boundary: the provider port (which returns `unknown` on
+  purpose), a deterministic fake provider that misbehaves deliberately, the
+  outbound data allowlist, and the fixed 13-step intent service.
+- Added `POST /api/projects/:id/intents`. It never changes the project. It
+  returns a pending proposal that must be accepted through the ordinary
+  change-set route, so "AI proposes, code executes" is structural.
+- Replaced the disabled chat placeholder with a working conversation panel, and
+  added by-hand repair of a pending proposal that never re-asks the provider.
+- Accepted AI edits are recorded with `source: "ai"` and their request ID, and
+  labelled "Suggested by the assistant" on screen — including after repair.
+- Added an 18-case prompt corpus asserting product behaviour, run on every test
+  run. 0 of 8 adversarial cases produced a change set.
+- Fixed an owner-reported problem: pressing Export looked like it did nothing,
+  because the result was below the fold. It now scrolls into view and takes
+  focus.
+- Verified in a real browser on the owner's own video: clarification, proposal,
+  repair, accept, on-disk provenance, and a real exported MP4 with the nameplate
+  present at 2 s and gone at 6 s.
+- 413 tests pass; all workspace builds clean.
+- Decisions: `DOCS/adr/ADR-004-ai-proposes-code-executes.md`.
+- Evidence: `DOCS/evidence/2026-07-27-g4b-first-ai-edit.md`.
+- **Not done:** G4B-10, connecting a real provider. No data has ever left the
+  machine.
+
+## 2026-07-27 — G4-A built and verified: scale-ready chassis and one render contract
+
+- Implemented `sanverse.project/v2` end to end, plus `@sanverse/render-contract`
+  consumed by both the browser preview and the FFmpeg exporter.
+- Migrated the owner's real 2026-07-25 v1 projects losslessly; migrated
+  nameplates keep `top-left` so nothing moved in an already-approved video.
+- Two defects were found by running the real browser, not by tests:
+  `requestVideoFrameCallback` fired zero times so the preview silently showed
+  nothing, and preview and export were offset by exactly the padding.
+- Known open gap: the drawn plate is ~10 px shorter vertically in the export.
+  Position is identical.
+- Decisions: ADR-002, ADR-003. Evidence:
+  `DOCS/evidence/2026-07-27-g4a-real-media.md`.
+
 ## 2026-07-27 — Complete macro and micro planning set drafted
 
 - Added the proposed canonical macro roadmap, dependency graph, goal entry/exit gates, and first- through fourth-order consequence analysis.

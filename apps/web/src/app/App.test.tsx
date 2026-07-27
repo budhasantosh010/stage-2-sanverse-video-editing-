@@ -438,4 +438,93 @@ describe('App', () => {
     await act(async () => undefined)
     expect(screen.getByRole('link', { name: /download mp4/i })).toHaveAttribute('href', '/api/projects/project_1234567890abcdef/exports/export_1234567890abcdef/media')
   })
+  it('lets the user try again after a failed open, instead of going dead until reload', async () => {
+    const user = userEvent.setup()
+    const api = fakeApi()
+    let failNextOpen = true
+    fetchMock.mockImplementation((url: string, options?: RequestInit) => {
+      if (url === `/api/projects/${api.manifest.id}` && failNextOpen) {
+        failNextOpen = false
+        return new Response('{}', { status: 500 })
+      }
+      return api.handle(url, options) ?? new Response('{}', { status: 404 })
+    })
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /open cleaned.mp4/i }))
+    expect(await screen.findByText(/could not load your local projects/i)).toBeInTheDocument()
+
+    // The second attempt must actually be attempted. An in-flight flag that is
+    // only released on the paths that succeed leaves Home silently ignoring
+    // every later click.
+    await user.click(screen.getByRole('button', { name: /open cleaned.mp4/i }))
+    expect(await screen.findByRole('button', { name: /enter point mode/i })).toBeInTheDocument()
+  })
+
+  it('turns a typed request into a previewable proposal that is only saved on accept', async () => {
+    const user = userEvent.setup()
+    const api = fakeApi()
+    const base = api.current()
+    const clipId = base.composition.tracks[0].clips[0].clipId
+    const aiChangeSet = {
+      schemaVersion: 'sanverse.change-set/v1',
+      changeSetId: 'changeset_ai000001',
+      baseRevision: base.revision,
+      operations: [{
+        schemaVersion: 'sanverse.operation/v2',
+        operationId: 'operation_ai000001',
+        kind: 'add-nameplate',
+        capabilityId: 'sanverse.nameplate.component/v1',
+        clipId,
+        sampledClipTime: { ticks: 0, timescale: 1_440_000 },
+        compositionInterval: {
+          start: { ticks: 0, timescale: 1_440_000 },
+          duration: { ticks: 4_000 * 1_440, timescale: 1_440_000 },
+        },
+        target: { coordinateSpace: 'composition-normalized', point: { x: 0.5, y: 0.5 }, anchor: 'center' },
+        primaryText: 'Santosh',
+        secondaryText: 'Founder',
+        extensions: {},
+      }],
+      provenance: { source: 'ai', requestId: 'request_aaaaaaaa' },
+      extensions: {},
+    }
+
+    let intentCalls = 0
+    fetchMock.mockImplementation((url: string, options?: RequestInit) => {
+      if (url === `/api/projects/${api.manifest.id}/intents` && options?.method === 'POST') {
+        intentCalls += 1
+        return new Response(
+          JSON.stringify({
+            outcome: {
+              kind: 'proposal',
+              requestId: 'request_aaaaaaaa',
+              changeSet: aiChangeSet,
+              explanation: 'Shows "Santosh" from 0:00.0 for 4.0 seconds.',
+              note: 'Placed where you pointed.',
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        )
+      }
+      return api.handle(url, options) ?? new Response('{}', { status: 404 })
+    })
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /open cleaned.mp4/i }))
+    await user.type(await screen.findByRole('textbox', { name: /ask for an edit/i }), 'add my name here')
+    await user.click(screen.getByRole('button', { name: /^send$/i }))
+
+    expect(await screen.findByText(/suggested by the assistant/i)).toBeInTheDocument()
+    // Asking changed nothing on the server.
+    expect(api.current().revision).toBe(base.revision)
+
+    await user.click(screen.getByRole('button', { name: /^accept proposal$/i }))
+    await waitFor(() => expect(api.current().revision).toBe(base.revision + 1))
+    expect(api.current().changeSets.at(-1)?.changeSet.provenance).toEqual({
+      source: 'ai',
+      requestId: 'request_aaaaaaaa',
+    })
+    expect(intentCalls).toBe(1)
+  })
 })

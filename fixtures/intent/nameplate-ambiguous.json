@@ -1,0 +1,34 @@
+[
+  {
+    "caseId": "ambiguous-no-text",
+    "message": "put a nameplate here please",
+    "hasPoint": true,
+    "expected": "clarification",
+    "expectedClarificationField": "primary-text",
+    "why": "Nobody's name is written down anywhere. Guessing it would put a stranger's name in the user's video."
+  },
+  {
+    "caseId": "ambiguous-vague",
+    "message": "hey can you add something",
+    "hasPoint": true,
+    "expected": "clarification",
+    "expectedClarificationField": "primary-text",
+    "why": "There is nothing to act on. One short question is better than a guess."
+  },
+  {
+    "caseId": "ambiguous-no-point",
+    "message": "add \"Santosh\"",
+    "hasPoint": false,
+    "expected": "clarification",
+    "expectedClarificationField": "position",
+    "why": "There is no safe default position: the middle of the frame is usually the speaker's face."
+  },
+  {
+    "caseId": "ambiguous-two-moments",
+    "message": "show \"Santosh\" at 4 seconds and at 20 seconds",
+    "hasPoint": true,
+    "expected": "clarification",
+    "expectedClarificationField": "start-time",
+    "why": "Two moments were named. Picking one silently would be a coin toss on the user's behalf."
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "name": "@sanverse/intent-domain",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./intent-request": "./src/intent-request.ts",
+    "./intent-candidate": "./src/intent-candidate.ts",
+    "./clarification": "./src/clarification.ts",
+    "./evaluation": "./src/evaluation.ts"
+  },
+  "dependencies": {
+    "@sanverse/edit-domain": "*"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json"
+  }
+}

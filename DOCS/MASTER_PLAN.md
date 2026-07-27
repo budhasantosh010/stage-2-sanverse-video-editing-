@@ -179,8 +179,8 @@ create long-term cost.
 | G1 Interface and renderer feasibility | Partly open | Technical shell and first renderer decision exist; owner motion/native drag-and-drop acceptance remains open |
 | G2 Narrow v1 edit foundation | Complete for the nameplate slice | Typed action/history/persistence tests and live reopen evidence |
 | G3 Manual nameplate vertical slice | Complete | Real browser, real media, persisted history, export, download, output inspection |
-| G4-A Scale-ready chassis | Not started | Proposed plan only |
-| G4-B First safe AI edit | Not started | Proposed plan only |
+| G4-A Scale-ready chassis | Complete | Project v2 + one render contract, built and verified on the owner's real media 2026-07-27; ADR-002, ADR-003, `evidence/2026-07-27-g4a-real-media.md`. Owner exit approval (G4A-22) still open |
+| G4-B First safe AI edit | Built on a fake provider | Tasks 01–11 complete and verified in a real browser through a real exported MP4; ADR-004, `evaluations/nameplate-intent-v1.md`, `evidence/2026-07-27-g4b-first-ai-edit.md`. No real provider is connected and no data has left the machine (G4B-12 to G4B-14 open) |
 | G5 and later | Not started | Roadmap only |
 
 The existing `sanverse.project/v1` is sufficient for the completed nameplate

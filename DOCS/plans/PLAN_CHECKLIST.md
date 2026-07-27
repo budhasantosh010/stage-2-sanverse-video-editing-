@@ -20,42 +20,42 @@ Legend:
 
 ## G4-A - Scale-ready chassis
 
-- [ ] G4A-01 Approve the G4-A specification and scope
-- [ ] G4A-02 Freeze rational time and half-open range semantics
-- [ ] G4A-03 Freeze asset identity and metadata contract
-- [ ] G4A-04 Freeze composition, track, and clip contract
-- [ ] G4A-05 Freeze geometry and anchor contract
-- [ ] G4A-06 Freeze project revision and stale-proposal contract
-- [ ] G4A-07 Freeze atomic change-set and dependency contract
-- [ ] G4A-08 Freeze strict-core and preserved-extension policy
-- [ ] G4A-09 Freeze three-level capability contract
-- [ ] G4A-10 Freeze canonical render specification
-- [ ] G4A-11 Implement Project v2 domain through TDD
-- [ ] G4A-12 Implement v1-to-v2 migration, backup, idempotency, and rollback
-- [ ] G4A-13 Persist and reopen Project v2 safely
-- [ ] G4A-14 Compile accepted change sets to the canonical render plan
-- [ ] G4A-15 Adapt browser preview to the canonical render plan
-- [ ] G4A-16 Adapt FFmpeg export to the canonical render plan
-- [ ] G4A-17 Prove invalid times/text cannot enter accepted state
-- [ ] G4A-18 Prove stale proposals and unsupported actions fail closed
-- [ ] G4A-19 Prove one change set equals one undo
-- [ ] G4A-20 Prove selective removal preserves or explicitly invalidates dependent work
-- [ ] G4A-21 Run real migration, reopen, preview, export, and rollback evidence
+- [x] G4A-01 Approve the G4-A specification and scope
+- [x] G4A-02 Freeze rational time and half-open range semantics
+- [x] G4A-03 Freeze asset identity and metadata contract
+- [x] G4A-04 Freeze composition, track, and clip contract
+- [x] G4A-05 Freeze geometry and anchor contract
+- [x] G4A-06 Freeze project revision and stale-proposal contract
+- [x] G4A-07 Freeze atomic change-set and dependency contract
+- [x] G4A-08 Freeze strict-core and preserved-extension policy
+- [x] G4A-09 Freeze three-level capability contract
+- [x] G4A-10 Freeze canonical render specification
+- [x] G4A-11 Implement Project v2 domain through TDD
+- [x] G4A-12 Implement v1-to-v2 migration, backup, idempotency, and rollback
+- [x] G4A-13 Persist and reopen Project v2 safely
+- [x] G4A-14 Compile accepted change sets to the canonical render plan
+- [x] G4A-15 Adapt browser preview to the canonical render plan
+- [x] G4A-16 Adapt FFmpeg export to the canonical render plan
+- [x] G4A-17 Prove invalid times/text cannot enter accepted state
+- [x] G4A-18 Prove stale proposals and unsupported actions fail closed
+- [x] G4A-19 Prove one change set equals one undo
+- [x] G4A-20 Prove selective removal preserves or explicitly invalidates dependent work
+- [x] G4A-21 Run real migration, reopen, preview, export, and rollback evidence
 - [ ] G4A-22 Owner approves G4-A exit
 
 ## G4-B - First safe AI edit
 
-- [ ] G4B-01 Approve the AI nameplate prompt/intent contract
-- [ ] G4B-02 Add provider-independent intent candidate types
-- [ ] G4B-03 Add deterministic fake provider
-- [ ] G4B-04 Add capability selection and argument validation
-- [ ] G4B-05 Add ambiguity detection and clarification
-- [ ] G4B-06 Add stale-revision and unsupported-capability rejection
-- [ ] G4B-07 Add preview-only proposal creation
-- [ ] G4B-08 Add direct manual repair
-- [ ] G4B-09 Add atomic approval and audit provenance
-- [ ] G4B-10 Build representative prompt/adversarial evaluation corpus
-- [ ] G4B-11 Add provider outbound-data allowlist and secret boundary
+- [x] G4B-01 Approve the AI nameplate prompt/intent contract
+- [x] G4B-02 Add provider-independent intent candidate types
+- [x] G4B-03 Add deterministic fake provider
+- [x] G4B-04 Add capability selection and argument validation
+- [x] G4B-05 Add ambiguity detection and clarification
+- [x] G4B-06 Add stale-revision and unsupported-capability rejection
+- [x] G4B-07 Add preview-only proposal creation
+- [x] G4B-08 Add direct manual repair
+- [x] G4B-09 Add atomic approval and audit provenance
+- [x] G4B-10 Build representative prompt/adversarial evaluation corpus
+- [x] G4B-11 Add provider outbound-data allowlist and secret boundary
 - [ ] G4B-12 Connect one real provider
 - [ ] G4B-13 Run provider-switch and failure-recovery evidence
 - [ ] G4B-14 Owner completes the real AI nameplate workflow

@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AddNameplateOperation, EditProject } from '@sanverse/edit-domain'
 import { toMilliseconds } from '@sanverse/edit-domain'
-import type { StudioState } from '../../app/app-state'
+import type { ConversationState, PendingProposal, ProposalRepair, StudioState } from '../../app/app-state'
+import { ChatComposer } from '../../features/conversation/ChatComposer'
+import type { IntentContextInput } from '../../features/conversation/conversation-client'
+import { NameplateRepair } from '../../features/proposal-repair/NameplateRepair'
 import {
   compilePreviewPlan,
   millisecondsToTicks,
@@ -22,12 +25,15 @@ import './StudioScreen.css'
 
 export type StudioScreenProps = {
   project: StudioState['project']
-  proposal: AddNameplateOperation | null
+  proposal: PendingProposal | null
+  conversation: ConversationState
   editProject: EditProject
   editError: string | null
   onProposal(proposal: AddNameplateOperation): void
   onDiscardProposal(): void
   onAcceptProposal(): void
+  onRepairProposal(repair: ProposalRepair): void
+  onSendMessage(message: string, context: IntentContextInput): void
   onUndo(): void
   onRedo(): void
   exportState: ProjectExportState
@@ -36,7 +42,6 @@ export type StudioScreenProps = {
   onBack(): void
 }
 
-const UNAVAILABLE_DESCRIPTION = 'studio-unavailable-description'
 const EXPORT_DESCRIPTION = 'studio-export-description'
 const KEYBOARD_POINT_STEP = 0.05
 
@@ -96,11 +101,14 @@ function getVideoContentLayerStyle(video: HTMLVideoElement) {
 export function StudioScreen({
   project,
   proposal,
+  conversation,
   editProject,
   editError,
   onProposal,
   onDiscardProposal,
   onAcceptProposal,
+  onRepairProposal,
+  onSendMessage,
   onUndo,
   onRedo,
   exportState,
@@ -111,6 +119,9 @@ export function StudioScreen({
   const draftRequest = project.draftRequest.trim()
   const [hasPreviewError, setHasPreviewError] = useState(false)
   const [isPointMode, setIsPointMode] = useState(false)
+  // True when Point is being used to move an existing proposal rather than to
+  // start a new one, so capturing a point repairs instead of replacing.
+  const [isMovingProposalPoint, setIsMovingProposalPoint] = useState(false)
   const [pointTarget, setPointTarget] = useState<CapturedPointTarget | null>(null)
   const [draftPoint, setDraftPoint] = useState<NormalizedPoint>({ x: 0.5, y: 0.5 })
   const [, setVideoLayoutRevision] = useState(0)
@@ -122,6 +133,7 @@ export function StudioScreen({
   const pointLayerRef = useRef<HTMLButtonElement>(null)
   const proposalSummaryRef = useRef<HTMLDivElement>(null)
   const proposalResultRef = useRef<HTMLParagraphElement>(null)
+  const exportResultRef = useRef<HTMLElement>(null)
   const pendingProposalResolutionRef = useRef<'accepted' | 'discarded' | null>(null)
 
   useEffect(() => {
@@ -151,6 +163,17 @@ export function StudioScreen({
   useEffect(() => {
     if (proposalResult) proposalResultRef.current?.focus()
   }, [proposalResult])
+
+  // Export is at the top of the screen and its result is at the bottom, so
+  // pressing Export used to look like it had done nothing at all. The result
+  // is brought to the user instead of the user having to go looking for it.
+  useEffect(() => {
+    if (exportState.status === 'idle') return
+    const target = exportResultRef.current
+    if (!target) return
+    target.scrollIntoView?.({ block: 'nearest' })
+    if (exportState.status === 'ready' || exportState.status === 'error') target.focus?.()
+  }, [exportState.status])
 
   useEffect(() => {
     if (editError) pendingProposalResolutionRef.current = null
@@ -222,7 +245,7 @@ export function StudioScreen({
   // uses. A pending proposal is layered on top without touching saved state.
   const composition = editProject.composition
   const previewPlan = compilePreviewPlan(
-    proposal ? withPendingProposal(editProject, proposal) : editProject,
+    proposal ? withPendingProposal(editProject, proposal.operation) : editProject,
   )
   const previewNodes = previewPlan ? visibleNodes(previewPlan, millisecondsToTicks(playheadMs)) : []
   const contentBox = video ? getRenderedVideoContentBox(video.getBoundingClientRect(), video.videoWidth, video.videoHeight) : null
@@ -235,9 +258,32 @@ export function StudioScreen({
   const isRendering = exportState.status === 'rendering'
   const canExport = acceptedCount > 0 && !proposal && !isRendering
 
+  const firstClip = composition.tracks[0]?.clips[0]
+  const compositionDurationTicks = firstClip
+    ? firstClip.compositionStart.ticks + firstClip.sourceRange.duration.ticks
+    : 0
+
+  /**
+   * Everything the assistant is allowed to know about what the user is doing.
+   * Built here because this screen is the only place that knows where the
+   * playhead is and whether the user pointed.
+   */
+  function buildIntentContext(): IntentContextInput {
+    return {
+      clipId: firstClipId,
+      sampledClipTimeTicks: pointTarget ? millisecondsToTicks(pointTarget.timeMs) : null,
+      point: pointTarget ? { x: pointTarget.x, y: pointTarget.y } : null,
+      playheadTicks: millisecondsToTicks(Math.max(0, playheadMs)),
+      compositionDurationTicks,
+      compositionWidth: composition.width,
+      compositionHeight: composition.height,
+    }
+  }
+
   function cancelPointMode() {
     pointModeButtonRef.current?.focus()
     setIsPointMode(false)
+    setIsMovingProposalPoint(false)
     setPointError(null)
   }
 
@@ -248,7 +294,27 @@ export function StudioScreen({
     setIsPointMode(true)
   }
 
+  function startMovingProposalPoint() {
+    if (isMovingProposalPoint) {
+      cancelPointMode()
+      return
+    }
+    setIsMovingProposalPoint(true)
+    enterPointMode()
+  }
+
   function completePointCapture(target: CapturedPointTarget) {
+    // Moving an existing proposal keeps everything else about it. Only a fresh
+    // point replaces the target and clears the pending proposal.
+    if (isMovingProposalPoint && proposal) {
+      onRepairProposal({ point: { x: target.x, y: target.y } })
+      setIsMovingProposalPoint(false)
+      setPointError(null)
+      setIsPointMode(false)
+      pointModeButtonRef.current?.focus()
+      return
+    }
+
     setPointTarget(target)
     if (proposal) onDiscardProposal()
     setPlayheadMs(target.timeMs)
@@ -444,7 +510,7 @@ export function StudioScreen({
             >
               {isPointMode ? 'Cancel' : 'Point'}
             </button>
-            <p id="point-mode-guidance" role="status" aria-live="polite">
+            <p id="point-mode-guidance" role="status" aria-label="Point guidance" aria-live="polite">
               {isPointMode
                 ? 'Click or use Arrow keys to place the cursor. Press Enter to choose or Escape to cancel.'
                 : pointTarget
@@ -495,12 +561,18 @@ export function StudioScreen({
                 role="status"
                 tabIndex={-1}
               >
-                <strong>{proposal.primaryText}</strong>
-                {proposal.secondaryText ? <span>{proposal.secondaryText}</span> : null}
+                <strong>{proposal.operation.primaryText}</strong>
+                {proposal.operation.secondaryText ? <span>{proposal.operation.secondaryText}</span> : null}
                 <small>
-                  Here · {formatPointTargetTime(toMilliseconds(proposal.compositionInterval.start))} ·{' '}
-                  {formatDuration(toMilliseconds(proposal.compositionInterval.duration))}
+                  Here · {formatPointTargetTime(toMilliseconds(proposal.operation.compositionInterval.start))} ·{' '}
+                  {formatDuration(toMilliseconds(proposal.operation.compositionInterval.duration))}
                 </small>
+                {proposal.origin.source === 'ai' ? (
+                  <span className="studio-screen__proposal-origin">Suggested by the assistant</span>
+                ) : null}
+                {proposal.origin.note ? (
+                  <span className="studio-screen__proposal-note">{proposal.origin.note}</span>
+                ) : null}
               </div>
             ) : (
               <p className="studio-screen__empty-copy">No pending proposal.</p>
@@ -519,6 +591,15 @@ export function StudioScreen({
               </button>
             </div>
             {editError ? <p role="alert" className="studio-screen__edit-error">{editError}</p> : null}
+            {proposal ? (
+              <NameplateRepair
+                proposal={proposal.operation}
+                playheadMs={Math.max(0, playheadMs)}
+                isMovingPoint={isMovingProposalPoint}
+                onRepair={onRepairProposal}
+                onMovePoint={startMovingProposalPoint}
+              />
+            ) : null}
           </section>
 
           {proposalResult ? (
@@ -570,7 +651,12 @@ export function StudioScreen({
             {saveState === 'error' ? <p className="studio-screen__save-error" role="alert">This edit is open, but it could not be saved locally.</p> : null}
           </section>
 
-          <section className="studio-screen__export-result" aria-labelledby="studio-export-label">
+          <section
+            ref={exportResultRef}
+            className="studio-screen__export-result"
+            aria-labelledby="studio-export-label"
+            tabIndex={-1}
+          >
             <h3 id="studio-export-label">Export</h3>
             <p id={EXPORT_DESCRIPTION} className="studio-screen__empty-copy">
               {acceptedCount === 0
@@ -597,29 +683,14 @@ export function StudioScreen({
             ) : null}
           </section>
 
-          <div className="studio-screen__chat">
-            <label htmlFor="studio-chat">Chat</label>
-            <textarea
-              id="studio-chat"
-              rows={3}
-              disabled
-              aria-label="Chat unavailable"
-              aria-describedby={UNAVAILABLE_DESCRIPTION}
-              placeholder="Chat is unavailable in this preview."
-            />
-            <button
-              type="button"
-              disabled
-              aria-label="Send unavailable"
-              aria-describedby={UNAVAILABLE_DESCRIPTION}
-            >
-              Send
-            </button>
-          </div>
-
-          <p id={UNAVAILABLE_DESCRIPTION} className="studio-screen__availability-note">
-            Chat is not available yet.
-          </p>
+          <ChatComposer
+            conversation={conversation}
+            canSend={!proposal}
+            disabledReason={
+              proposal ? 'Accept or discard the pending proposal before asking for another edit.' : null
+            }
+            onSend={(message) => onSendMessage(message, buildIntentContext())}
+          />
         </aside>
       </div>
 

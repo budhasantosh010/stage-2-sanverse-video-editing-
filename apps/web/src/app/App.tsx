@@ -9,11 +9,21 @@ import {
   discardEditProposal,
   openLocalProject,
   queueEditProposal,
+  repairProposal,
+  reportClarification,
+  reportConversationError,
   reportEditError,
+  reportUnsupported,
   returnHome,
+  startConversationRequest,
   updateDraftRequest,
   type AppState,
 } from './app-state'
+import {
+  CONVERSATION_ERROR,
+  requestIntent,
+  type IntentContextInput,
+} from '../features/conversation/conversation-client'
 import { uploadProject } from '../features/project-intake/project-intake'
 import { exportProject, type ProjectExportState } from '../features/project-export/project-export'
 import {
@@ -46,6 +56,8 @@ export function App() {
   const libraryInFlightRef = useRef(false)
   const saveSequenceRef = useRef(0)
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const conversationAbortRef = useRef<AbortController | null>(null)
+  const conversationSequenceRef = useRef(0)
 
   function resetExport(): void {
     exportAbortRef.current?.abort()
@@ -60,6 +72,7 @@ export function App() {
       intakeAbortRef.current?.abort()
       exportAbortRef.current?.abort()
       libraryAbortRef.current?.abort()
+      conversationAbortRef.current?.abort()
       intakeInFlightRef.current = false
       exportInFlightRef.current = false
     }
@@ -111,6 +124,54 @@ export function App() {
         setAppState((current) => (current.screen === 'studio' ? reportEditError(current, message) : current))
       },
     )
+  }
+
+  /**
+   * Ask the assistant for an edit.
+   *
+   * The reply is only ever a proposal. It is validated by the domain the same
+   * way a hand-made one is, and it is previewed rather than applied — so even a
+   * server that lied, or a provider that was talked into something, cannot
+   * change a single frame without the user pressing Accept.
+   */
+  function sendConversationMessage(message: string, context: IntentContextInput): void {
+    if (appState.screen !== 'studio' || appState.proposal) return
+    const projectId = appState.project.id
+    const baseRevision = appState.editProject.revision
+    const sequence = conversationSequenceRef.current + 1
+    conversationSequenceRef.current = sequence
+    conversationAbortRef.current?.abort()
+    const controller = new AbortController()
+    conversationAbortRef.current = controller
+
+    resetExport()
+    setAppState((current) => (current.screen === 'studio' ? startConversationRequest(current, message) : current))
+
+    void requestIntent(projectId, { message, baseRevision, context }, fetch, controller.signal)
+      .then((outcome) => {
+        if (conversationSequenceRef.current !== sequence || controller.signal.aborted) return
+        conversationAbortRef.current = null
+        setAppState((current) => {
+          if (current.screen !== 'studio') return current
+          if (outcome.kind === 'proposal') {
+            return queueEditProposal(current, outcome.operation, {
+              source: 'ai',
+              requestId: outcome.requestId,
+              explanation: outcome.explanation,
+              note: outcome.note,
+            })
+          }
+          if (outcome.kind === 'clarification') return reportClarification(current, outcome.question)
+          if (outcome.kind === 'unsupported') return reportUnsupported(current, outcome.message)
+          return reportConversationError(current, outcome.message)
+        })
+      })
+      .catch((error: unknown) => {
+        if (conversationSequenceRef.current !== sequence || controller.signal.aborted) return
+        conversationAbortRef.current = null
+        const message = error instanceof Error && error.message ? error.message : CONVERSATION_ERROR
+        setAppState((current) => (current.screen === 'studio' ? reportConversationError(current, message) : current))
+      })
   }
 
   if (appState.screen === 'home') {
@@ -177,10 +238,18 @@ export function App() {
           const controller = new AbortController()
           libraryAbortRef.current = controller
           void loadProject(summary.id, fetch, controller.signal)
-            .then((project) => {
-              if (transitionSequence !== transitionSequenceRef.current || controller.signal.aborted) return
+            // Released here rather than inside then/catch, because both of those
+            // return early when the request was abandoned. Releasing only on the
+            // paths that ran to completion left the flag stuck on after any
+            // cancellation, and Home then ignored every later click until the
+            // page was reloaded.
+            .finally(() => {
+              if (libraryAbortRef.current !== controller) return
               libraryInFlightRef.current = false
               libraryAbortRef.current = null
+            })
+            .then((project) => {
+              if (transitionSequence !== transitionSequenceRef.current || controller.signal.aborted) return
               transitionView(() => {
                 if (transitionSequence !== transitionSequenceRef.current) return
                 flushSync(() => {
@@ -199,8 +268,6 @@ export function App() {
             })
             .catch((error: unknown) => {
               if (transitionSequence !== transitionSequenceRef.current || controller.signal.aborted) return
-              libraryInFlightRef.current = false
-              libraryAbortRef.current = null
               setIsOpeningRecent(false)
               setLibraryError(error instanceof Error ? error.message : 'We could not load your local projects. Try again.')
             })
@@ -213,10 +280,15 @@ export function App() {
     <StudioScreen
       project={appState.project}
       proposal={appState.proposal}
+      conversation={appState.conversation}
       editProject={appState.editProject}
       editError={appState.editError}
       exportState={exportState}
       saveState={saveState}
+      onSendMessage={sendConversationMessage}
+      onRepairProposal={(repair) => {
+        setAppState((current) => (current.screen === 'studio' ? repairProposal(current, repair) : current))
+      }}
       onProposal={(proposal) => {
         resetExport()
         setAppState((current) =>

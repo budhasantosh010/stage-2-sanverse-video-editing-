@@ -1,0 +1,47 @@
+.nameplate-repair {
+  margin-top: 14px;
+  border-top: 1px solid var(--color-border-soft);
+  padding-top: 14px;
+}
+
+.nameplate-repair h3 {
+  margin: 0 0 10px;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 760;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.nameplate-repair label {
+  display: block;
+  margin: 10px 0 4px;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.nameplate-repair input {
+  width: 100%;
+  border: 1px solid var(--color-border-strong);
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.nameplate-repair__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.nameplate-repair__actions button {
+  flex: 1;
+  min-height: 34px;
+  font-size: 0.78rem;
+}
+
+.nameplate-repair__hint {
+  margin: 10px 0 0;
+  color: var(--color-text-subtle);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}

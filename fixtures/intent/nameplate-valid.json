@@ -1,0 +1,50 @@
+[
+  {
+    "caseId": "valid-quoted-two-lines",
+    "message": "add a nameplate saying \"Santosh\" \"Founder\"",
+    "hasPoint": true,
+    "expected": "proposal",
+    "expectedClarificationField": null,
+    "why": "Text, place and moment are all present, so asking anything would be an interruption."
+  },
+  {
+    "caseId": "valid-single-line",
+    "message": "show \"Priya Sharma\" here",
+    "hasPoint": true,
+    "expected": "proposal",
+    "expectedClarificationField": null,
+    "why": "One line is enough; the second line is optional and is left empty."
+  },
+  {
+    "caseId": "valid-loose-phrasing",
+    "message": "put my name on screen, call it Santosh",
+    "hasPoint": true,
+    "expected": "proposal",
+    "expectedClarificationField": null,
+    "why": "People do not use quotation marks when they talk. Plain phrasing must still work."
+  },
+  {
+    "caseId": "valid-misspelled",
+    "message": "add a namplate that says \"Santosh\"",
+    "hasPoint": true,
+    "expected": "proposal",
+    "expectedClarificationField": null,
+    "why": "A typo in the word for the feature must not change what happens."
+  },
+  {
+    "caseId": "valid-pronoun-tied-to-point",
+    "message": "put his name here: \"Santosh\"",
+    "hasPoint": true,
+    "expected": "proposal",
+    "expectedClarificationField": null,
+    "why": "\"here\" and \"his\" only mean something because the user pointed; the point supplies the position."
+  },
+  {
+    "caseId": "valid-explicit-duration",
+    "message": "show \"Santosh\" for 3 seconds",
+    "hasPoint": true,
+    "expected": "proposal",
+    "expectedClarificationField": null,
+    "why": "A stated length must be used instead of the five-second default."
+  }
+]

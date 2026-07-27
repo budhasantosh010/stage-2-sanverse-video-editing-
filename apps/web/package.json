@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@sanverse/edit-domain": "0.0.0",
+    "@sanverse/intent-domain": "0.0.0",
+    "@sanverse/render-contract": "0.0.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
