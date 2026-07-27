@@ -102,9 +102,22 @@ know the system survives is to make it happen every test run.
 - A stale revision is detected before the provider is called, so a wasted call
   costs nothing.
 
-## Not decided here
+## Decided since — which provider (DEC-011, 2026-07-27)
 
-- Which real provider. That is an adapter choice, deliberately deferred to
-  G4B-10, and it needs the owner's decision about data leaving the machine.
+One adapter written against the OpenAI chat-completions HTTP shape, pointed by
+default at a local LiteLLM proxy, which routes to four providers: NVIDIA and
+opencode as the owner's primaries, OpenRouter for overflow, and LM Studio for a
+fully local path where nothing leaves the machine. OpenAI and Anthropic are out
+of scope for now and are a configuration entry away if that changes.
+
+Nothing in this ADR changes. The provider still returns `unknown`, the candidate
+shape is still closed, an unoffered capability still has no code path, and
+`outbound-data-policy.ts` still builds the only object that leaves the process.
+LiteLLM sits *outside* that boundary and receives exactly what the allowlist
+permits — with one new obligation recorded in DEC-011: the proxy's own request
+logging must be verified off before a real call, because the allowlist governs
+what Sanverse sends, not what a downstream process writes to disk.
+
+## Not decided here
 - Multi-step requests ("tighten my intro"). One request currently produces at
   most one operation. Compound workflows are G7.

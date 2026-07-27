@@ -13,6 +13,8 @@ import { NAMEPLATE_COMPONENT_ID } from '@sanverse/edit-domain'
 import { createFfprobeMediaProbe, type MediaProbePort } from './media/media-probe.ts'
 import { describeFailure, errorCode } from './http/failure-response.ts'
 import { createFakeIntentAdapter } from './intent/fake-intent-adapter.ts'
+import { createIntentProvider, describeIntentProvider, resolveIntentProviderConfig } from './intent/intent-provider-config.ts'
+import type { IntentProviderPort } from './intent/intent-port.ts'
 import { createIntentService, type IntentService } from './intent/intent-service.ts'
 import { createFfmpegRenderAdapter } from './render/ffmpeg-render-adapter.ts'
 import { createRenderService } from './render/render-service.ts'
@@ -27,6 +29,8 @@ type ServerOptions = {
   mediaProbe?: MediaProbePort
   exportIdGenerator?: () => string
   fontPath?: string
+  /** Swaps only the provider; the safety pipeline around it is unchanged. */
+  intentProvider?: IntentProviderPort
   intentService?: IntentService
 }
 
@@ -159,7 +163,7 @@ export function createSanverseServer(options: ServerOptions) {
   // until a real provider is deliberately configured and the owner has approved
   // what the outbound allowlist sends.
   const intentService = options.intentService ?? createIntentService({
-    provider: createFakeIntentAdapter(),
+    provider: options.intentProvider ?? createFakeIntentAdapter(),
     loadProject: (projectId) => projectState.load(projectId),
     createOperationId: () => `operation_${randomBytes(16).toString('hex')}`,
   })
@@ -436,8 +440,18 @@ const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).hr
 if (import.meta.url === invokedPath) {
   const dataRoot = process.env.SANVERSE_DATA_DIR ?? fileURLToPath(new URL('../../../.sanverse-data', import.meta.url))
   const fontPath = process.env.SANVERSE_FONT_PATH ?? (process.platform === 'win32' ? 'C:\\Windows\\Fonts\\arial.ttf' : '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')
-  const server = createSanverseServer({ dataRoot, maxUploadBytes: parseConfiguredLimit(process.env.SANVERSE_MAX_UPLOAD_BYTES), fontPath })
+  // Resolved before the server is built, so a broken provider configuration
+  // stops startup instead of surfacing as a puzzling failure on the first
+  // sentence the user types. It never falls back to the fake silently.
+  const intentProviderConfig = resolveIntentProviderConfig(process.env)
+  const server = createSanverseServer({
+    dataRoot,
+    maxUploadBytes: parseConfiguredLimit(process.env.SANVERSE_MAX_UPLOAD_BYTES),
+    fontPath,
+    intentProvider: createIntentProvider(intentProviderConfig),
+  })
   server.listen(2001, '127.0.0.1', () => {
     console.log('Sanverse local API listening on http://127.0.0.1:2001')
+    console.log(describeIntentProvider(intentProviderConfig))
   })
 }

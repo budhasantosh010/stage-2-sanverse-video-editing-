@@ -4,8 +4,9 @@ Last updated: 2026-07-27
 
 ## Active goal
 
-**G4-B — first safe AI-operated nameplate. Tasks 01 through 09 are built and
-verified. Task 10, connecting one real provider, has not started.**
+**G4-B — first safe AI-operated nameplate. Tasks 01 through 11 are built and
+verified. Task 12, connecting one real provider, has not started and is gated
+on the owner's decision about data leaving the machine.**
 
 The chat box works. A sentence typed into it produces a pending proposal, one
 short question, a plain "cannot do that", or a refusal — and nothing else. The
@@ -33,7 +34,7 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
   description of a nameplate. Browser preview and FFmpeg export compile the same
   plan, and a parity test evaluates the exact FFmpeg placement expression
   numerically. The exporter's font is served to the browser. ADR-003.
-- **G4-B tasks 01–09 (complete).** `@sanverse/intent-domain` holds a closed
+- **G4-B tasks 01–11 (complete, on a fake provider).** `@sanverse/intent-domain` holds a closed
   request shape, a closed untrusted candidate shape, six bounded clarification
   fields, and the evaluation contract. The API holds the provider port, the
   deterministic fake, the outbound allowlist, and the fixed 13-step intent
@@ -51,10 +52,10 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
   edit-domain      103
   render-contract   22
   intent-domain     27
-  api              103
-  web              158
+  api              162
+  web              160
   ------------------------
-  total            413 passing; all workspace builds clean
+  total            474 passing; all workspace builds clean
 ```
 
 ## Owner evidence still open
@@ -66,7 +67,11 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
 
 ## Not built
 
-- Any real AI provider (G4B-10). The fake is the only provider that exists.
+- A call to any real AI provider. The adapter for one exists and is proved over
+  real HTTP against a stub (G4B-12A/12B/13A, DEC-011), but **no packet has
+  reached NVIDIA, opencode, OpenRouter, or LM Studio.** The fake remains the
+  default and the only provider that runs. Blocked on the owner's API keys, and
+  on verifying LiteLLM's request-body logging is off (G4B-12C).
 - Cut, trim, split, ripple delete, reorder, or a general timeline
 - Captions and audio editing primitives
 - Transform, crop, scale, rotation, keyframes, easing, spring/bounce,
@@ -96,7 +101,8 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
 - Recent-project presentation remains minimal, and the Home draft request is not
   restored when reopening a project.
 - Free AI-provider schemas, quotas, latency, reliability, and commercial terms
-  remain unverified.
+  remain unverified. opencode's gateway shape and model list in particular are
+  recorded from the owner's instruction, not from a test.
 
 ## Evidence boundary
 

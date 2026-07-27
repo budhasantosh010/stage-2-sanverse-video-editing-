@@ -455,6 +455,51 @@ describe('local API boundary', () => {
     expect(state.serialized()).toBe(before)
   })
 
+  it('stays on the offline fake even when the environment names a real provider', async () => {
+    // Provider configuration is read once, in `main()`, which only runs when
+    // server.ts is executed directly. A test importing the module can therefore
+    // never be redirected onto a network by a stray environment variable — this
+    // asserts that, so "no test called out" is a proved fact and not a habit.
+    const previous = process.env.SANVERSE_AI_PROVIDER
+    const previousUrl = process.env.SANVERSE_AI_BASE_URL
+    process.env.SANVERSE_AI_PROVIDER = 'openai-compatible'
+    process.env.SANVERSE_AI_BASE_URL = 'https://example.invalid/v1'
+    try {
+      const spy = readRepository(mp4())
+      const state = savedProjectState()
+      const port = await listen(createSanverseServer({
+        dataRoot: 'unused',
+        maxUploadBytes: 100,
+        repository: { ...spy.repository, ...state.repository },
+        mediaProbe: stubMediaProbe(),
+      }))
+      await call(port, { path: `/api/projects/${PROJECT_ID}` })
+
+      const response = await sendJson(port, 'POST', `/api/projects/${PROJECT_ID}/intents`, {
+        message: 'add a nameplate saying "Santosh"',
+        baseRevision: 0,
+        context: {
+          clipId: 'clip_1234567890ab',
+          sampledClipTimeTicks: 2_000 * 1_440,
+          point: { x: 0.4, y: 0.7 },
+          playheadTicks: 2_000 * 1_440,
+          compositionDurationTicks: 8_000 * 1_440,
+          compositionWidth: 1280,
+          compositionHeight: 720,
+        },
+      })
+
+      const { outcome } = JSON.parse(new TextDecoder().decode(response.body))
+      // A real call to example.invalid could only have produced a rejection.
+      expect(outcome.kind).toBe('proposal')
+    } finally {
+      if (previous === undefined) delete process.env.SANVERSE_AI_PROVIDER
+      else process.env.SANVERSE_AI_PROVIDER = previous
+      if (previousUrl === undefined) delete process.env.SANVERSE_AI_BASE_URL
+      else process.env.SANVERSE_AI_BASE_URL = previousUrl
+    }
+  })
+
   it('refuses an AI proposal built against a revision the project has moved past', async () => {
     const spy = readRepository(mp4())
     const state = savedProjectState()

@@ -56,8 +56,14 @@ Legend:
 - [x] G4B-09 Add atomic approval and audit provenance
 - [x] G4B-10 Build representative prompt/adversarial evaluation corpus
 - [x] G4B-11 Add provider outbound-data allowlist and secret boundary
-- [ ] G4B-12 Connect one real provider
+- [ ] G4B-12 Connect one real provider (DEC-011: one OpenAI-compatible adapter behind a LiteLLM proxy)
+  - [x] G4B-12A Implement the OpenAI-compatible adapter with no provider-specific branching
+  - [x] G4B-12B Keep the fake as the default; prove no test makes a network call
+  - [ ] G4B-12C Verify LiteLLM request-body logging is off before any real call — blocked: LiteLLM is not installed
+  - [ ] G4B-12D Run the corpus against NVIDIA, opencode, OpenRouter, and LM Studio — blocked: needs the owner's API keys
 - [ ] G4B-13 Run provider-switch and failure-recovery evidence
+  - [x] G4B-13A Proxy down, never answering, wrong key, prose reply, smuggled capability — proved over real HTTP
+  - [ ] G4B-13B The same corpus across two real providers unchanged — blocked with G4B-12D
 - [ ] G4B-14 Owner completes the real AI nameplate workflow
 
 ## G5-A - Captions and speech metadata

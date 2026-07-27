@@ -254,7 +254,17 @@ export function createIntentService(options: IntentServiceOptions) {
           return reject(request.requestId, 'OUTBOUND_BLOCKED', 'That request was not sent, because it contained something private.')
         }
         if (error instanceof ProviderCallError || controller.signal.aborted) {
-          log({ event: 'intent.provider-failed', requestId: request.requestId, provider: provider.name })
+          // `detail` is safe to log ONLY because `ProviderCallError` is thrown
+          // exclusively by this project's own adapters with this project's own
+          // wording. A provider's response text is never placed in it. Without
+          // this the owner cannot tell a wrong API key from an unreachable
+          // proxy — the user-facing sentence is identical for both.
+          log({
+            event: 'intent.provider-failed',
+            requestId: request.requestId,
+            provider: provider.name,
+            detail: error instanceof ProviderCallError ? error.message : 'The request was cancelled.',
+          })
           return reject(request.requestId, 'PROVIDER_UNAVAILABLE', 'The assistant is not responding right now. Your video is unchanged.')
         }
         throw error

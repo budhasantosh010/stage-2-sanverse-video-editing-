@@ -101,7 +101,16 @@ export type IntentCandidateError = {
   readonly issues: readonly { readonly path: string; readonly code: string }[]
 }
 
-const ARGUMENT_KEYS = [
+/**
+ * The exact key set a provider may return under `arguments`.
+ *
+ * Exported because a provider adapter has to describe this shape to a real
+ * model. Generating that description from this constant is what stops the
+ * instruction given to the model and the validator applied to its reply from
+ * ever drifting apart — a drift that would show up as a provider which fails
+ * validation on every single call, for reasons nobody could see.
+ */
+export const NAMEPLATE_ARGUMENT_KEYS = [
   'primaryText',
   'secondaryText',
   'startMs',
@@ -109,6 +118,8 @@ const ARGUMENT_KEYS = [
   'point',
   'anchor',
 ] as const
+
+const ARGUMENT_KEYS = NAMEPLATE_ARGUMENT_KEYS
 
 type Issue = IntentCandidateError['issues'][number]
 
