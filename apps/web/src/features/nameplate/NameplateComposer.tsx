@@ -2,9 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import {
   DEFAULT_NAMEPLATE_ANCHOR,
   NAMEPLATE_COMPONENT_ID,
+  OPERATION_SCHEMA_VERSION,
+  PROJECT_TIMESCALE,
+  clipAtCompositionTime,
   mediaTimeFromMilliseconds,
   validateOperation,
   type AddNameplateOperation,
+  type Composition,
 } from '@sanverse/edit-domain'
 
 import {
@@ -15,8 +19,8 @@ import './NameplateComposer.css'
 
 export type NameplateComposerProps = {
   target: CapturedPointTarget | null
-  /** The clip this nameplate attaches to, so it survives later cuts. */
-  clipId: string
+  /** The footage as it currently stands, so a click maps to the right frame. */
+  composition: Composition
   createOperationId(): string
   onProposal(proposal: AddNameplateOperation): void
 }
@@ -26,7 +30,7 @@ const DEFAULT_VISIBLE_MS = 5_000
 
 export function NameplateComposer({
   target,
-  clipId,
+  composition,
   createOperationId,
   onProposal,
 }: NameplateComposerProps) {
@@ -83,25 +87,36 @@ export function NameplateComposer({
       return
     }
 
-    const sampledClipTime = mediaTimeFromMilliseconds(target.timeMs)
     const start = mediaTimeFromMilliseconds(target.timeMs)
     const duration = mediaTimeFromMilliseconds(DEFAULT_VISIBLE_MS)
-    if (!sampledClipTime.ok || !start.ok || !duration.ok) {
+    if (!start.ok || !duration.ok) {
       setError('We could not create this proposal. Try again.')
       primaryRef.current?.focus()
       return
     }
 
+    // The user clicked a moment of the FINISHED video. The nameplate is stored
+    // against the original footage instead, so that a later cut moves it with
+    // the face it was placed on rather than leaving it at a wall-clock moment
+    // that now shows something else.
+    const clip = clipAtCompositionTime(composition, start.value)
+    if (!clip) {
+      setError('There is nothing at that moment of the video. Choose another point.')
+      primaryRef.current?.focus()
+      return
+    }
+    const sourceStart = clip.sourceRange.start.ticks + (start.value.ticks - clip.compositionStart.ticks)
+
     const result = validateOperation({
-      schemaVersion: 'sanverse.operation/v2',
+      schemaVersion: OPERATION_SCHEMA_VERSION,
       operationId,
       kind: 'add-nameplate',
       capabilityId: NAMEPLATE_COMPONENT_ID,
-      clipId,
-      // Evidence: where the user was pointing, on this clip's own timeline.
-      sampledClipTime: sampledClipTime.value,
-      // Instruction: when it is on screen, in finished-video time.
-      compositionInterval: { start: start.value, duration: duration.value },
+      assetId: clip.assetId,
+      sourceInterval: {
+        start: { ticks: sourceStart, timescale: PROJECT_TIMESCALE },
+        duration: duration.value,
+      },
       target: {
         coordinateSpace: 'composition-normalized',
         point: { x: target.x, y: target.y },
@@ -112,7 +127,7 @@ export function NameplateComposer({
       extensions: {},
     })
 
-    if (!result.ok) {
+    if (!result.ok || result.value.kind !== 'add-nameplate') {
       setError('We could not create this proposal. Try again.')
       primaryRef.current?.focus()
       return

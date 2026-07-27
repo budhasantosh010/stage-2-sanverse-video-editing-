@@ -3,6 +3,7 @@ import { findAsset, type VideoAsset } from './assets.ts'
 import {
   ZERO_TIME,
   mediaTime,
+  rangeIntersection,
   rangeWithin,
   validateMediaTime,
   validateTimeRange,
@@ -37,6 +38,16 @@ export type Clip = Readonly<{
   sourceRange: TimeRange
   compositionStart: MediaTime
   enabled: boolean
+  /**
+   * Loudness change for this piece, in decibels. 0 means untouched. Kept on the
+   * clip rather than on a separate operation list so that cutting a clip in two
+   * carries the loudness to both halves automatically.
+   */
+  gainDb: number
+  /** Silence-to-full ramp at the head of this piece. Zero means no ramp. */
+  fadeIn: MediaTime
+  /** Full-to-silence ramp at the tail of this piece. Zero means no ramp. */
+  fadeOut: MediaTime
 }>
 
 export type TrackKind = 'video' | 'audio' | 'overlay'
@@ -64,6 +75,8 @@ export type CompositionIssueCode =
   | 'SOURCE_RANGE_OUTSIDE_ASSET'
   | 'CLIPS_OVERLAP'
   | 'DUPLICATE_ID'
+  | 'GAIN_OUT_OF_RANGE'
+  | 'FADE_LONGER_THAN_CLIP'
 
 export type CompositionError = {
   readonly code: 'COMPOSITION_INVALID'
@@ -75,7 +88,25 @@ export const TRACK_ID_PATTERN = /^track_[a-z0-9]{8,64}$/
 export const COMPOSITION_ID_PATTERN = /^composition_[a-z0-9]{8,64}$/
 
 const MAX_DIMENSION = 16_384
-const CLIP_KEYS = ['clipId', 'assetId', 'sourceRange', 'compositionStart', 'enabled'] as const
+
+/**
+ * Loudness bounds. -60 dB is inaudible in practice and +12 dB is the most a
+ * clip can be lifted before clipping becomes unavoidable, so the domain refuses
+ * values outside that band instead of exporting distortion.
+ */
+export const MIN_CLIP_GAIN_DB = -60
+export const MAX_CLIP_GAIN_DB = 12
+
+const CLIP_KEYS = [
+  'clipId',
+  'assetId',
+  'sourceRange',
+  'compositionStart',
+  'enabled',
+  'gainDb',
+  'fadeIn',
+  'fadeOut',
+] as const
 const TRACK_KEYS = ['trackId', 'kind', 'order', 'clips'] as const
 const COMPOSITION_KEYS = ['compositionId', 'width', 'height', 'tracks'] as const
 const TRACK_KINDS: readonly TrackKind[] = ['video', 'audio', 'overlay']
@@ -95,6 +126,74 @@ export const compositionTimeToClip = (clip: Clip, compositionTime: MediaTime): M
 /** Map a time on a clip's own timeline to a time inside the source asset. */
 export const clipTimeToSource = (clip: Clip, clipTime: MediaTime): MediaTime =>
   mediaTime(clip.sourceRange.start.ticks + clipTime.ticks)
+
+/** Map a time inside the source asset back onto a clip's own timeline. */
+export const sourceTimeToClip = (clip: Clip, sourceTime: MediaTime): MediaTime =>
+  mediaTime(sourceTime.ticks - clip.sourceRange.start.ticks)
+
+/** One surviving appearance of a source-anchored span in the finished video. */
+export type SourceSpanPlacement = Readonly<{
+  clip: Clip
+  /** The part of the source span this clip still carries. */
+  sourceRange: TimeRange
+  /** Where that part lands in the finished video. */
+  compositionRange: TimeRange
+}>
+
+/**
+ * Where a span of the original footage ends up after cutting.
+ *
+ * Edits the user anchored to the footage — a nameplate on a face, a caption on
+ * a spoken word — are stored against the source timeline, never against the
+ * finished timeline. This is the one function that translates. Trimming the
+ * head off a clip therefore moves the nameplate with the face instead of
+ * leaving it pinned to a wall-clock moment that now shows something else.
+ *
+ * A span cut into two pieces returns two placements, which is why a nameplate
+ * survives a cut through the middle of itself and appears in both halves. A
+ * span whose footage was deleted returns an empty list, and the caller shows
+ * that plainly rather than guessing a new position.
+ */
+export const placeSourceSpan = (
+  composition: Composition,
+  assetId: string,
+  sourceRange: TimeRange,
+): readonly SourceSpanPlacement[] => {
+  const placements: SourceSpanPlacement[] = []
+  for (const track of composition.tracks) {
+    for (const clip of track.clips) {
+      if (clip.assetId !== assetId) continue
+      const overlap = rangeIntersection(clip.sourceRange, sourceRange)
+      if (!overlap) continue
+      const offset = overlap.start.ticks - clip.sourceRange.start.ticks
+      placements.push(Object.freeze({
+        clip,
+        sourceRange: overlap,
+        compositionRange: Object.freeze({
+          start: mediaTime(clip.compositionStart.ticks + offset),
+          duration: overlap.duration,
+        }),
+      }))
+    }
+  }
+  return Object.freeze(
+    placements.sort((a, b) => a.compositionRange.start.ticks - b.compositionRange.start.ticks),
+  )
+}
+
+/**
+ * The piece of footage showing at a given moment of the finished video, or
+ * undefined if that moment falls in a deliberate hole.
+ */
+export const clipAtCompositionTime = (composition: Composition, time: MediaTime): Clip | undefined => {
+  for (const track of composition.tracks) {
+    for (const clip of track.clips) {
+      const start = clip.compositionStart.ticks
+      if (time.ticks >= start && time.ticks < start + clip.sourceRange.duration.ticks) return clip
+    }
+  }
+  return undefined
+}
 
 export const findClip = (composition: Composition, clipId: string): Clip | undefined => {
   for (const track of composition.tracks) {
@@ -159,7 +258,35 @@ const validateClip = (
     }
   }
 
-  if (!sourceRange.ok || !compositionStart.ok || !asset || typeof input.clipId !== 'string' || typeof input.enabled !== 'boolean') {
+  const gainDb = input.gainDb
+  const gainValid =
+    typeof gainDb === 'number' &&
+    Number.isFinite(gainDb) &&
+    gainDb >= MIN_CLIP_GAIN_DB &&
+    gainDb <= MAX_CLIP_GAIN_DB
+  if (!gainValid) issues.push({ path: `${path}.gainDb`, code: 'GAIN_OUT_OF_RANGE' })
+  const fadeIn = validateMediaTime(input.fadeIn, `${path}.fadeIn`)
+  if (!fadeIn.ok) issues.push({ path: `${path}.fadeIn`, code: 'VALUE_OUT_OF_RANGE' })
+  const fadeOut = validateMediaTime(input.fadeOut, `${path}.fadeOut`)
+  if (!fadeOut.ok) issues.push({ path: `${path}.fadeOut`, code: 'VALUE_OUT_OF_RANGE' })
+  // Two ramps longer than the piece they live on would overlap and produce a
+  // loudness curve nobody asked for, so the pair is refused rather than capped.
+  if (fadeIn.ok && fadeOut.ok && sourceRange.ok) {
+    if (fadeIn.value.ticks + fadeOut.value.ticks > sourceRange.value.duration.ticks) {
+      issues.push({ path: `${path}.fadeIn`, code: 'FADE_LONGER_THAN_CLIP' })
+    }
+  }
+
+  if (
+    !sourceRange.ok ||
+    !compositionStart.ok ||
+    !asset ||
+    !gainValid ||
+    !fadeIn.ok ||
+    !fadeOut.ok ||
+    typeof input.clipId !== 'string' ||
+    typeof input.enabled !== 'boolean'
+  ) {
     return null
   }
   return Object.freeze({
@@ -168,6 +295,9 @@ const validateClip = (
     sourceRange: sourceRange.value,
     compositionStart: compositionStart.value,
     enabled: input.enabled,
+    gainDb,
+    fadeIn: fadeIn.value,
+    fadeOut: fadeOut.value,
   })
 }
 
@@ -307,6 +437,9 @@ export const createSingleClipComposition = (input: {
               sourceRange: { start: ZERO_TIME, duration: input.asset.duration },
               compositionStart: ZERO_TIME,
               enabled: true,
+              gainDb: 0,
+              fadeIn: ZERO_TIME,
+              fadeOut: ZERO_TIME,
             },
           ],
         },

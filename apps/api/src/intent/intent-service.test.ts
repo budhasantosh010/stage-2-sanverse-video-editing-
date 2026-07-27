@@ -5,6 +5,7 @@ import {
   PROJECT_TIMESCALE,
   TICKS_PER_MILLISECOND,
   createProject,
+  type AddNameplateOperation,
   type EditProject,
 } from '@sanverse/edit-domain'
 import { INTENT_CANDIDATE_SCHEMA } from '@sanverse/intent-domain'
@@ -12,6 +13,11 @@ import { INTENT_CANDIDATE_SCHEMA } from '@sanverse/intent-domain'
 import { createFakeIntentAdapter } from './fake-intent-adapter.ts'
 import { createIntentService } from './intent-service.ts'
 import type { IntentProviderPort } from './intent-port.ts'
+
+/** The tests below only ever build nameplates, so narrowing once keeps them readable. */
+const nameplateOf = (changeSet: { operations: readonly unknown[] }) =>
+  changeSet.operations[0] as AddNameplateOperation
+
 
 const PROJECT_ID = 'project_0123456789abcdef'
 const CLIP_ID = 'clip_0123456789ab'
@@ -83,8 +89,8 @@ describe('intent service with the fake provider', () => {
     expect(outcome.kind).toBe('proposal')
     if (outcome.kind !== 'proposal') return
     expect(outcome.changeSet.operations).toHaveLength(1)
-    expect(outcome.changeSet.operations[0].primaryText).toBe('Santosh')
-    expect(outcome.changeSet.operations[0].secondaryText).toBe('Founder')
+    expect(nameplateOf(outcome.changeSet).primaryText).toBe('Santosh')
+    expect(nameplateOf(outcome.changeSet).secondaryText).toBe('Founder')
     expect(outcome.changeSet.provenance).toEqual({ source: 'ai', requestId: 'request_0123456789abcdef' })
     expect(outcome.changeSet.baseRevision).toBe(0)
   })
@@ -92,8 +98,8 @@ describe('intent service with the fake provider', () => {
   it('places the nameplate where the user pointed, not where the provider guessed', async () => {
     const outcome = await makeService(createFakeIntentAdapter()).propose(request())
     if (outcome.kind !== 'proposal') throw new Error('expected a proposal')
-    expect(outcome.changeSet.operations[0].target.point).toEqual({ x: 0.4, y: 0.7 })
-    expect(outcome.changeSet.operations[0].target.anchor).toBe('center')
+    expect(nameplateOf(outcome.changeSet).target.point).toEqual({ x: 0.4, y: 0.7 })
+    expect(nameplateOf(outcome.changeSet).target.anchor).toBe('center')
   })
 
   it('asks what the text should say rather than inventing a name', async () => {
@@ -200,7 +206,7 @@ describe('intent service against a hostile provider', () => {
     const outcome = await makeService(hostile({ startMs: 28_000, durationMs: 10_000 })).propose(request())
     expect(outcome.kind).toBe('proposal')
     if (outcome.kind !== 'proposal') return
-    const interval = outcome.changeSet.operations[0].compositionInterval
+    const interval = nameplateOf(outcome.changeSet).sourceInterval
     expect(interval.start.ticks + interval.duration.ticks).toBe(THIRTY_SECONDS)
     expect(outcome.note).toContain('Shortened')
   })

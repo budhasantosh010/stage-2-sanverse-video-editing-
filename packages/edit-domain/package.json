@@ -12,12 +12,13 @@
     "./geometry": "./src/geometry.ts",
     "./composition": "./src/composition.ts",
     "./operations": "./src/operations.ts",
+    "./timeline-operations": "./src/timeline-operations.ts",
     "./change-set": "./src/change-set.ts",
     "./capabilities": "./src/capabilities.ts",
     "./json": "./src/json.ts",
     "./result": "./src/result.ts",
     "./legacy-project-v1": "./src/legacy-project-v1.ts",
-    "./migrations/project-v1-to-v2": "./src/migrations/project-v1-to-v2.ts"
+    "./migrations/upgrade-project": "./src/migrations/upgrade-project.ts"
   },
   "scripts": {
     "test": "vitest run",

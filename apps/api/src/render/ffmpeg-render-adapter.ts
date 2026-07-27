@@ -37,7 +37,23 @@ type BuildArgumentsInput = {
   readonly outputPath: string
   readonly fontPath: string
   readonly plan: RenderPlan
+  /** The source's own frame rate, so generated black matches it exactly. */
+  readonly frameRate: Readonly<{ numerator: number; denominator: number }>
+  /** False when the source has no sound at all, so no audio is built. */
+  readonly hasAudio: boolean
 }
+
+/**
+ * Every piece of audio is resampled to this before anything is joined.
+ *
+ * Joining two pieces of audio that disagree about sample rate or channel count
+ * is not something FFmpeg guesses at; it fails. Conforming everything first is
+ * also what replaced `-c:a copy`, which could only cut audio at its own
+ * compression block boundaries and therefore drifted out of sync with the
+ * picture at the first cut.
+ */
+const AUDIO_SAMPLE_RATE = 48_000
+const AUDIO_CHANNEL_LAYOUT = 'stereo'
 
 function renderError(code: RenderError['code'], message: string): RenderError {
   return new RenderError(code, message)
@@ -115,28 +131,120 @@ function nameplateFilters(node: TextOverlayNode, index: number, plan: RenderPlan
   return filters
 }
 
+/** One stretch of the finished video: either real footage or a deliberate hole. */
+type TimelinePiece =
+  | { readonly kind: 'footage'; readonly durationTicks: number; readonly segment: RenderPlan['segments'][number] }
+  | { readonly kind: 'hole'; readonly durationTicks: number }
+
+/**
+ * Lay the finished video out end to end, filling every hole explicitly.
+ *
+ * A hole is what "take this out but leave the space" produces. It has to become
+ * real black and real silence, because FFmpeg joins pieces one after another
+ * and has no notion of a gap between them; without this, removing a middle
+ * section without rippling would silently shorten the export and every later
+ * nameplate would land in the wrong place.
+ */
+export function layOutTimeline(plan: RenderPlan): readonly TimelinePiece[] {
+  const ordered = [...plan.segments].sort((left, right) => left.interval.start.ticks - right.interval.start.ticks)
+  const pieces: TimelinePiece[] = []
+  let cursor = 0
+  for (const segment of ordered) {
+    if (segment.interval.start.ticks > cursor) {
+      pieces.push({ kind: 'hole', durationTicks: segment.interval.start.ticks - cursor })
+    }
+    pieces.push({ kind: 'footage', durationTicks: segment.interval.duration.ticks, segment })
+    cursor = segment.interval.start.ticks + segment.interval.duration.ticks
+  }
+  if (cursor < plan.durationTicks) {
+    pieces.push({ kind: 'hole', durationTicks: plan.durationTicks - cursor })
+  }
+  return Object.freeze(pieces)
+}
+
 export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
   const plan = validateRenderPlan(input.plan)
   if (!plan.ok) {
     throw renderError('RENDER_INPUT_INVALID', 'The render plan is invalid.')
   }
-  if (plan.value.nodes.length === 0) {
-    throw renderError('RENDER_INPUT_INVALID', 'At least one accepted edit is required.')
-  }
   if (!/^[a-zA-Z0-9._-]+$/.test(input.fontPath)) {
     throw renderError('RENDER_INPUT_INVALID', 'The render font reference must be a fixed workspace filename.')
   }
+  if (
+    !Number.isSafeInteger(input.frameRate.numerator) || input.frameRate.numerator <= 0 ||
+    !Number.isSafeInteger(input.frameRate.denominator) || input.frameRate.denominator <= 0
+  ) {
+    throw renderError('RENDER_INPUT_INVALID', 'The source frame rate is not usable.')
+  }
 
-  const filters: string[] = []
-  plan.value.nodes.forEach((node, index) => {
+  const { width, height } = plan.value
+  const rate = `${input.frameRate.numerator}/${input.frameRate.denominator}`
+  const pieces = layOutTimeline(plan.value)
+  const graph: string[] = []
+  const concatInputs: string[] = []
+
+  pieces.forEach((piece, index) => {
+    const videoLabel = `v${index}`
+    const audioLabel = `a${index}`
+    const seconds = ticksToSeconds(piece.durationTicks)
+
+    if (piece.kind === 'hole') {
+      graph.push(`color=c=black:s=${width}x${height}:r=${rate}:d=${seconds},format=pix_fmts=yuv420p,setsar=1[${videoLabel}]`)
+      if (input.hasAudio) {
+        graph.push(
+          `anullsrc=channel_layout=${AUDIO_CHANNEL_LAYOUT}:sample_rate=${AUDIO_SAMPLE_RATE}:d=${seconds}` +
+            `,asetpts=PTS-STARTPTS[${audioLabel}]`,
+        )
+      }
+    } else {
+      const from = ticksToSeconds(piece.segment.sourceStartTicks)
+      const to = ticksToSeconds(piece.segment.sourceStartTicks + piece.durationTicks)
+      graph.push(
+        `[0:v]trim=start=${from}:end=${to},setpts=PTS-STARTPTS,fps=${rate},format=pix_fmts=yuv420p,setsar=1[${videoLabel}]`,
+      )
+      if (input.hasAudio) {
+        const steps = [
+          `[0:a]atrim=start=${from}:end=${to}`,
+          'asetpts=PTS-STARTPTS',
+          `aresample=${AUDIO_SAMPLE_RATE}`,
+          `aformat=sample_fmts=fltp:channel_layouts=${AUDIO_CHANNEL_LAYOUT}`,
+        ]
+        if (piece.segment.gainDb !== 0) steps.push(`volume=${piece.segment.gainDb}dB`)
+        if (piece.segment.fadeInTicks > 0) {
+          steps.push(`afade=t=in:st=0:d=${ticksToSeconds(piece.segment.fadeInTicks)}`)
+        }
+        if (piece.segment.fadeOutTicks > 0) {
+          const start = piece.durationTicks - piece.segment.fadeOutTicks
+          steps.push(`afade=t=out:st=${ticksToSeconds(start)}:d=${ticksToSeconds(piece.segment.fadeOutTicks)}`)
+        }
+        graph.push(`${steps.join(',')}[${audioLabel}]`)
+      }
+    }
+
+    concatInputs.push(`[${videoLabel}]`)
+    if (input.hasAudio) concatInputs.push(`[${audioLabel}]`)
+  })
+
+  const audioStreams = input.hasAudio ? 1 : 0
+  graph.push(
+    `${concatInputs.join('')}concat=n=${pieces.length}:v=1:a=${audioStreams}` +
+      `[vcat]${input.hasAudio ? '[acat]' : ''}`,
+  )
+
+  const overlayFilters: string[] = []
+  plan.value.overlays.forEach((node, index) => {
     if (
       Buffer.byteLength(node.primaryText, 'utf8') > MAX_TEXT_BYTES ||
       Buffer.byteLength(node.secondaryText, 'utf8') > MAX_TEXT_BYTES
     ) {
       throw renderError('RENDER_INPUT_INVALID', 'A nameplate exceeds the render text limit.')
     }
-    filters.push(...nameplateFilters(node, index, plan.value, input.fontPath))
+    overlayFilters.push(...nameplateFilters(node, index, plan.value, input.fontPath))
   })
+  // `null` is a real filter that passes frames through unchanged. It keeps the
+  // graph one shape whether or not anything is drawn, so an export with cuts
+  // but no nameplates takes exactly the same code path.
+  graph.push(`[vcat]${overlayFilters.length > 0 ? overlayFilters.join(',') : 'null'}[vout]`)
 
   return [
     '-hide_banner',
@@ -144,9 +252,9 @@ export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
     '-nostdin',
     '-n',
     '-i', input.sourcePath,
-    '-vf', filters.join(','),
-    '-map', '0:v:0',
-    '-map', '0:a?',
+    '-filter_complex', graph.join(';'),
+    '-map', '[vout]',
+    ...(input.hasAudio ? ['-map', '[acat]'] : []),
     '-c:v', 'libx264',
     '-preset', 'medium',
     '-crf', '18',
@@ -155,11 +263,12 @@ export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
     // be turned casually. See ADR-003.
     '-threads', '1',
     '-pix_fmt', 'yuv420p',
-    // Audio is copied untouched. This is correct only while nothing cuts the
-    // timeline. The first cut operation (G5-B) must replace this with a real
-    // audio conform step, because copied audio can only be cut at its own
-    // block boundaries and will drift out of sync.
-    '-c:a', 'copy',
+    // Audio is re-encoded from the conformed graph above. It is no longer
+    // copied, because copied audio can only be cut at its own block boundaries
+    // and drifts out of sync with the picture at the first cut.
+    ...(input.hasAudio
+      ? ['-c:a', 'aac', '-b:a', '192k', '-ar', String(AUDIO_SAMPLE_RATE), '-ac', '2']
+      : ['-an']),
     '-map_metadata', '-1',
     '-movflags', '+faststart',
     input.outputPath,
@@ -245,8 +354,18 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
       if (sourceProbe.width !== plan.value.width || sourceProbe.height !== plan.value.height) {
         throw renderError('RENDER_INPUT_INVALID', 'The source media no longer matches the project composition.')
       }
-      for (const node of plan.value.nodes) {
-        const endTicks = node.interval.start.ticks + node.interval.duration.ticks
+      // Black filling a deliberate hole has to be generated at the source's own
+      // frame rate, or the joined pieces disagree and the export stutters. If
+      // the rate cannot be read, that is refused rather than guessed at.
+      const frameRate = sourceProbe.frameRate
+      if (frameRate === null) {
+        throw renderError('RENDER_INPUT_INVALID', 'The source media frame rate could not be read.')
+      }
+      // Every piece of footage must actually exist inside the file on disk.
+      // Overlays no longer need this check: they are positioned from the
+      // segments, so a segment that fits guarantees an overlay that fits.
+      for (const segment of plan.value.segments) {
+        const endTicks = segment.sourceStartTicks + segment.interval.duration.ticks
         if (endTicks > sourceProbe.duration.ticks) {
           throw renderError('RENDER_INPUT_INVALID', 'An accepted edit extends beyond the source duration.')
         }
@@ -261,7 +380,7 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
           throw renderError('RENDER_PATH_INVALID', 'The private render workspace is not safe.')
         }
         await copyFile(paths.fontPath, resolve(renderTempDir, 'font.ttf'), constants.COPYFILE_EXCL)
-        await Promise.all(plan.value.nodes.flatMap((node, index) => {
+        await Promise.all(plan.value.overlays.flatMap((node, index) => {
           const files = [
             writeFile(resolve(renderTempDir, `primary-${index}.txt`), node.primaryText, { encoding: 'utf8', flag: 'wx', mode: 0o600 }),
           ]
@@ -275,6 +394,8 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
           outputPath: partialPath,
           fontPath: 'font.ttf',
           plan: plan.value,
+          frameRate,
+          hasAudio: sourceProbe.hasAudio,
         })
         const rendered = await runCommand({
           executable: ffmpegExecutable,
@@ -294,13 +415,17 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
           throw renderError('RENDER_OUTPUT_INVALID', 'FFmpeg did not produce a private regular output file.')
         }
         const outputProbe = await mediaProbe.probe({ path: partialPath, cwd: paths.work, signal: request.signal })
+        // The length to check against is the PLAN's, not the source file's.
+        // After a cut the export is deliberately shorter, and comparing it to
+        // the original would reject every successful cut.
+        const expectedDurationMs = plan.value.durationTicks / (PROJECT_TIMESCALE / 1000)
         if (
           outputProbe.width !== sourceProbe.width ||
           outputProbe.height !== sourceProbe.height ||
-          Math.abs(outputProbe.durationMs - sourceProbe.durationMs) > DURATION_TOLERANCE_MS ||
+          Math.abs(outputProbe.durationMs - expectedDurationMs) > DURATION_TOLERANCE_MS ||
           (sourceProbe.hasAudio && !outputProbe.hasAudio)
         ) {
-          throw renderError('RENDER_OUTPUT_INVALID', 'The rendered output did not preserve source dimensions, duration, and audio.')
+          throw renderError('RENDER_OUTPUT_INVALID', 'The rendered output did not match the approved dimensions, length, and audio.')
         }
         const outputSha256 = await sha256(partialPath, request.signal)
         throwIfCancelled(request.signal)

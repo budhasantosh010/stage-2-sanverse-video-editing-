@@ -6,6 +6,7 @@ import {
   PROJECT_TIMESCALE,
   TICKS_PER_MILLISECOND,
   createProject,
+  type AddNameplateOperation,
   type EditProject,
 } from '@sanverse/edit-domain'
 import { INTENT_CANDIDATE_SCHEMA } from '@sanverse/intent-domain'
@@ -13,6 +14,11 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { createIntentProvider, resolveIntentProviderConfig } from './intent-provider-config.ts'
 import { createIntentService } from './intent-service.ts'
+
+/** The tests below only ever build nameplates, so narrowing once keeps them readable. */
+const nameplateOf = (changeSet: { operations: readonly unknown[] }) =>
+  changeSet.operations[0] as AddNameplateOperation
+
 
 /**
  * The real adapter against a real HTTP server.
@@ -151,12 +157,12 @@ describe('the real adapter, over real HTTP', () => {
 
     expect(outcome.kind).toBe('proposal')
     if (outcome.kind !== 'proposal') return
-    expect(outcome.changeSet.operations[0].primaryText).toBe('Priya')
-    expect(outcome.changeSet.operations[0].secondaryText).toBe('Head of Design')
+    expect(nameplateOf(outcome.changeSet).primaryText).toBe('Priya')
+    expect(nameplateOf(outcome.changeSet).secondaryText).toBe('Head of Design')
     expect(outcome.changeSet.provenance.source).toBe('ai')
     // The provider returned point: null, so deterministic code used the click.
-    expect(outcome.changeSet.operations[0].target.point).toEqual({ x: 0.4, y: 0.7 })
-    expect(outcome.changeSet.operations[0].compositionInterval.duration.ticks).toBe(3_000 * TICKS_PER_MILLISECOND)
+    expect(nameplateOf(outcome.changeSet).target.point).toEqual({ x: 0.4, y: 0.7 })
+    expect(nameplateOf(outcome.changeSet).sourceInterval.duration.ticks).toBe(3_000 * TICKS_PER_MILLISECOND)
   })
 
   it('sends only the allowlisted payload and the key, over the wire', async () => {

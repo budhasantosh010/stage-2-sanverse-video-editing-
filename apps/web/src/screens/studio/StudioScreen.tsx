@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AddNameplateOperation, EditProject } from '@sanverse/edit-domain'
-import { toMilliseconds } from '@sanverse/edit-domain'
+import {
+  TICKS_PER_MILLISECOND as TICKS_PER_MS,
+  compositionDuration,
+  effectiveComposition,
+  toMilliseconds,
+} from '@sanverse/edit-domain'
+import { proposalPlacement } from '../../app/app-state'
 import type { ConversationState, PendingProposal, ProposalRepair, StudioState } from '../../app/app-state'
 import { ChatComposer } from '../../features/conversation/ChatComposer'
 import type { IntentContextInput } from '../../features/conversation/conversation-client'
 import { NameplateRepair } from '../../features/proposal-repair/NameplateRepair'
+import { describeOperation } from '../../features/history/describe-operation'
 import {
   compilePreviewPlan,
   millisecondsToTicks,
@@ -243,7 +250,8 @@ export function StudioScreen({
 
   // The preview is compiled from the project by the same compiler the exporter
   // uses. A pending proposal is layered on top without touching saved state.
-  const composition = editProject.composition
+  // The footage as it now stands: what was imported, plus every accepted cut.
+  const composition = effectiveComposition(editProject)
   const previewPlan = compilePreviewPlan(
     proposal ? withPendingProposal(editProject, proposal.operation) : editProject,
   )
@@ -258,10 +266,15 @@ export function StudioScreen({
   const isRendering = exportState.status === 'rendering'
   const canExport = acceptedCount > 0 && !proposal && !isRendering
 
-  const firstClip = composition.tracks[0]?.clips[0]
-  const compositionDurationTicks = firstClip
-    ? firstClip.compositionStart.ticks + firstClip.sourceRange.duration.ticks
-    : 0
+  const compositionDurationTicks = compositionDuration(composition).ticks
+
+  // Where the pending proposal actually lands on screen. After a cut this is
+  // not a number stored on the proposal; it has to be worked out from the
+  // footage that survived, and every place that shows a time uses this one
+  // value so the panel and the summary can never disagree.
+  const proposalPlaced = proposal ? proposalPlacement(editProject, proposal.operation) : null
+  const proposalStartMs = proposalPlaced ? proposalPlaced.startTicks / TICKS_PER_MS : 0
+  const proposalDurationMs = proposalPlaced ? proposalPlaced.durationTicks / TICKS_PER_MS : 0
 
   /**
    * Everything the assistant is allowed to know about what the user is doing.
@@ -520,7 +533,7 @@ export function StudioScreen({
           </div>
           <NameplateComposer
             target={pointTarget}
-            clipId={firstClipId}
+            composition={composition}
             createOperationId={createOperationId}
             onProposal={onProposal}
           />
@@ -564,8 +577,7 @@ export function StudioScreen({
                 <strong>{proposal.operation.primaryText}</strong>
                 {proposal.operation.secondaryText ? <span>{proposal.operation.secondaryText}</span> : null}
                 <small>
-                  Here · {formatPointTargetTime(toMilliseconds(proposal.operation.compositionInterval.start))} ·{' '}
-                  {formatDuration(toMilliseconds(proposal.operation.compositionInterval.duration))}
+                  Here · {formatPointTargetTime(proposalStartMs)} · {formatDuration(proposalDurationMs)}
                 </small>
                 {proposal.origin.source === 'ai' ? (
                   <span className="studio-screen__proposal-origin">Suggested by the assistant</span>
@@ -593,6 +605,7 @@ export function StudioScreen({
             {editError ? <p role="alert" className="studio-screen__edit-error">{editError}</p> : null}
             {proposal ? (
               <NameplateRepair
+                placedStartMs={proposalStartMs}
                 proposal={proposal.operation}
                 playheadMs={Math.max(0, playheadMs)}
                 isMovingPoint={isMovingProposalPoint}
@@ -620,7 +633,7 @@ export function StudioScreen({
               <ol className="studio-screen__history-list">
                 {acceptedRecords.map((record) => (
                   <li key={record.changeSet.changeSetId}>
-                    {record.changeSet.operations.map((operation) => operation.primaryText).join(', ')}
+                    {record.changeSet.operations.map(describeOperation).join(', ')}
                     {record.blockedReason ? <span className="studio-screen__history-blocked"> · needs attention</span> : null}
                   </li>
                 ))}

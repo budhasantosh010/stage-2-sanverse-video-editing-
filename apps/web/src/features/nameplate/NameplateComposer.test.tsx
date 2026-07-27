@@ -2,7 +2,12 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { effectiveComposition } from '@sanverse/edit-domain'
+
+import { testProject } from '../../test-fixtures'
 import { NameplateComposer } from './NameplateComposer'
+
+const composition = effectiveComposition(testProject())
 
 const target = { x: 0.25, y: 0.75, timeMs: 12_400 }
 
@@ -14,7 +19,7 @@ function renderComposer(
   const props: React.ComponentProps<typeof NameplateComposer> = {
     target,
     onProposal: vi.fn(),
-    clipId: 'clip_aaaaaaaa',
+    composition,
     createOperationId: () => 'operation_test0001',
     ...overrides,
   }
@@ -77,15 +82,14 @@ describe('NameplateComposer', () => {
     await user.click(screen.getByRole('button', { name: /create proposal/i }))
 
     expect(props.onProposal).toHaveBeenCalledWith({
-      schemaVersion: 'sanverse.operation/v2',
+      schemaVersion: 'sanverse.operation/v3',
       operationId: 'operation_test0001',
       kind: 'add-nameplate',
       capabilityId: 'sanverse.nameplate.component/v1',
-      clipId: 'clip_aaaaaaaa',
-      // Evidence: where the user pointed, on this clip's own timeline.
-      sampledClipTime: { ticks: 12_400 * 1_440, timescale: 1_440_000 },
-      // Instruction: when it is visible, in finished-video time.
-      compositionInterval: {
+      // Anchored to the footage, not to the finished video, so a later cut
+      // moves it with the face it was placed on.
+      assetId: 'asset_aaaaaaaa',
+      sourceInterval: {
         start: { ticks: 12_400 * 1_440, timescale: 1_440_000 },
         duration: { ticks: 5_000 * 1_440, timescale: 1_440_000 },
       },
@@ -153,7 +157,7 @@ describe('NameplateComposer', () => {
     const { rerender } = render(
       <NameplateComposer
         target={target}
-        clipId="clip_aaaaaaaa"
+        composition={composition}
         createOperationId={createOperationId}
         onProposal={onProposal}
       />,
@@ -164,7 +168,7 @@ describe('NameplateComposer', () => {
     rerender(
       <NameplateComposer
         target={{ x: 0.5, y: 0.5, timeMs: 20_000 }}
-        clipId="clip_aaaaaaaa"
+        composition={composition}
         createOperationId={createOperationId}
         onProposal={onProposal}
       />,

@@ -8,8 +8,7 @@ import {
   validateProject,
   type EditProject,
 } from '@sanverse/edit-domain'
-import { isProjectV1 } from '@sanverse/edit-domain/legacy-project-v1'
-import { migrateProjectV1ToV2 } from '@sanverse/edit-domain/migrations/project-v1-to-v2'
+import { upgradeSavedProject } from '@sanverse/edit-domain/migrations/upgrade-project'
 
 import type { MediaProbePort } from '../media/media-probe.ts'
 import type { ProjectRepository } from './project-repository.ts'
@@ -113,20 +112,28 @@ export function createProjectStateService(options: {
       throw new ProjectStateError('PROJECT_STATE_UNREADABLE', 'Saved project JSON is invalid.')
     }
 
-    if (isProjectV1(parsed)) {
-      const { ids, asset } = await describeAsset(projectId)
-      const migrated = migrateProjectV1ToV2({ v1: parsed, asset, projectId, ...ids })
-      if (!migrated.ok) {
-        throw new ProjectStateError('MIGRATION_FAILED', 'This project could not be upgraded.', migrated.error)
+    // One ladder handles every saved version, including "already current".
+    // The service therefore never has to know which version is on disk, and a
+    // future version cannot be forgotten at one of several call sites.
+    const { ids, asset } = await describeAsset(projectId)
+    const upgraded = upgradeSavedProject({ saved: parsed, asset, projectId, ...ids })
+    if (!upgraded.ok) {
+      const code = (upgraded.error as { code?: string }).code
+      // A file that claims a version but does not hold that version's shape is
+      // a corrupt file, not a failed upgrade, and saying so is the difference
+      // between "your project is damaged" and "this app could not upgrade it".
+      if (code === 'PROJECT_INVALID' || code === 'PROJECT_ID_MISMATCH' || code === 'V2_PROJECT_INVALID') {
+        throw new ProjectStateError('PROJECT_STATE_INVALID', 'Saved project contract is invalid.', upgraded.error)
       }
-      return persist(projectId, migrated.value.project)
+      throw new ProjectStateError('MIGRATION_FAILED', 'This project could not be upgraded.', upgraded.error)
     }
-
-    const project = validateProject(parsed)
-    if (!project.ok || project.value.projectId !== projectId) {
+    if (upgraded.value.project.projectId !== projectId) {
       throw new ProjectStateError('PROJECT_STATE_INVALID', 'Saved project contract is invalid.')
     }
-    return project.value
+    // An upgraded file is written back once, so the slower path runs only on
+    // the first open after an update rather than on every load.
+    if (upgraded.value.report.changed) return persist(projectId, upgraded.value.project)
+    return upgraded.value.project
   }
 
   const failFromDomain = (error: { code?: string }): never => {

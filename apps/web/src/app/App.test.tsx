@@ -168,13 +168,12 @@ describe('App', () => {
       changeSetId: 'changeset_saved001',
       baseRevision: base.revision,
       operations: [{
-        schemaVersion: 'sanverse.operation/v2',
+        schemaVersion: 'sanverse.operation/v3',
         operationId: 'operation_saved001',
         kind: 'add-nameplate',
         capabilityId: 'sanverse.nameplate.component/v1',
-        clipId: base.composition.tracks[0].clips[0].clipId,
-        sampledClipTime: { ticks: 1_000 * 1_440, timescale: 1_440_000 },
-        compositionInterval: {
+        assetId: base.composition.tracks[0].clips[0].assetId,
+        sourceInterval: {
           start: { ticks: 1_000 * 1_440, timescale: 1_440_000 },
           duration: { ticks: 5_000 * 1_440, timescale: 1_440_000 },
         },
@@ -465,19 +464,18 @@ describe('App', () => {
     const user = userEvent.setup()
     const api = fakeApi()
     const base = api.current()
-    const clipId = base.composition.tracks[0].clips[0].clipId
+    const assetId = base.composition.tracks[0].clips[0].assetId
     const aiChangeSet = {
       schemaVersion: 'sanverse.change-set/v1',
       changeSetId: 'changeset_ai000001',
       baseRevision: base.revision,
       operations: [{
-        schemaVersion: 'sanverse.operation/v2',
+        schemaVersion: 'sanverse.operation/v3',
         operationId: 'operation_ai000001',
         kind: 'add-nameplate',
         capabilityId: 'sanverse.nameplate.component/v1',
-        clipId,
-        sampledClipTime: { ticks: 0, timescale: 1_440_000 },
-        compositionInterval: {
+        assetId,
+        sourceInterval: {
           start: { ticks: 0, timescale: 1_440_000 },
           duration: { ticks: 4_000 * 1_440, timescale: 1_440_000 },
         },

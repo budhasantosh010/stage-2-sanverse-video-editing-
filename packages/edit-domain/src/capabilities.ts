@@ -23,6 +23,18 @@ export type CapabilityDescriptor = Readonly<{
 export const NAMEPLATE_PRIMITIVE_ID = 'sanverse.nameplate.primitive/v1'
 export const NAMEPLATE_COMPONENT_ID = 'sanverse.nameplate.component/v1'
 
+export const SPLIT_PRIMITIVE_ID = 'sanverse.timeline.split.primitive/v1'
+export const TRIM_PRIMITIVE_ID = 'sanverse.timeline.trim.primitive/v1'
+export const REMOVE_PRIMITIVE_ID = 'sanverse.timeline.remove.primitive/v1'
+export const REORDER_PRIMITIVE_ID = 'sanverse.timeline.reorder.primitive/v1'
+export const CLIP_ENABLED_PRIMITIVE_ID = 'sanverse.timeline.enabled.primitive/v1'
+export const CLIP_AUDIO_PRIMITIVE_ID = 'sanverse.timeline.audio.primitive/v1'
+
+/** "Take out the part between these two moments and close the gap." */
+export const REMOVE_RANGE_COMPONENT_ID = 'sanverse.timeline.remove-range.component/v1'
+/** "Make this stretch quieter, or fade it." */
+export const AUDIO_LEVEL_COMPONENT_ID = 'sanverse.timeline.audio-level.component/v1'
+
 /**
  * G4-A registers only what already exists. Workflow-level capabilities begin
  * in G4-B, when the AI first proposes an edit.
@@ -43,6 +55,72 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     accepts: 'A person\'s name and role, shown at a point the user indicated.',
     produces: Object.freeze(['add-nameplate']),
     requires: Object.freeze([NAMEPLATE_PRIMITIVE_ID]),
+  }),
+  Object.freeze({
+    capabilityId: SPLIT_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One piece of footage and one moment inside it to cut at.',
+    produces: Object.freeze(['split-clip']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: TRIM_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One piece of footage, and how much to shorten it by at each end.',
+    produces: Object.freeze(['trim-clip']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: REMOVE_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One piece of footage to take out, and whether to close the gap.',
+    produces: Object.freeze(['remove-clip']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: REORDER_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One piece of footage and the position it should take in the running order.',
+    produces: Object.freeze(['reorder-clip']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: CLIP_ENABLED_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One piece of footage to hide or bring back.',
+    produces: Object.freeze(['set-clip-enabled']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: CLIP_AUDIO_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One piece of footage, a loudness change, and ramps at each end.',
+    produces: Object.freeze(['set-clip-audio']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: REMOVE_RANGE_COMPONENT_ID,
+    version: 1,
+    level: 'component' as const,
+    accepts: 'Two moments in the finished video, and whether to close the gap left behind.',
+    // Taking out a stretch in the middle of a piece is two cuts and a removal,
+    // so this component names all three primitives it expands into.
+    produces: Object.freeze(['split-clip', 'remove-clip']),
+    requires: Object.freeze([SPLIT_PRIMITIVE_ID, REMOVE_PRIMITIVE_ID]),
+  }),
+  Object.freeze({
+    capabilityId: AUDIO_LEVEL_COMPONENT_ID,
+    version: 1,
+    level: 'component' as const,
+    accepts: 'A stretch of the video and how much quieter or louder it should be.',
+    produces: Object.freeze(['set-clip-audio']),
+    requires: Object.freeze([CLIP_AUDIO_PRIMITIVE_ID]),
   }),
 ])
 

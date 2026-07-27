@@ -7,6 +7,14 @@ import './NameplateRepair.css'
 
 export type NameplateRepairProps = {
   proposal: AddNameplateOperation
+  /**
+   * Where this proposal currently lands in the finished video, in milliseconds.
+   *
+   * It is passed in rather than read off the proposal because the proposal is
+   * anchored to the original footage: after a cut, the moment it appears on
+   * screen has to be worked out from which footage survived.
+   */
+  placedStartMs: number
   /** Where the video is right now, so "start here" means something. */
   playheadMs: number
   /** True while the user is re-pointing this proposal. */
@@ -24,9 +32,8 @@ const secondsOf = (milliseconds: number) => Number((milliseconds / 1_000).toFixe
  * answer that has to be judged from scratch. Changing the wording or the timing
  * keeps the rest exactly as approved. Nothing here calls the assistant.
  */
-export function NameplateRepair({ proposal, playheadMs, isMovingPoint, onRepair, onMovePoint }: NameplateRepairProps) {
-  const startMs = toMilliseconds(proposal.compositionInterval.start)
-  const durationMs = toMilliseconds(proposal.compositionInterval.duration)
+export function NameplateRepair({ proposal, placedStartMs, playheadMs, isMovingPoint, onRepair, onMovePoint }: NameplateRepairProps) {
+  const durationMs = toMilliseconds(proposal.sourceInterval.duration)
 
   const [primaryText, setPrimaryText] = useState(proposal.primaryText)
   const [secondaryText, setSecondaryText] = useState(proposal.secondaryText)
@@ -36,8 +43,8 @@ export function NameplateRepair({ proposal, playheadMs, isMovingPoint, onRepair,
   useEffect(() => {
     setPrimaryText(proposal.primaryText)
     setSecondaryText(proposal.secondaryText)
-    setSeconds(String(secondsOf(toMilliseconds(proposal.compositionInterval.duration))))
-  }, [proposal.operationId, proposal.primaryText, proposal.secondaryText, proposal.compositionInterval.duration])
+    setSeconds(String(secondsOf(toMilliseconds(proposal.sourceInterval.duration))))
+  }, [proposal.operationId, proposal.primaryText, proposal.secondaryText, proposal.sourceInterval.duration])
 
   const commitDuration = () => {
     const parsed = Number(seconds)
@@ -93,7 +100,7 @@ export function NameplateRepair({ proposal, playheadMs, isMovingPoint, onRepair,
       </div>
 
       <p className="nameplate-repair__hint">
-        Starts at {formatPointTargetTime(startMs)}. Nothing is saved until you accept it.
+        Starts at {formatPointTargetTime(placedStartMs)}. Nothing is saved until you accept it.
       </p>
     </section>
   )

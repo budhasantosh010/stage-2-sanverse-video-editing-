@@ -1,14 +1,17 @@
 import {
   DEFAULT_NAMEPLATE_ANCHOR,
   NAMEPLATE_COMPONENT_ID,
+  OPERATION_SCHEMA_VERSION,
   PROJECT_TIMESCALE,
   TICKS_PER_MILLISECOND,
   clipCompositionRange,
+  effectiveComposition,
   findClip,
   findCapability,
   validateChangeSet,
   validateOperation,
   validateOperationAgainstComposition,
+  type AddNameplateOperation,
   type ChangeSet,
   type Clip,
   type EditProject,
@@ -149,17 +152,19 @@ const buildOperation = (
   if (args.point === null && request.context.point) notes.push('Placed where you pointed.')
   if (args.durationMs === null) notes.push('Visible for 5 seconds, the usual length.')
 
-  const sampledClipTime = Math.min(Math.max(0, start - clipStart), clipRange.duration.ticks - 1)
+  // The user pointed at a moment of the FINISHED video, but the nameplate is
+  // stored against the original footage, so it stays on the same face if that
+  // footage is later moved by a cut. This is the one conversion between the two.
+  const sourceStart = clip.sourceRange.start.ticks + (start - clipStart)
 
   const operation = {
-    schemaVersion: 'sanverse.operation/v2',
+    schemaVersion: OPERATION_SCHEMA_VERSION,
     operationId,
     kind: 'add-nameplate',
     capabilityId: NAMEPLATE_COMPONENT_ID,
-    clipId: clip.clipId,
-    sampledClipTime: { ticks: sampledClipTime, timescale: PROJECT_TIMESCALE },
-    compositionInterval: {
-      start: { ticks: start, timescale: PROJECT_TIMESCALE },
+    assetId: clip.assetId,
+    sourceInterval: {
+      start: { ticks: sourceStart, timescale: PROJECT_TIMESCALE },
       duration: { ticks: duration, timescale: PROJECT_TIMESCALE },
     },
     target: {
@@ -232,7 +237,8 @@ export function createIntentService(options: IntentServiceOptions) {
         return reject(request.requestId, 'CAPABILITY_NOT_ALLOWED', 'That is not something this version can do yet.')
       }
 
-      const clip = findClip(project.composition, request.context.clipId)
+      const composition = effectiveComposition(project)
+      const clip = findClip(composition, request.context.clipId)
       if (!clip) {
         return reject(request.requestId, 'CLIP_UNKNOWN', 'That part of the video could not be found. Reopen the project and try again.')
       }
@@ -317,7 +323,7 @@ export function createIntentService(options: IntentServiceOptions) {
         log({ event: 'intent.operation-invalid', requestId: request.requestId, issue: operation.error.issues[0]?.code })
         return reject(request.requestId, 'DOES_NOT_FIT', 'That edit could not be built for this video. Nothing was changed.')
       }
-      const fits = validateOperationAgainstComposition(operation.value, project.composition)
+      const fits = validateOperationAgainstComposition(operation.value, composition)
       if (!fits.ok) {
         return reject(request.requestId, 'DOES_NOT_FIT', 'That edit does not fit this video. Try a different moment.')
       }
@@ -336,12 +342,13 @@ export function createIntentService(options: IntentServiceOptions) {
         return reject(request.requestId, 'DOES_NOT_FIT', 'That edit could not be prepared. Nothing was changed.')
       }
 
-      const secondary = operation.value.secondaryText ? ` and “${operation.value.secondaryText}”` : ''
+      const nameplate = operation.value as AddNameplateOperation
+      const secondary = nameplate.secondaryText ? ` and “${nameplate.secondaryText}”` : ''
       return Object.freeze({
         kind: 'proposal' as const,
         requestId: request.requestId,
         changeSet: changeSet.value,
-        explanation: `Shows “${operation.value.primaryText}”${secondary} from ${formatSeconds(built.startTicks)} for ${((built.durationTicks / TICKS_PER_MILLISECOND) / 1_000).toFixed(1)} seconds.`,
+        explanation: `Shows “${nameplate.primaryText}”${secondary} from ${formatSeconds(built.startTicks)} for ${((built.durationTicks / TICKS_PER_MILLISECOND) / 1_000).toFixed(1)} seconds.`,
         note: built.note,
       })
     },

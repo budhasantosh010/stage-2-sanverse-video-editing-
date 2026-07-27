@@ -1,8 +1,17 @@
 import type { VideoAsset } from './assets.ts'
 import { NAMEPLATE_COMPONENT_ID } from './capabilities.ts'
 import type { ChangeSet } from './change-set.ts'
-import type { AddNameplateOperation } from './operations.ts'
+import { OPERATION_SCHEMA_VERSION, type AddNameplateOperation } from './operations.ts'
 import { createProject, type EditProject } from './project.ts'
+import type { TimelineOperation } from './timeline-operations.ts'
+import {
+  CLIP_AUDIO_PRIMITIVE_ID,
+  CLIP_ENABLED_PRIMITIVE_ID,
+  REMOVE_PRIMITIVE_ID,
+  REORDER_PRIMITIVE_ID,
+  SPLIT_PRIMITIVE_ID,
+  TRIM_PRIMITIVE_ID,
+} from './capabilities.ts'
 import { PROJECT_TIMESCALE, mediaTimeFromMilliseconds } from './time.ts'
 
 export const TEST_PROJECT_ID = 'project_aaaaaaaaaaaaaaaa'
@@ -44,16 +53,17 @@ export const testProject = (asset: VideoAsset = testAsset()): EditProject => {
   return project.value
 }
 
+export const TEST_ASSET_ID = 'asset_aaaaaaaa'
+
 export const testOperation = (
   overrides: Partial<AddNameplateOperation> = {},
 ): AddNameplateOperation => ({
-  schemaVersion: 'sanverse.operation/v2',
+  schemaVersion: OPERATION_SCHEMA_VERSION,
   operationId: 'operation_aaaaaaaa',
   kind: 'add-nameplate',
   capabilityId: NAMEPLATE_COMPONENT_ID,
-  clipId: TEST_CLIP_ID,
-  sampledClipTime: ms(2_000),
-  compositionInterval: { start: ms(2_000), duration: ms(5_000) },
+  assetId: TEST_ASSET_ID,
+  sourceInterval: { start: ms(2_000), duration: ms(5_000) },
   target: {
     coordinateSpace: 'composition-normalized',
     point: { x: 0.25, y: 0.75 },
@@ -76,6 +86,87 @@ export const testChangeSet = (
   provenance: { source: 'direct', requestId: null },
   extensions: {},
   ...overrides,
+})
+
+const timelineDefaults = (operationId: string, capabilityId: string) => ({
+  schemaVersion: OPERATION_SCHEMA_VERSION as typeof OPERATION_SCHEMA_VERSION,
+  operationId,
+  capabilityId,
+  clipId: TEST_CLIP_ID,
+  extensions: {},
+})
+
+export const testSplit = (
+  overrides: Partial<Extract<TimelineOperation, { kind: 'split-clip' }>> = {},
+): TimelineOperation => ({
+  ...timelineDefaults('operation_split001', SPLIT_PRIMITIVE_ID),
+  kind: 'split-clip',
+  atClipTime: ms(10_000),
+  newClipId: 'clip_bbbbbbbb',
+  ...overrides,
+})
+
+export const testTrim = (
+  overrides: Partial<Extract<TimelineOperation, { kind: 'trim-clip' }>> = {},
+): TimelineOperation => ({
+  ...timelineDefaults('operation_trim0001', TRIM_PRIMITIVE_ID),
+  kind: 'trim-clip',
+  trimStart: ms(1_000),
+  trimEnd: ms(0),
+  ripple: true,
+  ...overrides,
+})
+
+export const testRemove = (
+  overrides: Partial<Extract<TimelineOperation, { kind: 'remove-clip' }>> = {},
+): TimelineOperation => ({
+  ...timelineDefaults('operation_remove01', REMOVE_PRIMITIVE_ID),
+  kind: 'remove-clip',
+  ripple: true,
+  ...overrides,
+})
+
+export const testReorder = (
+  overrides: Partial<Extract<TimelineOperation, { kind: 'reorder-clip' }>> = {},
+): TimelineOperation => ({
+  ...timelineDefaults('operation_reorder1', REORDER_PRIMITIVE_ID),
+  kind: 'reorder-clip',
+  toIndex: 0,
+  ...overrides,
+})
+
+export const testSetEnabled = (
+  overrides: Partial<Extract<TimelineOperation, { kind: 'set-clip-enabled' }>> = {},
+): TimelineOperation => ({
+  ...timelineDefaults('operation_enabled1', CLIP_ENABLED_PRIMITIVE_ID),
+  kind: 'set-clip-enabled',
+  enabled: false,
+  ...overrides,
+})
+
+export const testSetAudio = (
+  overrides: Partial<Extract<TimelineOperation, { kind: 'set-clip-audio' }>> = {},
+): TimelineOperation => ({
+  ...timelineDefaults('operation_audio001', CLIP_AUDIO_PRIMITIVE_ID),
+  kind: 'set-clip-audio',
+  gainDb: -6,
+  fadeIn: ms(500),
+  fadeOut: ms(500),
+  ...overrides,
+})
+
+/** A change set holding whatever operations a test needs. */
+export const changeSetOf = (
+  changeSetId: string,
+  baseRevision: number,
+  operations: readonly (AddNameplateOperation | TimelineOperation)[],
+): ChangeSet => ({
+  schemaVersion: 'sanverse.change-set/v1',
+  changeSetId,
+  baseRevision,
+  operations,
+  provenance: { source: 'direct', requestId: null },
+  extensions: {},
 })
 
 export { PROJECT_TIMESCALE }

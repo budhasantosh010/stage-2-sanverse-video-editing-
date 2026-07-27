@@ -20,8 +20,7 @@ const accept = (project: ReturnType<typeof testProject>, changeSetId: string, ba
       { changeSetId, baseRevision },
       {
         operationId: `operation_${changeSetId.slice(-8)}`,
-        compositionInterval: { start: ms(startMs), duration: ms(2_000) },
-        sampledClipTime: ms(startMs),
+        sourceInterval: { start: ms(startMs), duration: ms(2_000) },
       },
     ),
   )
@@ -71,7 +70,7 @@ describe('accepting a change set', () => {
     const project = testProject()
     const result = acceptChangeSet(
       project,
-      testChangeSet({}, { compositionInterval: { start: ms(4_980_000), duration: ms(5_000) } }),
+      testChangeSet({}, { sourceInterval: { start: ms(4_980_000), duration: ms(5_000) } }),
     )
     expect(result).toMatchObject({ ok: false, error: { code: 'OPERATION_INVALID' } })
   })

@@ -18,7 +18,7 @@ afterEach(cleanup)
 describe('NameplateOverlay', () => {
   it('renders both lines of the node it is given', () => {
     render(
-      <NameplateOverlay node={plan().nodes[0]} compositionWidth={1920} compositionHeight={1080} scale={1} />,
+      <NameplateOverlay node={plan().overlays[0]} compositionWidth={1920} compositionHeight={1080} scale={1} />,
     )
 
     const overlay = screen.getByTestId('nameplate-overlay')
@@ -31,7 +31,7 @@ describe('NameplateOverlay', () => {
     if (!compiled) throw new Error('fixture failed')
 
     render(
-      <NameplateOverlay node={compiled.nodes[0]} compositionWidth={1920} compositionHeight={1080} scale={1} />,
+      <NameplateOverlay node={compiled.overlays[0]} compositionWidth={1920} compositionHeight={1080} scale={1} />,
     )
 
     expect(screen.getByText('Santosh')).toBeInTheDocument()
@@ -40,7 +40,7 @@ describe('NameplateOverlay', () => {
 
   it('stays hidden until it has measured itself, so it is never seen in the wrong place', () => {
     const { container } = render(
-      <NameplateOverlay node={plan().nodes[0]} compositionWidth={1920} compositionHeight={1080} scale={0} />,
+      <NameplateOverlay node={plan().overlays[0]} compositionWidth={1920} compositionHeight={1080} scale={0} />,
     )
 
     expect(container.querySelector('.nameplate-overlay__primary')).toHaveStyle({ visibility: 'hidden' })
@@ -50,7 +50,7 @@ describe('NameplateOverlay', () => {
     // FFmpeg's drawtext draws a box per line. One box wrapped around both lines
     // would look tidier in the preview and would not match the exported video.
     const { container } = render(
-      <NameplateOverlay node={plan().nodes[0]} compositionWidth={1920} compositionHeight={1080} scale={1} />,
+      <NameplateOverlay node={plan().overlays[0]} compositionWidth={1920} compositionHeight={1080} scale={1} />,
     )
 
     expect(container.querySelectorAll('.nameplate-overlay__primary')).toHaveLength(1)
@@ -62,7 +62,7 @@ describe('when a nameplate is on screen', () => {
   it('includes its start instant and excludes its end instant', () => {
     // Half-open, identical to the exporter's enable expression. Back-to-back
     // nameplates therefore never overlap by a frame or leave a frame's gap.
-    const node = plan().nodes[0]
+    const node = plan().overlays[0]
     expect(isNodeVisible(node, millisecondsToTicks(1_000))).toBe(true)
     expect(isNodeVisible(node, millisecondsToTicks(999))).toBe(false)
     expect(isNodeVisible(node, millisecondsToTicks(5_999))).toBe(true)
@@ -70,7 +70,7 @@ describe('when a nameplate is on screen', () => {
   })
 
   it('measures visibility in exact ticks rather than rounded milliseconds', () => {
-    const node = plan().nodes[0]
+    const node = plan().overlays[0]
     expect(node.interval.start).toEqual(ms(1_000))
     expect(node.interval.duration).toEqual(ms(5_000))
   })

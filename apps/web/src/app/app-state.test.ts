@@ -15,6 +15,7 @@ import {
   returnHome,
   updateDraftRequest,
   type StudioState,
+  proposalPlacement,
 } from './app-state'
 import {
   TEST_PROJECT_ID,
@@ -77,14 +78,28 @@ describe('queueing a proposal', () => {
     expect(next.editProject).toBe(state.editProject)
   })
 
-  it('refuses a nameplate that runs past the end of this video, before it is previewed', () => {
+  it('refuses a nameplate anchored entirely past the end of this video', () => {
     // The v1 defect: this was previewed, accepted, and saved, then failed only
     // at export, long after the user believed the edit was done.
     const next = queueEditProposal(studio(), testOperation({
-      compositionInterval: { start: ms(29_000), duration: ms(5_000) },
+      sourceInterval: { start: ms(35_000), duration: ms(5_000) },
     }))
     expect(next.proposal).toBeNull()
     expect(next.editError).toMatch(/past the end/i)
+  })
+
+  it('keeps a nameplate that only partly overruns, and shows the length it will really be', () => {
+    // Five seconds were asked for at 29 s of a 30-second video. One second of
+    // it exists, so one second is what happens — and the summary says 1 s, so
+    // the user approves the version they can actually see.
+    const state = studio()
+    const next = queueEditProposal(state, testOperation({
+      sourceInterval: { start: ms(29_000), duration: ms(5_000) },
+    }))
+    expect(next.editError).toBeNull()
+    expect(next.proposal).not.toBeNull()
+    if (!next.proposal) return
+    expect(proposalPlacement(next.editProject, next.proposal.operation)?.durationTicks).toBe(ms(1_000).ticks)
   })
 
   it('refuses a proposal whose ID is already used', () => {
@@ -167,7 +182,7 @@ describe('assistant proposals', () => {
   it('checks an assistant proposal exactly as it checks a hand-made one', () => {
     const state = queueEditProposal(
       studio(),
-      testOperation({ compositionInterval: { start: ms(29_000), duration: ms(5_000) } }),
+      testOperation({ sourceInterval: { start: ms(35_000), duration: ms(5_000) } }),
       aiOrigin,
     )
     expect(state.proposal).toBeNull()
@@ -205,7 +220,7 @@ describe('repairing a proposal by hand', () => {
 
   it('shortens a new length so it still ends with the video', () => {
     const repaired = repairProposal(pending(), { startMs: 28_000, durationMs: 10_000 })
-    const interval = repaired.proposal?.operation.compositionInterval
+    const interval = repaired.proposal?.operation.sourceInterval
     expect(interval?.start.ticks).toBe(ms(28_000).ticks)
     expect((interval?.start.ticks ?? 0) + (interval?.duration.ticks ?? 0)).toBe(ms(30_000).ticks)
   })

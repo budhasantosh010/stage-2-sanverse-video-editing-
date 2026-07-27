@@ -4,7 +4,7 @@ import type { AddNameplateAction } from '../actions'
 import { accept, createHistory } from '../history'
 import { activeOperations, blockedChangeSets, serializeProject } from '../project'
 import { TEST_CLIP_ID, TEST_COMPOSITION_ID, TEST_PROJECT_ID, TEST_TRACK_ID, ms, testAsset } from '../test-fixtures'
-import { migrateProjectV1ToV2 } from './project-v1-to-v2'
+import { upgradeSavedProject } from './upgrade-project'
 
 const action = (overrides: Partial<AddNameplateAction> = {}): AddNameplateAction => ({
   schemaVersion: 'sanverse.action/v1',
@@ -29,8 +29,8 @@ const v1Project = (actions: readonly AddNameplateAction[]) => {
 }
 
 const migrate = (actions: readonly AddNameplateAction[], asset = testAsset()) =>
-  migrateProjectV1ToV2({
-    v1: v1Project(actions),
+  upgradeSavedProject({
+    saved: v1Project(actions),
     asset,
     projectId: TEST_PROJECT_ID,
     compositionId: TEST_COMPOSITION_ID,
@@ -38,7 +38,7 @@ const migrate = (actions: readonly AddNameplateAction[], asset = testAsset()) =>
     clipId: TEST_CLIP_ID,
   })
 
-describe('migrating a saved v1 project', () => {
+describe('upgrading a saved v1 project', () => {
   it('carries every accepted edit across as its own change set', () => {
     const result = migrate([action(), action({ actionId: 'action-2', startMs: 10_000 })])
     expect(result).toMatchObject({ ok: true })
@@ -52,9 +52,12 @@ describe('migrating a saved v1 project', () => {
     const result = migrate([action({ startMs: 2_137, durationMs: 4_913 })])
     if (!result.ok) throw new Error('setup failed')
     const operation = activeOperations(result.value.project)[0]
-    expect(operation.compositionInterval.start).toEqual(ms(2_137))
-    expect(operation.compositionInterval.duration).toEqual(ms(4_913))
-    expect(operation.sampledClipTime).toEqual(ms(2_000))
+    if (operation.kind !== 'add-nameplate') throw new Error('setup failed')
+    expect(operation.sourceInterval.start).toEqual(ms(2_137))
+    expect(operation.sourceInterval.duration).toEqual(ms(4_913))
+    // The old "where the user pointed" value was evidence, not an instruction.
+    // It is kept for audit, but it no longer decides anything.
+    expect(operation.extensions['sanverse.migration/legacy-sampled-source-ms']).toBe('2000')
   })
 
   it('keeps migrated nameplates where they already were on screen', () => {
@@ -63,6 +66,7 @@ describe('migrating a saved v1 project', () => {
     const result = migrate([action()])
     if (!result.ok) throw new Error('setup failed')
     const operation = activeOperations(result.value.project)[0]
+    if (operation.kind !== 'add-nameplate') throw new Error('setup failed')
     expect(operation.target.anchor).toBe('top-left')
     expect(operation.target.coordinateSpace).toBe('composition-normalized')
     expect(operation.target.point).toEqual({ x: 0.25, y: 0.75 })
@@ -101,8 +105,8 @@ describe('migrating a saved v1 project', () => {
   })
 
   it('refuses to migrate a project ID that does not match', () => {
-    const result = migrateProjectV1ToV2({
-      v1: v1Project([action()]),
+    const result = upgradeSavedProject({
+      saved: v1Project([action()]),
       asset: testAsset(),
       projectId: 'project_bbbbbbbbbbbbbbbb',
       compositionId: TEST_COMPOSITION_ID,
@@ -113,8 +117,8 @@ describe('migrating a saved v1 project', () => {
   })
 
   it('refuses a v1 project that is not valid v1 in the first place', () => {
-    const result = migrateProjectV1ToV2({
-      v1: { schemaVersion: 'sanverse.project/v1', projectId: TEST_PROJECT_ID },
+    const result = upgradeSavedProject({
+      saved: { schemaVersion: 'sanverse.project/v1', projectId: TEST_PROJECT_ID },
       asset: testAsset(),
       projectId: TEST_PROJECT_ID,
       compositionId: TEST_COMPOSITION_ID,

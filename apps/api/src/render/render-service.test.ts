@@ -41,13 +41,12 @@ const withNameplate = (project: EditProject): EditProject => {
     changeSetId: 'changeset_aaaaaaaa',
     baseRevision: project.revision,
     operations: [{
-      schemaVersion: 'sanverse.operation/v2',
+      schemaVersion: 'sanverse.operation/v3',
       operationId: 'operation_aaaaaaaa',
       kind: 'add-nameplate',
       capabilityId: 'sanverse.nameplate.component/v1',
-      clipId: 'clip_aaaaaaaa',
-      sampledClipTime: ms(1_000),
-      compositionInterval: { start: ms(1_000), duration: ms(5_000) },
+      assetId: 'asset_aaaaaaaa',
+      sourceInterval: { start: ms(1_000), duration: ms(5_000) },
       target: { coordinateSpace: 'composition-normalized', point: { x: 0.25, y: 0.5 }, anchor: 'center' },
       primaryText: 'Santosh',
       secondaryText: 'Founder',
@@ -83,9 +82,11 @@ describe('render service', () => {
 
     expect(result.outputPath).toBe('export.mp4')
     const request = (renderer.render as ReturnType<typeof vi.fn>).mock.calls[0][0]
-    expect(request.plan.schemaVersion).toBe('sanverse.render-plan/v1')
-    expect(request.plan.nodes).toHaveLength(1)
-    expect(request.plan.nodes[0].primaryText).toBe('Santosh')
+    expect(request.plan.schemaVersion).toBe('sanverse.render-plan/v2')
+    expect(request.plan.overlays).toHaveLength(1)
+    expect(request.plan.overlays[0].primaryText).toBe('Santosh')
+    // The footage itself is described too, not just what is drawn on it.
+    expect(request.plan.segments).toHaveLength(1)
     // The exported file can be traced back to the exact project state.
     expect(request.plan.projectRevision).toBe(project.revision)
     expect(result.projectRevision).toBe(project.revision)

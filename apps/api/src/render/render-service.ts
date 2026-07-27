@@ -1,4 +1,4 @@
-import type { EditProject } from '@sanverse/edit-domain'
+import { activeOperations, type EditProject } from '@sanverse/edit-domain'
 import { compileProjectToRenderPlan } from '@sanverse/render-contract/compile-project'
 
 import type { RenderPort, RenderResult } from './render-port.ts'
@@ -37,7 +37,10 @@ export function createRenderService({ renderer }: { renderer: RenderPort }) {
       if (!plan.ok) {
         throw new RenderServiceError('RENDER_PROJECT_INVALID', 'The project could not be compiled for rendering.')
       }
-      if (plan.value.nodes.length === 0) {
+      // A project whose only edits are cuts has an empty overlay list and is
+      // still perfectly exportable, so the question is whether the user has
+      // accepted anything at all — not whether anything is drawn on top.
+      if (activeOperations(input.project).length === 0) {
         throw new RenderServiceError('NOTHING_TO_RENDER', 'Accept at least one edit before exporting.')
       }
       return renderer.render({

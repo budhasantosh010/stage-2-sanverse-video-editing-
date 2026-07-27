@@ -1,5 +1,5 @@
 import { PROJECT_TIMESCALE } from '@sanverse/edit-domain/time'
-import type { RenderPlan, TextOverlayNode } from '@sanverse/render-contract'
+import type { RenderPlan, SourceSegmentNode, TextOverlayNode } from '@sanverse/render-contract'
 
 import type { MediaProbePort } from './media/media-probe.ts'
 import type { ProjectRepository } from './projects/project-repository.ts'
@@ -22,18 +22,37 @@ export const testOverlayNode = (overrides: Partial<TextOverlayNode> = {}): TextO
   ...overrides,
 } as TextOverlayNode)
 
+export const testSegmentNode = (overrides: Partial<SourceSegmentNode> = {}): SourceSegmentNode => ({
+  nodeId: 'clip_aaaaaaaa',
+  kind: 'source-segment',
+  interval: { start: ms(0), duration: ms(8_000) },
+  assetId: 'asset_aaaaaaaa',
+  sourceStartTicks: 0,
+  gainDb: 0,
+  fadeInTicks: 0,
+  fadeOutTicks: 0,
+  ...overrides,
+} as SourceSegmentNode)
+
 /** Matches the 1280x720, 8-second media the probe fixture reports. */
 export const testPlan = (overrides: Partial<RenderPlan> = {}): RenderPlan => ({
-  schemaVersion: 'sanverse.render-plan/v1',
+  schemaVersion: 'sanverse.render-plan/v2',
   projectId: 'project_aaaaaaaaaaaaaaaa',
   projectRevision: 1,
   compositionId: 'composition_aaaaaaaa',
   width: 1280,
   height: 720,
   durationTicks: 8_000 * TICKS_PER_MS,
-  nodes: [testOverlayNode()],
+  segments: [testSegmentNode()],
+  overlays: [testOverlayNode()],
   ...overrides,
 } as RenderPlan)
+
+/** The source facts the argument builder needs alongside a plan. */
+export const testSourceFacts = {
+  frameRate: { numerator: 30, denominator: 1 },
+  hasAudio: true,
+} as const
 
 export const probeJson = (durationSeconds = 8, hasAudio = true, width = 1280, height = 720) =>
   JSON.stringify({

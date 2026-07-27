@@ -132,6 +132,20 @@ export const rangeContains = (range: TimeRange, time: MediaTime): boolean =>
 export const rangesOverlap = (a: TimeRange, b: TimeRange): boolean =>
   a.start.ticks < b.start.ticks + b.duration.ticks && b.start.ticks < a.start.ticks + a.duration.ticks
 
+/**
+ * The overlapping part of two half-open ranges, or null when they miss.
+ *
+ * This is what maps an edit anchored to the source footage onto the pieces of
+ * that footage which survived cutting. A zero-length touch is not an overlap,
+ * because a half-open range never contains its own end instant.
+ */
+export const rangeIntersection = (a: TimeRange, b: TimeRange): TimeRange | null => {
+  const start = Math.max(a.start.ticks, b.start.ticks)
+  const end = Math.min(a.start.ticks + a.duration.ticks, b.start.ticks + b.duration.ticks)
+  if (end <= start) return null
+  return Object.freeze({ start: mediaTime(start), duration: mediaTime(end - start) })
+}
+
 /** `[a.start, a.end) ⊆ [b.start, b.end)`. */
 export const rangeWithin = (inner: TimeRange, outer: TimeRange): boolean =>
   inner.start.ticks >= outer.start.ticks &&

@@ -1,18 +1,21 @@
 import { err, isRecord, ok, type Result } from './result.ts'
 import { capabilityProduces } from './capabilities.ts'
 import {
-  clipCompositionRange,
   findClip,
+  placeSourceSpan,
   type Composition,
 } from './composition.ts'
 import { emptyExtensions, validateExtensions, type Extensions } from './json.ts'
 import { validateSpatialTarget, type SpatialTarget } from './geometry.ts'
 import {
-  rangeContains,
-  rangeWithin,
-  validateMediaTime,
+  OPERATION_SCHEMA_VERSION,
+  isTimelineOperationKind,
+  validateTimelineOperation,
+  TIMELINE_OPERATION_KINDS,
+  type TimelineOperation,
+} from './timeline-operations.ts'
+import {
   validateTimeRange,
-  type MediaTime,
   type TimeRange,
 } from './time.ts'
 
@@ -26,42 +29,60 @@ import {
 export const MAX_PRIMARY_TEXT_LENGTH = 120
 export const MAX_SECONDARY_TEXT_LENGTH = 160
 
+export { OPERATION_SCHEMA_VERSION }
 export const OPERATION_ID_PATTERN = /^operation_[a-z0-9]{8,64}$/
 
 /**
  * Add a nameplate.
  *
- * Two different times used to be muddled together. They are now separate and
- * named for the timeline they belong to:
+ * WHEN it appears is measured on the original footage's own timeline, not on
+ * the finished video's. That one choice is what makes cutting safe.
  *
- *   sampledClipTime   EVIDENCE. Where the user was pointing, on that clip's
- *                     own timeline. Explains why the system chose this. It is
- *                     never used to decide when the nameplate is visible.
+ * Consider a nameplate the user placed on a face eight seconds into the raw
+ * recording, and then imagine trimming four seconds off the front:
  *
- *   compositionInterval  INSTRUCTION. When the nameplate is actually on screen,
- *                     measured on the finished video's timeline.
+ *   stored against the finished video   the nameplate stays at 00:08 of the
+ *                                       finished cut, which is now 00:12 of the
+ *                                       recording — a different moment, and
+ *                                       nothing warns anyone
  *
- * In v1 nothing linked the two, and the hand-built UI kept them equal only by
- * luck. An AI has no such luck.
+ *   stored against the footage (this)   the nameplate stays on the face; the
+ *                                       system recomputes that it is now 00:04
+ *                                       of the finished cut
+ *
+ * If the footage it was anchored to is deleted outright, the nameplate is
+ * reported as blocked. It is never quietly moved somewhere it might fit.
  */
 export type AddNameplateOperation = Readonly<{
-  schemaVersion: 'sanverse.operation/v2'
+  schemaVersion: typeof OPERATION_SCHEMA_VERSION
   operationId: string
   kind: 'add-nameplate'
   capabilityId: string
-  clipId: string
-  sampledClipTime: MediaTime
-  compositionInterval: TimeRange
+  /** Which piece of original footage this is anchored to. */
+  assetId: string
+  /** When it is on screen, measured on that footage's own timeline. */
+  sourceInterval: TimeRange
   target: SpatialTarget
   primaryText: string
   secondaryText: string
   extensions: Extensions
 }>
 
-export type EditOperation = AddNameplateOperation
+export type EditOperation = AddNameplateOperation | TimelineOperation
 
 /** Every operation kind this build can execute. Unknown kinds are rejected. */
-export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze(['add-nameplate'])
+export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze([
+  'add-nameplate',
+  ...TIMELINE_OPERATION_KINDS,
+])
+
+/** True for the operations that change which footage the finished video is made of. */
+export const isTimelineOperation = (operation: EditOperation): operation is TimelineOperation =>
+  isTimelineOperationKind(operation.kind)
+
+/** True for the operations that draw on top of whatever footage survives. */
+export const isOverlayOperation = (operation: EditOperation): operation is AddNameplateOperation =>
+  operation.kind === 'add-nameplate'
 
 export type OperationIssueCode =
   | 'TYPE_INVALID'
@@ -71,8 +92,8 @@ export type OperationIssueCode =
   | 'OPERATION_KIND_UNKNOWN'
   | 'CAPABILITY_UNKNOWN'
   | 'CLIP_UNKNOWN'
-  | 'SAMPLE_OUTSIDE_CLIP'
-  | 'INTERVAL_OUTSIDE_COMPOSITION'
+  | 'ASSET_NOT_IN_COMPOSITION'
+  | 'SOURCE_SPAN_REMOVED'
   | 'TEXT_TOO_LONG'
 
 export type OperationError = {
@@ -85,9 +106,8 @@ const NAMEPLATE_KEYS = [
   'operationId',
   'kind',
   'capabilityId',
-  'clipId',
-  'sampledClipTime',
-  'compositionInterval',
+  'assetId',
+  'sourceInterval',
   'target',
   'primaryText',
   'secondaryText',
@@ -96,23 +116,11 @@ const NAMEPLATE_KEYS = [
 
 type Issue = OperationError['issues'][number]
 
-/**
- * Structural validation only. This cannot tell whether the clip exists or the
- * interval fits the video; that needs the project, and lives in
- * `validateOperationAgainstComposition`.
- */
-export const validateOperation = (input: unknown, path = '$'): Result<EditOperation, OperationError> => {
+const validateNameplate = (
+  input: Record<string, unknown>,
+  path: string,
+): Result<AddNameplateOperation, OperationError> => {
   const issues: Issue[] = []
-  if (!isRecord(input)) {
-    return err({ code: 'OPERATION_INVALID', issues: [{ path, code: 'TYPE_INVALID' }] })
-  }
-
-  // An unrecognised executable kind is refused loudly. It is never skipped,
-  // because skipping it exports a video the user never approved.
-  if (typeof input.kind !== 'string' || !EXECUTABLE_OPERATION_KINDS.includes(input.kind)) {
-    return err({ code: 'OPERATION_INVALID', issues: [{ path: `${path}.kind`, code: 'OPERATION_KIND_UNKNOWN' }] })
-  }
-
   for (const key of NAMEPLATE_KEYS) {
     if (!Object.hasOwn(input, key)) issues.push({ path: `${path}.${key}`, code: 'FIELD_REQUIRED' })
   }
@@ -122,17 +130,17 @@ export const validateOperation = (input: unknown, path = '$'): Result<EditOperat
     }
   }
 
-  if (input.schemaVersion !== 'sanverse.operation/v2') {
+  if (input.schemaVersion !== OPERATION_SCHEMA_VERSION) {
     issues.push({ path: `${path}.schemaVersion`, code: 'VALUE_OUT_OF_RANGE' })
   }
   if (typeof input.operationId !== 'string' || !OPERATION_ID_PATTERN.test(input.operationId)) {
     issues.push({ path: `${path}.operationId`, code: 'VALUE_OUT_OF_RANGE' })
   }
-  if (typeof input.capabilityId !== 'string' || !capabilityProduces(input.capabilityId, input.kind)) {
+  if (typeof input.capabilityId !== 'string' || !capabilityProduces(input.capabilityId, 'add-nameplate')) {
     issues.push({ path: `${path}.capabilityId`, code: 'CAPABILITY_UNKNOWN' })
   }
-  if (typeof input.clipId !== 'string' || input.clipId.trim().length === 0) {
-    issues.push({ path: `${path}.clipId`, code: 'VALUE_OUT_OF_RANGE' })
+  if (typeof input.assetId !== 'string' || input.assetId.trim().length === 0) {
+    issues.push({ path: `${path}.assetId`, code: 'VALUE_OUT_OF_RANGE' })
   }
   if (typeof input.primaryText !== 'string' || input.primaryText.trim().length === 0) {
     issues.push({ path: `${path}.primaryText`, code: 'VALUE_OUT_OF_RANGE' })
@@ -145,10 +153,8 @@ export const validateOperation = (input: unknown, path = '$'): Result<EditOperat
     issues.push({ path: `${path}.secondaryText`, code: 'TEXT_TOO_LONG' })
   }
 
-  const sampledClipTime = validateMediaTime(input.sampledClipTime, `${path}.sampledClipTime`)
-  if (!sampledClipTime.ok) issues.push({ path: `${path}.sampledClipTime`, code: 'VALUE_OUT_OF_RANGE' })
-  const compositionInterval = validateTimeRange(input.compositionInterval, `${path}.compositionInterval`)
-  if (!compositionInterval.ok) issues.push({ path: `${path}.compositionInterval`, code: 'VALUE_OUT_OF_RANGE' })
+  const sourceInterval = validateTimeRange(input.sourceInterval, `${path}.sourceInterval`)
+  if (!sourceInterval.ok) issues.push({ path: `${path}.sourceInterval`, code: 'VALUE_OUT_OF_RANGE' })
   const target = validateSpatialTarget(input.target, `${path}.target`)
   if (!target.ok) {
     for (const issue of target.error.issues) issues.push({ path: issue.path, code: 'VALUE_OUT_OF_RANGE' })
@@ -163,13 +169,12 @@ export const validateOperation = (input: unknown, path = '$'): Result<EditOperat
   if (issues.length > 0) return err({ code: 'OPERATION_INVALID', issues })
 
   return ok(Object.freeze({
-    schemaVersion: 'sanverse.operation/v2',
+    schemaVersion: OPERATION_SCHEMA_VERSION,
     operationId: input.operationId as string,
     kind: 'add-nameplate',
     capabilityId: input.capabilityId as string,
-    clipId: input.clipId as string,
-    sampledClipTime: (sampledClipTime as { ok: true; value: MediaTime }).value,
-    compositionInterval: (compositionInterval as { ok: true; value: TimeRange }).value,
+    assetId: input.assetId as string,
+    sourceInterval: (sourceInterval as { ok: true; value: TimeRange }).value,
     target: (target as { ok: true; value: SpatialTarget }).value,
     primaryText: input.primaryText as string,
     secondaryText: input.secondaryText as string,
@@ -178,38 +183,72 @@ export const validateOperation = (input: unknown, path = '$'): Result<EditOperat
 }
 
 /**
- * Contextual validation: does this operation make sense against this video?
+ * Structural validation only. This cannot tell whether the footage still
+ * exists or the cut point still falls inside a piece; that needs the project,
+ * and lives in `validateOperationAgainstComposition`.
+ */
+export const validateOperation = (input: unknown, path = '$'): Result<EditOperation, OperationError> => {
+  if (!isRecord(input)) {
+    return err({ code: 'OPERATION_INVALID', issues: [{ path, code: 'TYPE_INVALID' }] })
+  }
+
+  // An unrecognised executable kind is refused loudly. It is never skipped,
+  // because skipping it exports a video the user never approved.
+  if (typeof input.kind !== 'string' || !EXECUTABLE_OPERATION_KINDS.includes(input.kind)) {
+    return err({ code: 'OPERATION_INVALID', issues: [{ path: `${path}.kind`, code: 'OPERATION_KIND_UNKNOWN' }] })
+  }
+
+  if (isTimelineOperationKind(input.kind)) {
+    const timeline = validateTimelineOperation(input, path)
+    if (!timeline.ok) {
+      return err({
+        code: 'OPERATION_INVALID',
+        issues: timeline.error.issues.map((issue) => ({
+          path: issue.path,
+          code: issue.code as OperationIssueCode,
+        })),
+      })
+    }
+    return ok(timeline.value)
+  }
+
+  return validateNameplate(input, path)
+}
+
+/**
+ * Contextual validation: does this operation still make sense against the
+ * footage the finished video is currently made of?
  *
- * This is the check v1 could not perform, because the domain never knew how
- * long the video was. A nameplate at minute 83 of a 30-second video is now
- * refused here, before it is previewed and before it is saved, instead of at
- * export time after the user has moved on.
+ * For a nameplate this asks whether the moment it was pinned to survived the
+ * cutting. For a timeline operation it asks whether the piece it names is still
+ * there — the deeper question of whether the cut point itself is still inside
+ * that piece is answered by actually applying it, in `applyTimelineOperation`,
+ * because that is the only place the answer is knowable without duplicating the
+ * arithmetic in two files that could then disagree.
  */
 export const validateOperationAgainstComposition = (
   operation: EditOperation,
   composition: Composition,
   path = '$',
 ): Result<EditOperation, OperationError> => {
-  const issues: Issue[] = []
-  const clip = findClip(composition, operation.clipId)
-  if (!clip) {
-    return err({ code: 'OPERATION_INVALID', issues: [{ path: `${path}.clipId`, code: 'CLIP_UNKNOWN' }] })
+  if (isTimelineOperation(operation)) {
+    if (!findClip(composition, operation.clipId)) {
+      return err({ code: 'OPERATION_INVALID', issues: [{ path: `${path}.clipId`, code: 'CLIP_UNKNOWN' }] })
+    }
+    return ok(operation)
   }
 
-  const clipLocalRange: TimeRange = {
-    start: { ticks: 0, timescale: clip.sourceRange.duration.timescale },
-    duration: clip.sourceRange.duration,
+  const usesAsset = composition.tracks.some((track) =>
+    track.clips.some((clip) => clip.assetId === operation.assetId),
+  )
+  if (!usesAsset) {
+    return err({ code: 'OPERATION_INVALID', issues: [{ path: `${path}.assetId`, code: 'ASSET_NOT_IN_COMPOSITION' }] })
   }
-  if (!rangeContains(clipLocalRange, operation.sampledClipTime)) {
-    issues.push({ path: `${path}.sampledClipTime`, code: 'SAMPLE_OUTSIDE_CLIP' })
+  if (placeSourceSpan(composition, operation.assetId, operation.sourceInterval).length === 0) {
+    return err({
+      code: 'OPERATION_INVALID',
+      issues: [{ path: `${path}.sourceInterval`, code: 'SOURCE_SPAN_REMOVED' }],
+    })
   }
-
-  // The nameplate must be visible only while its clip is on screen. That is
-  // what keeps it attached to the clip when the timeline is cut in G5-B.
-  if (!rangeWithin(operation.compositionInterval, clipCompositionRange(clip))) {
-    issues.push({ path: `${path}.compositionInterval`, code: 'INTERVAL_OUTSIDE_COMPOSITION' })
-  }
-
-  if (issues.length > 0) return err({ code: 'OPERATION_INVALID', issues })
   return ok(operation)
 }

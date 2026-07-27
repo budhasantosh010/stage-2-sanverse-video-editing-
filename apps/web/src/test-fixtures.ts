@@ -11,6 +11,7 @@ import {
 export const TEST_PROJECT_ID = 'project_1234567890abcdef'
 export const TEST_COMPOSITION_ID = 'composition_aaaaaaaa'
 export const TEST_TRACK_ID = 'track_aaaaaaaa'
+export const TEST_ASSET_ID = 'asset_aaaaaaaa'
 export const TEST_CLIP_ID = 'clip_aaaaaaaa'
 
 export const ms = (milliseconds: number) => ({
@@ -52,13 +53,12 @@ export const testProject = (
 export const testOperation = (
   overrides: Partial<AddNameplateOperation> = {},
 ): AddNameplateOperation => ({
-  schemaVersion: 'sanverse.operation/v2',
+  schemaVersion: 'sanverse.operation/v3',
   operationId: 'operation_aaaaaaaa',
   kind: 'add-nameplate',
   capabilityId: NAMEPLATE_COMPONENT_ID,
-  clipId: TEST_CLIP_ID,
-  sampledClipTime: ms(1_000),
-  compositionInterval: { start: ms(1_000), duration: ms(5_000) },
+  assetId: TEST_ASSET_ID,
+  sourceInterval: { start: ms(1_000), duration: ms(5_000) },
   target: { coordinateSpace: 'composition-normalized', point: { x: 0.25, y: 0.75 }, anchor: 'center' },
   primaryText: 'Santosh',
   secondaryText: 'Founder',

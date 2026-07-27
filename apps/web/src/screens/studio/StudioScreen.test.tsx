@@ -112,8 +112,7 @@ const directProposal = (operation = nameplate) => ({
 
 const nameplate = testOperation({
   operationId: 'operation_studio01',
-  sampledClipTime: ms(12_400),
-  compositionInterval: { start: ms(12_400), duration: ms(5_000) },
+  sourceInterval: { start: ms(12_400), duration: ms(5_000) },
 })
 
 /** A project with one accepted nameplate visible from 12.4s to 17.4s. */
@@ -123,8 +122,7 @@ function projectWithNameplate(
 ): EditProject {
   const base = testProject()
   const accepted = acceptChangeSet(base, testChangeSet(base.revision, changeSetId, {
-    sampledClipTime: ms(12_400),
-    compositionInterval: { start: ms(12_400), duration: ms(5_000) },
+    sourceInterval: { start: ms(12_400), duration: ms(5_000) },
     ...overrides,
   }))
   if (!accepted.ok) throw new Error(`fixture failed: ${JSON.stringify(accepted.error)}`)
@@ -514,8 +512,8 @@ describe('StudioScreen', () => {
         secondaryText: 'Founder',
         // The nameplate attaches to a clip, not to raw source time, so it
         // moves with that clip when the timeline is cut later.
-        clipId: expect.stringMatching(/^clip_/),
-        compositionInterval: {
+        assetId: expect.stringMatching(/^asset_/),
+        sourceInterval: {
           start: ms(12_400),
           duration: ms(5_000),
         },
@@ -663,8 +661,7 @@ describe('StudioScreen', () => {
     renderStudio({
       proposal: directProposal(testOperation({
         operationId: 'operation_studio02',
-        sampledClipTime: ms(12_400),
-        compositionInterval: { start: ms(12_400), duration: ms(2_500) },
+        sourceInterval: { start: ms(12_400), duration: ms(2_500) },
       })),
     })
 
@@ -732,8 +729,7 @@ describe('StudioScreen', () => {
     const second = acceptChangeSet(first, testChangeSet(first.revision, 'changeset_studio02', {
       operationId: 'operation_studio02',
       primaryText: 'Redo only',
-      sampledClipTime: ms(12_400),
-      compositionInterval: { start: ms(12_400), duration: ms(5_000) },
+      sourceInterval: { start: ms(12_400), duration: ms(5_000) },
     }))
     if (!second.ok) throw new Error('fixture failed')
     const undone = undoChangeSet(second.value)

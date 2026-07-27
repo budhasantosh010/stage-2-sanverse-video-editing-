@@ -42,65 +42,58 @@ describe('nameplate operation structure', () => {
     expect(validateOperation(testOperation({ primaryText: '   ' }))).toMatchObject({ ok: false })
   })
 
-  it('keeps the pointing evidence separate from the visibility instruction', () => {
+  it('anchors visibility to the footage, not to the finished video', () => {
     const operation = validateOperation(
-      testOperation({ sampledClipTime: ms(1_000), compositionInterval: { start: ms(9_000), duration: ms(2_000) } }),
+      testOperation({ sourceInterval: { start: ms(9_000), duration: ms(2_000) } }),
     )
-    // They are allowed to differ. In v1 nothing linked them and nothing
-    // separated them either, so an AI could set one and mean the other.
     expect(operation).toMatchObject({ ok: true })
-    if (!operation.ok) return
-    expect(operation.value.sampledClipTime).toEqual(ms(1_000))
-    expect(operation.value.compositionInterval.start).toEqual(ms(9_000))
+    if (!operation.ok || operation.value.kind !== 'add-nameplate') return
+    expect(operation.value.sourceInterval.start).toEqual(ms(9_000))
+    // The field that used to hold a finished-video time is gone entirely, so
+    // no caller can accidentally keep writing one.
+    expect(Object.keys(operation.value)).not.toContain('compositionInterval')
   })
 })
 
 describe('nameplate operation against a real video', () => {
-  it('refuses a nameplate that starts after the video ends', () => {
+  it('refuses a nameplate anchored past the end of the footage', () => {
     // The exact defect found in v1: a nameplate at minute 83 of a 30-second
     // video passed every check, previewed, and persisted.
     const operation = validateOperation(
-      testOperation({ compositionInterval: { start: ms(4_980_000), duration: ms(5_000) } }),
+      testOperation({ sourceInterval: { start: ms(4_980_000), duration: ms(5_000) } }),
     )
     if (!operation.ok) throw new Error('setup failed')
     const result = validateOperationAgainstComposition(operation.value, composition)
     expect(result).toMatchObject({ ok: false })
     if (result.ok) return
-    expect(result.error.issues[0].code).toBe('INTERVAL_OUTSIDE_COMPOSITION')
+    expect(result.error.issues[0].code).toBe('SOURCE_SPAN_REMOVED')
   })
 
-  it('refuses a nameplate whose tail runs past the end of the video', () => {
+  it('keeps the part of a nameplate that overlaps footage that is still present', () => {
+    // A nameplate running past the end is trimmed to what survives rather than
+    // refused outright, because the user can see the part that does show.
     const operation = validateOperation(
-      testOperation({ compositionInterval: { start: ms(28_000), duration: ms(5_000) } }),
-    )
-    if (!operation.ok) throw new Error('setup failed')
-    expect(validateOperationAgainstComposition(operation.value, composition)).toMatchObject({ ok: false })
-  })
-
-  it('accepts a nameplate ending exactly at the last instant of the video', () => {
-    const operation = validateOperation(
-      testOperation({ compositionInterval: { start: ms(25_000), duration: ms(5_000) } }),
+      testOperation({ sourceInterval: { start: ms(28_000), duration: ms(5_000) } }),
     )
     if (!operation.ok) throw new Error('setup failed')
     expect(validateOperationAgainstComposition(operation.value, composition)).toMatchObject({ ok: true })
   })
 
-  it('refuses a sample taken outside the clip', () => {
-    const operation = validateOperation(testOperation({ sampledClipTime: ms(30_000) }))
+  it('accepts a nameplate ending exactly at the last instant of the video', () => {
+    const operation = validateOperation(
+      testOperation({ sourceInterval: { start: ms(25_000), duration: ms(5_000) } }),
+    )
     if (!operation.ok) throw new Error('setup failed')
-    const result = validateOperationAgainstComposition(operation.value, composition)
-    expect(result).toMatchObject({ ok: false })
-    if (result.ok) return
-    expect(result.error.issues[0].code).toBe('SAMPLE_OUTSIDE_CLIP')
+    expect(validateOperationAgainstComposition(operation.value, composition)).toMatchObject({ ok: true })
   })
 
-  it('refuses an operation addressed to a clip that does not exist', () => {
-    const operation = validateOperation(testOperation({ clipId: 'clip_zzzzzzzz' }))
+  it('refuses a nameplate anchored to footage this project does not use', () => {
+    const operation = validateOperation(testOperation({ assetId: 'asset_zzzzzzzz' }))
     if (!operation.ok) throw new Error('setup failed')
     const result = validateOperationAgainstComposition(operation.value, composition)
     expect(result).toMatchObject({ ok: false })
     if (result.ok) return
-    expect(result.error.issues[0].code).toBe('CLIP_UNKNOWN')
+    expect(result.error.issues[0].code).toBe('ASSET_NOT_IN_COMPOSITION')
     expect(TEST_CLIP_ID).not.toBe('clip_zzzzzzzz')
   })
 })

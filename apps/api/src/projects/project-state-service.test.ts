@@ -59,14 +59,14 @@ describe('opening a project', () => {
     const { service: subject, current } = service(null)
     const project = await subject.load(PROJECT_ID)
 
-    expect(project.schemaVersion).toBe('sanverse.project/v2')
+    expect(project.schemaVersion).toBe('sanverse.project/v3')
     expect(project.revision).toBe(0)
     // The engine now knows how long the video is, which v1 never did.
     expect(project.assets[0].duration).toEqual(ms(8_000))
     expect(project.composition.width).toBe(1280)
     // The domain holds an opaque reference, never a filesystem path.
     expect(project.assets[0].storageRef).not.toContain('source.mp4')
-    expect(JSON.parse(current() ?? '{}').schemaVersion).toBe('sanverse.project/v2')
+    expect(JSON.parse(current() ?? '{}').schemaVersion).toBe('sanverse.project/v3')
   })
 
   it('produces the same IDs on every reload rather than inventing new ones', async () => {
@@ -126,13 +126,12 @@ describe('editing a project', () => {
     changeSetId,
     baseRevision,
     operations: [{
-      schemaVersion: 'sanverse.operation/v2',
+      schemaVersion: 'sanverse.operation/v3',
       operationId: `operation_${changeSetId.slice(-8)}`,
       kind: 'add-nameplate',
       capabilityId: 'sanverse.nameplate.component/v1',
-      clipId: 'clip_1234567890ab',
-      sampledClipTime: ms(1_000),
-      compositionInterval: { start: ms(1_000), duration: ms(2_000) },
+      assetId: 'asset_1234567890ab',
+      sourceInterval: { start: ms(1_000), duration: ms(2_000) },
       target: { coordinateSpace: 'composition-normalized', point: { x: 0.2, y: 0.3 }, anchor: 'center' },
       primaryText: 'Santosh',
       secondaryText: '',
@@ -166,7 +165,7 @@ describe('editing a project', () => {
 
     const beyondEnd = {
       ...changeSet(0),
-      operations: [{ ...changeSet(0).operations[0], compositionInterval: { start: ms(9_000), duration: ms(1_000) } }],
+      operations: [{ ...changeSet(0).operations[0], sourceInterval: { start: ms(9_000), duration: ms(1_000) } }],
     }
     await expect(subject.accept(PROJECT_ID, beyondEnd)).rejects.toMatchObject({ code: 'CHANGE_SET_REJECTED' })
     expect(writes).toHaveLength(writesBefore)
@@ -183,7 +182,7 @@ describe('editing a project', () => {
     await subject.accept(PROJECT_ID, changeSet(0))
     const project = await subject.accept(PROJECT_ID, {
       ...changeSet(1, 'changeset_bbbbbbbb'),
-      operations: [{ ...changeSet(1, 'changeset_bbbbbbbb').operations[0], compositionInterval: { start: ms(4_000), duration: ms(2_000) } }],
+      operations: [{ ...changeSet(1, 'changeset_bbbbbbbb').operations[0], sourceInterval: { start: ms(4_000), duration: ms(2_000) } }],
     })
     expect(project.changeSets).toHaveLength(2)
 

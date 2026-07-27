@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
-import { ms, probeJson, testOverlayNode, testPlan } from '../test-fixtures.ts'
+import { ms, probeJson, testOverlayNode, testPlan, testSegmentNode, testSourceFacts } from '../test-fixtures.ts'
 import {
   buildFfmpegArguments,
   createCommandRunner,
@@ -24,22 +24,28 @@ const probe = probeJson
 const PRIMARY_TEXT = String.raw`O'Brien, CEO: C:\clips\[safe]`
 
 describe('FFmpeg render adapter', () => {
-  it('builds an argument array with externalized text, copied audio, bounded placement, and no shell string', () => {
+  it('builds an argument array with externalized text, conformed audio, bounded placement, and no shell string', () => {
     const args = buildFfmpegArguments({
       sourcePath: String.raw`C:\source video.mp4`,
       outputPath: String.raw`C:\trusted output\render.mp4`,
       fontPath: 'font.ttf',
+      ...testSourceFacts,
       plan: testPlan(),
     })
 
     expect(args[args.indexOf('-i') + 1]).toBe(String.raw`C:\source video.mp4`)
     expect(args).toContain('-map')
-    expect(args).toContain('0:a?')
-    expect(args).toContain('copy')
+    expect(args).toContain('[vout]')
+    expect(args).toContain('[acat]')
+    // Audio is conformed and re-encoded. `-c:a copy` could only cut audio at
+    // its own compression block boundaries, so it drifted out of sync with the
+    // picture at the first cut.
+    expect(args).not.toContain('copy')
+    expect(args).toContain('aac')
     expect(args).toContain('-n')
     expect(args).not.toContain('-y')
     expect(args.at(-1)).toBe(String.raw`C:\trusted output\render.mp4`)
-    const filter = args[args.indexOf('-vf') + 1]
+    const filter = args[args.indexOf('-filter_complex') + 1]
     expect(filter).not.toContain('drawbox=')
     expect(filter).toContain('fontcolor=0xffffff@1:fontsize=25')
     expect(filter).toContain('fontcolor=0xffffff@0.78')
@@ -57,10 +63,11 @@ describe('FFmpeg render adapter', () => {
       sourcePath: 'source.mp4',
       outputPath: 'output.mp4',
       fontPath: 'font.ttf',
+      ...testSourceFacts,
       plan: testPlan({
         width: 714,
         height: 1280,
-        nodes: [testOverlayNode({
+        overlays: [testOverlayNode({
           target: { coordinateSpace: 'composition-normalized', point: { x: 0.25, y: 0.25 }, anchor: 'center' },
           primaryText: 'hello text',
           secondaryText: '',
@@ -69,7 +76,7 @@ describe('FFmpeg render adapter', () => {
       }),
     })
 
-    const filter = args[args.indexOf('-vf') + 1]
+    const filter = args[args.indexOf('-filter_complex') + 1]
     expect(filter).not.toContain('drawbox=')
     // 714 is the shortest edge here, so sizes follow it rather than the height.
     expect(filter).toContain(`fontsize=${Math.round(714 * 0.035)}`)
@@ -86,7 +93,8 @@ describe('FFmpeg render adapter', () => {
       sourcePath: 'source.mp4',
       outputPath: 'output.mp4',
       fontPath: 'font.ttf',
-      plan: testPlan({ nodes: [testOverlayNode({ interval: { start: ms(7_000), duration: ms(5_000) } })] }),
+      ...testSourceFacts,
+      plan: testPlan({ overlays: [testOverlayNode({ interval: { start: ms(7_000), duration: ms(5_000) } })] }),
     })).toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
   })
 
@@ -143,28 +151,32 @@ describe('FFmpeg render adapter', () => {
       sourcePath: 'source.mp4',
       outputPath: 'output.mp4',
       fontPath: 'font.ttf',
+      ...testSourceFacts,
     }
 
     expect(() => buildFfmpegArguments({
       ...base,
-      plan: testPlan({ nodes: [testOverlayNode({ interval: { start: ms(0), duration: ms(0) } })] }),
+      plan: testPlan({ overlays: [testOverlayNode({ interval: { start: ms(0), duration: ms(0) } })] }),
     })).toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
     expect(() => buildFfmpegArguments({
       ...base,
-      plan: testPlan({ nodes: [testOverlayNode({ primaryText: 'x'.repeat(4097) })] }),
+      plan: testPlan({ overlays: [testOverlayNode({ primaryText: 'x'.repeat(4097) })] }),
     })).toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
     expect(() => buildFfmpegArguments({
       ...base,
       plan: testPlan({
-        nodes: Array.from({ length: 513 }, (_, index) => testOverlayNode({ nodeId: `operation_${index}` })),
+        overlays: Array.from({ length: 513 }, (_, index) => testOverlayNode({ nodeId: `operation_${index}` })),
       }),
     })).toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
-    expect(() => buildFfmpegArguments({ ...base, plan: testPlan({ nodes: [] }) }))
+    // No overlays is now perfectly legal — a video that was only cut still
+    // exports. What is refused is a plan with no FOOTAGE in it.
+    expect(() => buildFfmpegArguments({ ...base, plan: testPlan({ segments: [] }) }))
       .toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
+    expect(buildFfmpegArguments({ ...base, plan: testPlan({ overlays: [] }) })).toContain('-filter_complex')
     // An unrecognised node is refused, never skipped.
     expect(() => buildFfmpegArguments({
       ...base,
-      plan: testPlan({ nodes: [{ ...testOverlayNode(), kind: 'colour-grade' } as never] }),
+      plan: testPlan({ overlays: [{ ...testOverlayNode(), kind: 'colour-grade' } as never] }),
     })).toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
   })
 
@@ -269,7 +281,7 @@ describe('FFmpeg render adapter', () => {
       sourcePath,
       outputPath,
       trustedWorkDir: work,
-      plan: testPlan({ nodes: [testOverlayNode({ interval: { start: ms(2_050), duration: ms(10) } })] }),
+      plan: testPlan({ overlays: [testOverlayNode({ interval: { start: ms(2_050), duration: ms(10) } })] }),
     })).rejects.toMatchObject({ code: 'RENDER_INPUT_INVALID' })
     expect(runCommand).toHaveBeenCalledOnce()
   })

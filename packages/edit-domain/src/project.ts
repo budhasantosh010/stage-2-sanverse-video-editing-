@@ -14,10 +14,12 @@ import {
 } from './change-set.ts'
 import { emptyExtensions, validateExtensions, type Extensions, type ExtensionsError } from './json.ts'
 import {
+  isTimelineOperation,
   validateOperationAgainstComposition,
   type EditOperation,
   type OperationError,
 } from './operations.ts'
+import { applyTimelineOperation } from './timeline-operations.ts'
 import { PROJECT_TIMESCALE } from './time.ts'
 
 /**
@@ -28,12 +30,24 @@ import { PROJECT_TIMESCALE } from './time.ts'
  * the revision it was computed against, and acceptance fails if the project
  * has moved on since.
  */
+export const PROJECT_SCHEMA_VERSION = 'sanverse.project/v3'
+
 export type EditProject = Readonly<{
-  schemaVersion: 'sanverse.project/v2'
+  schemaVersion: typeof PROJECT_SCHEMA_VERSION
   projectId: string
   revision: number
   timescale: typeof PROJECT_TIMESCALE
   assets: readonly VideoAsset[]
+  /**
+   * The footage as it arrived, before any cut. This never changes.
+   *
+   * What the viewer actually sees is `effectiveComposition(project)`, which is
+   * this plus every accepted cut replayed in order. Storing the starting point
+   * and replaying the edits — rather than storing the current arrangement —
+   * is what makes one cut exactly one Undo, lets a single cut in the middle of
+   * the history be switched off on its own, and guarantees the saved file and
+   * the screen can never drift apart.
+   */
   composition: Composition
   changeSets: readonly ChangeSetRecord[]
   redoStack: readonly ChangeSet[]
@@ -99,7 +113,7 @@ export const createProject = (input: {
   if (!extensions.ok) return extensions
 
   return ok(Object.freeze({
-    schemaVersion: 'sanverse.project/v2',
+    schemaVersion: PROJECT_SCHEMA_VERSION,
     projectId: input.projectId,
     revision: 0,
     timescale: PROJECT_TIMESCALE,
@@ -120,7 +134,7 @@ export const validateProject = (input: unknown): Result<EditProject, ProjectErro
   for (const key of Object.keys(input)) {
     if (!(PROJECT_KEYS as readonly string[]).includes(key)) return err(invalid(key, 'FIELD_UNKNOWN'))
   }
-  if (input.schemaVersion !== 'sanverse.project/v2') return err(invalid('schemaVersion', 'VALUE_OUT_OF_RANGE'))
+  if (input.schemaVersion !== PROJECT_SCHEMA_VERSION) return err(invalid('schemaVersion', 'VALUE_OUT_OF_RANGE'))
   if (typeof input.projectId !== 'string' || !PROJECT_ID_PATTERN.test(input.projectId)) {
     return err(invalid('projectId', 'VALUE_OUT_OF_RANGE'))
   }
@@ -202,7 +216,7 @@ export const validateProject = (input: unknown): Result<EditProject, ProjectErro
   if (!extensions.ok) return extensions
 
   return ok(Object.freeze({
-    schemaVersion: 'sanverse.project/v2',
+    schemaVersion: PROJECT_SCHEMA_VERSION,
     projectId: input.projectId,
     revision: input.revision as number,
     timescale: PROJECT_TIMESCALE,
@@ -218,37 +232,109 @@ export const validateProject = (input: unknown): Result<EditProject, ProjectErro
 const withRevision = (
   project: EditProject,
   changes: Partial<Pick<EditProject, 'changeSets' | 'redoStack' | 'issuedChangeSetIds'>>,
-): EditProject =>
-  Object.freeze({
+): EditProject => {
+  const next = Object.freeze({
     ...project,
     ...changes,
     revision: project.revision + 1,
   })
+  // Every state that leaves this module carries freshly recomputed blocked
+  // reasons, so what is written to disk always matches what a replay produces.
+  return Object.freeze({ ...next, changeSets: evaluateProject(next).records })
+}
+
+export type ProjectEvaluation = Readonly<{
+  /** The footage as it now stands: the imported arrangement plus every cut. */
+  composition: Composition
+  /** The same change sets, each carrying an up-to-date reason if it no longer fits. */
+  records: readonly ChangeSetRecord[]
+}>
 
 /**
- * Recheck every active change set against the current composition.
+ * Replay the accepted history over the imported footage, once.
  *
- * A change set that no longer fits is marked blocked and shown to the user.
- * It is never quietly adjusted to make it pass, because an edit the user did
- * not ask for is worse than an edit that visibly needs attention.
+ * This is the only place in the system that decides two things — what the
+ * finished video is made of, and which change sets no longer fit. Computing
+ * them together in one pass is deliberate: two passes could disagree, and a
+ * disagreement here would mean the screen shows one video and the export
+ * produces another.
+ *
+ * A change set is all-or-nothing. If any operation inside it fails, the whole
+ * change set is marked blocked and none of its operations touch the footage,
+ * because the user approved the request as one thing and half of it is a state
+ * they never agreed to.
+ *
+ * A blocked change set is shown to the user and never quietly adjusted to make
+ * it fit, because an edit the user did not ask for is worse than an edit that
+ * visibly needs attention.
  */
-const revalidate = (
-  composition: Composition,
-  records: readonly ChangeSetRecord[],
-): readonly ChangeSetRecord[] =>
-  Object.freeze(records.map((record) => {
-    if (!record.active) {
-      return record.blockedReason === null ? record : Object.freeze({ ...record, blockedReason: null })
-    }
+export const evaluateProject = (project: EditProject): ProjectEvaluation => {
+  const cleared = (record: ChangeSetRecord): ChangeSetRecord =>
+    record.blockedReason === null ? record : Object.freeze({ ...record, blockedReason: null })
+
+  // Pass one — what the finished video is MADE OF.
+  //
+  // Cuts are replayed in the order they were approved, each against the result
+  // of the ones before it, because that is the order the user made them in.
+  let composition = project.composition
+  const cutFailures = new Map<number, string>()
+
+  project.changeSets.forEach((record, index) => {
+    if (!record.active) return
+    let trial = composition
+    let reason: string | null = null
     for (const operation of record.changeSet.operations) {
+      if (!isTimelineOperation(operation)) continue
+      const applied = applyTimelineOperation(trial, operation, project.assets)
+      if (!applied.ok) {
+        reason = applied.error.reason
+        break
+      }
+      trial = applied.value
+    }
+    if (reason !== null) {
+      cutFailures.set(index, reason)
+      return
+    }
+    composition = trial
+  })
+
+  // Pass two — what is DRAWN on it.
+  //
+  // Overlays are judged against the finished footage, not against the footage
+  // as it stood when they were approved. A nameplate approved before a cut, on
+  // a face the cut later removed, must be reported as no longer showing. Judging
+  // it at its own point in the history would leave it silently invisible.
+  //
+  // The two passes are deliberately one-way: an overlay can never change what
+  // the video is made of. Letting it do so would mean removing a cut could make
+  // an overlay valid again, which could re-apply the cut, which could invalidate
+  // the overlay — a loop with no settled answer.
+  const records = project.changeSets.map((record, index) => {
+    if (!record.active) return cleared(record)
+    const cutFailure = cutFailures.get(index)
+    if (cutFailure !== undefined) return Object.freeze({ ...record, blockedReason: cutFailure })
+
+    for (const operation of record.changeSet.operations) {
+      if (isTimelineOperation(operation)) continue
       const checked = validateOperationAgainstComposition(operation, composition)
       if (!checked.ok) {
-        const reason = checked.error.issues[0]?.code ?? 'OPERATION_INVALID'
-        return Object.freeze({ ...record, blockedReason: reason })
+        return Object.freeze({ ...record, blockedReason: checked.error.issues[0]?.code ?? 'OPERATION_INVALID' })
       }
     }
-    return record.blockedReason === null ? record : Object.freeze({ ...record, blockedReason: null })
-  }))
+    return cleared(record)
+  })
+
+  return Object.freeze({ composition, records: Object.freeze(records) })
+}
+
+/**
+ * What the viewer sees: the imported footage with every accepted cut applied.
+ * Preview, export, and every "does this still fit?" question use this, never
+ * `project.composition`.
+ */
+export const effectiveComposition = (project: EditProject): Composition =>
+  evaluateProject(project).composition
 
 /**
  * Accept one change set as one atomic step.
@@ -286,8 +372,6 @@ export const acceptChangeSet = (
     if (issuedOperationIds.has(operation.operationId)) {
       return err(invalid('operations', 'DUPLICATE_OPERATION_ID'))
     }
-    const checked = validateOperationAgainstComposition(operation, current.value.composition)
-    if (!checked.ok) return checked
   }
 
   const record: ChangeSetRecord = Object.freeze({
@@ -295,12 +379,22 @@ export const acceptChangeSet = (
     active: true,
     blockedReason: null,
   })
-  return ok(withRevision(current.value, {
+  const next = withRevision(current.value, {
     changeSets: Object.freeze([...current.value.changeSets, record]),
     // Accepting new work invalidates the redo branch, exactly like every editor.
     redoStack: Object.freeze([]),
     issuedChangeSetIds: Object.freeze([...current.value.issuedChangeSetIds, changeSet.value.changeSetId]),
-  }))
+  })
+
+  // Acceptance is proved by actually replaying the edit, not by predicting that
+  // it would work. A change set that cannot be applied is refused outright
+  // rather than accepted and then displayed as broken, because "saved, but
+  // doing nothing" is the most confusing state a non-editor can be left in.
+  const accepted = next.changeSets.at(-1)
+  if (accepted?.blockedReason != null) {
+    return err({ code: 'OPERATION_INVALID', issues: [{ path: 'operations', code: accepted.blockedReason as never }] })
+  }
+  return ok(next)
 }
 
 /** Reverse the most recent accepted change set as one step. */
@@ -311,7 +405,7 @@ export const undoChangeSet = (project: EditProject): Result<EditProject, Project
   if (!last) return err({ code: 'NOTHING_TO_UNDO' })
   const remaining = current.value.changeSets.slice(0, -1)
   return ok(withRevision(current.value, {
-    changeSets: revalidate(current.value.composition, remaining),
+    changeSets: Object.freeze(remaining),
     redoStack: Object.freeze([...current.value.redoStack, last.changeSet]),
   }))
 }
@@ -319,17 +413,18 @@ export const undoChangeSet = (project: EditProject): Result<EditProject, Project
 export const redoChangeSet = (project: EditProject): Result<EditProject, ProjectError> => {
   const current = validateProject(project)
   if (!current.ok) return current
-  const next = current.value.redoStack.at(-1)
-  if (!next) return err({ code: 'NOTHING_TO_REDO' })
-  for (const operation of next.operations) {
-    const checked = validateOperationAgainstComposition(operation, current.value.composition)
-    if (!checked.ok) return checked
-  }
-  const record: ChangeSetRecord = Object.freeze({ changeSet: next, active: true, blockedReason: null })
-  return ok(withRevision(current.value, {
+  const pending = current.value.redoStack.at(-1)
+  if (!pending) return err({ code: 'NOTHING_TO_REDO' })
+  const record: ChangeSetRecord = Object.freeze({ changeSet: pending, active: true, blockedReason: null })
+  const next = withRevision(current.value, {
     changeSets: Object.freeze([...current.value.changeSets, record]),
     redoStack: Object.freeze(current.value.redoStack.slice(0, -1)),
-  }))
+  })
+  const restored = next.changeSets.at(-1)
+  if (restored?.blockedReason != null) {
+    return err({ code: 'OPERATION_INVALID', issues: [{ path: 'operations', code: restored.blockedReason as never }] })
+  }
+  return ok(next)
 }
 
 /**
@@ -353,23 +448,29 @@ export const setChangeSetActive = (
     position === index ? Object.freeze({ ...record, active }) : record,
   )
   return ok(withRevision(current.value, {
-    changeSets: revalidate(current.value.composition, updated),
+    changeSets: Object.freeze(updated),
   }))
 }
 
 /**
  * Every operation that actually affects the exported video, in order.
  * Change sets that are switched off or blocked contribute nothing.
+ *
+ * This replays the history rather than trusting the stored blocked flags, so a
+ * project file that was hand-edited, restored from a backup, or written by an
+ * older build cannot make the export disagree with the screen.
  */
 export const activeOperations = (project: EditProject): readonly EditOperation[] =>
   Object.freeze(
-    project.changeSets
-      .filter((record) => record.active && record.blockedReason === null)
+    evaluateProject(project)
+      .records.filter((record) => record.active && record.blockedReason === null)
       .flatMap((record) => record.changeSet.operations),
   )
 
 export const blockedChangeSets = (project: EditProject): readonly ChangeSetRecord[] =>
-  Object.freeze(project.changeSets.filter((record) => record.active && record.blockedReason !== null))
+  Object.freeze(
+    evaluateProject(project).records.filter((record) => record.active && record.blockedReason !== null),
+  )
 
 export const canUndo = (project: EditProject): boolean => project.changeSets.length > 0
 export const canRedo = (project: EditProject): boolean => project.redoStack.length > 0
@@ -397,6 +498,9 @@ export * from './time.ts'
 export * from './geometry.ts'
 export { findAsset, validateVideoAsset, ASSET_ID_PATTERN } from './assets.ts'
 export {
+  MAX_CLIP_GAIN_DB,
+  MIN_CLIP_GAIN_DB,
+  clipAtCompositionTime,
   clipCompositionRange,
   clipTimeToComposition,
   clipTimeToSource,
@@ -405,8 +509,11 @@ export {
   compositionTimeToClip,
   createSingleClipComposition,
   findClip,
+  placeSourceSpan,
+  sourceTimeToClip,
   validateComposition,
   type Clip,
+  type SourceSpanPlacement,
   type Track,
   type TimeAnchor,
 } from './composition.ts'
@@ -415,10 +522,28 @@ export {
   MAX_PRIMARY_TEXT_LENGTH,
   MAX_SECONDARY_TEXT_LENGTH,
   OPERATION_ID_PATTERN,
+  OPERATION_SCHEMA_VERSION,
+  isOverlayOperation,
+  isTimelineOperation,
   validateOperation,
   validateOperationAgainstComposition,
   type AddNameplateOperation,
 } from './operations.ts'
+export {
+  MAX_CLIPS_PER_TRACK,
+  TIMELINE_OPERATION_KINDS,
+  applyTimelineOperation,
+  isTimelineOperationKind,
+  validateTimelineOperation,
+  type RemoveClipOperation,
+  type ReorderClipOperation,
+  type SetClipAudioOperation,
+  type SetClipEnabledOperation,
+  type SplitClipOperation,
+  type TimelineApplyCode,
+  type TimelineOperation,
+  type TrimClipOperation,
+} from './timeline-operations.ts'
 export {
   CHANGE_SET_ID_PATTERN,
   MAX_OPERATIONS_PER_CHANGE_SET,
@@ -427,9 +552,17 @@ export {
   type ChangeSetSource,
 } from './change-set.ts'
 export {
+  AUDIO_LEVEL_COMPONENT_ID,
   CAPABILITY_REGISTRY,
+  CLIP_AUDIO_PRIMITIVE_ID,
+  CLIP_ENABLED_PRIMITIVE_ID,
   NAMEPLATE_COMPONENT_ID,
   NAMEPLATE_PRIMITIVE_ID,
+  REMOVE_PRIMITIVE_ID,
+  REMOVE_RANGE_COMPONENT_ID,
+  REORDER_PRIMITIVE_ID,
+  SPLIT_PRIMITIVE_ID,
+  TRIM_PRIMITIVE_ID,
   capabilityProduces,
   expandCapability,
   findCapability,

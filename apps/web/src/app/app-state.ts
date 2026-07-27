@@ -1,7 +1,10 @@
 import {
+  PROJECT_TIMESCALE,
   TICKS_PER_MILLISECOND,
-  clipCompositionRange,
-  findClip,
+  clipAtCompositionTime,
+  effectiveComposition,
+  isOverlayOperation,
+  placeSourceSpan,
   validateOperation,
   validateOperationAgainstComposition,
   type AddNameplateOperation,
@@ -159,13 +162,21 @@ export function queueEditProposal(
     }
   }
 
-  const fits = validateOperationAgainstComposition(validated.value, state.editProject.composition)
+  if (!isOverlayOperation(validated.value)) {
+    return {
+      ...state,
+      proposal: null,
+      editError: 'The app could not preview this proposal because its edit data is invalid.',
+    }
+  }
+
+  const fits = validateOperationAgainstComposition(validated.value, effectiveComposition(state.editProject))
   if (!fits.ok) {
     const issue = fits.error.issues[0]?.code
     return {
       ...state,
       proposal: null,
-      editError: issue === 'INTERVAL_OUTSIDE_COMPOSITION'
+      editError: issue === 'SOURCE_SPAN_REMOVED'
         ? 'That text would run past the end of this video. Choose an earlier point.'
         : 'This edit does not fit this video. Choose another point and try again.',
     }
@@ -188,6 +199,36 @@ export function queueEditProposal(
     editError: null,
     conversation: { ...state.conversation, status: 'ready', question: null, notice: null },
   }
+}
+
+/**
+ * Where a pending nameplate would appear on screen, right now.
+ *
+ * A nameplate is stored against the original footage, so its on-screen position
+ * is not a number that can be read off it — it has to be worked out from which
+ * pieces of that footage survived cutting. Everything that shows a time to the
+ * user goes through here, so the panel, the time strip, and the preview can
+ * never quote three different numbers.
+ *
+ * Null means the footage it was pinned to is no longer in the video.
+ */
+export function proposalPlacement(
+  project: EditProject,
+  operation: AddNameplateOperation,
+): Readonly<{ startTicks: number; durationTicks: number }> | null {
+  const placements = placeSourceSpan(
+    effectiveComposition(project),
+    operation.assetId,
+    operation.sourceInterval,
+  )
+  if (placements.length === 0) return null
+  const first = placements[0]
+  const last = placements[placements.length - 1]
+  const endTicks = last.compositionRange.start.ticks + last.compositionRange.duration.ticks
+  return Object.freeze({
+    startTicks: first.compositionRange.start.ticks,
+    durationTicks: endTicks - first.compositionRange.start.ticks,
+  })
 }
 
 export type ProposalRepair = Readonly<{
@@ -214,37 +255,37 @@ export function repairProposal(state: StudioState, repair: ProposalRepair): Stud
   const pending = state.proposal
   if (!pending) return state
   const current = pending.operation
-
-  const clip = findClip(state.editProject.composition, current.clipId)
-  if (!clip) {
-    return { ...state, editError: 'That part of the video could not be found. Reopen the project and try again.' }
-  }
-  const clipRange = clipCompositionRange(clip)
-  const clipStart = clipRange.start.ticks
-  const clipEnd = clipStart + clipRange.duration.ticks
+  const composition = effectiveComposition(state.editProject)
 
   const start = repair.startMs === undefined
-    ? current.compositionInterval.start.ticks
+    ? proposalPlacement(state.editProject, current)?.startTicks ?? -1
     : Math.round(repair.startMs) * TICKS_PER_MILLISECOND
   const requestedDuration = repair.durationMs === undefined
-    ? current.compositionInterval.duration.ticks
+    ? current.sourceInterval.duration.ticks
     : Math.round(repair.durationMs) * TICKS_PER_MILLISECOND
 
-  if (start < clipStart || start >= clipEnd) {
+  // The moment the user typed is a moment of the FINISHED video. It has to
+  // land on a piece of footage that is still there; a hole left by "remove but
+  // keep the space" has nothing to pin a nameplate to.
+  const clip = start < 0
+    ? undefined
+    : clipAtCompositionTime(composition, { ticks: start, timescale: PROJECT_TIMESCALE })
+  if (!clip) {
     return { ...state, editError: 'That moment is outside this video. Choose one inside it.' }
   }
+  const clipEnd = clip.compositionStart.ticks + clip.sourceRange.duration.ticks
+
   // Shortening to fit is visible in the preview before anything is accepted,
   // so the user always sees the version they are approving.
   const duration = Math.max(TICKS_PER_MILLISECOND, Math.min(requestedDuration, clipEnd - start))
-
-  const sampledClipTime = Math.min(Math.max(0, start - clipStart), clipRange.duration.ticks - 1)
+  const sourceStart = clip.sourceRange.start.ticks + (start - clip.compositionStart.ticks)
 
   const repaired = {
     ...current,
-    sampledClipTime: { ticks: sampledClipTime, timescale: current.sampledClipTime.timescale },
-    compositionInterval: {
-      start: { ticks: start, timescale: current.compositionInterval.start.timescale },
-      duration: { ticks: duration, timescale: current.compositionInterval.duration.timescale },
+    assetId: clip.assetId,
+    sourceInterval: {
+      start: { ticks: sourceStart, timescale: PROJECT_TIMESCALE },
+      duration: { ticks: duration, timescale: PROJECT_TIMESCALE },
     },
     target: repair.point
       ? { ...current.target, point: { x: repair.point.x, y: repair.point.y } }
@@ -254,10 +295,10 @@ export function repairProposal(state: StudioState, repair: ProposalRepair): Stud
   }
 
   const validated = validateOperation(repaired)
-  if (!validated.ok) {
+  if (!validated.ok || !isOverlayOperation(validated.value)) {
     return { ...state, editError: 'That change could not be applied. The text may be empty or too long.' }
   }
-  const fits = validateOperationAgainstComposition(validated.value, state.editProject.composition)
+  const fits = validateOperationAgainstComposition(validated.value, composition)
   if (!fits.ok) {
     return { ...state, editError: 'That change does not fit this video. Try a different moment.' }
   }

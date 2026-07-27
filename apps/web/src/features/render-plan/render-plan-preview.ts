@@ -53,7 +53,7 @@ export const isNodeVisible = (node: TextOverlayNode, ticks: number): boolean =>
   ticks >= node.interval.start.ticks && ticks < node.interval.start.ticks + node.interval.duration.ticks
 
 export const visibleNodes = (plan: RenderPlan, ticks: number): readonly TextOverlayNode[] =>
-  plan.nodes.filter((node) => isNodeVisible(node, ticks))
+  plan.overlays.filter((node) => isNodeVisible(node, ticks))
 
 export type NameplateCssVariables = Readonly<Record<string, string>>
 
