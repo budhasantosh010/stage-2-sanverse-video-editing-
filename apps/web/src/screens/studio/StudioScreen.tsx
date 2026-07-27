@@ -184,13 +184,17 @@ export function StudioScreen({
     observer?.observe(video)
     video.addEventListener('loadedmetadata', refreshProjection)
     video.addEventListener('resize', refreshProjection)
-    if (hasVideoFrameCallback) {
-      requestNextVideoFrame()
-    } else {
-      video.addEventListener('loadedmetadata', refreshPlayhead)
-      video.addEventListener('timeupdate', refreshPlayhead)
-      video.addEventListener('seeked', refreshPlayhead)
-    }
+
+    // Media events are always listened to, even when frame callbacks are
+    // available. A browser can expose requestVideoFrameCallback and still never
+    // fire it — a background tab, a decoder that never presents a frame — and
+    // with no fallback the preview would silently show nothing at all while
+    // looking perfectly healthy. Frame callbacks give exact timing when they
+    // work; these events guarantee the preview is never simply blank.
+    video.addEventListener('loadedmetadata', refreshPlayhead)
+    video.addEventListener('timeupdate', refreshPlayhead)
+    video.addEventListener('seeked', refreshPlayhead)
+    if (hasVideoFrameCallback) requestNextVideoFrame()
 
     return () => {
       stopped = true
@@ -203,11 +207,9 @@ export function StudioScreen({
       observer?.disconnect()
       video.removeEventListener('loadedmetadata', refreshProjection)
       video.removeEventListener('resize', refreshProjection)
-      if (!hasVideoFrameCallback) {
-        video.removeEventListener('loadedmetadata', refreshPlayhead)
-        video.removeEventListener('timeupdate', refreshPlayhead)
-        video.removeEventListener('seeked', refreshPlayhead)
-      }
+      video.removeEventListener('loadedmetadata', refreshPlayhead)
+      video.removeEventListener('timeupdate', refreshPlayhead)
+      video.removeEventListener('seeked', refreshPlayhead)
     }
   }, [])
 

@@ -16,17 +16,27 @@
   font-display: block;
 }
 
+/* A positioning frame only. It draws nothing itself. */
 .nameplate-overlay {
   position: absolute;
+  inset: 0;
   z-index: 4;
-  display: grid;
-  gap: var(--nameplate-line-gap, 4px);
+  pointer-events: none;
+}
+
+/*
+ * One box per line, because FFmpeg's drawtext draws one box per line. A single
+ * box wrapped around both lines would look tidier in the preview and would not
+ * match the exported video.
+ */
+.nameplate-overlay__primary,
+.nameplate-overlay__secondary {
+  position: absolute;
   padding: var(--nameplate-padding, 8px);
   background: var(--nameplate-background, rgb(0 0 0 / 82%));
-  color: var(--nameplate-primary-color, #fff);
   font-family: 'SanverseNameplate', sans-serif;
   font-weight: 400;
-  pointer-events: none;
+  line-height: 1;
 
   /*
    * Single line, never wrapped. FFmpeg's drawtext cannot wrap, so a wrapping
@@ -37,14 +47,12 @@
   white-space: pre;
 }
 
-.nameplate-overlay strong {
+.nameplate-overlay__primary {
+  color: var(--nameplate-primary-color, #fff);
   font-size: var(--nameplate-primary-size, 1rem);
-  font-weight: 400;
-  line-height: 1;
 }
 
-.nameplate-overlay span {
+.nameplate-overlay__secondary {
   color: var(--nameplate-secondary-color, rgb(255 255 255 / 78%));
   font-size: var(--nameplate-secondary-size, 0.8rem);
-  line-height: 1;
 }

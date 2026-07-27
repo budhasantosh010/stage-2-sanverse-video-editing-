@@ -28,21 +28,34 @@ const evaluateFfmpegExpression = (expression: string, textWidth: number, textHei
     'lt',
     'max',
     'min',
+    'round',
     `return (${javascript})`,
   ) as (
     IF: (condition: number, a: number, b: number) => number,
     lt: (a: number, b: number) => number,
     max: (a: number, b: number) => number,
     min: (a: number, b: number) => number,
+    round: (value: number) => number,
   ) => number
   return evaluate(
     (condition, a, b) => (condition ? a : b),
     (a, b) => (a < b ? 1 : 0),
     Math.max,
     Math.min,
+    Math.round,
   )
 }
 
+/**
+ * Place the same nameplate through both renderers and return both answers as
+ * BOX positions in composition pixels.
+ *
+ * `boxWidth`/`boxHeight` are what the browser measures — the drawn box,
+ * padding included. FFmpeg is given the text size it would measure, which is
+ * that box minus the padding on each side, and its answer is converted back
+ * from a text position to a box position. If the two disagree, the user
+ * approved something the export will not produce.
+ */
 const placeBothWays = (input: {
   pointX: number
   pointY: number
@@ -54,32 +67,33 @@ const placeBothWays = (input: {
 }) => {
   const metrics = resolveNameplateMetrics(input.frameWidth, input.frameHeight)
   const fraction = anchorFraction(input.anchor)
+  const lineHeight = input.boxHeight - metrics.padding * 2
+  const textWidth = input.boxWidth - metrics.padding * 2
+  // FFmpeg's glyph box is shorter than the em box by the font's internal
+  // leading. Simulating that here is what proves the vertical placement no
+  // longer depends on it.
+  const glyphHeight = lineHeight - 8
   const browser = resolveNameplatePlacement({ ...input, safeMargin: metrics.safeMargin })
-  const ffmpeg = {
-    x: evaluateFfmpegExpression(
+  const ffmpegAxis = (axis: 'x' | 'y') => {
+    const text = evaluateFfmpegExpression(
       ffmpegPlacementExpression({
-        axis: 'x',
-        point: input.pointX,
-        anchorFraction: fraction.x,
-        frameSize: input.frameWidth,
+        axis,
+        point: axis === 'x' ? input.pointX : input.pointY,
+        anchorFraction: axis === 'x' ? fraction.x : fraction.y,
+        frameSize: axis === 'x' ? input.frameWidth : input.frameHeight,
         safeMargin: metrics.safeMargin,
+        padding: metrics.padding,
+        lineHeight,
       }),
-      input.boxWidth,
-      input.boxHeight,
-    ),
-    y: evaluateFfmpegExpression(
-      ffmpegPlacementExpression({
-        axis: 'y',
-        point: input.pointY,
-        anchorFraction: fraction.y,
-        frameSize: input.frameHeight,
-        safeMargin: metrics.safeMargin,
-      }),
-      input.boxWidth,
-      input.boxHeight,
-    ),
+      textWidth,
+      glyphHeight,
+    )
+    // Convert the text position FFmpeg uses back to the box corner.
+    return axis === 'x'
+      ? text - metrics.padding
+      : text - metrics.padding - (lineHeight - glyphHeight) / 2
   }
-  return { browser, ffmpeg }
+  return { browser, ffmpeg: { x: ffmpegAxis('x'), y: ffmpegAxis('y') } }
 }
 
 describe('preview and export agree on placement', () => {

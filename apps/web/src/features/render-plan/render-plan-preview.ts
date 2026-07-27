@@ -83,6 +83,16 @@ export const nameplateCssVariables = (
   })
 }
 
+/**
+ * How far below its anchored position the second line is drawn, in composition
+ * pixels. Mirrors the exporter, which offsets the secondary drawtext by exactly
+ * the primary font size plus the line gap.
+ */
+export const secondaryLineOffset = (compositionWidth: number, compositionHeight: number): number => {
+  const metrics = resolveNameplateMetrics(compositionWidth, compositionHeight)
+  return metrics.primaryFontSize + metrics.lineGap
+}
+
 export type PreviewPlacement = Readonly<{ left: number; top: number }>
 
 /**
@@ -98,7 +108,8 @@ export const previewPlacement = (input: {
   readonly compositionWidth: number
   readonly compositionHeight: number
   readonly measuredWidth: number
-  readonly measuredHeight: number
+  /** The line's em-box height in composition pixels: its font size. */
+  readonly lineHeight: number
   readonly scale: number
 }): PreviewPlacement => {
   const metrics = resolveNameplateMetrics(input.compositionWidth, input.compositionHeight)
@@ -108,8 +119,13 @@ export const previewPlacement = (input: {
     anchor: input.node.target.anchor,
     frameWidth: input.compositionWidth,
     frameHeight: input.compositionHeight,
+    // Width is measured, because only the browser knows how wide its own text
+    // is — and FFmpeg measures its own the same way.
     boxWidth: input.scale > 0 ? input.measuredWidth / input.scale : 0,
-    boxHeight: input.scale > 0 ? input.measuredHeight / input.scale : 0,
+    // Height is derived, not measured, so both renderers use the same number.
+    // FFmpeg's text_h is the glyph box and CSS's is the em box; deriving it
+    // from the font size removes that difference entirely.
+    boxHeight: input.lineHeight + metrics.padding * 2,
     safeMargin: metrics.safeMargin,
   })
   return Object.freeze({ left: placement.x * input.scale, top: placement.y * input.scale })

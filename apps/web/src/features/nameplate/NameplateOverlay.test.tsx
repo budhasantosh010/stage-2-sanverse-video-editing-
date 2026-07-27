@@ -39,11 +39,22 @@ describe('NameplateOverlay', () => {
   })
 
   it('stays hidden until it has measured itself, so it is never seen in the wrong place', () => {
-    render(
+    const { container } = render(
       <NameplateOverlay node={plan().nodes[0]} compositionWidth={1920} compositionHeight={1080} scale={0} />,
     )
 
-    expect(screen.getByTestId('nameplate-overlay')).toHaveStyle({ visibility: 'hidden' })
+    expect(container.querySelector('.nameplate-overlay__primary')).toHaveStyle({ visibility: 'hidden' })
+  })
+
+  it('draws one box per line, exactly as the exporter does', () => {
+    // FFmpeg's drawtext draws a box per line. One box wrapped around both lines
+    // would look tidier in the preview and would not match the exported video.
+    const { container } = render(
+      <NameplateOverlay node={plan().nodes[0]} compositionWidth={1920} compositionHeight={1080} scale={1} />,
+    )
+
+    expect(container.querySelectorAll('.nameplate-overlay__primary')).toHaveLength(1)
+    expect(container.querySelectorAll('.nameplate-overlay__secondary')).toHaveLength(1)
   })
 })
 

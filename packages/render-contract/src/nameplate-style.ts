@@ -141,27 +141,69 @@ const clampAxis = (raw: number, boxSize: number, frameSize: number, safeMargin: 
 /**
  * The same clamp, written as an FFmpeg expression.
  *
- * FFmpeg substitutes the real measured text box for `text_w` and `text_h` at
- * render time, so this is not an approximation of the browser's behaviour —
- * it is the identical formula with the identical inputs. The parity test
+ * FFmpeg substitutes the real measured text size for `text_w` and `text_h` at
+ * render time, so this is not an approximation of the browser's behaviour — it
+ * is the identical formula with the identical inputs. The parity test
  * evaluates this string numerically and asserts it matches
- * `resolveNameplatePlacement` exactly.
+ * `resolveNameplatePlacement`.
+ *
+ * Two details matter for that to hold.
+ *
+ * First, what gets anchored is the VISIBLE BOX, not the text inside it. The
+ * user pointed at a place on the picture and expects the thing they can see to
+ * land there. FFmpeg's `x`/`y` position the text, so the padding is added back
+ * at the end.
+ *
+ * Second, the result is rounded here rather than left to FFmpeg, so both
+ * renderers land on the same whole pixel instead of rounding independently.
  */
-export const ffmpegPlacementExpression = (input: {
-  readonly axis: 'x' | 'y'
-  readonly point: number
-  readonly anchorFraction: number
-  readonly frameSize: number
-  readonly safeMargin: number
-}): string => {
-  const boxSize = input.axis === 'x' ? 'text_w' : 'text_h'
+export type FfmpegPlacementInput = Readonly<{
+  axis: 'x' | 'y'
+  point: number
+  anchorFraction: number
+  frameSize: number
+  safeMargin: number
+  padding: number
+  /**
+   * The line's height in composition pixels — its font size. Used instead of
+   * FFmpeg's `text_h` on the vertical axis, because `text_h` measures the
+   * glyphs while CSS measures the em box, and those differ by the font's
+   * internal leading (8 pixels at 28px Arial, measured 2026-07-27). Using a
+   * number both renderers already know makes vertical placement identical for
+   * every anchor rather than only for top-anchored nameplates.
+   */
+  lineHeight: number
+}>
+
+/** Where the visible box's top-left corner goes, in composition pixels. */
+export const ffmpegBoxPositionExpression = (input: FfmpegPlacementInput): string => {
+  const boxSize = input.axis === 'x'
+    ? `(text_w+${2 * input.padding})`
+    : String(input.lineHeight + 2 * input.padding)
   const anchored = `${input.point * input.frameSize}-${boxSize}*${input.anchorFraction}`
   const min = input.safeMargin
   const max = `${input.frameSize - input.safeMargin}-${boxSize}`
   const centred = `(${input.frameSize}-${boxSize})/2`
   // lt(max,min) is the "box does not fit the safe area" case.
-  return `if(lt(${max}\\,${min})\\,${centred}\\,max(${min}\\,min(${max}\\,${anchored})))`
+  return `round(if(lt(${max}\\,${min})\\,${centred}\\,max(${min}\\,min(${max}\\,${anchored}))))`
 }
+
+/**
+ * From the box's corner to where FFmpeg wants the text drawn.
+ *
+ * Horizontally that is just the padding. Vertically the glyphs are also
+ * centred inside the em box, so a shorter glyph box sits in the same place the
+ * browser's line box does.
+ */
+export const ffmpegTextInsetExpression = (
+  axis: 'x' | 'y',
+  padding: number,
+  lineHeight: number,
+): string => (axis === 'x' ? `+${padding}` : `+${padding}+(${lineHeight}-text_h)/2`)
+
+/** Box position and text inset combined: the value FFmpeg's `x`/`y` takes. */
+export const ffmpegPlacementExpression = (input: FfmpegPlacementInput): string =>
+  `${ffmpegBoxPositionExpression(input)}${ffmpegTextInsetExpression(input.axis, input.padding, input.lineHeight)}`
 
 export const toFfmpegColor = (hex: string, opacity: number): string =>
   `0x${hex.replace('#', '')}@${opacity}`

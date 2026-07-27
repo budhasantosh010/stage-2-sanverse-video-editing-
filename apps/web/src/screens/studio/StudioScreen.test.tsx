@@ -482,10 +482,12 @@ describe('StudioScreen', () => {
       width: '100%',
       height: '56.25%',
     })
-    // Position now comes from the shared placement rule after the box measures
-    // itself. jsdom reports a zero-sized box, so the overlay stays hidden here
-    // rather than being drawn somewhere it does not belong.
-    expect(screen.getByTestId('nameplate-overlay')).toHaveStyle({ visibility: 'hidden' })
+    // Position now comes from the shared placement rule after each line box
+    // measures itself. jsdom reports a zero-sized box, so the lines stay hidden
+    // rather than being drawn somewhere they do not belong.
+    expect(container.querySelector('.nameplate-overlay__primary')).toHaveStyle({ visibility: 'hidden' })
+    // Two boxes, one per line, exactly as FFmpeg's drawtext draws them.
+    expect(container.querySelectorAll('.nameplate-overlay__primary, .nameplate-overlay__secondary')).toHaveLength(2)
 
     video.currentTime = 17.4
     act(() => {
@@ -494,17 +496,35 @@ describe('StudioScreen', () => {
     expect(screen.queryByTestId('nameplate-overlay')).not.toBeInTheDocument()
   })
 
-  it('uses video frames as the only playback clock when frame callbacks are available', () => {
+  it('keeps the preview alive on media events even when frame callbacks never fire', () => {
+    // A browser can expose requestVideoFrameCallback and still never call it —
+    // a background tab, a decoder that presents no frame. Verified in a real
+    // browser on 2026-07-27, where it fired zero times and the preview showed
+    // nothing at all while looking perfectly healthy. Media events are the
+    // safety net that stops the preview from silently going blank.
+    const { container } = renderStudio({ proposal: nameplate })
+    const video = container.querySelector('video') as HTMLVideoElement
+    prepareVideoForPointing(video, 0)
+    fireEvent.loadedMetadata(video)
+    expect(videoFrameCallback).not.toBeNull()
+
+    video.currentTime = 12.4
+    fireEvent.seeked(video)
+    expect(screen.getByTestId('nameplate-overlay')).toHaveTextContent('Santosh')
+
+    video.currentTime = 17.4
+    fireEvent.timeUpdate(video)
+    expect(screen.queryByTestId('nameplate-overlay')).not.toBeInTheDocument()
+  })
+
+  it('prefers the exact frame time when frame callbacks do fire', () => {
     const { container } = renderStudio({ proposal: nameplate })
     const video = container.querySelector('video') as HTMLVideoElement
     prepareVideoForPointing(video, 0)
     fireEvent.loadedMetadata(video)
 
-    video.currentTime = 12.4
-    fireEvent.timeUpdate(video)
-    fireEvent.seeked(video)
-    expect(screen.queryByTestId('nameplate-overlay')).not.toBeInTheDocument()
-
+    // The element's currentTime lags the presented frame; the frame's own
+    // mediaTime is the accurate one, so it must win.
     act(() => {
       videoFrameCallback?.(0, { mediaTime: 12.4 } as VideoFrameCallbackMetadata)
     })

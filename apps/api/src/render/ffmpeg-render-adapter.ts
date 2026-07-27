@@ -8,7 +8,8 @@ import { validateRenderPlan, type RenderPlan, type TextOverlayNode } from '@sanv
 import {
   NAMEPLATE_STYLE_V1,
   anchorFraction,
-  ffmpegPlacementExpression,
+  ffmpegBoxPositionExpression,
+  ffmpegTextInsetExpression,
   resolveNameplateMetrics,
   toFfmpegColor,
 } from '@sanverse/render-contract/nameplate-style'
@@ -74,22 +75,25 @@ function nameplateFilters(node: TextOverlayNode, index: number, plan: RenderPlan
 
   const hasSecondary = node.secondaryText.length > 0
 
-  // The whole block is anchored as one unit, then each line is drawn inside it,
-  // so the two lines cannot drift apart from each other.
-  const blockX = ffmpegPlacementExpression({
-    axis: 'x',
-    point: node.target.point.x,
-    anchorFraction: fraction.x,
-    frameSize: plan.width,
-    safeMargin: metrics.safeMargin,
-  })
-  const blockY = ffmpegPlacementExpression({
-    axis: 'y',
-    point: node.target.point.y,
-    anchorFraction: fraction.y,
-    frameSize: plan.height,
-    safeMargin: metrics.safeMargin,
-  })
+  const boxPosition = (axis: 'x' | 'y', lineHeight: number) =>
+    ffmpegBoxPositionExpression({
+      axis,
+      point: axis === 'x' ? node.target.point.x : node.target.point.y,
+      anchorFraction: axis === 'x' ? fraction.x : fraction.y,
+      frameSize: axis === 'x' ? plan.width : plan.height,
+      safeMargin: metrics.safeMargin,
+      padding: metrics.padding,
+      lineHeight,
+    })
+
+  // Each line is anchored on its own, exactly as the preview measures and
+  // places each of its two boxes.
+  const primaryX = `${boxPosition('x', metrics.primaryFontSize)}${ffmpegTextInsetExpression('x', metrics.padding, metrics.primaryFontSize)}`
+  const primaryY = `${boxPosition('y', metrics.primaryFontSize)}${ffmpegTextInsetExpression('y', metrics.padding, metrics.primaryFontSize)}`
+  const secondaryX = `${boxPosition('x', metrics.secondaryFontSize)}${ffmpegTextInsetExpression('x', metrics.padding, metrics.secondaryFontSize)}`
+  // The second line's box sits a fixed distance below the first line's box.
+  const secondaryY = `${boxPosition('y', metrics.primaryFontSize)}+${metrics.primaryFontSize + metrics.lineGap}` +
+    ffmpegTextInsetExpression('y', metrics.padding, metrics.secondaryFontSize)
 
   const background = toFfmpegColor(NAMEPLATE_STYLE_V1.backgroundColor, NAMEPLATE_STYLE_V1.backgroundOpacity)
   const shared =
@@ -99,16 +103,13 @@ function nameplateFilters(node: TextOverlayNode, index: number, plan: RenderPlan
   const filters = [
     `drawtext=${shared}:textfile='primary-${index}.txt'` +
       `:fontcolor=${toFfmpegColor(NAMEPLATE_STYLE_V1.primaryColor, NAMEPLATE_STYLE_V1.primaryOpacity)}` +
-      `:fontsize=${metrics.primaryFontSize}:x=${blockX}:y=${blockY}`,
+      `:fontsize=${metrics.primaryFontSize}:x=${primaryX}:y=${primaryY}`,
   ]
   if (hasSecondary) {
-    // The second line sits a fixed gap below the first, using the same anchored
-    // block origin rather than a separately anchored position.
-    const secondaryY = `(${blockY})+${metrics.primaryFontSize + metrics.lineGap}`
     filters.push(
       `drawtext=${shared}:textfile='secondary-${index}.txt'` +
         `:fontcolor=${toFfmpegColor(NAMEPLATE_STYLE_V1.secondaryColor, NAMEPLATE_STYLE_V1.secondaryOpacity)}` +
-        `:fontsize=${metrics.secondaryFontSize}:x=${blockX}:y=${secondaryY}`,
+        `:fontsize=${metrics.secondaryFontSize}:x=${secondaryX}:y=${secondaryY}`,
     )
   }
   return filters
