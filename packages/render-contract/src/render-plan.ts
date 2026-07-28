@@ -46,7 +46,28 @@ export type TextOverlayNode = Readonly<{
   styleId: string
 }>
 
-export type RenderNode = TextOverlayNode
+/**
+ * One caption on screen.
+ *
+ * A separate node kind from `text-overlay` on purpose. A caption is not "a text
+ * overlay that happens to be at the bottom": it carries one to three stacked
+ * lines instead of a primary/secondary pair, it has no user-chosen position,
+ * and it is drawn with its own style. Reusing the nameplate node would have
+ * forced every renderer to branch on the style id to work out which set of
+ * rules applied, and a branch like that is exactly where the preview and the
+ * export drift apart.
+ */
+export type CaptionOverlayNode = Readonly<{
+  nodeId: string
+  kind: 'caption-overlay'
+  /** When it is on screen, in finished-video time. */
+  interval: TimeRange
+  /** One to three lines, top to bottom. Never contains a newline. */
+  lines: readonly string[]
+  styleId: string
+}>
+
+export type RenderNode = TextOverlayNode | CaptionOverlayNode
 
 export type RenderPlan = Readonly<{
   schemaVersion: 'sanverse.render-plan/v2'
@@ -83,8 +104,14 @@ export type RenderPlanError = {
 }
 
 export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v2'
-export const MAX_RENDER_NODES = 512
+/**
+ * Raised from 512 because captions produce one node per line of speech. A
+ * ten-minute talk is roughly 200 cues before cutting, and a cut through a cue
+ * splits it in two, so the ceiling has to leave real headroom above that.
+ */
+export const MAX_RENDER_NODES = 4_096
 export const MAX_RENDER_SEGMENTS = 512
+export const MAX_CAPTION_LINES_PER_NODE = 3
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -239,21 +266,32 @@ export const validateRenderPlan = (
       }
       // An unrecognised node changes what the viewer sees, so it is refused,
       // never skipped.
-      if (node.kind !== 'text-overlay') {
+      if (node.kind !== 'text-overlay' && node.kind !== 'caption-overlay') {
         issues.push({ path: `${path}.kind`, code: 'NODE_KIND_UNKNOWN' })
         return
       }
       if (typeof node.nodeId !== 'string' || node.nodeId.length === 0) {
         issues.push({ path: `${path}.nodeId`, code: 'VALUE_OUT_OF_RANGE' })
       }
-      if (typeof node.primaryText !== 'string' || node.primaryText.length === 0) {
-        issues.push({ path: `${path}.primaryText`, code: 'VALUE_OUT_OF_RANGE' })
-      }
-      if (typeof node.secondaryText !== 'string') {
-        issues.push({ path: `${path}.secondaryText`, code: 'TYPE_INVALID' })
-      }
       if (typeof node.styleId !== 'string' || node.styleId.length === 0) {
         issues.push({ path: `${path}.styleId`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      if (node.kind === 'caption-overlay') {
+        if (
+          !Array.isArray(node.lines) ||
+          node.lines.length === 0 ||
+          node.lines.length > MAX_CAPTION_LINES_PER_NODE ||
+          node.lines.some((line) => typeof line !== 'string' || line.length === 0 || /[\r\n]/.test(line))
+        ) {
+          issues.push({ path: `${path}.lines`, code: 'VALUE_OUT_OF_RANGE' })
+        }
+      } else {
+        if (typeof node.primaryText !== 'string' || node.primaryText.length === 0) {
+          issues.push({ path: `${path}.primaryText`, code: 'VALUE_OUT_OF_RANGE' })
+        }
+        if (typeof node.secondaryText !== 'string') {
+          issues.push({ path: `${path}.secondaryText`, code: 'TYPE_INVALID' })
+        }
       }
       const interval = readInterval(node.interval)
       if (interval === null) {
@@ -268,8 +306,10 @@ export const validateRenderPlan = (
         // already been previewed, accepted, and written to disk.
         issues.push({ path: `${path}.interval`, code: 'NODE_OUTSIDE_COMPOSITION' })
       }
-      if (!isRecord(node.target) || !isRecord(node.target.point) || typeof node.target.anchor !== 'string') {
-        issues.push({ path: `${path}.target`, code: 'TYPE_INVALID' })
+      if (node.kind === 'text-overlay') {
+        if (!isRecord(node.target) || !isRecord(node.target.point) || typeof node.target.anchor !== 'string') {
+          issues.push({ path: `${path}.target`, code: 'TYPE_INVALID' })
+        }
       }
     })
   }

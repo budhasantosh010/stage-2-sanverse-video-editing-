@@ -16,6 +16,7 @@ import { createFakeIntentAdapter } from './intent/fake-intent-adapter.ts'
 import { createIntentProvider, describeIntentProvider, resolveIntentProviderConfig } from './intent/intent-provider-config.ts'
 import type { IntentProviderPort } from './intent/intent-port.ts'
 import { createIntentService, type IntentService } from './intent/intent-service.ts'
+import { buildCaptionsChangeSet } from './transcripts/build-captions.ts'
 import { createFfmpegRenderAdapter } from './render/ffmpeg-render-adapter.ts'
 import { createRenderService } from './render/render-service.ts'
 
@@ -238,6 +239,61 @@ export function createSanverseServer(options: ServerOptions) {
         }
         const project = await projectState.accept(projectId, (payload as { changeSet: unknown }).changeSet)
         json(response, 201, { project })
+        return
+      }
+
+      // Captions from a transcript file the user already has.
+      //
+      // Nothing leaves the machine. The file is read, cut into readable lines
+      // by fixed arithmetic, and handed to the SAME acceptance the browser uses
+      // for every other edit — so captions cannot bypass revision fencing,
+      // history, or Undo.
+      const captionsMatch = /^\/api\/projects\/([^/]+)\/captions$/.exec(requestUrl.pathname)
+      if (request.method === 'POST' && captionsMatch) {
+        const projectId = captionsMatch[1]
+        if (!PROJECT_ID_PATTERN.test(projectId)) { request.resume(); json(response, 404, { error: 'Project was not found.' }); return }
+        const payload = await readJsonBody(request)
+        const contents = typeof payload === 'object' && payload !== null
+          ? (payload as { transcript?: unknown }).transcript
+          : undefined
+        if (typeof contents !== 'string' || contents.length === 0) {
+          throw new ApiRequestError('INVALID_JSON', 'A transcript file is required.')
+        }
+
+        const current = await projectState.load(projectId)
+        const asset = current.assets[0]
+        if (!asset) { json(response, 404, { error: 'Project was not found.' }); return }
+
+        const built = buildCaptionsChangeSet({
+          contents,
+          asset,
+          baseRevision: current.revision,
+          ids: {
+            transcriptId: `transcript_${randomBytes(16).toString('hex')}`,
+            captionSetId: `captions_${randomBytes(16).toString('hex')}`,
+            operationId: `operation_${randomBytes(16).toString('hex')}`,
+            changeSetId: `changeset_${randomBytes(16).toString('hex')}`,
+          },
+        })
+        if (!built.ok) {
+          // A file that cannot be read is the user's problem to fix, not a
+          // server fault, so it is a 400 with a sentence they can act on.
+          json(response, 400, { error: built.error.message })
+          return
+        }
+
+        const project = await projectState.accept(projectId, built.value.changeSet)
+        // Everything the pipeline had to change is reported back, so the screen
+        // can tell the user rather than quietly presenting an adjusted result.
+        json(response, 201, {
+          project,
+          report: {
+            cueCount: built.value.cueCount,
+            adjustments: built.value.adjustments,
+            skipped: built.value.skipped,
+            language: built.value.transcript.language,
+          },
+        })
         return
       }
 

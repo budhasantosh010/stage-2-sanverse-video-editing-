@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ms, probeJson, testOverlayNode, testPlan, testSegmentNode, testSourceFacts } from '../test-fixtures.ts'
 import {
   buildFfmpegArguments,
+  buildFilterGraph,
   createCommandRunner,
   createFfmpegRenderAdapter,
   type CommandInvocation,
@@ -25,13 +26,14 @@ const PRIMARY_TEXT = String.raw`O'Brien, CEO: C:\clips\[safe]`
 
 describe('FFmpeg render adapter', () => {
   it('builds an argument array with externalized text, conformed audio, bounded placement, and no shell string', () => {
-    const args = buildFfmpegArguments({
+    const graphInput = {
       sourcePath: String.raw`C:\source video.mp4`,
       outputPath: String.raw`C:\trusted output\render.mp4`,
       fontPath: 'font.ttf',
       ...testSourceFacts,
       plan: testPlan(),
-    })
+    }
+    const args = buildFfmpegArguments(graphInput)
 
     expect(args[args.indexOf('-i') + 1]).toBe(String.raw`C:\source video.mp4`)
     expect(args).toContain('-map')
@@ -45,7 +47,7 @@ describe('FFmpeg render adapter', () => {
     expect(args).toContain('-n')
     expect(args).not.toContain('-y')
     expect(args.at(-1)).toBe(String.raw`C:\trusted output\render.mp4`)
-    const filter = args[args.indexOf('-filter_complex') + 1]
+    const filter = buildFilterGraph(graphInput)
     expect(filter).not.toContain('drawbox=')
     expect(filter).toContain('fontcolor=0xffffff@1:fontsize=25')
     expect(filter).toContain('fontcolor=0xffffff@0.78')
@@ -59,7 +61,7 @@ describe('FFmpeg render adapter', () => {
   })
 
   it('takes every visual number from the shared style contract, scaled to the video', () => {
-    const args = buildFfmpegArguments({
+    const graphInput = {
       sourcePath: 'source.mp4',
       outputPath: 'output.mp4',
       fontPath: 'font.ttf',
@@ -74,9 +76,10 @@ describe('FFmpeg render adapter', () => {
           interval: { start: ms(0), duration: ms(5_000) },
         })],
       }),
-    })
+    }
+    buildFfmpegArguments(graphInput)
 
-    const filter = args[args.indexOf('-filter_complex') + 1]
+    const filter = buildFilterGraph(graphInput)
     expect(filter).not.toContain('drawbox=')
     // 714 is the shortest edge here, so sizes follow it rather than the height.
     expect(filter).toContain(`fontsize=${Math.round(714 * 0.035)}`)
@@ -165,14 +168,16 @@ describe('FFmpeg render adapter', () => {
     expect(() => buildFfmpegArguments({
       ...base,
       plan: testPlan({
-        overlays: Array.from({ length: 513 }, (_, index) => testOverlayNode({ nodeId: `operation_${index}` })),
+        // The ceiling rose to 4,096 when captions arrived: a captioned
+        // ten-minute talk is ~200 cues, and a cut through one makes it two.
+        overlays: Array.from({ length: 4_097 }, (_, index) => testOverlayNode({ nodeId: `operation_${index}` })),
       }),
     })).toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
     // No overlays is now perfectly legal — a video that was only cut still
     // exports. What is refused is a plan with no FOOTAGE in it.
     expect(() => buildFfmpegArguments({ ...base, plan: testPlan({ segments: [] }) }))
       .toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
-    expect(buildFfmpegArguments({ ...base, plan: testPlan({ overlays: [] }) })).toContain('-filter_complex')
+    expect(buildFfmpegArguments({ ...base, plan: testPlan({ overlays: [] }) })).toContain('-filter_complex_script')
     // An unrecognised node is refused, never skipped.
     expect(() => buildFfmpegArguments({
       ...base,

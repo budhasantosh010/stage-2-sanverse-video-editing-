@@ -68,19 +68,28 @@ Legend:
 
 ## G5-A - Captions and speech metadata
 
-- [ ] G5A-01 Approve caption workflow and creative references
-- [ ] G5A-02 Define transcript/word-timing sidecar contract
-- [ ] G5A-03 Implement Stage 1 sidecar import adapter
-- [ ] G5A-04 Implement optional transcription adapter boundary
-- [ ] G5A-05 Define caption segment and style operations
-- [ ] G5A-06 Implement deterministic segmentation and correction
-- [ ] G5A-07 Implement caption timing repair
-- [ ] G5A-08 Compile captions to canonical render nodes
-- [ ] G5A-09 Implement browser preview
-- [ ] G5A-10 Implement export rendering
-- [ ] G5A-11 Implement timeline-change invalidation/reflow
-- [ ] G5A-12 Run readability, timing, fidelity, and owner visual gates
-- [ ] G5A-13 Owner exports a publishable captioned video
+Decisions: ADR-006. Evidence: `DOCS/evidence/2026-07-28-g5a-captions.md`.
+"Domain only" means the rule is built, tested, and reaches the export, but no
+button offers it yet - the owner cannot get to it from the screen.
+
+- [ ] G5A-01 Approve caption workflow and creative references - owner gate
+- [x] G5A-02 Define transcript/word-timing sidecar contract
+- [x] G5A-03 Implement Stage 1 sidecar import adapter - the Whisper word-timing
+      shape, implemented from its published form; NOT verified against a real
+      Stage 1 file, because none exists here yet (ADR-006 records the assumption)
+- [x] G5A-04 Implement optional transcription adapter boundary - the port, its
+      rules, and a refusing default; no real service is wired
+- [x] G5A-05 Define caption segment and style operations
+- [x] G5A-06 Implement deterministic segmentation and correction - correction
+      exists as `set-caption-cue`; domain only, no control on screen
+- [x] G5A-07 Implement caption timing repair
+- [x] G5A-08 Compile captions to canonical render nodes
+- [x] G5A-09 Implement browser preview
+- [x] G5A-10 Implement export rendering
+- [x] G5A-11 Implement timeline-change invalidation/reflow
+- [ ] G5A-12 Run readability, timing, fidelity, and owner visual gates - the
+      transcript used was synthetic; English only; no owner visual verdict
+- [ ] G5A-13 Owner exports a publishable captioned video - owner gate
 
 ## G5-B - Timeline and editorial primitives
 

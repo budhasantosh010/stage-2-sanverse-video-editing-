@@ -14,11 +14,13 @@ import {
 } from './change-set.ts'
 import { emptyExtensions, validateExtensions, type Extensions, type ExtensionsError } from './json.ts'
 import {
+  isCaptionOperation,
   isTimelineOperation,
   validateOperationAgainstComposition,
   type EditOperation,
   type OperationError,
 } from './operations.ts'
+import { foldCaptionOperations, type CaptionSet } from './caption-operations.ts'
 import { applyTimelineOperation } from './timeline-operations.ts'
 import { PROJECT_TIMESCALE } from './time.ts'
 
@@ -472,6 +474,16 @@ export const blockedChangeSets = (project: EditProject): readonly ChangeSetRecor
     evaluateProject(project).records.filter((record) => record.active && record.blockedReason !== null),
   )
 
+/**
+ * The caption sets as they currently stand, after every accepted edit to them.
+ *
+ * Derived from the same replay as everything else, so a caption the user
+ * reworded is the reworded caption everywhere: preview, export, and the panel
+ * that lists them cannot disagree.
+ */
+export const activeCaptionSets = (project: EditProject): readonly CaptionSet[] =>
+  foldCaptionOperations(activeOperations(project).filter(isCaptionOperation))
+
 export const canUndo = (project: EditProject): boolean => project.changeSets.length > 0
 export const canRedo = (project: EditProject): boolean => project.redoStack.length > 0
 
@@ -523,12 +535,62 @@ export {
   MAX_SECONDARY_TEXT_LENGTH,
   OPERATION_ID_PATTERN,
   OPERATION_SCHEMA_VERSION,
+  isCaptionOperation,
   isOverlayOperation,
   isTimelineOperation,
   validateOperation,
   validateOperationAgainstComposition,
   type AddNameplateOperation,
 } from './operations.ts'
+export {
+  CAPTION_CUE_ID_PATTERN,
+  CAPTION_OPERATION_KINDS,
+  CAPTION_SET_ID_PATTERN,
+  CAPTION_STYLE_IDS,
+  DEFAULT_CAPTION_STYLE_ID,
+  MAX_CAPTION_CUES,
+  MAX_CAPTION_LINES,
+  MAX_CAPTION_LINE_LENGTH,
+  foldCaptionOperations,
+  isCaptionOperationKind,
+  validateCaptionOperation,
+  type AddCaptionsOperation,
+  type CaptionCue,
+  type CaptionOperation,
+  type CaptionSet,
+  type CaptionStyleId,
+  type RemoveCaptionCueOperation,
+  type SetCaptionCueOperation,
+  type SetCaptionStyleOperation,
+} from './caption-operations.ts'
+export {
+  MAX_TRANSCRIPT_SEGMENTS,
+  MAX_WORDS,
+  TRANSCRIPT_ID_PATTERN,
+  TRANSCRIPT_SCHEMA_VERSION,
+  TRANSCRIPT_SEGMENT_ID_PATTERN,
+  transcriptWordCount,
+  transcriptWords,
+  validateTranscript,
+  type Transcript,
+  type TranscriptSegment,
+  type TranscriptWord,
+} from './transcript.ts'
+export {
+  DEFAULT_SEGMENTATION,
+  segmentTranscript,
+  wrapIntoLines,
+  type CaptionCueDraft,
+  type SegmentationOptions,
+} from './captions/segment-transcript.ts'
+export {
+  DEFAULT_REPAIR,
+  cuesAreDisjoint,
+  repairCueTimings,
+  type CueAdjustment,
+  type CueRepairOptions,
+  type CueRepairResult,
+} from './captions/repair-cues.ts'
 export {
   MAX_CLIPS_PER_TRACK,
   TIMELINE_OPERATION_KINDS,
@@ -554,6 +616,10 @@ export {
 export {
   AUDIO_LEVEL_COMPONENT_ID,
   CAPABILITY_REGISTRY,
+  CAPTIONS_COMPONENT_ID,
+  CAPTIONS_PRIMITIVE_ID,
+  CAPTION_CUE_PRIMITIVE_ID,
+  CAPTION_STYLE_PRIMITIVE_ID,
   CLIP_AUDIO_PRIMITIVE_ID,
   CLIP_ENABLED_PRIMITIVE_ID,
   NAMEPLATE_COMPONENT_ID,

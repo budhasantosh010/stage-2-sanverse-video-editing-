@@ -28,6 +28,7 @@ import { uploadProject } from '../features/project-intake/project-intake'
 import { exportProject, type ProjectExportState } from '../features/project-export/project-export'
 import {
   acceptChangeSet,
+  addCaptionsFromTranscript,
   listRecentProjects,
   loadProject,
   redoProject,
@@ -321,6 +322,22 @@ export function App() {
             fetch,
           ),
         )
+      }}
+      onAddCaptions={async (transcript) => {
+        if (appState.screen !== 'studio' || appState.proposal) return 'Finish the pending edit first.'
+        resetExport()
+        try {
+          const next = await addCaptionsFromTranscript(appState.project.id, transcript, fetch)
+          setAppState((current) =>
+            current.screen === 'studio' ? { ...current, editProject: next, editError: null } : current,
+          )
+          return null
+        } catch (error) {
+          // The server's sentence is shown as it is. It was written for a
+          // non-editor, and rewording it here would make two different
+          // explanations of the same failure.
+          return error instanceof Error && error.message ? error.message : 'Captions could not be added.'
+        }
       }}
       onAcceptProposal={() => {
         if (appState.screen !== 'studio' || !appState.proposal) return

@@ -1,4 +1,5 @@
 import {
+  activeCaptionSets,
   activeOperations,
   compositionDuration,
   effectiveComposition,
@@ -87,6 +88,31 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
       }))
     }
   }
+  // Captions, placed by exactly the same rule as everything else drawn on top.
+  //
+  // One cue can become two nodes when a cut passed through it, so node ids are
+  // qualified by the piece of footage they landed on. A cue whose footage was
+  // deleted simply produces no node — it is not an error, and the rest of the
+  // captions are unaffected. See `validateOperationAgainstComposition` for why
+  // that differs from a nameplate.
+  for (const set of activeCaptionSets(project)) {
+    for (const cue of set.cues) {
+      const placements = placeSourceSpan(composition, set.assetId, cue.sourceInterval)
+      for (const [index, placement] of placements.entries()) {
+        if (!placement.clip.enabled) continue
+        overlays.push(Object.freeze({
+          nodeId: index === 0
+            ? `${set.captionSetId}.${cue.cueId}`
+            : `${set.captionSetId}.${cue.cueId}.${placement.clip.clipId}`,
+          kind: 'caption-overlay' as const,
+          interval: placement.compositionRange,
+          lines: cue.lines,
+          styleId: set.styleId,
+        }))
+      }
+    }
+  }
+
   overlays.sort((left, right) => left.interval.start.ticks - right.interval.start.ticks)
 
   const plan = {

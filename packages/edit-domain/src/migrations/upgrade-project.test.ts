@@ -76,6 +76,7 @@ describe('upgrading a saved v1 project', () => {
     const result = migrate([action({ actionId: 'action-original' })])
     if (!result.ok) throw new Error('setup failed')
     const operation = activeOperations(result.value.project)[0]
+    if (operation.kind !== 'add-nameplate') throw new Error('expected a nameplate')
     expect(operation.extensions['sanverse.migration/legacy-action-id']).toBe('action-original')
   })
 

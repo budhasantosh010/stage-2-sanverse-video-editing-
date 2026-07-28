@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/render-plan.ts",
     "./nameplate-style": "./src/nameplate-style.ts",
+    "./caption-style": "./src/caption-style.ts",
     "./compile-project": "./src/compile-project.ts"
   },
   "dependencies": {

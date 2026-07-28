@@ -176,7 +176,9 @@ describe('compiling the footage a video is made of', () => {
     // Two on-screen appearances, so two identifiers — a renderer keying on
     // nodeId must not silently draw only one of them.
     expect(compiled.value.overlays[0].nodeId).not.toBe(compiled.value.overlays[1].nodeId)
-    expect(compiled.value.overlays[0].primaryText).toBe(compiled.value.overlays[1].primaryText)
+    const [first, second] = compiled.value.overlays
+    if (first.kind !== 'text-overlay' || second.kind !== 'text-overlay') throw new Error('expected nameplates')
+    expect(first.primaryText).toBe(second.primaryText)
   })
 
   it('leaves a hole rather than shifting everything when a piece is hidden', () => {

@@ -4,7 +4,12 @@ import { chmod, copyFile, link, lstat, mkdir, realpath, rm, stat, writeFile } fr
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 
 import { PROJECT_TIMESCALE } from '@sanverse/edit-domain/time'
-import { validateRenderPlan, type RenderPlan, type TextOverlayNode } from '@sanverse/render-contract'
+import {
+  validateRenderPlan,
+  type CaptionOverlayNode,
+  type RenderPlan,
+  type TextOverlayNode,
+} from '@sanverse/render-contract'
 import {
   NAMEPLATE_STYLE_V1,
   anchorFraction,
@@ -13,6 +18,12 @@ import {
   resolveNameplateMetrics,
   toFfmpegColor,
 } from '@sanverse/render-contract/nameplate-style'
+import {
+  captionLineTop,
+  ffmpegCaptionXExpression,
+  resolveCaptionMetrics,
+  resolveCaptionStyle,
+} from '@sanverse/render-contract/caption-style'
 
 import { createCommandRunner, type CommandRunner } from '../process/command-runner.ts'
 import { createFfprobeMediaProbe, type MediaProbePort } from '../media/media-probe.ts'
@@ -131,6 +142,54 @@ function nameplateFilters(node: TextOverlayNode, index: number, plan: RenderPlan
   return filters
 }
 
+/**
+ * Build the drawtext filters for one caption.
+ *
+ * One filter per LINE, because FFmpeg's drawtext draws a single line and has no
+ * way to wrap. The wrapping decision was already made, deterministically, in
+ * the domain (`segmentTranscript`), so both renderers receive the lines already
+ * split and neither can wrap them differently.
+ *
+ * Every number comes from the shared caption style. This file decides nothing
+ * about how a caption looks.
+ */
+function captionFilters(node: CaptionOverlayNode, index: number, plan: RenderPlan, fontPath: string): string[] {
+  const style = resolveCaptionStyle(node.styleId)
+  const metrics = resolveCaptionMetrics(plan.width, plan.height, style)
+  const startSeconds = ticksToSeconds(node.interval.start.ticks)
+  const endSeconds = ticksToSeconds(node.interval.start.ticks + node.interval.duration.ticks)
+  const enable = `gte(t\\,${startSeconds})*lt(t\\,${endSeconds})`
+  const x = ffmpegCaptionXExpression(plan.width)
+
+  return node.lines.map((_line, lineIndex) => {
+    const boxTop = captionLineTop(lineIndex, node.lines.length, plan.height, metrics)
+    // Same em-box correction as the nameplate: FFmpeg's `text_h` measures the
+    // glyphs while CSS measures the line box, so the difference is split evenly
+    // to land the glyphs where the browser puts them.
+    const y = `${boxTop + metrics.padding}+(${metrics.fontSize}-text_h)/2`
+
+    const parts = [
+      `fontfile='${fontPath}'`,
+      `textfile='caption-${index}-${lineIndex}.txt'`,
+      `fontcolor=${toFfmpegColor(style.textColor, style.textOpacity)}`,
+      `fontsize=${metrics.fontSize}`,
+      `x=${x}`,
+      `y=${y}`,
+      'fix_bounds=1',
+      'expansion=none',
+      `enable='${enable}'`,
+    ]
+    if (style.backgroundColor !== null) {
+      parts.push('box=1', `boxcolor=${toFfmpegColor(style.backgroundColor, style.backgroundOpacity)}`)
+      parts.push(`boxborderw=${metrics.padding}`)
+    }
+    if (metrics.outlineWidth > 0) {
+      parts.push(`borderw=${metrics.outlineWidth}`, `bordercolor=${toFfmpegColor(style.outlineColor, 1)}`)
+    }
+    return `drawtext=${parts.join(':')}`
+  })
+}
+
 /** One stretch of the finished video: either real footage or a deliberate hole. */
 type TimelinePiece =
   | { readonly kind: 'footage'; readonly durationTicks: number; readonly segment: RenderPlan['segments'][number] }
@@ -162,7 +221,24 @@ export function layOutTimeline(plan: RenderPlan): readonly TimelinePiece[] {
   return Object.freeze(pieces)
 }
 
-export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
+/**
+ * The filter graph is written to a file, not put on the command line.
+ *
+ * A captioned ten-minute talk produces roughly 200 cues, each up to two lines,
+ * each one drawtext filter of about 250 characters — some 100,000 characters of
+ * graph. Windows caps a whole command line at 32,767 characters, so the inline
+ * form would have worked for nameplates and then failed the first time a real
+ * video was captioned, with an error from the operating system that says
+ * nothing about captions.
+ *
+ * Writing the graph to a file removes the ceiling entirely, and it is used for
+ * every export rather than only the large ones, so there is one code path and
+ * no size at which behaviour changes.
+ */
+export const FILTER_GRAPH_FILENAME = 'filtergraph.txt'
+
+/** The whole filter graph as one string: cuts, holes, and everything drawn on top. */
+export function buildFilterGraph(input: BuildArgumentsInput): string {
   const plan = validateRenderPlan(input.plan)
   if (!plan.ok) {
     throw renderError('RENDER_INPUT_INVALID', 'The render plan is invalid.')
@@ -233,6 +309,15 @@ export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
 
   const overlayFilters: string[] = []
   plan.value.overlays.forEach((node, index) => {
+    if (node.kind === 'caption-overlay') {
+      for (const line of node.lines) {
+        if (Buffer.byteLength(line, 'utf8') > MAX_TEXT_BYTES) {
+          throw renderError('RENDER_INPUT_INVALID', 'A caption exceeds the render text limit.')
+        }
+      }
+      overlayFilters.push(...captionFilters(node, index, plan.value, input.fontPath))
+      return
+    }
     if (
       Buffer.byteLength(node.primaryText, 'utf8') > MAX_TEXT_BYTES ||
       Buffer.byteLength(node.secondaryText, 'utf8') > MAX_TEXT_BYTES
@@ -246,13 +331,25 @@ export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
   // but no nameplates takes exactly the same code path.
   graph.push(`[vcat]${overlayFilters.length > 0 ? overlayFilters.join(',') : 'null'}[vout]`)
 
+  return graph.join(';')
+}
+
+/**
+ * The full FFmpeg command, reading its filter graph from
+ * `FILTER_GRAPH_FILENAME` in the working directory the adapter creates.
+ */
+export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
+  // Built and discarded here purely so an invalid plan or frame rate is refused
+  // by the same code path whether a caller wants the graph or the command.
+  buildFilterGraph(input)
+
   return [
     '-hide_banner',
     '-loglevel', 'error',
     '-nostdin',
     '-n',
     '-i', input.sourcePath,
-    '-filter_complex', graph.join(';'),
+    '-filter_complex_script', FILTER_GRAPH_FILENAME,
     '-map', '[vout]',
     ...(input.hasAudio ? ['-map', '[acat]'] : []),
     '-c:v', 'libx264',
@@ -380,23 +477,29 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
           throw renderError('RENDER_PATH_INVALID', 'The private render workspace is not safe.')
         }
         await copyFile(paths.fontPath, resolve(renderTempDir, 'font.ttf'), constants.COPYFILE_EXCL)
+        // Text is handed to FFmpeg in files rather than on the command line, so
+        // nothing a user typed can be read as filter syntax.
+        const write = (name: string, contents: string) =>
+          writeFile(resolve(renderTempDir, name), contents, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
         await Promise.all(plan.value.overlays.flatMap((node, index) => {
-          const files = [
-            writeFile(resolve(renderTempDir, `primary-${index}.txt`), node.primaryText, { encoding: 'utf8', flag: 'wx', mode: 0o600 }),
-          ]
-          if (node.secondaryText.length > 0) {
-            files.push(writeFile(resolve(renderTempDir, `secondary-${index}.txt`), node.secondaryText, { encoding: 'utf8', flag: 'wx', mode: 0o600 }))
+          if (node.kind === 'caption-overlay') {
+            return node.lines.map((line, lineIndex) => write(`caption-${index}-${lineIndex}.txt`, line))
           }
+          const files = [write(`primary-${index}.txt`, node.primaryText)]
+          if (node.secondaryText.length > 0) files.push(write(`secondary-${index}.txt`, node.secondaryText))
           return files
         }))
-        const command = buildFfmpegArguments({
+
+        const buildInput = {
           sourcePath: paths.sourcePath,
           outputPath: partialPath,
           fontPath: 'font.ttf',
           plan: plan.value,
           frameRate,
           hasAudio: sourceProbe.hasAudio,
-        })
+        }
+        await write(FILTER_GRAPH_FILENAME, buildFilterGraph(buildInput))
+        const command = buildFfmpegArguments(buildInput)
         const rendered = await runCommand({
           executable: ffmpegExecutable,
           args: command,

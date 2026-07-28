@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AddNameplateOperation, EditProject, TimelineOperation } from '@sanverse/edit-domain'
 import {
+  DEFAULT_CAPTION_STYLE_ID,
   PROJECT_TIMESCALE,
   TICKS_PER_MILLISECOND as TICKS_PER_MS,
   compositionDuration,
@@ -27,15 +28,18 @@ import {
   type PlaybackSegment,
 } from '../../features/render-plan/segment-playback'
 import {
+  captionCssVariables,
   compilePreviewPlan,
   millisecondsToTicks,
   nameplateCssVariables,
-  visibleNodes,
+  visibleCaptions,
+  visibleNameplates,
   withPendingProposal,
 } from '../../features/render-plan/render-plan-preview'
 import type { ProjectExportState } from '../../features/project-export/project-export'
 import { NameplateComposer } from '../../features/nameplate/NameplateComposer'
 import { NameplateOverlay } from '../../features/nameplate/NameplateOverlay'
+import { CaptionOverlay } from '../../features/captions/CaptionOverlay'
 import {
   capturePointTarget,
   formatPointTargetTime,
@@ -56,6 +60,11 @@ export type StudioScreenProps = {
   onRepairProposal(repair: ProposalRepair): void
   /** Apply one cut immediately. The server decides the resulting revision. */
   onTimelineEdit(operation: TimelineOperation): void
+  /**
+   * Hand a transcript file's text to the server and adopt what comes back.
+   * Resolves to a plain sentence when it could not be used, or null on success.
+   */
+  onAddCaptions(transcript: string): Promise<string | null>
   onSendMessage(message: string, context: IntentContextInput): void
   onUndo(): void
   onRedo(): void
@@ -138,6 +147,7 @@ export function StudioScreen({
   onAcceptProposal,
   onRepairProposal,
   onTimelineEdit,
+  onAddCaptions: onAddCaptionsText,
   onSendMessage,
   onUndo,
   onRedo,
@@ -168,6 +178,8 @@ export function StudioScreen({
   const [proposalResult, setProposalResult] = useState<string | null>(null)
   /** A plain sentence explaining why a cut was not made. */
   const [timelineNotice, setTimelineNotice] = useState<string | null>(null)
+  const [captionsNotice, setCaptionsNotice] = useState<string | null>(null)
+  const [captionsBusy, setCaptionsBusy] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const pointModeButtonRef = useRef<HTMLButtonElement>(null)
   const pointLayerRef = useRef<HTMLButtonElement>(null)
@@ -387,10 +399,21 @@ export function StudioScreen({
   const previewPlan = compilePreviewPlan(
     proposal ? withPendingProposal(editProject, proposal.operation) : editProject,
   )
-  const previewNodes = previewPlan ? visibleNodes(previewPlan, millisecondsToTicks(playheadMs)) : []
+  const playheadPreviewTicks = millisecondsToTicks(playheadMs)
+  const previewNodes = previewPlan ? visibleNameplates(previewPlan, playheadPreviewTicks) : []
+  const previewCaptions = previewPlan ? visibleCaptions(previewPlan, playheadPreviewTicks) : []
   const contentBox = video ? getRenderedVideoContentBox(video.getBoundingClientRect(), video.videoWidth, video.videoHeight) : null
   const previewScale = contentBox && composition.width > 0 ? contentBox.width / composition.width : 0
   const nameplateVariables = nameplateCssVariables(composition.width, composition.height, previewScale)
+  // Only one caption is ever on screen, so one set of variables is enough. Two
+  // caption sets with different looks would need one layer each; that arrives
+  // with multi-asset projects, not before.
+  const captionVariables = captionCssVariables(
+    previewCaptions[0]?.styleId ?? DEFAULT_CAPTION_STYLE_ID,
+    composition.width,
+    composition.height,
+    previewScale,
+  )
 
   const acceptedRecords = editProject.changeSets
   const acceptedCount = acceptedRecords.length
@@ -445,6 +468,29 @@ export function StudioScreen({
     }
     setTimelineNotice(null)
     onTimelineEdit(result.operation)
+  }
+
+  /**
+   * Read a transcript file and let the server turn it into captions.
+   *
+   * The browser reads the file only to get its text; it does no parsing, no
+   * line breaking, and no timing. All of that happens once, on the server, so
+   * the captions that were saved and the captions being previewed are the same
+   * captions by construction.
+   */
+  async function onAddCaptions(file: File): Promise<void> {
+    if (captionsBusy || timelineBusy) return
+    setCaptionsBusy(true)
+    setCaptionsNotice(null)
+    try {
+      const text = await file.text()
+      const failure = await onAddCaptionsText(text)
+      setCaptionsNotice(failure ?? 'Captions added.')
+    } catch {
+      setCaptionsNotice('That file could not be read.')
+    } finally {
+      setCaptionsBusy(false)
+    }
   }
 
   const proposalPlaced = proposal ? proposalPlacement(editProject, proposal.operation) : null
@@ -652,10 +698,19 @@ export function StudioScreen({
                 <div
                   className="studio-screen__video-content-layer"
                   data-testid="video-content-layer"
-                  style={{ ...videoContentLayerStyle, ...nameplateVariables }}
+                  style={{ ...videoContentLayerStyle, ...nameplateVariables, ...captionVariables }}
                 >
                   {previewNodes.map((node) => (
                     <NameplateOverlay
+                      key={node.nodeId}
+                      node={node}
+                      compositionWidth={composition.width}
+                      compositionHeight={composition.height}
+                      scale={previewScale}
+                    />
+                  ))}
+                  {previewCaptions.map((node) => (
+                    <CaptionOverlay
                       key={node.nodeId}
                       node={node}
                       compositionWidth={composition.width}
@@ -943,6 +998,36 @@ export function StudioScreen({
             {timelineNotice}
           </p>
         ) : null}
+
+        <div className="studio-screen__captions">
+          <h3>Captions</h3>
+          <p>
+            Choose the transcript file for this video. Nothing is sent anywhere — the
+            words are read on this machine and turned into readable lines for you.
+          </p>
+          <label className="studio-screen__captions-picker">
+            <span>Add captions from a transcript file</span>
+            <input
+              type="file"
+              accept="application/json,.json"
+              disabled={timelineBusy || captionsBusy}
+              data-testid="caption-file-input"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0]
+                // The picker is cleared straight away so choosing the same file
+                // twice still fires, which is what a user expects after a
+                // failure they have just fixed.
+                event.currentTarget.value = ''
+                if (file) void onAddCaptions(file)
+              }}
+            />
+          </label>
+          {captionsNotice ? (
+            <p className="studio-screen__track-notice" role="status">
+              {captionsNotice}
+            </p>
+          ) : null}
+        </div>
       </section>
     </main>
   )

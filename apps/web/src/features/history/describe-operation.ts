@@ -41,6 +41,20 @@ export const describeOperation = (operation: EditOperation): string => {
       if (operation.fadeOut.ticks > 0) parts.push('faded out')
       return parts.length > 0 ? `Sound: ${parts.join(', ')}` : 'Sound left unchanged'
     }
+    case 'add-captions': {
+      const count = operation.cues.length
+      return `Added captions — ${count} ${count === 1 ? 'line' : 'lines'}`
+    }
+    case 'set-caption-cue':
+      // The new words are shown rather than "edited a caption", because the
+      // history is how a user finds the change they want to undo.
+      return `Changed a caption to "${operation.lines.join(' ')}"`
+    case 'remove-caption-cue':
+      return 'Removed one caption'
+    case 'set-caption-style':
+      return operation.styleId === 'sanverse.caption.plain/v1'
+        ? 'Captions: no background'
+        : 'Captions: dark background'
     default: {
       const unreachable: never = operation
       void unreachable

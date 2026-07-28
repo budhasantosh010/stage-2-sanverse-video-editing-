@@ -124,6 +124,28 @@ export async function acceptChangeSet(
   return editRequest(projectId, `/api/projects/${projectId}/change-sets`, jsonInit('POST', { changeSet }, signal), 201, fetcher)
 }
 
+/**
+ * Send a transcript file and get back the project with captions on it.
+ *
+ * The file's TEXT is sent, not the file. The browser never decides where lines
+ * break or when a caption appears — the server does all of that and returns the
+ * result — so the preview cannot disagree with what was saved.
+ */
+export async function addCaptionsFromTranscript(
+  projectId: string,
+  transcript: string,
+  fetcher: typeof fetch = fetch,
+  signal?: AbortSignal,
+): Promise<EditProject> {
+  return editRequest(
+    projectId,
+    `/api/projects/${projectId}/captions`,
+    jsonInit('POST', { transcript }, signal),
+    201,
+    fetcher,
+  )
+}
+
 export async function undoProject(projectId: string, fetcher: typeof fetch = fetch, signal?: AbortSignal): Promise<EditProject> {
   return editRequest(projectId, `/api/projects/${projectId}/undo`, { method: 'POST', signal }, 200, fetcher)
 }

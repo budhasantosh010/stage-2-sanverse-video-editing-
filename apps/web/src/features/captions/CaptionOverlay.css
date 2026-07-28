@@ -1,0 +1,44 @@
+/*
+ * Every value here comes from the shared caption style contract, passed in as
+ * CSS variables. This file defines no product semantics of its own: it must not
+ * introduce a font, size, colour, position, or wrapping rule the exporter does
+ * not also apply.
+ */
+
+/* A positioning frame only. It draws nothing itself. */
+.caption-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/*
+ * One box per line, because FFmpeg's drawtext draws one box per line, and each
+ * line's vertical position is computed by the shared contract rather than by
+ * stacking boxes in a flow. Laying them out with flexbox would look identical
+ * on most captions and would drift on the ones where it did not.
+ */
+.caption-overlay__line {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--caption-padding, 5px);
+  background: var(--caption-background, rgb(0 0 0 / 75%));
+  color: var(--caption-color, #fff);
+  font-family: 'SanverseNameplate', sans-serif;
+  font-size: var(--caption-size, 1rem);
+  font-weight: 400;
+  line-height: 1;
+  text-shadow: var(--caption-outline, none);
+
+  /*
+   * Never wrapped. The line breaks were already decided, deterministically, by
+   * `segmentTranscript` in the domain, and both renderers receive them already
+   * split. A preview that re-wrapped would show a different number of lines
+   * from the export.
+   */
+  width: max-content;
+  max-width: none;
+  white-space: pre;
+}

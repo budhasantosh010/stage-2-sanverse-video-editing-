@@ -13,12 +13,19 @@ const plan = () => {
   return compiled
 }
 
+/** The plan can now hold captions too, so the nameplate is asked for by kind. */
+const firstNameplate = (compiled: ReturnType<typeof plan>) => {
+  const node = compiled.overlays.find((entry) => entry.kind === 'text-overlay')
+  if (!node || node.kind !== 'text-overlay') throw new Error('fixture failed')
+  return node
+}
+
 afterEach(cleanup)
 
 describe('NameplateOverlay', () => {
   it('renders both lines of the node it is given', () => {
     render(
-      <NameplateOverlay node={plan().overlays[0]} compositionWidth={1920} compositionHeight={1080} scale={1} />,
+      <NameplateOverlay node={firstNameplate(plan())} compositionWidth={1920} compositionHeight={1080} scale={1} />,
     )
 
     const overlay = screen.getByTestId('nameplate-overlay')
@@ -31,7 +38,7 @@ describe('NameplateOverlay', () => {
     if (!compiled) throw new Error('fixture failed')
 
     render(
-      <NameplateOverlay node={compiled.overlays[0]} compositionWidth={1920} compositionHeight={1080} scale={1} />,
+      <NameplateOverlay node={firstNameplate(compiled)} compositionWidth={1920} compositionHeight={1080} scale={1} />,
     )
 
     expect(screen.getByText('Santosh')).toBeInTheDocument()
@@ -40,7 +47,7 @@ describe('NameplateOverlay', () => {
 
   it('stays hidden until it has measured itself, so it is never seen in the wrong place', () => {
     const { container } = render(
-      <NameplateOverlay node={plan().overlays[0]} compositionWidth={1920} compositionHeight={1080} scale={0} />,
+      <NameplateOverlay node={firstNameplate(plan())} compositionWidth={1920} compositionHeight={1080} scale={0} />,
     )
 
     expect(container.querySelector('.nameplate-overlay__primary')).toHaveStyle({ visibility: 'hidden' })
@@ -50,7 +57,7 @@ describe('NameplateOverlay', () => {
     // FFmpeg's drawtext draws a box per line. One box wrapped around both lines
     // would look tidier in the preview and would not match the exported video.
     const { container } = render(
-      <NameplateOverlay node={plan().overlays[0]} compositionWidth={1920} compositionHeight={1080} scale={1} />,
+      <NameplateOverlay node={firstNameplate(plan())} compositionWidth={1920} compositionHeight={1080} scale={1} />,
     )
 
     expect(container.querySelectorAll('.nameplate-overlay__primary')).toHaveLength(1)

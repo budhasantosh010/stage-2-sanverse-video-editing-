@@ -30,6 +30,12 @@ export const REORDER_PRIMITIVE_ID = 'sanverse.timeline.reorder.primitive/v1'
 export const CLIP_ENABLED_PRIMITIVE_ID = 'sanverse.timeline.enabled.primitive/v1'
 export const CLIP_AUDIO_PRIMITIVE_ID = 'sanverse.timeline.audio.primitive/v1'
 
+export const CAPTIONS_PRIMITIVE_ID = 'sanverse.captions.add.primitive/v1'
+export const CAPTION_CUE_PRIMITIVE_ID = 'sanverse.captions.cue.primitive/v1'
+export const CAPTION_STYLE_PRIMITIVE_ID = 'sanverse.captions.style.primitive/v1'
+/** "Put captions on my video." */
+export const CAPTIONS_COMPONENT_ID = 'sanverse.captions.component/v1'
+
 /** "Take out the part between these two moments and close the gap." */
 export const REMOVE_RANGE_COMPONENT_ID = 'sanverse.timeline.remove-range.component/v1'
 /** "Make this stretch quieter, or fade it." */
@@ -103,6 +109,38 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     accepts: 'One piece of footage, a loudness change, and ramps at each end.',
     produces: Object.freeze(['set-clip-audio']),
     requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: CAPTIONS_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One piece of footage, a look, and a list of lines each with its own moment.',
+    produces: Object.freeze(['add-captions']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: CAPTION_CUE_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One caption line to reword, retime, or delete.',
+    produces: Object.freeze(['set-caption-cue', 'remove-caption-cue']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: CAPTION_STYLE_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One set of captions and the look they should all take.',
+    produces: Object.freeze(['set-caption-style']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: CAPTIONS_COMPONENT_ID,
+    version: 1,
+    level: 'component' as const,
+    accepts: 'Captions for what is spoken, cut into readable lines automatically.',
+    produces: Object.freeze(['add-captions']),
+    requires: Object.freeze([CAPTIONS_PRIMITIVE_ID]),
   }),
   Object.freeze({
     capabilityId: REMOVE_RANGE_COMPONENT_ID,

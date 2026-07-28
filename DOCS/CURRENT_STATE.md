@@ -39,6 +39,19 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
   description of a nameplate. Browser preview and FFmpeg export compile the same
   plan, and a parity test evaluates the exact FFmpeg placement expression
   numerically. The exporter's font is served to the browser. ADR-003.
+- **G5-A captions (built end to end, on a transcript file).** A transcript is
+  a per-asset sidecar, never inside the project, because it is evidence about
+  footage rather than a decision the user made. Captions are one `add-captions`
+  operation holding many cues, so "put captions on my video" is one Undo, and
+  later corrections are small operations folded over it in history order. Line
+  breaking is pure deterministic arithmetic in the domain, so a re-render cannot
+  differ from what was approved. Every cue is anchored to the original footage,
+  so cutting moves them with the words; cues whose footage is deleted simply do
+  not draw, and only a set with nothing left surviving is blocked. ADR-006.
+- **G5-A rendering.** A new `caption-overlay` node kind, one shared caption style
+  contract read by both CSS and FFmpeg, and the filter graph moved out of the
+  command line into a file so a fully captioned video cannot exceed the
+  operating system's command-line limit.
 - **G5-B cutting (complete in the domain, the renderer, and the screen).**
   Cuts are ordinary operations in ordinary change sets, so one cut is one Undo
   and a single cut in the middle of the history can be switched off on its own.
@@ -68,13 +81,13 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
 ## Test and build state
 
 ```
-  edit-domain      134
-  render-contract   28
+  edit-domain      198
+  render-contract   35
   intent-domain     27
-  api              162
-  web              191
+  api              198
+  web              200
   ------------------------
-  total            542 passing; all workspace builds clean
+  total            658 passing; all workspace builds clean
 ```
 
 ## Owner evidence still open
@@ -95,7 +108,12 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
   are built, tested, and reach the export, but nothing offers them yet.
 - Creating a deliberate hole from the screen. The remove button always closes
   the gap; holes exist in the domain, the preview, and the export only.
-- Captions and speech metadata
+- A control on screen for rewording, retiming, or deleting one caption, or for
+  changing the caption look. All four are built, tested, and reach the export.
+- Automatic transcription against a real service. The boundary, its consent
+  rule, and a refusing default adapter exist; nothing is wired.
+- A verified Stage 1 transcript format. The importer follows the published
+  Whisper word-timing shape and has never seen a real Stage 1 file.
 - Transform, crop, scale, rotation, keyframes, easing, spring/bounce,
   transitions, or general effects
 - Reusable versioned titles, callouts, subtitle components, B-roll, or templates
@@ -114,6 +132,12 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
   percentage or time estimate. Deprioritized by the owner.
 - Only one frame rate has been exercised on real media: 30/1 constant. Variable
   frame rate and 30000/1001 fixtures are G5B-13 and have not been run.
+- Captions have been proved with one English, synthetic transcript on one
+  recording. Right-to-left scripts and CJK line breaking are untested; the
+  segmentation rules (42 characters, 17 characters per second) are Latin-script
+  assumptions.
+- A transcript upload is capped at 1 MB by the shared JSON body limit, which is
+  roughly a 20-minute transcript with word timings.
 - A change set holding both a cut and an overlay can have the cut applied while
   being reported blocked for its overlay. No such change set exists today; G7
   must resolve it before compound requests ship. ADR-005.

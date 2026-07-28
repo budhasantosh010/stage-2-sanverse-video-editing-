@@ -1,10 +1,12 @@
 import type { VideoAsset } from './assets.ts'
 import { NAMEPLATE_COMPONENT_ID } from './capabilities.ts'
 import type { ChangeSet } from './change-set.ts'
-import { OPERATION_SCHEMA_VERSION, type AddNameplateOperation } from './operations.ts'
+import { OPERATION_SCHEMA_VERSION, type AddNameplateOperation, type EditOperation } from './operations.ts'
+import { DEFAULT_CAPTION_STYLE_ID, type AddCaptionsOperation } from './caption-operations.ts'
 import { createProject, type EditProject } from './project.ts'
 import type { TimelineOperation } from './timeline-operations.ts'
 import {
+  CAPTIONS_COMPONENT_ID,
   CLIP_AUDIO_PRIMITIVE_ID,
   CLIP_ENABLED_PRIMITIVE_ID,
   REMOVE_PRIMITIVE_ID,
@@ -155,11 +157,32 @@ export const testSetAudio = (
   ...overrides,
 })
 
+export const TEST_CAPTION_SET_ID = 'captions_aaaaaaaa'
+
+/** Captions covering source seconds 1-2, 3-4, and 5-6 by default. */
+export const testCaptions = (
+  overrides: Partial<AddCaptionsOperation> = {},
+): AddCaptionsOperation => ({
+  schemaVersion: OPERATION_SCHEMA_VERSION,
+  operationId: 'operation_caption1',
+  kind: 'add-captions',
+  capabilityId: CAPTIONS_COMPONENT_ID,
+  captionSetId: TEST_CAPTION_SET_ID,
+  assetId: TEST_ASSET_ID,
+  styleId: DEFAULT_CAPTION_STYLE_ID,
+  cues: [
+    { cueId: 'cue_0001', sourceInterval: { start: ms(1_000), duration: ms(1_000) }, lines: ['first line'] },
+    { cueId: 'cue_0002', sourceInterval: { start: ms(3_000), duration: ms(1_000) }, lines: ['second line'] },
+    { cueId: 'cue_0003', sourceInterval: { start: ms(5_000), duration: ms(1_000) }, lines: ['third line'] },
+  ],
+  ...overrides,
+})
+
 /** A change set holding whatever operations a test needs. */
 export const changeSetOf = (
   changeSetId: string,
   baseRevision: number,
-  operations: readonly (AddNameplateOperation | TimelineOperation)[],
+  operations: readonly EditOperation[],
 ): ChangeSet => ({
   schemaVersion: 'sanverse.change-set/v1',
   changeSetId,

@@ -15,6 +15,12 @@ import {
   type TimelineOperation,
 } from './timeline-operations.ts'
 import {
+  CAPTION_OPERATION_KINDS,
+  isCaptionOperationKind,
+  validateCaptionOperation,
+  type CaptionOperation,
+} from './caption-operations.ts'
+import {
   validateTimeRange,
   type TimeRange,
 } from './time.ts'
@@ -68,12 +74,13 @@ export type AddNameplateOperation = Readonly<{
   extensions: Extensions
 }>
 
-export type EditOperation = AddNameplateOperation | TimelineOperation
+export type EditOperation = AddNameplateOperation | TimelineOperation | CaptionOperation
 
 /** Every operation kind this build can execute. Unknown kinds are rejected. */
 export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze([
   'add-nameplate',
   ...TIMELINE_OPERATION_KINDS,
+  ...CAPTION_OPERATION_KINDS,
 ])
 
 /** True for the operations that change which footage the finished video is made of. */
@@ -83,6 +90,10 @@ export const isTimelineOperation = (operation: EditOperation): operation is Time
 /** True for the operations that draw on top of whatever footage survives. */
 export const isOverlayOperation = (operation: EditOperation): operation is AddNameplateOperation =>
   operation.kind === 'add-nameplate'
+
+/** True for the operations that describe captions. */
+export const isCaptionOperation = (operation: EditOperation): operation is CaptionOperation =>
+  isCaptionOperationKind(operation.kind)
 
 export type OperationIssueCode =
   | 'TYPE_INVALID'
@@ -95,6 +106,11 @@ export type OperationIssueCode =
   | 'ASSET_NOT_IN_COMPOSITION'
   | 'SOURCE_SPAN_REMOVED'
   | 'TEXT_TOO_LONG'
+  | 'TOO_MANY_CUES'
+  | 'DUPLICATE_CUE_ID'
+  | 'CUES_OVERLAP'
+  | 'CUES_EMPTY'
+  | 'ALL_CUES_REMOVED'
 
 export type OperationError = {
   readonly code: 'OPERATION_INVALID'
@@ -198,6 +214,20 @@ export const validateOperation = (input: unknown, path = '$'): Result<EditOperat
     return err({ code: 'OPERATION_INVALID', issues: [{ path: `${path}.kind`, code: 'OPERATION_KIND_UNKNOWN' }] })
   }
 
+  if (isCaptionOperationKind(input.kind)) {
+    const captions = validateCaptionOperation(input, path)
+    if (!captions.ok) {
+      return err({
+        code: 'OPERATION_INVALID',
+        issues: captions.error.issues.map((issue) => ({
+          path: issue.path,
+          code: issue.code as OperationIssueCode,
+        })),
+      })
+    }
+    return ok(captions.value)
+  }
+
   if (isTimelineOperationKind(input.kind)) {
     const timeline = validateTimelineOperation(input, path)
     if (!timeline.ok) {
@@ -234,6 +264,43 @@ export const validateOperationAgainstComposition = (
   if (isTimelineOperation(operation)) {
     if (!findClip(composition, operation.clipId)) {
       return err({ code: 'OPERATION_INVALID', issues: [{ path: `${path}.clipId`, code: 'CLIP_UNKNOWN' }] })
+    }
+    return ok(operation)
+  }
+
+  if (isCaptionOperation(operation)) {
+    // Captions are judged as a SET, not cue by cue, and this differs from a
+    // nameplate on purpose.
+    //
+    // A nameplate is one statement about one moment: if its moment is deleted,
+    // the whole statement is meaningless and must be reported. A caption set is
+    // hundreds of statements about hundreds of moments, and cutting ten seconds
+    // out of the middle legitimately deletes some of them. Blocking all 150
+    // captions because 3 lost their footage would leave the user with a silent,
+    // caption-free video and a warning they cannot act on.
+    //
+    // So: cues whose footage is gone simply do not draw, and the set is blocked
+    // only when NOTHING survives — which is the only case where "your captions
+    // are not showing" is the honest thing to say.
+    if (operation.kind !== 'add-captions') return ok(operation)
+
+    const usesAsset = composition.tracks.some((track) =>
+      track.clips.some((clip) => clip.assetId === operation.assetId),
+    )
+    if (!usesAsset) {
+      return err({
+        code: 'OPERATION_INVALID',
+        issues: [{ path: `${path}.assetId`, code: 'ASSET_NOT_IN_COMPOSITION' }],
+      })
+    }
+    const anySurvives = operation.cues.some(
+      (cue) => placeSourceSpan(composition, operation.assetId, cue.sourceInterval).length > 0,
+    )
+    if (!anySurvives) {
+      return err({
+        code: 'OPERATION_INVALID',
+        issues: [{ path: `${path}.cues`, code: 'ALL_CUES_REMOVED' }],
+      })
     }
     return ok(operation)
   }
