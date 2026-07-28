@@ -358,7 +358,7 @@ describe('local API boundary', () => {
     // the engine finally knows how long the video actually is.
     const opened = await call(port, { path: `/api/projects/${PROJECT_ID}` })
     const openedBody = JSON.parse(new TextDecoder().decode(opened.body))
-    expect(openedBody).toMatchObject({ ...MANIFEST, project: { schemaVersion: 'sanverse.project/v3', revision: 0 } })
+    expect(openedBody).toMatchObject({ ...MANIFEST, project: { schemaVersion: 'sanverse.project/v4', revision: 0 } })
     expect(openedBody.project.composition.width).toBe(1280)
 
     const accepted = await sendJson(port, 'POST', `/api/projects/${PROJECT_ID}/change-sets`, { changeSet: changeSet(0) })
@@ -385,7 +385,7 @@ describe('local API boundary', () => {
 
     const reopened = await call(port, { path: `/api/projects/${PROJECT_ID}` })
     expect(JSON.parse(new TextDecoder().decode(reopened.body)).project.changeSets[0].active).toBe(false)
-    expect(JSON.parse(state.serialized() ?? '{}').schemaVersion).toBe('sanverse.project/v3')
+    expect(JSON.parse(state.serialized() ?? '{}').schemaVersion).toBe('sanverse.project/v4')
   })
 
   it('upgrades a saved v1 project on open without losing or moving an edit', async () => {
@@ -408,13 +408,13 @@ describe('local API boundary', () => {
 
     const opened = await call(port, { path: `/api/projects/${PROJECT_ID}` })
     const project = JSON.parse(new TextDecoder().decode(opened.body)).project
-    expect(project.schemaVersion).toBe('sanverse.project/v3')
+    expect(project.schemaVersion).toBe('sanverse.project/v4')
     expect(project.changeSets).toHaveLength(1)
     expect(project.changeSets[0].changeSet.operations[0].primaryText).toBe('Santosh')
     // v1 put the corner on the clicked point. Migrating to the new centre
     // default would shift a nameplate in a video the owner already approved.
     expect(project.changeSets[0].changeSet.operations[0].target.anchor).toBe('top-left')
-    expect(JSON.parse(state.serialized() ?? '{}').schemaVersion).toBe('sanverse.project/v3')
+    expect(JSON.parse(state.serialized() ?? '{}').schemaVersion).toBe('sanverse.project/v4')
   })
 
   it('returns a pending AI proposal without changing the saved project', async () => {

@@ -12,6 +12,7 @@ import {
   foldCaptionOperations,
   validateCaptionOperation,
   type CaptionOperation,
+  type CaptionStyleId,
 } from './caption-operations.ts'
 import { OPERATION_SCHEMA_VERSION } from './timeline-operations.ts'
 import { ms, testCaptions } from './test-fixtures.ts'
@@ -102,7 +103,7 @@ describe('validateCaptionOperation — add-captions', () => {
   })
 
   it('refuses a look it does not know', () => {
-    expect(validateCaptionOperation(testCaptions({ styleId: 'sanverse.caption.neon/v9' })).ok).toBe(false)
+    expect(validateCaptionOperation(testCaptions({ styleId: 'sanverse.caption.neon/v9' as CaptionStyleId })).ok).toBe(false)
   })
 
   it('refuses a newline hidden inside a line', () => {

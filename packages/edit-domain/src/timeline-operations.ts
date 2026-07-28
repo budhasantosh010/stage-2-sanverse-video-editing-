@@ -10,7 +10,7 @@ import {
   type Track,
 } from './composition.ts'
 import { emptyExtensions, validateExtensions, type Extensions } from './json.ts'
-import type { VideoAsset } from './assets.ts'
+import type { MediaAsset } from './assets.ts'
 import {
   ZERO_TIME,
   mediaTime,
@@ -365,7 +365,7 @@ const replaceTrack = (composition: Composition, trackId: string, clips: readonly
 export const applyTimelineOperation = (
   composition: Composition,
   operation: TimelineOperation,
-  assets: readonly VideoAsset[],
+  assets: readonly MediaAsset[],
 ): Result<Composition, TimelineApplyError> => {
   const track = findTrackOf(composition, operation.clipId)
   if (!track) return err(fail('CLIP_UNKNOWN'))

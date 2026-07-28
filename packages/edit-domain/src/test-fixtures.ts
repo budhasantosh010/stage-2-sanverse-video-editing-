@@ -1,12 +1,25 @@
-import type { VideoAsset } from './assets.ts'
+import { ASSET_SCHEMA_VERSION, type AudioAsset, type ImageAsset, type VideoAsset } from './assets.ts'
 import { NAMEPLATE_COMPONENT_ID } from './capabilities.ts'
 import type { ChangeSet } from './change-set.ts'
 import { OPERATION_SCHEMA_VERSION, type AddNameplateOperation, type EditOperation } from './operations.ts'
 import { DEFAULT_CAPTION_STYLE_ID, type AddCaptionsOperation } from './caption-operations.ts'
-import { createProject, type EditProject } from './project.ts'
+import { addAsset, createProject, type EditProject } from './project.ts'
 import type { TimelineOperation } from './timeline-operations.ts'
 import {
+  DEFAULT_CALLOUT_STYLE_ID,
+  DEFAULT_MUSIC_GAIN_DB,
+  DEFAULT_TITLE_STYLE_ID,
+  type AddCalloutOperation,
+  type AddMediaOverlayOperation,
+  type AddMusicOperation,
+  type AddTitleOperation,
+} from './overlay-operations.ts'
+import {
+  CALLOUT_COMPONENT_ID,
   CAPTIONS_COMPONENT_ID,
+  MEDIA_OVERLAY_COMPONENT_ID,
+  MUSIC_COMPONENT_ID,
+  TITLE_COMPONENT_ID,
   CLIP_AUDIO_PRIMITIVE_ID,
   CLIP_ENABLED_PRIMITIVE_ID,
   REMOVE_PRIMITIVE_ID,
@@ -29,7 +42,8 @@ export const ms = (milliseconds: number) => {
 
 /** A 30-second, 1920x1080, 30 fps asset with audio. */
 export const testAsset = (overrides: Partial<VideoAsset> = {}): VideoAsset => ({
-  schemaVersion: 'sanverse.asset/video/v1',
+  schemaVersion: ASSET_SCHEMA_VERSION,
+  mediaKind: 'video',
   assetId: 'asset_aaaaaaaa',
   storageRef: 'project/project_aaaaaaaaaaaaaaaa/source',
   sha256: 'a'.repeat(64),
@@ -56,6 +70,56 @@ export const testProject = (asset: VideoAsset = testAsset()): EditProject => {
 }
 
 export const TEST_ASSET_ID = 'asset_aaaaaaaa'
+export const TEST_BROLL_ASSET_ID = 'asset_bbbbbbbb'
+export const TEST_IMAGE_ASSET_ID = 'asset_cccccccc'
+export const TEST_MUSIC_ASSET_ID = 'asset_dddddddd'
+
+/** A 10-second, 1280x720 B-roll clip with no sound. */
+export const testBrollAsset = (overrides: Partial<VideoAsset> = {}): VideoAsset =>
+  testAsset({
+    assetId: TEST_BROLL_ASSET_ID,
+    storageRef: 'project/project_aaaaaaaaaaaaaaaa/broll',
+    sha256: 'b'.repeat(64),
+    duration: ms(10_000),
+    width: 1280,
+    height: 720,
+    hasAudio: false,
+    ...overrides,
+  })
+
+/** A 1200x800 still picture. A picture has no length of its own. */
+export const testImageAsset = (overrides: Partial<ImageAsset> = {}): ImageAsset => ({
+  schemaVersion: ASSET_SCHEMA_VERSION,
+  mediaKind: 'image',
+  assetId: TEST_IMAGE_ASSET_ID,
+  storageRef: 'project/project_aaaaaaaaaaaaaaaa/picture',
+  sha256: 'c'.repeat(64),
+  byteLength: 250_000,
+  duration: null,
+  width: 1200,
+  height: 800,
+  frameRate: null,
+  hasAudio: false,
+  durationResidualSeconds: 0,
+  ...overrides,
+})
+
+/** A 120-second piece of music. Music has no picture. */
+export const testMusicAsset = (overrides: Partial<AudioAsset> = {}): AudioAsset => ({
+  schemaVersion: ASSET_SCHEMA_VERSION,
+  mediaKind: 'audio',
+  assetId: TEST_MUSIC_ASSET_ID,
+  storageRef: 'project/project_aaaaaaaaaaaaaaaa/music',
+  sha256: 'd'.repeat(64),
+  byteLength: 3_000_000,
+  duration: ms(120_000),
+  width: null,
+  height: null,
+  frameRate: null,
+  hasAudio: true,
+  durationResidualSeconds: 0,
+  ...overrides,
+})
 
 export const testOperation = (
   overrides: Partial<AddNameplateOperation> = {},
@@ -177,6 +241,83 @@ export const testCaptions = (
   ],
   ...overrides,
 })
+
+export const testTitle = (overrides: Partial<AddTitleOperation> = {}): AddTitleOperation => ({
+  schemaVersion: OPERATION_SCHEMA_VERSION,
+  operationId: 'operation_title001',
+  kind: 'add-title',
+  capabilityId: TITLE_COMPONENT_ID,
+  titleId: 'title_0001',
+  assetId: TEST_ASSET_ID,
+  sourceInterval: { start: ms(0), duration: ms(3_000) },
+  headline: 'How we edit',
+  subhead: 'in under a minute',
+  placement: 'center',
+  styleId: DEFAULT_TITLE_STYLE_ID,
+  extensions: {},
+  ...overrides,
+})
+
+export const testCallout = (overrides: Partial<AddCalloutOperation> = {}): AddCalloutOperation => ({
+  schemaVersion: OPERATION_SCHEMA_VERSION,
+  operationId: 'operation_call0001',
+  kind: 'add-callout',
+  capabilityId: CALLOUT_COMPONENT_ID,
+  calloutId: 'callout_0001',
+  assetId: TEST_ASSET_ID,
+  sourceInterval: { start: ms(4_000), duration: ms(3_000) },
+  region: { coordinateSpace: 'composition-normalized', x: 0.55, y: 0.2, width: 0.3, height: 0.25 },
+  label: 'the export button',
+  styleId: DEFAULT_CALLOUT_STYLE_ID,
+  extensions: {},
+  ...overrides,
+})
+
+export const testMediaOverlay = (
+  overrides: Partial<AddMediaOverlayOperation> = {},
+): AddMediaOverlayOperation => ({
+  schemaVersion: OPERATION_SCHEMA_VERSION,
+  operationId: 'operation_broll001',
+  kind: 'add-media-overlay',
+  capabilityId: MEDIA_OVERLAY_COMPONENT_ID,
+  overlayId: 'broll_0001',
+  overlayAssetId: TEST_BROLL_ASSET_ID,
+  assetId: TEST_ASSET_ID,
+  sourceInterval: { start: ms(8_000), duration: ms(4_000) },
+  overlaySourceStart: ms(1_000),
+  region: { coordinateSpace: 'composition-normalized', x: 0.05, y: 0.05, width: 0.4, height: 0.4 },
+  opacity: 1,
+  useOverlayAudio: false,
+  extensions: {},
+  ...overrides,
+})
+
+export const testMusic = (overrides: Partial<AddMusicOperation> = {}): AddMusicOperation => ({
+  schemaVersion: OPERATION_SCHEMA_VERSION,
+  operationId: 'operation_music001',
+  kind: 'add-music',
+  capabilityId: MUSIC_COMPONENT_ID,
+  musicId: 'music_0001',
+  assetId: TEST_MUSIC_ASSET_ID,
+  compositionStart: ms(0),
+  sourceStart: ms(0),
+  gainDb: DEFAULT_MUSIC_GAIN_DB,
+  fadeIn: ms(1_000),
+  fadeOut: ms(2_000),
+  extensions: {},
+  ...overrides,
+})
+
+/** A project holding footage plus B-roll, a picture, and music. */
+export const testMultiAssetProject = (): EditProject => {
+  let project = testProject()
+  for (const asset of [testBrollAsset(), testImageAsset(), testMusicAsset()]) {
+    const next = addAsset(project, asset)
+    if (!next.ok) throw new Error(`invalid fixture asset: ${JSON.stringify(next.error)}`)
+    project = next.value
+  }
+  return project
+}
 
 /** A change set holding whatever operations a test needs. */
 export const changeSetOf = (

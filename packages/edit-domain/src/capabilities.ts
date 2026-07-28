@@ -36,6 +36,20 @@ export const CAPTION_STYLE_PRIMITIVE_ID = 'sanverse.captions.style.primitive/v1'
 /** "Put captions on my video." */
 export const CAPTIONS_COMPONENT_ID = 'sanverse.captions.component/v1'
 
+export const TITLE_PRIMITIVE_ID = 'sanverse.title.primitive/v1'
+export const CALLOUT_PRIMITIVE_ID = 'sanverse.callout.primitive/v1'
+export const MEDIA_OVERLAY_PRIMITIVE_ID = 'sanverse.broll.primitive/v1'
+export const MUSIC_PRIMITIVE_ID = 'sanverse.music.primitive/v1'
+
+/** "Put a title on it." */
+export const TITLE_COMPONENT_ID = 'sanverse.title.component/v1'
+/** "Point at this bit." */
+export const CALLOUT_COMPONENT_ID = 'sanverse.callout.component/v1'
+/** "Show this clip while I talk about it." */
+export const MEDIA_OVERLAY_COMPONENT_ID = 'sanverse.broll.component/v1'
+/** "Put music under it." */
+export const MUSIC_COMPONENT_ID = 'sanverse.music.component/v1'
+
 /** "Take out the part between these two moments and close the gap." */
 export const REMOVE_RANGE_COMPONENT_ID = 'sanverse.timeline.remove-range.component/v1'
 /** "Make this stretch quieter, or fade it." */
@@ -141,6 +155,70 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     accepts: 'Captions for what is spoken, cut into readable lines automatically.',
     produces: Object.freeze(['add-captions']),
     requires: Object.freeze([CAPTIONS_PRIMITIVE_ID]),
+  }),
+  Object.freeze({
+    capabilityId: TITLE_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One piece of footage, a moment on it, up to two lines of words, and where they sit.',
+    produces: Object.freeze(['add-title']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: CALLOUT_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One piece of footage, a moment on it, a rectangle on the picture, and an optional label.',
+    produces: Object.freeze(['add-callout']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: MEDIA_OVERLAY_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'A second video or a picture, the moment of footage it covers, and the box it is drawn in.',
+    produces: Object.freeze(['add-media-overlay']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: MUSIC_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One piece of music, when it starts on the finished video, how loud, and its ramps.',
+    produces: Object.freeze(['add-music']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: TITLE_COMPONENT_ID,
+    version: 1,
+    level: 'component' as const,
+    accepts: 'A title, and roughly where in the video it belongs.',
+    produces: Object.freeze(['add-title']),
+    requires: Object.freeze([TITLE_PRIMITIVE_ID]),
+  }),
+  Object.freeze({
+    capabilityId: CALLOUT_COMPONENT_ID,
+    version: 1,
+    level: 'component' as const,
+    accepts: 'A part of the picture to draw attention to, and what to call it.',
+    produces: Object.freeze(['add-callout']),
+    requires: Object.freeze([CALLOUT_PRIMITIVE_ID]),
+  }),
+  Object.freeze({
+    capabilityId: MEDIA_OVERLAY_COMPONENT_ID,
+    version: 1,
+    level: 'component' as const,
+    accepts: 'Another clip or picture to show while a stretch of the talking plays.',
+    produces: Object.freeze(['add-media-overlay']),
+    requires: Object.freeze([MEDIA_OVERLAY_PRIMITIVE_ID]),
+  }),
+  Object.freeze({
+    capabilityId: MUSIC_COMPONENT_ID,
+    version: 1,
+    level: 'component' as const,
+    accepts: 'Background music under the finished video, quiet enough to talk over.',
+    produces: Object.freeze(['add-music']),
+    requires: Object.freeze([MUSIC_PRIMITIVE_ID]),
   }),
   Object.freeze({
     capabilityId: REMOVE_RANGE_COMPONENT_ID,

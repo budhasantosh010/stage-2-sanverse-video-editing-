@@ -67,10 +67,85 @@ export type CaptionOverlayNode = Readonly<{
   styleId: string
 }>
 
-export type RenderNode = TextOverlayNode | CaptionOverlayNode
+/** Big words over the picture. */
+export type TitleOverlayNode = Readonly<{
+  nodeId: string
+  kind: 'title-overlay'
+  interval: TimeRange
+  headline: string
+  /** Empty when only the headline is shown. */
+  subhead: string
+  placement: 'center' | 'lower-third'
+  styleId: string
+}>
+
+/** A rectangle drawn around part of the picture, with an optional label. */
+export type CalloutOverlayNode = Readonly<{
+  nodeId: string
+  kind: 'callout-overlay'
+  interval: TimeRange
+  /** Fractions of the frame: 0,0 is the top left, 1,1 the bottom right. */
+  region: Readonly<{ x: number; y: number; width: number; height: number }>
+  /** Empty when only the rectangle is drawn. */
+  label: string
+  styleId: string
+}>
+
+/**
+ * A second video or a still picture laid on top of the footage.
+ *
+ * `assetId` names a DIFFERENT file from the footage underneath, which is why
+ * the plan now carries a list of sources: a renderer has to open more than one
+ * file to make this frame.
+ */
+export type MediaOverlayNode = Readonly<{
+  nodeId: string
+  kind: 'media-overlay'
+  interval: TimeRange
+  assetId: string
+  /** Where inside the overlay clip to start. Always 0 for a still picture. */
+  sourceStartTicks: number
+  region: Readonly<{ x: number; y: number; width: number; height: number }>
+  opacity: number
+  useOverlayAudio: boolean
+}>
+
+/**
+ * Music under the finished video.
+ *
+ * Kept OUT of `overlays` because an overlay is something drawn on the picture,
+ * and music is not drawn at all. Putting it in the same list would force every
+ * renderer to check "is this one actually visible?" before drawing, and a check
+ * like that is exactly where a preview and an export drift apart.
+ *
+ * Its interval is measured on the FINISHED video, not on any piece of footage.
+ */
+export type MusicNode = Readonly<{
+  nodeId: string
+  kind: 'music'
+  interval: TimeRange
+  assetId: string
+  sourceStartTicks: number
+  gainDb: number
+  fadeInTicks: number
+  fadeOutTicks: number
+}>
+
+export type RenderNode =
+  | TextOverlayNode
+  | CaptionOverlayNode
+  | TitleOverlayNode
+  | CalloutOverlayNode
+  | MediaOverlayNode
+
+/** One file a renderer must open to produce this video. */
+export type RenderSource = Readonly<{
+  assetId: string
+  mediaKind: 'video' | 'image' | 'audio'
+}>
 
 export type RenderPlan = Readonly<{
-  schemaVersion: 'sanverse.render-plan/v2'
+  schemaVersion: 'sanverse.render-plan/v3'
   projectId: string
   /**
    * The revision this plan was compiled from. An export carries it, so a file
@@ -82,10 +157,20 @@ export type RenderPlan = Readonly<{
   height: number
   /** Total length of the finished video, in project ticks. */
   durationTicks: number
+  /**
+   * Every file the renderer must open, footage first.
+   *
+   * Listed here rather than left implicit because a plan used to describe one
+   * video file and now describes several. A renderer that guessed would open
+   * the wrong file the first time B-roll appeared.
+   */
+  sources: readonly RenderSource[]
   /** The footage the finished video is made of, earliest first. */
   segments: readonly SourceSegmentNode[]
   /** What is drawn on top of that footage. */
   overlays: readonly RenderNode[]
+  /** What is heard under it. Empty when there is no music. */
+  music: readonly MusicNode[]
 }>
 
 export type RenderPlanIssueCode =
@@ -97,13 +182,15 @@ export type RenderPlanIssueCode =
   | 'NODE_OUTSIDE_COMPOSITION'
   | 'SEGMENTS_OVERLAP'
   | 'SEGMENTS_EMPTY'
+  | 'SOURCE_UNKNOWN'
+  | 'DUPLICATE_SOURCE'
 
 export type RenderPlanError = {
   readonly code: 'RENDER_PLAN_INVALID'
   readonly issues: readonly { readonly path: string; readonly code: RenderPlanIssueCode }[]
 }
 
-export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v2'
+export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v3'
 /**
  * Raised from 512 because captions produce one node per line of speech. A
  * ten-minute talk is roughly 200 cues before cutting, and a cut through a cue
@@ -111,6 +198,9 @@ export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v2'
  */
 export const MAX_RENDER_NODES = 4_096
 export const MAX_RENDER_SEGMENTS = 512
+/** Files one export may open. Matches the project's own asset ceiling. */
+export const MAX_RENDER_SOURCES = 64
+export const MAX_MUSIC_NODES = 16
 export const MAX_CAPTION_LINES_PER_NODE = 3
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -124,11 +214,29 @@ const PLAN_KEYS = [
   'width',
   'height',
   'durationTicks',
+  'sources',
   'segments',
   'overlays',
+  'music',
 ] as const
 
 type Issue = RenderPlanError['issues'][number]
+
+/** A rectangle must be a real rectangle, wholly on the picture. */
+const isRegionOnPicture = (value: unknown): boolean => {
+  if (!isRecord(value)) return false
+  const keys = Object.keys(value)
+  if (keys.length !== 4) return false
+  for (const key of ['x', 'y', 'width', 'height']) {
+    const number = value[key]
+    if (typeof number !== 'number' || !Number.isFinite(number)) return false
+  }
+  const x = value.x as number
+  const y = value.y as number
+  const width = value.width as number
+  const height = value.height as number
+  return x >= 0 && y >= 0 && width > 0 && height > 0 && x + width <= 1 && y + height <= 1
+}
 
 /** Reads `{ start: { ticks }, duration: { ticks } }` without trusting any of it. */
 const readInterval = (value: unknown): { start: number; duration: number } | null => {
@@ -250,8 +358,100 @@ export const validateRenderPlan = (
     }
   }
 
+  // Every file the renderer will open, declared up front. An overlay naming a
+  // file that is not on this list is refused rather than skipped: skipping it
+  // would export a video missing something the user approved.
+  const sourceIds = new Set<string>()
+  if (!Array.isArray(input.sources)) {
+    issues.push({ path: 'sources', code: 'TYPE_INVALID' })
+  } else if (input.sources.length === 0 || input.sources.length > MAX_RENDER_SOURCES) {
+    issues.push({ path: 'sources', code: 'VALUE_OUT_OF_RANGE' })
+  } else {
+    input.sources.forEach((source, index) => {
+      const path = `sources[${index}]`
+      if (!isRecord(source)) {
+        issues.push({ path, code: 'TYPE_INVALID' })
+        return
+      }
+      const keys = Object.keys(source)
+      if (keys.length !== 2 || !Object.hasOwn(source, 'assetId') || !Object.hasOwn(source, 'mediaKind')) {
+        issues.push({ path, code: 'FIELD_UNKNOWN' })
+        return
+      }
+      if (typeof source.assetId !== 'string' || source.assetId.length === 0) {
+        issues.push({ path: `${path}.assetId`, code: 'VALUE_OUT_OF_RANGE' })
+        return
+      }
+      if (source.mediaKind !== 'video' && source.mediaKind !== 'image' && source.mediaKind !== 'audio') {
+        issues.push({ path: `${path}.mediaKind`, code: 'VALUE_OUT_OF_RANGE' })
+        return
+      }
+      if (sourceIds.has(source.assetId)) {
+        issues.push({ path: `${path}.assetId`, code: 'DUPLICATE_SOURCE' })
+        return
+      }
+      sourceIds.add(source.assetId)
+    })
+  }
+
   const durationTicks = Number.isSafeInteger(input.durationTicks) ? (input.durationTicks as number) : -1
   if (durationTicks > 0) validateSegments(input.segments, durationTicks, issues)
+  if (Array.isArray(input.segments)) {
+    input.segments.forEach((segment, index) => {
+      if (isRecord(segment) && typeof segment.assetId === 'string' && !sourceIds.has(segment.assetId)) {
+        issues.push({ path: `segments[${index}].assetId`, code: 'SOURCE_UNKNOWN' })
+      }
+    })
+  }
+
+  if (!Array.isArray(input.music)) {
+    issues.push({ path: 'music', code: 'TYPE_INVALID' })
+  } else if (input.music.length > MAX_MUSIC_NODES) {
+    issues.push({ path: 'music', code: 'VALUE_OUT_OF_RANGE' })
+  } else {
+    input.music.forEach((node, index) => {
+      const path = `music[${index}]`
+      if (!isRecord(node) || node.kind !== 'music') {
+        issues.push({ path: `${path}.kind`, code: 'NODE_KIND_UNKNOWN' })
+        return
+      }
+      if (typeof node.nodeId !== 'string' || node.nodeId.length === 0) {
+        issues.push({ path: `${path}.nodeId`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      if (typeof node.assetId !== 'string' || !sourceIds.has(node.assetId)) {
+        issues.push({ path: `${path}.assetId`, code: 'SOURCE_UNKNOWN' })
+      }
+      if (!Number.isSafeInteger(node.sourceStartTicks) || (node.sourceStartTicks as number) < 0) {
+        issues.push({ path: `${path}.sourceStartTicks`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      if (typeof node.gainDb !== 'number' || !Number.isFinite(node.gainDb)) {
+        issues.push({ path: `${path}.gainDb`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      const interval = readInterval(node.interval)
+      if (interval === null) {
+        issues.push({ path: `${path}.interval`, code: 'TYPE_INVALID' })
+        return
+      }
+      if (
+        durationTicks <= 0 ||
+        interval.start < 0 ||
+        interval.duration <= 0 ||
+        interval.start + interval.duration > durationTicks
+      ) {
+        issues.push({ path: `${path}.interval`, code: 'NODE_OUTSIDE_COMPOSITION' })
+        return
+      }
+      const fadeIn = node.fadeInTicks
+      const fadeOut = node.fadeOutTicks
+      if (
+        !Number.isSafeInteger(fadeIn) || (fadeIn as number) < 0 ||
+        !Number.isSafeInteger(fadeOut) || (fadeOut as number) < 0 ||
+        (fadeIn as number) + (fadeOut as number) > interval.duration
+      ) {
+        issues.push({ path: `${path}.fadeInTicks`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+    })
+  }
 
   if (!Array.isArray(input.overlays)) {
     issues.push({ path: 'overlays', code: 'TYPE_INVALID' })
@@ -266,15 +466,50 @@ export const validateRenderPlan = (
       }
       // An unrecognised node changes what the viewer sees, so it is refused,
       // never skipped.
-      if (node.kind !== 'text-overlay' && node.kind !== 'caption-overlay') {
+      const KINDS = ['text-overlay', 'caption-overlay', 'title-overlay', 'callout-overlay', 'media-overlay']
+      if (typeof node.kind !== 'string' || !KINDS.includes(node.kind)) {
         issues.push({ path: `${path}.kind`, code: 'NODE_KIND_UNKNOWN' })
         return
       }
       if (typeof node.nodeId !== 'string' || node.nodeId.length === 0) {
         issues.push({ path: `${path}.nodeId`, code: 'VALUE_OUT_OF_RANGE' })
       }
-      if (typeof node.styleId !== 'string' || node.styleId.length === 0) {
+      // A media overlay is a file, not a look, so it carries no style id.
+      if (node.kind !== 'media-overlay' && (typeof node.styleId !== 'string' || node.styleId.length === 0)) {
         issues.push({ path: `${path}.styleId`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      if (node.kind === 'title-overlay') {
+        if (typeof node.headline !== 'string' || node.headline.length === 0) {
+          issues.push({ path: `${path}.headline`, code: 'VALUE_OUT_OF_RANGE' })
+        }
+        if (typeof node.subhead !== 'string') {
+          issues.push({ path: `${path}.subhead`, code: 'TYPE_INVALID' })
+        }
+        if (node.placement !== 'center' && node.placement !== 'lower-third') {
+          issues.push({ path: `${path}.placement`, code: 'VALUE_OUT_OF_RANGE' })
+        }
+      }
+      if (node.kind === 'callout-overlay' || node.kind === 'media-overlay') {
+        if (!isRegionOnPicture(node.region)) {
+          issues.push({ path: `${path}.region`, code: 'VALUE_OUT_OF_RANGE' })
+        }
+      }
+      if (node.kind === 'callout-overlay' && typeof node.label !== 'string') {
+        issues.push({ path: `${path}.label`, code: 'TYPE_INVALID' })
+      }
+      if (node.kind === 'media-overlay') {
+        if (typeof node.assetId !== 'string' || !sourceIds.has(node.assetId)) {
+          issues.push({ path: `${path}.assetId`, code: 'SOURCE_UNKNOWN' })
+        }
+        if (!Number.isSafeInteger(node.sourceStartTicks) || (node.sourceStartTicks as number) < 0) {
+          issues.push({ path: `${path}.sourceStartTicks`, code: 'VALUE_OUT_OF_RANGE' })
+        }
+        if (typeof node.opacity !== 'number' || !(node.opacity > 0) || node.opacity > 1) {
+          issues.push({ path: `${path}.opacity`, code: 'VALUE_OUT_OF_RANGE' })
+        }
+        if (typeof node.useOverlayAudio !== 'boolean') {
+          issues.push({ path: `${path}.useOverlayAudio`, code: 'TYPE_INVALID' })
+        }
       }
       if (node.kind === 'caption-overlay') {
         if (
@@ -285,7 +520,8 @@ export const validateRenderPlan = (
         ) {
           issues.push({ path: `${path}.lines`, code: 'VALUE_OUT_OF_RANGE' })
         }
-      } else {
+      }
+      if (node.kind === 'text-overlay') {
         if (typeof node.primaryText !== 'string' || node.primaryText.length === 0) {
           issues.push({ path: `${path}.primaryText`, code: 'VALUE_OUT_OF_RANGE' })
         }

@@ -1,6 +1,6 @@
 import { err, isRecord, ok, type Result } from '../result.ts'
 import type { AddNameplateAction } from '../actions.ts'
-import type { VideoAsset } from '../assets.ts'
+import { ASSET_SCHEMA_VERSION, type VideoAsset } from '../assets.ts'
 import type { ChangeSet, ChangeSetRecord } from '../change-set.ts'
 import { NAMEPLATE_COMPONENT_ID } from '../capabilities.ts'
 import { createSingleClipComposition } from '../composition.ts'
@@ -77,6 +77,7 @@ export type MigrationInput = Readonly<{
 }>
 
 export const LEGACY_PROJECT_V2_VERSION = 'sanverse.project/v2'
+export const LEGACY_PROJECT_V3_VERSION = 'sanverse.project/v3'
 
 /**
  * Deterministic ID derived from the v1 action ID, so running the migration
@@ -177,7 +178,7 @@ const migrateFromV1 = (input: MigrationInput): Result<MigrationResult, Migration
 
     let blockedReason: string | null = null
     for (const operation of changeSet.value.operations) {
-      const checked = validateOperationAgainstComposition(operation, composition.value)
+      const checked = validateOperationAgainstComposition(operation, composition.value, [input.asset])
       if (!checked.ok) {
         blockedReason = checked.error.issues[0]?.code ?? 'OPERATION_INVALID'
         break
@@ -311,7 +312,15 @@ const upgradeV2Operation = (
   }
 }
 
-const migrateFromV2 = (input: MigrationInput): Result<MigrationResult, MigrationError> => {
+/**
+ * v2 to v3, as a SHAPE rather than a finished project.
+ *
+ * It hands back a plain object in v3's shape instead of a validated project,
+ * because a v2 file must then climb the next rung to v4. Validating here would
+ * check it against a schema it has not reached yet and fail for the wrong
+ * reason.
+ */
+const migrateFromV2Shape = (input: MigrationInput): Result<Record<string, unknown>, MigrationError> => {
   const saved = input.saved
   if (!isRecord(saved)) return err({ code: 'V2_PROJECT_INVALID', reason: 'NOT_AN_OBJECT' })
   const composition = saved.composition
@@ -380,9 +389,9 @@ const migrateFromV2 = (input: MigrationInput): Result<MigrationResult, Migration
     return { ...(record as Record<string, unknown>), changeSet: nextChangeSet }
   }
 
-  const candidate = {
+  return ok({
     ...saved,
-    schemaVersion: PROJECT_SCHEMA_VERSION,
+    schemaVersion: LEGACY_PROJECT_V3_VERSION,
     composition: { ...composition, tracks },
     changeSets: Array.isArray(saved.changeSets)
       ? saved.changeSets.map((record) => upgradeChangeSet(record, false))
@@ -393,19 +402,57 @@ const migrateFromV2 = (input: MigrationInput): Result<MigrationResult, Migration
     extensions: {
       ...(isRecord(saved.extensions) ? saved.extensions : {}),
       'sanverse.migration/from': LEGACY_PROJECT_V2_VERSION,
+      // Recorded so a two-rung climb is still traceable to where it started.
+      'sanverse.migration/blocked-on-v2': String(blocked.length),
+    },
+  })
+}
+
+/**
+ * v3 to v4: a project used to hold only videos, so an asset did not have to say
+ * what kind of media it was. Now it can also hold pictures and music, so every
+ * asset states its kind.
+ *
+ * Nothing about an existing project changes. Every asset a v3 file holds IS a
+ * video — that was the only kind that could exist — so stamping `video` on it
+ * is a restatement of a fact, not a guess. No timing, no edit, and no pixel
+ * moves.
+ */
+const migrateFromV3 = (input: MigrationInput): Result<MigrationResult, MigrationError> => {
+  const saved = input.saved
+  if (!isRecord(saved)) return err({ code: 'V2_PROJECT_INVALID', reason: 'NOT_AN_OBJECT' })
+  if (!Array.isArray(saved.assets)) return err({ code: 'V2_PROJECT_INVALID', reason: 'ASSETS_INVALID' })
+
+  const assets = saved.assets.map((asset) => {
+    if (!isRecord(asset)) return asset
+    return {
+      ...asset,
+      schemaVersion: ASSET_SCHEMA_VERSION,
+      mediaKind: 'video' as const,
+    }
+  })
+
+  const candidate = {
+    ...saved,
+    schemaVersion: PROJECT_SCHEMA_VERSION,
+    assets,
+    extensions: {
+      ...(isRecord(saved.extensions) ? saved.extensions : {}),
+      'sanverse.migration/from': LEGACY_PROJECT_V3_VERSION,
     },
   }
 
   const project = validateProject(candidate)
   if (!project.ok) return project
+  if (project.value.projectId !== input.projectId) return err({ code: 'PROJECT_ID_MISMATCH' })
 
   return ok(Object.freeze({
     project: project.value,
     report: Object.freeze({
-      fromVersion: LEGACY_PROJECT_V2_VERSION,
+      fromVersion: LEGACY_PROJECT_V3_VERSION,
       changed: true,
       migratedChangeSets: project.value.changeSets.length,
-      blocked: Object.freeze(blocked),
+      blocked: Object.freeze([]),
       migratedRedoEntries: project.value.redoStack.length,
     }),
   }))
@@ -420,8 +467,23 @@ const migrateFromV2 = (input: MigrationInput): Result<MigrationResult, Migration
 export const upgradeSavedProject = (input: MigrationInput): Result<MigrationResult, MigrationError> => {
   if (isProjectV1(input.saved)) return migrateFromV1(input)
 
+  // The ladder runs oldest first, and each rung hands its result to the next,
+  // so a v1 file on disk still arrives at the current shape in one call.
   if (isRecord(input.saved) && input.saved.schemaVersion === LEGACY_PROJECT_V2_VERSION) {
-    return migrateFromV2(input)
+    const v3 = migrateFromV2Shape(input)
+    if (!v3.ok) return v3
+    const v4 = migrateFromV3({ ...input, saved: v3.value })
+    if (!v4.ok) return v4
+    // The report says where the file actually came from, not where the last
+    // rung of the ladder picked it up.
+    return ok(Object.freeze({
+      project: v4.value.project,
+      report: Object.freeze({ ...v4.value.report, fromVersion: LEGACY_PROJECT_V2_VERSION }),
+    }))
+  }
+
+  if (isRecord(input.saved) && input.saved.schemaVersion === LEGACY_PROJECT_V3_VERSION) {
+    return migrateFromV3(input)
   }
 
   const project = validateProject(input.saved)

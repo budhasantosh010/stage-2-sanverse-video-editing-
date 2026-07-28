@@ -27,7 +27,8 @@ function testProject(): EditProject {
   const created = createProject({
     projectId: PROJECT_ID,
     asset: {
-      schemaVersion: 'sanverse.asset/video/v1',
+      schemaVersion: 'sanverse.asset/media/v1' as const,
+      mediaKind: 'video' as const,
       assetId: 'asset_0123456789ab',
       storageRef: `project:${PROJECT_ID}/source`,
       sha256: 'a'.repeat(64),

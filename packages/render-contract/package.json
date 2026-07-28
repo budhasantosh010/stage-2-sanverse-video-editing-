@@ -7,7 +7,8 @@
     ".": "./src/render-plan.ts",
     "./nameplate-style": "./src/nameplate-style.ts",
     "./caption-style": "./src/caption-style.ts",
-    "./compile-project": "./src/compile-project.ts"
+    "./compile-project": "./src/compile-project.ts",
+    "./overlay-style": "./src/overlay-style.ts"
   },
   "dependencies": {
     "@sanverse/edit-domain": "*"

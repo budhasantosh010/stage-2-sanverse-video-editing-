@@ -1,7 +1,17 @@
 import type { RenderPlan } from '@sanverse/render-contract'
 
 export type RenderRequest = {
+  /** The main footage. Its dimensions and frame rate govern the whole export. */
   readonly sourcePath: string
+  /**
+   * Where every OTHER file the plan names lives, keyed by asset id: B-roll
+   * clips, pictures, and music.
+   *
+   * Kept separate from the plan itself because a plan is renderer-neutral and
+   * must never contain a filesystem path — that is what lets the same plan be
+   * rendered on this machine today and in a container tomorrow.
+   */
+  readonly extraSourcePaths?: Readonly<Record<string, string>>
   readonly outputPath: string
   readonly trustedWorkDir: string
   /**

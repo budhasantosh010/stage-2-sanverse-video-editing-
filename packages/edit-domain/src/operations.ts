@@ -21,6 +21,13 @@ import {
   type CaptionOperation,
 } from './caption-operations.ts'
 import {
+  OVERLAY_OPERATION_KINDS,
+  isOverlayOperationKind,
+  validateOverlayOperation,
+  type OverlayOperation,
+} from './overlay-operations.ts'
+import { findAsset, type MediaAsset } from './assets.ts'
+import {
   validateTimeRange,
   type TimeRange,
 } from './time.ts'
@@ -74,22 +81,46 @@ export type AddNameplateOperation = Readonly<{
   extensions: Extensions
 }>
 
-export type EditOperation = AddNameplateOperation | TimelineOperation | CaptionOperation
+export type EditOperation =
+  | AddNameplateOperation
+  | TimelineOperation
+  | CaptionOperation
+  | OverlayOperation
 
 /** Every operation kind this build can execute. Unknown kinds are rejected. */
 export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze([
   'add-nameplate',
   ...TIMELINE_OPERATION_KINDS,
   ...CAPTION_OPERATION_KINDS,
+  ...OVERLAY_OPERATION_KINDS,
 ])
 
 /** True for the operations that change which footage the finished video is made of. */
 export const isTimelineOperation = (operation: EditOperation): operation is TimelineOperation =>
   isTimelineOperationKind(operation.kind)
 
-/** True for the operations that draw on top of whatever footage survives. */
-export const isOverlayOperation = (operation: EditOperation): operation is AddNameplateOperation =>
+/** True for a nameplate specifically. */
+export const isNameplateOperation = (operation: EditOperation): operation is AddNameplateOperation =>
   operation.kind === 'add-nameplate'
+
+/** True for titles, callouts, B-roll, and music. */
+export const isOverlayFamilyOperation = (operation: EditOperation): operation is OverlayOperation =>
+  isOverlayOperationKind(operation.kind)
+
+/**
+ * True when this operation is pinned to a moment of original footage.
+ *
+ * Everything drawn on the picture is. Music is the one exception, because it
+ * belongs to the finished video rather than to a filmed moment — see the note
+ * at the top of `overlay-operations.ts`.
+ */
+export const isSourceAnchoredOperation = (
+  operation: EditOperation,
+): operation is AddNameplateOperation | Exclude<OverlayOperation, { kind: 'add-music' }> =>
+  operation.kind === 'add-nameplate' ||
+  operation.kind === 'add-title' ||
+  operation.kind === 'add-callout' ||
+  operation.kind === 'add-media-overlay'
 
 /** True for the operations that describe captions. */
 export const isCaptionOperation = (operation: EditOperation): operation is CaptionOperation =>
@@ -111,6 +142,16 @@ export type OperationIssueCode =
   | 'CUES_OVERLAP'
   | 'CUES_EMPTY'
   | 'ALL_CUES_REMOVED'
+  | 'TEXT_TOO_LONG_OVERLAY'
+  | 'REGION_OFF_PICTURE'
+  | 'OVERLAY_ASSET_SAME_AS_FOOTAGE'
+  | 'GAIN_OUT_OF_RANGE'
+  /** The B-roll clip, picture, or piece of music is not in this project. */
+  | 'OVERLAY_ASSET_UNKNOWN'
+  /** Music was pointed at a video, or B-roll at a piece of music. */
+  | 'OVERLAY_ASSET_WRONG_KIND'
+  /** The stretch of B-roll asked for runs past the end of the B-roll clip. */
+  | 'OVERLAY_SPAN_OUTSIDE_ASSET'
 
 export type OperationError = {
   readonly code: 'OPERATION_INVALID'
@@ -228,6 +269,20 @@ export const validateOperation = (input: unknown, path = '$'): Result<EditOperat
     return ok(captions.value)
   }
 
+  if (isOverlayOperationKind(input.kind)) {
+    const overlay = validateOverlayOperation(input, path)
+    if (!overlay.ok) {
+      return err({
+        code: 'OPERATION_INVALID',
+        issues: overlay.error.issues.map((issue) => ({
+          path: issue.path,
+          code: (issue.code === 'TEXT_TOO_LONG' ? 'TEXT_TOO_LONG' : issue.code) as OperationIssueCode,
+        })),
+      })
+    }
+    return ok(overlay.value)
+  }
+
   if (isTimelineOperationKind(input.kind)) {
     const timeline = validateTimelineOperation(input, path)
     if (!timeline.ok) {
@@ -259,8 +314,39 @@ export const validateOperation = (input: unknown, path = '$'): Result<EditOperat
 export const validateOperationAgainstComposition = (
   operation: EditOperation,
   composition: Composition,
+  assets: readonly MediaAsset[] = [],
   path = '$',
 ): Result<EditOperation, OperationError> => {
+  const fail = (field: string, code: OperationIssueCode): Result<EditOperation, OperationError> =>
+    err({ code: 'OPERATION_INVALID', issues: [{ path: `${path}.${field}`, code }] })
+
+  if (operation.kind === 'add-music') {
+    // Music is judged only on whether the music itself is still here. It is not
+    // pinned to any moment of footage, so no amount of cutting can invalidate
+    // it — the bed simply plays over whatever finished video now exists.
+    const asset = findAsset(assets, operation.assetId)
+    if (!asset) return fail('assetId', 'OVERLAY_ASSET_UNKNOWN')
+    if (asset.mediaKind !== 'audio') return fail('assetId', 'OVERLAY_ASSET_WRONG_KIND')
+    return ok(operation)
+  }
+
+  if (operation.kind === 'add-media-overlay') {
+    const overlayAsset = findAsset(assets, operation.overlayAssetId)
+    if (!overlayAsset) return fail('overlayAssetId', 'OVERLAY_ASSET_UNKNOWN')
+    if (overlayAsset.mediaKind === 'audio') return fail('overlayAssetId', 'OVERLAY_ASSET_WRONG_KIND')
+    // A still picture can be held for any length. A B-roll VIDEO cannot: asking
+    // for eight seconds of a five-second clip is refused rather than padded with
+    // a frozen frame nobody approved.
+    if (overlayAsset.mediaKind === 'video') {
+      const neededTicks = operation.overlaySourceStart.ticks + operation.sourceInterval.duration.ticks
+      if (neededTicks > overlayAsset.duration.ticks) {
+        return fail('overlaySourceStart', 'OVERLAY_SPAN_OUTSIDE_ASSET')
+      }
+    }
+    // Falls through to the shared source-anchored check below, because WHERE it
+    // appears is a moment of the main footage like any other overlay.
+  }
+
   if (isTimelineOperation(operation)) {
     if (!findClip(composition, operation.clipId)) {
       return err({ code: 'OPERATION_INVALID', issues: [{ path: `${path}.clipId`, code: 'CLIP_UNKNOWN' }] })

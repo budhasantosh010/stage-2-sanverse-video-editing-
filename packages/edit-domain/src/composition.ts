@@ -1,5 +1,5 @@
 import { err, isRecord, ok, type Result } from './result.ts'
-import { findAsset, type VideoAsset } from './assets.ts'
+import { findAsset, type MediaAsset, type VideoAsset } from './assets.ts'
 import {
   ZERO_TIME,
   mediaTime,
@@ -72,6 +72,14 @@ export type CompositionIssueCode =
   | 'FIELD_UNKNOWN'
   | 'VALUE_OUT_OF_RANGE'
   | 'ASSET_UNKNOWN'
+  /**
+   * A composition is what the finished video is MADE OF, so every piece in it
+   * must be footage. A picture or a piece of music laid over the video is not a
+   * piece of the video's own body; those are overlays, and they live in
+   * operations rather than in tracks. Refusing them here means no later reader
+   * has to wonder what a still image with no length is doing on the timeline.
+   */
+  | 'ASSET_NOT_VIDEO'
   | 'SOURCE_RANGE_OUTSIDE_ASSET'
   | 'CLIPS_OVERLAP'
   | 'DUPLICATE_ID'
@@ -222,7 +230,7 @@ type Issue = CompositionError['issues'][number]
 const validateClip = (
   input: unknown,
   path: string,
-  assets: readonly VideoAsset[],
+  assets: readonly MediaAsset[],
   issues: Issue[],
 ): Clip | null => {
   if (!isRecord(input)) {
@@ -248,13 +256,19 @@ const validateClip = (
   const compositionStart = validateMediaTime(input.compositionStart, `${path}.compositionStart`)
   if (!compositionStart.ok) issues.push({ path: `${path}.compositionStart`, code: 'VALUE_OUT_OF_RANGE' })
 
-  const asset = typeof input.assetId === 'string' ? findAsset(assets, input.assetId) : undefined
-  if (!asset) {
+  const found = typeof input.assetId === 'string' ? findAsset(assets, input.assetId) : undefined
+  let asset: VideoAsset | undefined
+  if (!found) {
     issues.push({ path: `${path}.assetId`, code: 'ASSET_UNKNOWN' })
-  } else if (sourceRange.ok) {
-    const assetRange: TimeRange = { start: ZERO_TIME, duration: asset.duration }
-    if (!rangeWithin(sourceRange.value, assetRange)) {
-      issues.push({ path: `${path}.sourceRange`, code: 'SOURCE_RANGE_OUTSIDE_ASSET' })
+  } else if (found.mediaKind !== 'video') {
+    issues.push({ path: `${path}.assetId`, code: 'ASSET_NOT_VIDEO' })
+  } else {
+    asset = found
+    if (sourceRange.ok) {
+      const assetRange: TimeRange = { start: ZERO_TIME, duration: found.duration }
+      if (!rangeWithin(sourceRange.value, assetRange)) {
+        issues.push({ path: `${path}.sourceRange`, code: 'SOURCE_RANGE_OUTSIDE_ASSET' })
+      }
     }
   }
 
@@ -303,7 +317,7 @@ const validateClip = (
 
 export const validateComposition = (
   input: unknown,
-  assets: readonly VideoAsset[],
+  assets: readonly MediaAsset[],
   path = '$',
 ): Result<Composition, CompositionError> => {
   const issues: Issue[] = []

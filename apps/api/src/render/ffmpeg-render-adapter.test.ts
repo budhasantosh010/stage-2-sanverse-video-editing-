@@ -38,7 +38,7 @@ describe('FFmpeg render adapter', () => {
     expect(args[args.indexOf('-i') + 1]).toBe(String.raw`C:\source video.mp4`)
     expect(args).toContain('-map')
     expect(args).toContain('[vout]')
-    expect(args).toContain('[acat]')
+    expect(args).toContain('[aout]')
     // Audio is conformed and re-encoded. `-c:a copy` could only cut audio at
     // its own compression block boundaries, so it drifted out of sync with the
     // picture at the first cut.

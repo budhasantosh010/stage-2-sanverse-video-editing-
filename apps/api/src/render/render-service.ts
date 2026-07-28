@@ -18,6 +18,11 @@ export class RenderServiceError extends Error {
 type ExportProjectInput = {
   readonly project: EditProject
   readonly sourcePath: string
+  /**
+   * Where every extra file lives, keyed by asset id. The caller owns storage,
+   * so it is the caller that turns an opaque storageRef into a real path.
+   */
+  readonly extraSourcePaths?: Readonly<Record<string, string>>
   readonly outputPath: string
   readonly trustedWorkDir: string
   readonly signal?: AbortSignal
@@ -45,6 +50,7 @@ export function createRenderService({ renderer }: { renderer: RenderPort }) {
       }
       return renderer.render({
         sourcePath: input.sourcePath,
+        extraSourcePaths: input.extraSourcePaths,
         outputPath: input.outputPath,
         trustedWorkDir: input.trustedWorkDir,
         plan: plan.value,

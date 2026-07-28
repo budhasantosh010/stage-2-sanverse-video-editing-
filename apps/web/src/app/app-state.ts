@@ -3,7 +3,7 @@ import {
   TICKS_PER_MILLISECOND,
   clipAtCompositionTime,
   effectiveComposition,
-  isOverlayOperation,
+  isNameplateOperation,
   placeSourceSpan,
   validateOperation,
   validateOperationAgainstComposition,
@@ -162,7 +162,11 @@ export function queueEditProposal(
     }
   }
 
-  if (!isOverlayOperation(validated.value)) {
+  // Only a nameplate can be previewed as a pending proposal today. Every other
+  // family is accepted directly rather than staged, so a proposal that is not a
+  // nameplate is a mistake somewhere upstream, not something to render.
+  const nameplate = isNameplateOperation(validated.value) ? validated.value : null
+  if (!nameplate) {
     return {
       ...state,
       proposal: null,
@@ -195,7 +199,7 @@ export function queueEditProposal(
 
   return {
     ...state,
-    proposal: { operation: validated.value, origin },
+    proposal: { operation: nameplate, origin },
     editError: null,
     conversation: { ...state.conversation, status: 'ready', question: null, notice: null },
   }
@@ -295,7 +299,7 @@ export function repairProposal(state: StudioState, repair: ProposalRepair): Stud
   }
 
   const validated = validateOperation(repaired)
-  if (!validated.ok || !isOverlayOperation(validated.value)) {
+  if (!validated.ok || !isNameplateOperation(validated.value)) {
     return { ...state, editError: 'That change could not be applied. The text may be empty or too long.' }
   }
   const fits = validateOperationAgainstComposition(validated.value, composition)

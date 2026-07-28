@@ -21,7 +21,8 @@ const project = (): EditProject => {
     trackId: 'track_aaaaaaaa',
     clipId: 'clip_aaaaaaaa',
     asset: {
-      schemaVersion: 'sanverse.asset/video/v1',
+      schemaVersion: 'sanverse.asset/media/v1' as const,
+      mediaKind: 'video' as const,
       assetId: 'asset_aaaaaaaa',
       storageRef: 'project/source',
       sha256: 'a'.repeat(64),
@@ -72,7 +73,9 @@ describe('compiling a project into a render plan', () => {
     expect(compiled.value.width).toBe(1920)
     expect(compiled.value.durationTicks).toBe(30_000 * TICKS_PER_MS)
     expect(compiled.value.overlays).toHaveLength(1)
-    expect(compiled.value.overlays[0].styleId).toBe('sanverse.nameplate.default/v1')
+    const first = compiled.value.overlays[0]
+    if (first.kind !== 'text-overlay') throw new Error('expected a nameplate node')
+    expect(first.styleId).toBe('sanverse.nameplate.default/v1')
     expect(validateRenderPlan(compiled.value)).toMatchObject({ ok: true })
   })
 

@@ -6,10 +6,21 @@ import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 import { PROJECT_TIMESCALE } from '@sanverse/edit-domain/time'
 import {
   validateRenderPlan,
+  type CalloutOverlayNode,
   type CaptionOverlayNode,
   type RenderPlan,
   type TextOverlayNode,
+  type TitleOverlayNode,
 } from '@sanverse/render-contract'
+import {
+  calloutLabelTop,
+  calloutRectPixels,
+  resolveCalloutMetrics,
+  resolveCalloutStyle,
+  resolveTitleMetrics,
+  resolveTitleStyle,
+  titleLineTop,
+} from '@sanverse/render-contract/overlay-style'
 import {
   NAMEPLATE_STYLE_V1,
   anchorFraction,
@@ -52,6 +63,41 @@ type BuildArgumentsInput = {
   readonly frameRate: Readonly<{ numerator: number; denominator: number }>
   /** False when the source has no sound at all, so no audio is built. */
   readonly hasAudio: boolean
+  /**
+   * Where every extra file lives, keyed by asset id. Empty for a project with
+   * no B-roll, pictures, or music.
+   */
+  readonly extraSourcePaths?: Readonly<Record<string, string>>
+}
+
+/**
+ * Which FFmpeg input number each file gets.
+ *
+ * The main footage is always input 0, and every other file follows in the plan's
+ * own `sources` order. Computed in one place because the filter graph refers to
+ * inputs by number, and a graph that disagreed with the command line by one
+ * would silently composite the wrong clip.
+ */
+export function planInputs(plan: RenderPlan): readonly { assetId: string; mediaKind: string; index: number }[] {
+  return Object.freeze(plan.sources.map((source, index) => ({
+    assetId: source.assetId,
+    mediaKind: source.mediaKind,
+    index,
+  })))
+}
+
+/** The latest instant any node needs from one extra file, in ticks. */
+function latestUseTicks(plan: RenderPlan, assetId: string): number {
+  let latest = 0
+  for (const node of plan.overlays) {
+    if (node.kind !== 'media-overlay' || node.assetId !== assetId) continue
+    latest = Math.max(latest, node.sourceStartTicks + node.interval.duration.ticks)
+  }
+  for (const node of plan.music) {
+    if (node.assetId !== assetId) continue
+    latest = Math.max(latest, node.sourceStartTicks + node.interval.duration.ticks)
+  }
+  return latest
 }
 
 /**
@@ -190,6 +236,83 @@ function captionFilters(node: CaptionOverlayNode, index: number, plan: RenderPla
   })
 }
 
+/**
+ * Build the drawtext filters for one title.
+ *
+ * One filter per line, like a caption, and for the same reason: drawtext draws
+ * a single line. Every number comes from the shared style contract.
+ */
+function titleFilters(node: TitleOverlayNode, index: number, plan: RenderPlan, fontPath: string): string[] {
+  const style = resolveTitleStyle(node.styleId)
+  const metrics = resolveTitleMetrics(plan.width, plan.height, style)
+  const startSeconds = ticksToSeconds(node.interval.start.ticks)
+  const endSeconds = ticksToSeconds(node.interval.start.ticks + node.interval.duration.ticks)
+  const enable = `gte(t\\,${startSeconds})*lt(t\\,${endSeconds})`
+  const hasSubhead = node.subhead.length > 0
+
+  const line = (lineIndex: number, fontSize: number, file: string): string => {
+    const boxTop = titleLineTop(lineIndex, hasSubhead, node.placement, plan.height, metrics)
+    // Same em-box correction the nameplate and caption use: FFmpeg measures the
+    // glyphs, CSS measures the line box, so the difference is split evenly.
+    const y = `${boxTop + metrics.padding}+(${fontSize}-text_h)/2`
+    const parts = [
+      `fontfile='${fontPath}'`,
+      `textfile='${file}'`,
+      `fontcolor=${toFfmpegColor(style.textColor, style.textOpacity)}`,
+      `fontsize=${fontSize}`,
+      `x=round((${plan.width}-text_w)/2)`,
+      `y=${y}`,
+      'fix_bounds=1',
+      'expansion=none',
+      `enable='${enable}'`,
+    ]
+    if (style.backgroundColor !== null) {
+      parts.push('box=1', `boxcolor=${toFfmpegColor(style.backgroundColor, style.backgroundOpacity)}`)
+      parts.push(`boxborderw=${metrics.padding}`)
+    }
+    return `drawtext=${parts.join(':')}`
+  }
+
+  const filters = [line(0, metrics.headlineFontSize, `title-${index}-0.txt`)]
+  if (hasSubhead) filters.push(line(1, metrics.subheadFontSize, `title-${index}-1.txt`))
+  return filters
+}
+
+/**
+ * Build the filters for one callout: a rectangle, and optionally a label.
+ *
+ * `drawbox` is used rather than an overlaid image because it needs no extra
+ * input file and its geometry is plain arithmetic the preview can reproduce
+ * exactly in CSS.
+ */
+function calloutFilters(node: CalloutOverlayNode, index: number, plan: RenderPlan, fontPath: string): string[] {
+  const style = resolveCalloutStyle(node.styleId)
+  const metrics = resolveCalloutMetrics(plan.width, plan.height, style)
+  const rect = calloutRectPixels(node.region, plan.width, plan.height)
+  const startSeconds = ticksToSeconds(node.interval.start.ticks)
+  const endSeconds = ticksToSeconds(node.interval.start.ticks + node.interval.duration.ticks)
+  const enable = `gte(t\\,${startSeconds})*lt(t\\,${endSeconds})`
+
+  const filters = [
+    `drawbox=x=${rect.x}:y=${rect.y}:w=${rect.width}:h=${rect.height}` +
+      `:color=${toFfmpegColor(style.borderColor, style.borderOpacity)}` +
+      `:t=${metrics.borderWidth}:enable='${enable}'`,
+  ]
+  if (node.label.length > 0) {
+    const labelTop = calloutLabelTop(rect, metrics)
+    filters.push(
+      `drawtext=fontfile='${fontPath}':textfile='callout-${index}.txt'` +
+        `:fontcolor=${toFfmpegColor(style.labelColor, 1)}` +
+        `:fontsize=${metrics.labelFontSize}` +
+        `:x=${rect.x + metrics.labelPadding}` +
+        `:y=${labelTop + metrics.labelPadding}+(${metrics.labelFontSize}-text_h)/2` +
+        `:box=1:boxcolor=${toFfmpegColor(style.labelBackgroundColor, style.labelBackgroundOpacity)}` +
+        `:boxborderw=${metrics.labelPadding}:fix_bounds=1:expansion=none:enable='${enable}'`,
+    )
+  }
+  return filters
+}
+
 /** One stretch of the finished video: either real footage or a deliberate hole. */
 type TimelinePiece =
   | { readonly kind: 'footage'; readonly durationTicks: number; readonly segment: RenderPlan['segments'][number] }
@@ -307,8 +430,61 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
       `[vcat]${input.hasAudio ? '[acat]' : ''}`,
   )
 
+  const inputIndex = new Map(planInputs(plan.value).map((source) => [source.assetId, source.index]))
+  const totalSeconds = ticksToSeconds(plan.value.durationTicks)
+
+  // ── Layer one: B-roll and pictures, composited UNDER everything written ────
+  //
+  // Done before any text so a clip dropped over a caption cannot hide it. Each
+  // overlay consumes the previous picture and produces the next, so they stack
+  // in the plan's own order.
+  let videoLabel = 'vcat'
+  const mediaOverlays = plan.value.overlays.filter((node) => node.kind === 'media-overlay')
+  mediaOverlays.forEach((node, index) => {
+    const source = inputIndex.get(node.assetId)
+    if (source === undefined) {
+      throw renderError('RENDER_INPUT_INVALID', 'An overlay names a file the plan does not list.')
+    }
+    const boxX = Math.round(node.region.x * width)
+    const boxY = Math.round(node.region.y * height)
+    const boxWidth = Math.max(2, Math.round(node.region.width * width))
+    const boxHeight = Math.max(2, Math.round(node.region.height * height))
+    const from = ticksToSeconds(node.sourceStartTicks)
+    const to = ticksToSeconds(node.sourceStartTicks + node.interval.duration.ticks)
+
+    const steps = [
+      `[${source}:v]trim=start=${from}:end=${to}`,
+      'setpts=PTS-STARTPTS',
+      // `decrease` fits the clip inside the box while keeping its own shape, so
+      // a tall phone clip in a wide box is letterboxed rather than squashed.
+      // This is the same rule `fitInsideRegion` states for the preview.
+      `scale=${boxWidth}:${boxHeight}:force_original_aspect_ratio=decrease`,
+      // H.264 with 4:2:0 colour cannot encode an odd dimension.
+      'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+      'setsar=1',
+    ]
+    if (node.opacity < 1) {
+      steps.push('format=pix_fmts=yuva420p', `colorchannelmixer=aa=${node.opacity}`)
+    }
+    graph.push(`${steps.join(',')}[b${index}]`)
+
+    const startSeconds = ticksToSeconds(node.interval.start.ticks)
+    const endSeconds = ticksToSeconds(node.interval.start.ticks + node.interval.duration.ticks)
+    const next = `vm${index}`
+    graph.push(
+      `[${videoLabel}][b${index}]overlay` +
+        `:x='${boxX}+(${boxWidth}-overlay_w)/2'` +
+        `:y='${boxY}+(${boxHeight}-overlay_h)/2'` +
+        `:eof_action=pass:shortest=0` +
+        `:enable='gte(t\\,${startSeconds})*lt(t\\,${endSeconds})'[${next}]`,
+    )
+    videoLabel = next
+  })
+
+  // ── Layer two: everything written on the picture ──────────────────────────
   const overlayFilters: string[] = []
   plan.value.overlays.forEach((node, index) => {
+    if (node.kind === 'media-overlay') return
     if (node.kind === 'caption-overlay') {
       for (const line of node.lines) {
         if (Buffer.byteLength(line, 'utf8') > MAX_TEXT_BYTES) {
@@ -316,6 +492,23 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
         }
       }
       overlayFilters.push(...captionFilters(node, index, plan.value, input.fontPath))
+      return
+    }
+    if (node.kind === 'title-overlay') {
+      if (
+        Buffer.byteLength(node.headline, 'utf8') > MAX_TEXT_BYTES ||
+        Buffer.byteLength(node.subhead, 'utf8') > MAX_TEXT_BYTES
+      ) {
+        throw renderError('RENDER_INPUT_INVALID', 'A title exceeds the render text limit.')
+      }
+      overlayFilters.push(...titleFilters(node, index, plan.value, input.fontPath))
+      return
+    }
+    if (node.kind === 'callout-overlay') {
+      if (Buffer.byteLength(node.label, 'utf8') > MAX_TEXT_BYTES) {
+        throw renderError('RENDER_INPUT_INVALID', 'A callout label exceeds the render text limit.')
+      }
+      overlayFilters.push(...calloutFilters(node, index, plan.value, input.fontPath))
       return
     }
     if (
@@ -329,9 +522,114 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
   // `null` is a real filter that passes frames through unchanged. It keeps the
   // graph one shape whether or not anything is drawn, so an export with cuts
   // but no nameplates takes exactly the same code path.
-  graph.push(`[vcat]${overlayFilters.length > 0 ? overlayFilters.join(',') : 'null'}[vout]`)
+  graph.push(`[${videoLabel}]${overlayFilters.length > 0 ? overlayFilters.join(',') : 'null'}[vout]`)
+
+  // ── Sound ─────────────────────────────────────────────────────────────────
+  //
+  // Music and B-roll sound are laid UNDER the footage's own audio rather than
+  // replacing it. A project whose footage is silent still gets a real audio
+  // track when music is added, because a file with no audio stream at all
+  // behaves differently in every player and uploader.
+  const brollAudio = mediaOverlays.filter((node) => node.useOverlayAudio)
+  const extraAudio: string[] = []
+
+  const delayedAudio = (
+    label: string,
+    sourceIndexValue: number,
+    startTicks: number,
+    sourceStartTicks: number,
+    durationTicks: number,
+    gainDb: number,
+    fadeInTicks: number,
+    fadeOutTicks: number,
+  ): void => {
+    const from = ticksToSeconds(sourceStartTicks)
+    const to = ticksToSeconds(sourceStartTicks + durationTicks)
+    const steps = [
+      `[${sourceIndexValue}:a]atrim=start=${from}:end=${to}`,
+      'asetpts=PTS-STARTPTS',
+      `aresample=${AUDIO_SAMPLE_RATE}`,
+      `aformat=sample_fmts=fltp:channel_layouts=${AUDIO_CHANNEL_LAYOUT}`,
+    ]
+    if (gainDb !== 0) steps.push(`volume=${gainDb}dB`)
+    if (fadeInTicks > 0) steps.push(`afade=t=in:st=0:d=${ticksToSeconds(fadeInTicks)}`)
+    if (fadeOutTicks > 0) {
+      steps.push(`afade=t=out:st=${ticksToSeconds(durationTicks - fadeOutTicks)}:d=${ticksToSeconds(fadeOutTicks)}`)
+    }
+    if (startTicks > 0) {
+      // adelay takes whole milliseconds, one value per channel. One tick is
+      // about 0.0007 ms, so rounding here is far below anything audible.
+      const delayMs = Math.round(startTicks / (PROJECT_TIMESCALE / 1000))
+      steps.push(`adelay=${delayMs}|${delayMs}`)
+    }
+    graph.push(`${steps.join(',')}[${label}]`)
+    extraAudio.push(`[${label}]`)
+  }
+
+  plan.value.music.forEach((node, index) => {
+    const source = inputIndex.get(node.assetId)
+    if (source === undefined) {
+      throw renderError('RENDER_INPUT_INVALID', 'Music names a file the plan does not list.')
+    }
+    delayedAudio(
+      `mus${index}`,
+      source,
+      node.interval.start.ticks,
+      node.sourceStartTicks,
+      node.interval.duration.ticks,
+      node.gainDb,
+      node.fadeInTicks,
+      node.fadeOutTicks,
+    )
+  })
+
+  brollAudio.forEach((node, index) => {
+    const source = inputIndex.get(node.assetId)
+    if (source === undefined) return
+    delayedAudio(
+      `bra${index}`,
+      source,
+      node.interval.start.ticks,
+      node.sourceStartTicks,
+      node.interval.duration.ticks,
+      0,
+      0,
+      0,
+    )
+  })
+
+  if (extraAudio.length > 0) {
+    let base = 'acat'
+    if (!input.hasAudio) {
+      // Silence the exact length of the finished video, so the mix below has a
+      // first input whose duration governs the result.
+      graph.push(
+        `anullsrc=channel_layout=${AUDIO_CHANNEL_LAYOUT}:sample_rate=${AUDIO_SAMPLE_RATE}:d=${totalSeconds}` +
+          ',asetpts=PTS-STARTPTS[asilent]',
+      )
+      base = 'asilent'
+    }
+    graph.push(
+      `[${base}]${extraAudio.join('')}amix=inputs=${extraAudio.length + 1}` +
+        // `duration=first` keeps the export exactly as long as the picture, so a
+        // long song cannot stretch the file. `normalize=0` stops FFmpeg quietly
+        // halving the speech to make room for the music.
+        ':duration=first:dropout_transition=0:normalize=0[aout]',
+    )
+  } else if (input.hasAudio) {
+    graph.push('[acat]anull[aout]')
+  }
 
   return graph.join(';')
+}
+
+/** True when the finished file will carry a sound track. */
+export function planHasAudio(plan: RenderPlan, sourceHasAudio: boolean): boolean {
+  return (
+    sourceHasAudio ||
+    plan.music.length > 0 ||
+    plan.overlays.some((node) => node.kind === 'media-overlay' && node.useOverlayAudio)
+  )
 }
 
 /**
@@ -343,15 +641,39 @@ export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
   // by the same code path whether a caller wants the graph or the command.
   buildFilterGraph(input)
 
+  const paths = input.extraSourcePaths ?? {}
+  const rate = `${input.frameRate.numerator}/${input.frameRate.denominator}`
+  const extraInputs: string[] = []
+  // Input 0 is the main footage; every other source follows in the plan's own
+  // order, which is exactly the order `planInputs` reports to the filter graph.
+  for (const source of planInputs(input.plan).slice(1)) {
+    const path = paths[source.assetId]
+    if (path === undefined) {
+      throw renderError('RENDER_INPUT_INVALID', 'A file the plan needs was not supplied to the renderer.')
+    }
+    if (source.mediaKind === 'image') {
+      // A still picture is one frame. `-loop 1` turns it into a stream, and
+      // `-t` bounds that stream to the last instant anything actually needs it,
+      // because an unbounded looping input would never finish on its own.
+      const seconds = (latestUseTicks(input.plan, source.assetId) / PROJECT_TIMESCALE).toFixed(9)
+      extraInputs.push('-loop', '1', '-framerate', rate, '-t', seconds, '-i', path)
+    } else {
+      extraInputs.push('-i', path)
+    }
+  }
+
+  const hasOutputAudio = planHasAudio(input.plan, input.hasAudio)
+
   return [
     '-hide_banner',
     '-loglevel', 'error',
     '-nostdin',
     '-n',
     '-i', input.sourcePath,
+    ...extraInputs,
     '-filter_complex_script', FILTER_GRAPH_FILENAME,
     '-map', '[vout]',
-    ...(input.hasAudio ? ['-map', '[acat]'] : []),
+    ...(hasOutputAudio ? ['-map', '[aout]'] : []),
     '-c:v', 'libx264',
     '-preset', 'medium',
     '-crf', '18',
@@ -363,7 +685,7 @@ export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
     // Audio is re-encoded from the conformed graph above. It is no longer
     // copied, because copied audio can only be cut at its own block boundaries
     // and drifts out of sync with the picture at the first cut.
-    ...(input.hasAudio
+    ...(hasOutputAudio
       ? ['-c:a', 'aac', '-b:a', '192k', '-ar', String(AUDIO_SAMPLE_RATE), '-ac', '2']
       : ['-an']),
     '-map_metadata', '-1',
@@ -468,6 +790,25 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
         }
       }
 
+      // Every extra file the plan names must exist and be a real file before a
+      // single frame is encoded. Checking here rather than letting FFmpeg fail
+      // means a missing B-roll clip produces a sentence about a missing clip,
+      // not a wall of encoder output.
+      const extraPaths: Record<string, string> = {}
+      for (const source of planInputs(plan.value).slice(1)) {
+        const supplied = request.extraSourcePaths?.[source.assetId]
+        if (supplied === undefined) {
+          throw renderError('RENDER_INPUT_INVALID', 'A file this export needs was not provided.')
+        }
+        const canonical = await realpath(supplied).catch(() => {
+          throw renderError('RENDER_PATH_INVALID', 'A file this export needs is missing.')
+        })
+        if (!(await stat(canonical)).isFile()) {
+          throw renderError('RENDER_PATH_INVALID', 'A file this export needs is not a file.')
+        }
+        extraPaths[source.assetId] = canonical
+      }
+
       const renderTempDir = resolve(paths.work, `.render-${randomUUID()}`)
       const partialPath = resolve(renderTempDir, 'output.mp4')
       try {
@@ -482,8 +823,17 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
         const write = (name: string, contents: string) =>
           writeFile(resolve(renderTempDir, name), contents, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
         await Promise.all(plan.value.overlays.flatMap((node, index) => {
+          if (node.kind === 'media-overlay') return []
           if (node.kind === 'caption-overlay') {
             return node.lines.map((line, lineIndex) => write(`caption-${index}-${lineIndex}.txt`, line))
+          }
+          if (node.kind === 'title-overlay') {
+            const files = [write(`title-${index}-0.txt`, node.headline)]
+            if (node.subhead.length > 0) files.push(write(`title-${index}-1.txt`, node.subhead))
+            return files
+          }
+          if (node.kind === 'callout-overlay') {
+            return node.label.length > 0 ? [write(`callout-${index}.txt`, node.label)] : []
           }
           const files = [write(`primary-${index}.txt`, node.primaryText)]
           if (node.secondaryText.length > 0) files.push(write(`secondary-${index}.txt`, node.secondaryText))
@@ -497,6 +847,7 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
           plan: plan.value,
           frameRate,
           hasAudio: sourceProbe.hasAudio,
+          extraSourcePaths: extraPaths,
         }
         await write(FILTER_GRAPH_FILENAME, buildFilterGraph(buildInput))
         const command = buildFfmpegArguments(buildInput)
@@ -526,7 +877,7 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
           outputProbe.width !== sourceProbe.width ||
           outputProbe.height !== sourceProbe.height ||
           Math.abs(outputProbe.durationMs - expectedDurationMs) > DURATION_TOLERANCE_MS ||
-          (sourceProbe.hasAudio && !outputProbe.hasAudio)
+          (planHasAudio(plan.value, sourceProbe.hasAudio) && !outputProbe.hasAudio)
         ) {
           throw renderError('RENDER_OUTPUT_INVALID', 'The rendered output did not match the approved dimensions, length, and audio.')
         }

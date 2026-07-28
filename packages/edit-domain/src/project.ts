@@ -1,5 +1,5 @@
 import { err, isRecord, ok, type Result } from './result.ts'
-import { validateVideoAsset, type AssetError, type VideoAsset } from './assets.ts'
+import { validateMediaAsset, validateVideoAsset, type AssetError, type MediaAsset, type VideoAsset } from './assets.ts'
 import {
   createSingleClipComposition,
   validateComposition,
@@ -15,11 +15,13 @@ import {
 import { emptyExtensions, validateExtensions, type Extensions, type ExtensionsError } from './json.ts'
 import {
   isCaptionOperation,
+  isOverlayFamilyOperation,
   isTimelineOperation,
   validateOperationAgainstComposition,
   type EditOperation,
   type OperationError,
 } from './operations.ts'
+import type { OverlayOperation } from './overlay-operations.ts'
 import { foldCaptionOperations, type CaptionSet } from './caption-operations.ts'
 import { applyTimelineOperation } from './timeline-operations.ts'
 import { PROJECT_TIMESCALE } from './time.ts'
@@ -32,14 +34,14 @@ import { PROJECT_TIMESCALE } from './time.ts'
  * the revision it was computed against, and acceptance fails if the project
  * has moved on since.
  */
-export const PROJECT_SCHEMA_VERSION = 'sanverse.project/v3'
+export const PROJECT_SCHEMA_VERSION = 'sanverse.project/v4'
 
 export type EditProject = Readonly<{
   schemaVersion: typeof PROJECT_SCHEMA_VERSION
   projectId: string
   revision: number
   timescale: typeof PROJECT_TIMESCALE
-  assets: readonly VideoAsset[]
+  assets: readonly MediaAsset[]
   /**
    * The footage as it arrived, before any cut. This never changes.
    *
@@ -72,6 +74,12 @@ export type ProjectError =
 
 export const PROJECT_ID_PATTERN = /^project_[a-z0-9]{16,64}$/
 export const MAX_CHANGE_SETS = 512
+/**
+ * Most pieces of media one project may hold. A talking-head video with B-roll,
+ * a few pictures, and music is well under this; the ceiling exists so a runaway
+ * upload loop cannot grow a project file without bound.
+ */
+export const MAX_ASSETS = 64
 
 const PROJECT_KEYS = [
   'schemaVersion',
@@ -128,6 +136,40 @@ export const createProject = (input: {
   }))
 }
 
+/**
+ * Bring a second piece of media into the project: more footage, a picture, or
+ * a piece of music.
+ *
+ * Adding media is NOT an edit. Nothing on screen changes, nothing enters the
+ * undo history, and no change set is created — the user has put something on
+ * the shelf, not used it. Only an operation that names the asset changes the
+ * video, and that is a separate, approvable act.
+ *
+ * The revision still moves forward, because the revision means "the project
+ * state" and one rule with no exceptions is safer than a rule with one. The
+ * cost is that an AI answer computed a moment before an upload must be
+ * recomputed; the benefit is that no reader ever has to remember which changes
+ * count.
+ */
+export const addAsset = (project: EditProject, candidate: unknown): Result<EditProject, ProjectError> => {
+  const current = validateProject(project)
+  if (!current.ok) return current
+  const asset = validateMediaAsset(candidate, 'asset')
+  if (!asset.ok) return asset
+  if (current.value.assets.some((existing) => existing.assetId === asset.value.assetId)) {
+    return err(invalid('assets', 'DUPLICATE_ID'))
+  }
+  if (current.value.assets.length >= MAX_ASSETS) {
+    return err(invalid('assets', 'TOO_MANY_ASSETS'))
+  }
+  const next = Object.freeze({
+    ...current.value,
+    assets: Object.freeze([...current.value.assets, asset.value]),
+    revision: current.value.revision + 1,
+  })
+  return ok(Object.freeze({ ...next, changeSets: evaluateProject(next).records }))
+}
+
 export const validateProject = (input: unknown): Result<EditProject, ProjectError> => {
   if (!isRecord(input)) return err(invalid('$', 'TYPE_INVALID'))
   for (const key of PROJECT_KEYS) {
@@ -146,10 +188,10 @@ export const validateProject = (input: unknown): Result<EditProject, ProjectErro
   if (input.timescale !== PROJECT_TIMESCALE) return err(invalid('timescale', 'TIMESCALE_UNSUPPORTED'))
 
   if (!Array.isArray(input.assets) || input.assets.length === 0) return err(invalid('assets', 'TYPE_INVALID'))
-  const assets: VideoAsset[] = []
+  const assets: MediaAsset[] = []
   const seenAssetIds = new Set<string>()
   for (const [index, rawAsset] of input.assets.entries()) {
-    const asset = validateVideoAsset(rawAsset, `assets[${index}]`)
+    const asset = validateMediaAsset(rawAsset, `assets[${index}]`)
     if (!asset.ok) return asset
     if (seenAssetIds.has(asset.value.assetId)) return err(invalid(`assets[${index}].assetId`, 'DUPLICATE_ID'))
     seenAssetIds.add(asset.value.assetId)
@@ -319,7 +361,7 @@ export const evaluateProject = (project: EditProject): ProjectEvaluation => {
 
     for (const operation of record.changeSet.operations) {
       if (isTimelineOperation(operation)) continue
-      const checked = validateOperationAgainstComposition(operation, composition)
+      const checked = validateOperationAgainstComposition(operation, composition, project.assets)
       if (!checked.ok) {
         return Object.freeze({ ...record, blockedReason: checked.error.issues[0]?.code ?? 'OPERATION_INVALID' })
       }
@@ -484,6 +526,10 @@ export const blockedChangeSets = (project: EditProject): readonly ChangeSetRecor
 export const activeCaptionSets = (project: EditProject): readonly CaptionSet[] =>
   foldCaptionOperations(activeOperations(project).filter(isCaptionOperation))
 
+/** Titles, callouts, B-roll, and music that currently affect the exported video. */
+export const activeOverlayOperations = (project: EditProject): readonly OverlayOperation[] =>
+  Object.freeze(activeOperations(project).filter(isOverlayFamilyOperation))
+
 export const canUndo = (project: EditProject): boolean => project.changeSets.length > 0
 export const canRedo = (project: EditProject): boolean => project.redoStack.length > 0
 
@@ -504,11 +550,65 @@ export const deserializeProject = (serialized: string): Result<EditProject, Proj
 }
 
 export { emptyExtensions }
-export type { Extensions, VideoAsset, Composition, ChangeSet, ChangeSetRecord, EditOperation, Result }
+export type { Extensions, MediaAsset, VideoAsset, Composition, ChangeSet, ChangeSetRecord, EditOperation, Result }
 
 export * from './time.ts'
 export * from './geometry.ts'
-export { findAsset, validateVideoAsset, ASSET_ID_PATTERN } from './assets.ts'
+export {
+  ASSET_ID_PATTERN,
+  ASSET_SCHEMA_VERSION,
+  MEDIA_KINDS,
+  findAsset,
+  findVideoAsset,
+  isAudioAsset,
+  isImageAsset,
+  isVideoAsset,
+  isVisualAsset,
+  validateMediaAsset,
+  validateVideoAsset,
+  type AudioAsset,
+  type ImageAsset,
+  type MediaKind,
+} from './assets.ts'
+export {
+  ANNOTATION_ID_PATTERN,
+  ANNOTATION_SCHEMA_VERSION,
+  ANNOTATION_SHAPES,
+  MAX_ANNOTATIONS_PER_REQUEST,
+  MAX_ANNOTATION_NOTE_LENGTH,
+  MAX_FREEHAND_POINTS,
+  annotationBounds,
+  describeAnnotation,
+  validateAnnotation,
+  validateAnnotations,
+  type Annotation,
+  type AnnotationShape,
+} from './annotations.ts'
+export {
+  CALLOUT_STYLE_IDS,
+  DEFAULT_CALLOUT_STYLE_ID,
+  DEFAULT_MUSIC_GAIN_DB,
+  DEFAULT_TITLE_STYLE_ID,
+  MAX_CALLOUT_LABEL_LENGTH,
+  MAX_HEADLINE_LENGTH,
+  MAX_MUSIC_GAIN_DB,
+  MAX_SUBHEAD_LENGTH,
+  MIN_MUSIC_GAIN_DB,
+  OVERLAY_OPERATION_KINDS,
+  TITLE_PLACEMENTS,
+  TITLE_STYLE_IDS,
+  isOverlayOperationKind,
+  validateOverlayOperation,
+  type AddCalloutOperation,
+  type AddMediaOverlayOperation,
+  type AddMusicOperation,
+  type AddTitleOperation,
+  type CalloutStyleId,
+  type NormalizedRect,
+  type OverlayOperation,
+  type TitlePlacement,
+  type TitleStyleId,
+} from './overlay-operations.ts'
 export {
   MAX_CLIP_GAIN_DB,
   MIN_CLIP_GAIN_DB,
@@ -536,7 +636,9 @@ export {
   OPERATION_ID_PATTERN,
   OPERATION_SCHEMA_VERSION,
   isCaptionOperation,
-  isOverlayOperation,
+  isNameplateOperation,
+  isOverlayFamilyOperation,
+  isSourceAnchoredOperation,
   isTimelineOperation,
   validateOperation,
   validateOperationAgainstComposition,
@@ -622,8 +724,16 @@ export {
   CAPTION_STYLE_PRIMITIVE_ID,
   CLIP_AUDIO_PRIMITIVE_ID,
   CLIP_ENABLED_PRIMITIVE_ID,
+  CALLOUT_COMPONENT_ID,
+  CALLOUT_PRIMITIVE_ID,
+  MEDIA_OVERLAY_COMPONENT_ID,
+  MEDIA_OVERLAY_PRIMITIVE_ID,
+  MUSIC_COMPONENT_ID,
+  MUSIC_PRIMITIVE_ID,
   NAMEPLATE_COMPONENT_ID,
   NAMEPLATE_PRIMITIVE_ID,
+  TITLE_COMPONENT_ID,
+  TITLE_PRIMITIVE_ID,
   REMOVE_PRIMITIVE_ID,
   REMOVE_RANGE_COMPONENT_ID,
   REORDER_PRIMITIVE_ID,

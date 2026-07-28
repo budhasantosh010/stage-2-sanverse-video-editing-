@@ -261,7 +261,9 @@ export function createSanverseServer(options: ServerOptions) {
         }
 
         const current = await projectState.load(projectId)
-        const asset = current.assets[0]
+        // Captions describe what is SPOKEN, so they belong to the footage —
+        // never to a picture or a piece of music the project also holds.
+        const asset = current.assets.find((candidate) => candidate.mediaKind === 'video')
         if (!asset) { json(response, 404, { error: 'Project was not found.' }); return }
 
         const built = buildCaptionsChangeSet({

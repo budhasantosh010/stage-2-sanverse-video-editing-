@@ -23,7 +23,9 @@
     "./result": "./src/result.ts",
     "./test-fixtures": "./src/test-fixtures.ts",
     "./legacy-project-v1": "./src/legacy-project-v1.ts",
-    "./migrations/upgrade-project": "./src/migrations/upgrade-project.ts"
+    "./migrations/upgrade-project": "./src/migrations/upgrade-project.ts",
+    "./annotations": "./src/annotations.ts",
+    "./overlay-operations": "./src/overlay-operations.ts"
   },
   "scripts": {
     "test": "vitest run",

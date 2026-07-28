@@ -21,7 +21,8 @@ export const ms = (milliseconds: number) => ({
 
 /** A 30-second, 1920x1080 asset with audio. */
 export const testAsset = (overrides: Partial<VideoAsset> = {}): VideoAsset => ({
-  schemaVersion: 'sanverse.asset/video/v1',
+  schemaVersion: 'sanverse.asset/media/v1' as const,
+      mediaKind: 'video' as const,
   assetId: 'asset_aaaaaaaa',
   storageRef: `project:${TEST_PROJECT_ID}/source`,
   sha256: 'a'.repeat(64),

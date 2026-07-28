@@ -18,7 +18,8 @@ const baseProject = (): EditProject => {
     trackId: 'track_aaaaaaaa',
     clipId: 'clip_aaaaaaaa',
     asset: {
-      schemaVersion: 'sanverse.asset/video/v1',
+      schemaVersion: 'sanverse.asset/media/v1' as const,
+      mediaKind: 'video' as const,
       assetId: 'asset_aaaaaaaa',
       storageRef: 'project:source',
       sha256: 'a'.repeat(64),
@@ -82,7 +83,7 @@ describe('render service', () => {
 
     expect(result.outputPath).toBe('export.mp4')
     const request = (renderer.render as ReturnType<typeof vi.fn>).mock.calls[0][0]
-    expect(request.plan.schemaVersion).toBe('sanverse.render-plan/v2')
+    expect(request.plan.schemaVersion).toBe('sanverse.render-plan/v3')
     expect(request.plan.overlays).toHaveLength(1)
     expect(request.plan.overlays[0].primaryText).toBe('Santosh')
     // The footage itself is described too, not just what is drawn on it.

@@ -60,7 +60,8 @@ export function createProjectStateService(options: {
     return {
       ids,
       asset: {
-        schemaVersion: 'sanverse.asset/video/v1' as const,
+        schemaVersion: 'sanverse.asset/media/v1' as const,
+        mediaKind: 'video' as const,
         assetId: ids.assetId,
         // Opaque to the domain. Only the storage adapter knows it means a file.
         storageRef: `project:${projectId}/source`,

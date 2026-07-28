@@ -4,7 +4,10 @@ import { PROJECT_TIMESCALE, toSeconds } from '../time.ts'
 import type { CaptionCueDraft } from './segment-transcript.ts'
 import { DEFAULT_REPAIR, cuesAreDisjoint, repairCueTimings } from './repair-cues.ts'
 
-const time = (seconds: number) => ({ ticks: Math.round(seconds * PROJECT_TIMESCALE), timescale: PROJECT_TIMESCALE })
+const time = (seconds: number) => ({
+  ticks: Math.round(seconds * PROJECT_TIMESCALE),
+  timescale: PROJECT_TIMESCALE as typeof PROJECT_TIMESCALE,
+})
 
 const cue = (start: number, duration: number, text = 'hello'): CaptionCueDraft => ({
   sourceInterval: { start: time(start), duration: time(duration) },

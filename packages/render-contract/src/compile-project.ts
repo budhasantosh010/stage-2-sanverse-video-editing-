@@ -3,18 +3,22 @@ import {
   activeOperations,
   compositionDuration,
   effectiveComposition,
-  isOverlayOperation,
+  findAsset,
+  isNameplateOperation,
   placeSourceSpan,
   type EditProject,
 } from '@sanverse/edit-domain'
 
 import { NAMEPLATE_STYLE_ID } from './nameplate-style.ts'
 import {
+  MAX_MUSIC_NODES,
   RENDER_PLAN_SCHEMA_VERSION,
   validateRenderPlan,
+  type MusicNode,
   type RenderNode,
   type RenderPlan,
   type RenderPlanError,
+  type RenderSource,
   type SourceSegmentNode,
 } from './render-plan.ts'
 
@@ -41,12 +45,28 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     return { ok: false, error: { code: 'COMPILE_FAILED', reason: 'The composition is empty.' } }
   }
 
+  // Every file the renderer must open, in the order they are first needed.
+  // Footage always comes first so the main input keeps a stable position.
+  const sources: RenderSource[] = []
+  const seenSources = new Set<string>()
+  const useSource = (assetId: string): boolean => {
+    if (seenSources.has(assetId)) return true
+    const asset = findAsset(project.assets, assetId)
+    if (!asset) return false
+    seenSources.add(assetId)
+    sources.push(Object.freeze({ assetId, mediaKind: asset.mediaKind }))
+    return true
+  }
+
   const segments: SourceSegmentNode[] = []
   for (const track of composition.tracks) {
     for (const clip of track.clips) {
       // A hidden piece leaves a hole rather than shifting everything after it,
       // so that switching it back on restores the exact video the user saw.
       if (!clip.enabled) continue
+      if (!useSource(clip.assetId)) {
+        return { ok: false, error: { code: 'COMPILE_FAILED', reason: 'A piece of footage is missing.' } }
+      }
       segments.push(Object.freeze({
         nodeId: clip.clipId,
         kind: 'source-segment' as const,
@@ -69,25 +89,129 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
   }
 
   const overlays: RenderNode[] = []
-  for (const operation of activeOperations(project)) {
-    if (!isOverlayOperation(operation)) continue
+  const music: MusicNode[] = []
 
-    // One nameplate can produce two on-screen appearances if a cut passed
-    // through the middle of it: it stays with the footage on both sides.
-    const placements = placeSourceSpan(composition, operation.assetId, operation.sourceInterval)
+  /**
+   * One overlay operation can produce two on-screen appearances if a cut passed
+   * through the middle of it: it stays with the footage on both sides. Every
+   * source-anchored family is placed by this one function, so a nameplate, a
+   * caption, a title, a callout, and a piece of B-roll can never disagree about
+   * where a cut left them.
+   */
+  const placeAnchored = (
+    assetId: string,
+    sourceInterval: { start: { ticks: number }; duration: { ticks: number } },
+    build: (nodeIdSuffix: string, interval: RenderNode['interval'], sourceOffsetTicks: number) => RenderNode,
+  ): void => {
+    const placements = placeSourceSpan(composition, assetId, sourceInterval as never)
     for (const [index, placement] of placements.entries()) {
       if (!placement.clip.enabled) continue
-      overlays.push(Object.freeze({
-        nodeId: index === 0 ? operation.operationId : `${operation.operationId}.${placement.clip.clipId}`,
+      // How far into the original span this surviving piece begins. A B-roll
+      // clip cut in half must resume where it left off, not restart.
+      const offset = placement.sourceRange.start.ticks - sourceInterval.start.ticks
+      overlays.push(build(index === 0 ? '' : `.${placement.clip.clipId}`, placement.compositionRange, offset))
+    }
+  }
+
+  for (const operation of activeOperations(project)) {
+    if (isNameplateOperation(operation)) {
+      placeAnchored(operation.assetId, operation.sourceInterval, (suffix, interval) => Object.freeze({
+        nodeId: `${operation.operationId}${suffix}`,
         kind: 'text-overlay' as const,
-        interval: placement.compositionRange,
+        interval,
         target: operation.target,
         primaryText: operation.primaryText,
         secondaryText: operation.secondaryText,
         styleId: NAMEPLATE_STYLE_ID,
       }))
+      continue
+    }
+
+    if (operation.kind === 'add-title') {
+      placeAnchored(operation.assetId, operation.sourceInterval, (suffix, interval) => Object.freeze({
+        nodeId: `${operation.titleId}${suffix}`,
+        kind: 'title-overlay' as const,
+        interval,
+        headline: operation.headline,
+        subhead: operation.subhead,
+        placement: operation.placement,
+        styleId: operation.styleId,
+      }))
+      continue
+    }
+
+    if (operation.kind === 'add-callout') {
+      placeAnchored(operation.assetId, operation.sourceInterval, (suffix, interval) => Object.freeze({
+        nodeId: `${operation.calloutId}${suffix}`,
+        kind: 'callout-overlay' as const,
+        interval,
+        region: Object.freeze({
+          x: operation.region.x,
+          y: operation.region.y,
+          width: operation.region.width,
+          height: operation.region.height,
+        }),
+        label: operation.label,
+        styleId: operation.styleId,
+      }))
+      continue
+    }
+
+    if (operation.kind === 'add-media-overlay') {
+      if (!useSource(operation.overlayAssetId)) continue
+      const asset = findAsset(project.assets, operation.overlayAssetId)
+      const isStill = asset?.mediaKind === 'image'
+      placeAnchored(operation.assetId, operation.sourceInterval, (suffix, interval, offset) => Object.freeze({
+        nodeId: `${operation.overlayId}${suffix}`,
+        kind: 'media-overlay' as const,
+        interval,
+        assetId: operation.overlayAssetId,
+        // A still picture has nowhere to seek to, so it always starts at zero.
+        // A B-roll video resumes where the cut interrupted it.
+        sourceStartTicks: isStill ? 0 : operation.overlaySourceStart.ticks + offset,
+        region: Object.freeze({
+          x: operation.region.x,
+          y: operation.region.y,
+          width: operation.region.width,
+          height: operation.region.height,
+        }),
+        opacity: operation.opacity,
+        useOverlayAudio: operation.useOverlayAudio,
+      }))
+      continue
+    }
+
+    if (operation.kind === 'add-music') {
+      if (music.length >= MAX_MUSIC_NODES) continue
+      const asset = findAsset(project.assets, operation.assetId)
+      if (!asset || asset.mediaKind !== 'audio') continue
+      // Music is measured on the FINISHED video, so cutting the middle out does
+      // not cut the middle out of the song. It plays for as long as there is
+      // both video left to cover and song left to play, whichever runs out
+      // first — never looped, because a loop point nobody chose is audible.
+      const videoLeft = duration.ticks - operation.compositionStart.ticks
+      const songLeft = asset.duration.ticks - operation.sourceStart.ticks
+      const playable = Math.min(videoLeft, songLeft)
+      if (playable <= 0) continue
+      if (!useSource(operation.assetId)) continue
+      const fadeIn = Math.min(operation.fadeIn.ticks, playable)
+      const fadeOut = Math.min(operation.fadeOut.ticks, playable - fadeIn)
+      music.push(Object.freeze({
+        nodeId: operation.musicId,
+        kind: 'music' as const,
+        interval: Object.freeze({
+          start: operation.compositionStart,
+          duration: Object.freeze({ ticks: playable, timescale: duration.timescale }),
+        }),
+        assetId: operation.assetId,
+        sourceStartTicks: operation.sourceStart.ticks,
+        gainDb: operation.gainDb,
+        fadeInTicks: fadeIn,
+        fadeOutTicks: fadeOut,
+      }))
     }
   }
+
   // Captions, placed by exactly the same rule as everything else drawn on top.
   //
   // One cue can become two nodes when a cut passed through it, so node ids are
@@ -97,23 +221,24 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
   // that differs from a nameplate.
   for (const set of activeCaptionSets(project)) {
     for (const cue of set.cues) {
-      const placements = placeSourceSpan(composition, set.assetId, cue.sourceInterval)
-      for (const [index, placement] of placements.entries()) {
-        if (!placement.clip.enabled) continue
-        overlays.push(Object.freeze({
-          nodeId: index === 0
-            ? `${set.captionSetId}.${cue.cueId}`
-            : `${set.captionSetId}.${cue.cueId}.${placement.clip.clipId}`,
-          kind: 'caption-overlay' as const,
-          interval: placement.compositionRange,
-          lines: cue.lines,
-          styleId: set.styleId,
-        }))
-      }
+      placeAnchored(set.assetId, cue.sourceInterval, (suffix, interval) => Object.freeze({
+        nodeId: `${set.captionSetId}.${cue.cueId}${suffix}`,
+        kind: 'caption-overlay' as const,
+        interval,
+        lines: cue.lines,
+        styleId: set.styleId,
+      }))
     }
   }
 
-  overlays.sort((left, right) => left.interval.start.ticks - right.interval.start.ticks)
+  // Drawing order is the order of this list, and it is sorted by when each
+  // thing appears. Within one instant, B-roll must sit UNDER the words, or a
+  // clip dropped over a caption would hide it. Media overlays are therefore
+  // pulled ahead of everything else that starts at the same moment.
+  const drawRank = (node: RenderNode): number => (node.kind === 'media-overlay' ? 0 : 1)
+  overlays.sort((left, right) =>
+    left.interval.start.ticks - right.interval.start.ticks || drawRank(left) - drawRank(right),
+  )
 
   const plan = {
     schemaVersion: RENDER_PLAN_SCHEMA_VERSION,
@@ -123,8 +248,10 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     width: composition.width,
     height: composition.height,
     durationTicks: duration.ticks,
+    sources: Object.freeze(sources),
     segments: Object.freeze(segments),
     overlays: Object.freeze(overlays),
+    music: Object.freeze(music),
   }
 
   // Compiled output is checked by the same validator that guards a plan

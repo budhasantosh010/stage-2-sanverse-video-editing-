@@ -55,6 +55,30 @@ export const describeOperation = (operation: EditOperation): string => {
       return operation.styleId === 'sanverse.caption.plain/v1'
         ? 'Captions: no background'
         : 'Captions: dark background'
+    case 'add-title':
+      return operation.subhead
+        ? `Title: “${operation.headline}” — ${operation.subhead}`
+        : `Title: “${operation.headline}”`
+    case 'add-callout':
+      return operation.label
+        ? `Pointed out “${operation.label}”`
+        : 'Drew a box on the picture'
+    case 'add-media-overlay': {
+      const length = seconds(operation.sourceInterval.duration.ticks)
+      return `Showed another clip for ${length}s`
+    }
+    case 'add-music': {
+      // The loudness is said the way a person would ask for it, not in decibels
+      // — "quiet" is what the user meant; -18 dB is how the machine stores it.
+      const level = operation.gainDb <= -24
+        ? 'very quiet'
+        : operation.gainDb <= -12
+          ? 'quiet'
+          : operation.gainDb < 0
+            ? 'a little quiet'
+            : 'full volume'
+      return `Added music, ${level}`
+    }
     default: {
       const unreachable: never = operation
       void unreachable
