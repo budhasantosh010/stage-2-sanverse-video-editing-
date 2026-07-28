@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AddNameplateOperation, EditProject, TimelineOperation } from '@sanverse/edit-domain'
 import {
   DEFAULT_CAPTION_STYLE_ID,
+  DEFAULT_TITLE_STYLE_ID,
+  type EditOperation,
+  type MediaAsset,
   PROJECT_TIMESCALE,
   TICKS_PER_MILLISECOND as TICKS_PER_MS,
   compositionDuration,
@@ -32,7 +35,11 @@ import {
   compilePreviewPlan,
   millisecondsToTicks,
   nameplateCssVariables,
+  visibleCallouts,
   visibleCaptions,
+  visibleMediaOverlays,
+  visibleTitles,
+  titleCssVariables,
   visibleNameplates,
   withPendingProposal,
 } from '../../features/render-plan/render-plan-preview'
@@ -40,6 +47,8 @@ import type { ProjectExportState } from '../../features/project-export/project-e
 import { NameplateComposer } from '../../features/nameplate/NameplateComposer'
 import { NameplateOverlay } from '../../features/nameplate/NameplateOverlay'
 import { CaptionOverlay } from '../../features/captions/CaptionOverlay'
+import { AddOverlayPanel } from '../../features/overlays/AddOverlayPanel'
+import { CalloutOverlay, MediaOverlay, TitleOverlay } from '../../features/overlays/OverlayLayers'
 import {
   capturePointTarget,
   formatPointTargetTime,
@@ -65,6 +74,15 @@ export type StudioScreenProps = {
    * Resolves to a plain sentence when it could not be used, or null on success.
    */
   onAddCaptions(transcript: string): Promise<string | null>
+  /**
+   * Accept one new title, callout, B-roll clip, or piece of music.
+   * Resolves to a plain sentence when it could not be used, or null on success.
+   */
+  onCreateOverlay(operation: EditOperation): Promise<string | null>
+  /** Put one file on the project's shelf, and say what it turned out to be. */
+  onUploadAsset(file: File): Promise<MediaAsset | string>
+  /** Where each extra file can be fetched from, for the preview. */
+  assetUrl(assetId: string): string
   onSendMessage(message: string, context: IntentContextInput): void
   onUndo(): void
   onRedo(): void
@@ -148,6 +166,9 @@ export function StudioScreen({
   onRepairProposal,
   onTimelineEdit,
   onAddCaptions: onAddCaptionsText,
+  onCreateOverlay,
+  onUploadAsset,
+  assetUrl,
   onSendMessage,
   onUndo,
   onRedo,
@@ -402,6 +423,10 @@ export function StudioScreen({
   const playheadPreviewTicks = millisecondsToTicks(playheadMs)
   const previewNodes = previewPlan ? visibleNameplates(previewPlan, playheadPreviewTicks) : []
   const previewCaptions = previewPlan ? visibleCaptions(previewPlan, playheadPreviewTicks) : []
+  const previewTitles = previewPlan ? visibleTitles(previewPlan, playheadPreviewTicks) : []
+  const previewCallouts = previewPlan ? visibleCallouts(previewPlan, playheadPreviewTicks) : []
+  const previewMedia = previewPlan ? visibleMediaOverlays(previewPlan, playheadPreviewTicks) : []
+  const assetKinds = new Map(editProject.assets.map((asset) => [asset.assetId, asset.mediaKind]))
   const contentBox = video ? getRenderedVideoContentBox(video.getBoundingClientRect(), video.videoWidth, video.videoHeight) : null
   const previewScale = contentBox && composition.width > 0 ? contentBox.width / composition.width : 0
   const nameplateVariables = nameplateCssVariables(composition.width, composition.height, previewScale)
@@ -410,6 +435,15 @@ export function StudioScreen({
   // with multi-asset projects, not before.
   const captionVariables = captionCssVariables(
     previewCaptions[0]?.styleId ?? DEFAULT_CAPTION_STYLE_ID,
+    composition.width,
+    composition.height,
+    previewScale,
+  )
+
+  // One title is ever on screen at a time for the same reason, so one set of
+  // variables is enough here too.
+  const titleVariables = titleCssVariables(
+    previewTitles[0]?.styleId ?? DEFAULT_TITLE_STYLE_ID,
     composition.width,
     composition.height,
     previewScale,
@@ -698,8 +732,38 @@ export function StudioScreen({
                 <div
                   className="studio-screen__video-content-layer"
                   data-testid="video-content-layer"
-                  style={{ ...videoContentLayerStyle, ...nameplateVariables, ...captionVariables }}
+                  style={{ ...videoContentLayerStyle, ...nameplateVariables, ...captionVariables, ...titleVariables }}
                 >
+                  {previewMedia.map((node) => (
+                    <MediaOverlay
+                      key={node.nodeId}
+                      node={node}
+                      sourceUrl={assetUrl(node.assetId)}
+                      isStill={assetKinds.get(node.assetId) === 'image'}
+                      ticks={playheadPreviewTicks}
+                      compositionWidth={composition.width}
+                      compositionHeight={composition.height}
+                      scale={previewScale}
+                    />
+                  ))}
+                  {previewCallouts.map((node) => (
+                    <CalloutOverlay
+                      key={node.nodeId}
+                      node={node}
+                      compositionWidth={composition.width}
+                      compositionHeight={composition.height}
+                      scale={previewScale}
+                    />
+                  ))}
+                  {previewTitles.map((node) => (
+                    <TitleOverlay
+                      key={node.nodeId}
+                      node={node}
+                      compositionWidth={composition.width}
+                      compositionHeight={composition.height}
+                      scale={previewScale}
+                    />
+                  ))}
                   {previewNodes.map((node) => (
                     <NameplateOverlay
                       key={node.nodeId}
@@ -1005,6 +1069,13 @@ export function StudioScreen({
             Choose the transcript file for this video. Nothing is sent anywhere — the
             words are read on this machine and turned into readable lines for you.
           </p>
+          <AddOverlayPanel
+            editProject={editProject}
+            playheadMs={playheadMs}
+            busy={timelineBusy || captionsBusy}
+            onCreate={onCreateOverlay}
+            onUploadAsset={onUploadAsset}
+          />
           <label className="studio-screen__captions-picker">
             <span>Add captions from a transcript file</span>
             <input

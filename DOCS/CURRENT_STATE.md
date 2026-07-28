@@ -125,8 +125,9 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
 
 ## G5-C so far — many kinds of media, and four new overlays
 
-Built and unit-proved this batch; see `ADR-007`. **Not proved on real media,
-and mostly not reachable from the screen yet.**
+Built, wired to the screen, and **proved in real exports** on 2026-07-29; see
+`ADR-007` and `DOCS/evidence/2026-07-29-g5c-real-media.md`. That run found two
+defects 741 passing tests had missed, both now fixed and guarded.
 
 - A project can now hold several videos, pictures, and music. One asset type
   with a stated kind; a picture has no length and music has no picture, and
@@ -153,14 +154,18 @@ and mostly not reachable from the screen yet.**
 
 ## Known limitations
 
-- **G5-C is not reachable from the screen.** There is no upload route for
-  pictures or music, and no control for creating a title, a callout, B-roll, or
-  music. All four are built, tested, and reach the export; none has a button.
-  Progressive disclosure in Studio (G5C-08) and per-family repair (G5C-07's
-  second half) are not started.
-- **No G5-C feature has touched real media.** Everything is proved at the plan
-  and filter-graph level only. By Rule #3 that means it is not yet known to
-  work. No real B-roll clip, picture, or music file has been through an export.
+- **No repair panel for the four new families.** A title, callout, B-roll clip,
+  or piece of music can be created and undone, but not adjusted in place.
+  G5C-07's second half is not started.
+- **A callout cannot be moved or resized on screen.** It appears in a fixed
+  sensible place over the middle-right of the picture.
+- **The on-screen controls were not driven by hand.** The Add panel, the upload
+  route, and the preview layers are built and type-checked, and the API path
+  behind them was exercised directly with real files. Clicking through them in
+  a browser is not done.
+- **The B-roll and music used in the real run were synthetic** — an FFmpeg test
+  pattern and a 220 Hz sine. A real phone clip and a real song have not been
+  through it.
 - A second video cannot be appended to the timeline. Multi-asset intake is the
   shelf; there is no `append-clip` operation.
 - **The drawn background plate is about 10 px shorter vertically in the export

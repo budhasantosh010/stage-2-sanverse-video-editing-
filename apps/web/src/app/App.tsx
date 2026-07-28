@@ -29,6 +29,8 @@ import { exportProject, type ProjectExportState } from '../features/project-expo
 import {
   acceptChangeSet,
   addCaptionsFromTranscript,
+  projectAssetUrl,
+  uploadProjectAsset,
   listRecentProjects,
   loadProject,
   redoProject,
@@ -339,6 +341,51 @@ export function App() {
           return error instanceof Error && error.message ? error.message : 'Captions could not be added.'
         }
       }}
+      onCreateOverlay={async (operation) => {
+        if (appState.screen !== 'studio' || appState.proposal) return 'Finish the pending edit first.'
+        resetExport()
+        try {
+          // Exactly the same server-authoritative path a cut takes: the browser
+          // asks for one change set and adopts whatever comes back. It never
+          // applies the edit to its own copy and hopes the server agrees.
+          const next = await acceptChangeSet(
+            appState.project.id,
+            {
+              schemaVersion: 'sanverse.change-set/v1' as const,
+              changeSetId: `changeset_${operation.operationId.replace(/^operation_/, '').slice(0, 32)}`,
+              baseRevision: appState.editProject.revision,
+              operations: [operation],
+              provenance: { source: 'direct' as const, requestId: null },
+              extensions: {},
+            },
+            fetch,
+          )
+          setAppState((current) =>
+            current.screen === 'studio' ? { ...current, editProject: next, editError: null } : current,
+          )
+          return null
+        } catch (error) {
+          return error instanceof Error && error.message ? error.message : 'That could not be added.'
+        }
+      }}
+      onUploadAsset={async (file) => {
+        if (appState.screen !== 'studio') return 'Open a project first.'
+        try {
+          const { project, assetId } = await uploadProjectAsset(appState.project.id, file, fetch)
+          setAppState((current) =>
+            current.screen === 'studio' ? { ...current, editProject: project, editError: null } : current,
+          )
+          const asset = project.assets.find((candidate) => candidate.assetId === assetId)
+          // The server said the upload worked, so an asset it did not return
+          // would mean the two disagree - reported rather than guessed at.
+          return asset ?? 'That file was added but could not be read back.'
+        } catch (error) {
+          return error instanceof Error && error.message ? error.message : 'That file could not be added.'
+        }
+      }}
+      assetUrl={(assetId) =>
+        appState.screen === 'studio' ? projectAssetUrl(appState.project.id, assetId) : ''
+      }
       onAcceptProposal={() => {
         if (appState.screen !== 'studio' || !appState.proposal) return
         const changeSet = buildChangeSet(appState.proposal, appState.editProject.revision)

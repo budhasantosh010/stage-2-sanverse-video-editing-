@@ -154,6 +154,50 @@ export async function redoProject(projectId: string, fetcher: typeof fetch = fet
   return editRequest(projectId, `/api/projects/${projectId}/redo`, { method: 'POST', signal }, 200, fetcher)
 }
 
+/**
+ * Put one more file on the project's shelf: B-roll, a picture, or music.
+ *
+ * The file's BYTES are sent and the server decides what kind of thing it is by
+ * looking at them. The browser never claims a kind, because the browser only
+ * knows the name the user's computer gave the file, and a name can say anything.
+ *
+ * This is not an edit. Nothing appears in the history, and Undo is unaffected —
+ * the file has been put on a shelf, not used.
+ */
+export async function uploadProjectAsset(
+  projectId: string,
+  file: File,
+  fetcher: typeof fetch = fetch,
+  signal?: AbortSignal,
+): Promise<{ project: EditProject; assetId: string }> {
+  const response = await fetcher(`/api/projects/${projectId}/assets`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/octet-stream' },
+    body: file,
+    signal,
+  })
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { error?: unknown } | null
+    throw new ProjectEditError(
+      'EDIT_REJECTED',
+      typeof body?.error === 'string' ? body.error : 'That file could not be added.',
+    )
+  }
+  const payload = await response.json().catch(() => null) as
+    | { project?: unknown; asset?: { assetId?: unknown } }
+    | null
+  const project = validateProject(payload?.project)
+  const assetId = payload?.asset?.assetId
+  if (!project.ok || project.value.projectId !== projectId || typeof assetId !== 'string') {
+    throw new ProjectEditError('EDIT_REJECTED', EDIT_ERROR)
+  }
+  return { project: project.value, assetId }
+}
+
+/** Where the browser can fetch one of those files back for the preview. */
+export const projectAssetUrl = (projectId: string, assetId: string): string =>
+  `/api/projects/${projectId}/assets/${assetId}/media`
+
 export async function setChangeSetActive(
   projectId: string,
   changeSetId: string,

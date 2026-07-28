@@ -1,5 +1,6 @@
 import {
   acceptChangeSet,
+  addAsset,
   createProject,
   redoChangeSet,
   serializeProject,
@@ -160,6 +161,19 @@ export function createProjectStateService(options: {
     async accept(projectId: string, changeSet: unknown): Promise<EditProject> {
       const current = await load(projectId)
       const next = acceptChangeSet(current, changeSet)
+      if (!next.ok) failFromDomain(next.error as { code?: string })
+      return persist(projectId, (next as { ok: true; value: EditProject }).value)
+    },
+
+    /**
+     * Bring one more file into the project.
+     *
+     * Deliberately NOT an edit: it creates no change set, so nothing appears in
+     * the history and Undo is unaffected. The saved file still changes, because
+     * the project now knows about a file it did not know about before.
+     */
+    async addAsset(projectId: string, asset: unknown): Promise<EditProject> {
+      const next = addAsset(await load(projectId), asset)
       if (!next.ok) failFromDomain(next.error as { code?: string })
       return persist(projectId, (next as { ok: true; value: EditProject }).value)
     },

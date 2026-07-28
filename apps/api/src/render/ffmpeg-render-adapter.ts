@@ -452,9 +452,20 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
     const from = ticksToSeconds(node.sourceStartTicks)
     const to = ticksToSeconds(node.sourceStartTicks + node.interval.duration.ticks)
 
+    const startSeconds = ticksToSeconds(node.interval.start.ticks)
+    const endSeconds = ticksToSeconds(node.interval.start.ticks + node.interval.duration.ticks)
+
     const steps = [
       `[${source}:v]trim=start=${from}:end=${to}`,
-      'setpts=PTS-STARTPTS',
+      // Moved to the moment it actually appears, not reset to zero.
+      //
+      // `setpts=PTS-STARTPTS` alone puts the trimmed clip at time 0. A four
+      // second clip then exists only from 0s to 4s — so an overlay enabled at
+      // 11s had NOTHING to composite and silently drew nothing. The export
+      // succeeded, the file was the right length, and the B-roll was simply
+      // absent. Adding the start time shifts the clip onto the moment it
+      // belongs to, which is what makes `enable` and the frames agree.
+      `setpts=PTS-STARTPTS+${startSeconds}/TB`,
       // `decrease` fits the clip inside the box while keeping its own shape, so
       // a tall phone clip in a wide box is letterboxed rather than squashed.
       // This is the same rule `fitInsideRegion` states for the preview.
@@ -468,12 +479,14 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
     }
     graph.push(`${steps.join(',')}[b${index}]`)
 
-    const startSeconds = ticksToSeconds(node.interval.start.ticks)
-    const endSeconds = ticksToSeconds(node.interval.start.ticks + node.interval.duration.ticks)
     const next = `vm${index}`
+    // `overlay=` and not `overlay:` — a filter's FIRST option is joined to its
+    // name with an equals sign, and only the options after it are separated by
+    // colons. Getting this wrong produced a graph that read correctly to a
+    // human and was rejected by FFmpeg with "No option name near…".
     graph.push(
       `[${videoLabel}][b${index}]overlay` +
-        `:x='${boxX}+(${boxWidth}-overlay_w)/2'` +
+        `=x='${boxX}+(${boxWidth}-overlay_w)/2'` +
         `:y='${boxY}+(${boxHeight}-overlay_h)/2'` +
         `:eof_action=pass:shortest=0` +
         `:enable='gte(t\\,${startSeconds})*lt(t\\,${endSeconds})'[${next}]`,

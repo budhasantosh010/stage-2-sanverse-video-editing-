@@ -9,8 +9,14 @@ import { stat } from 'node:fs/promises'
 import { createFilesystemProjectRepository } from './projects/filesystem-project-repository.ts'
 import { createProjectIntakeService, EXPORT_ID_PATTERN, PROJECT_ID_PATTERN, ProjectIntakeError, type ProjectRepository } from './projects/project-repository.ts'
 import { createProjectStateService, type ProjectStateService } from './projects/project-state-service.ts'
-import { NAMEPLATE_COMPONENT_ID } from '@sanverse/edit-domain'
-import { createFfprobeMediaProbe, type MediaProbePort } from './media/media-probe.ts'
+import { ASSET_SCHEMA_VERSION, NAMEPLATE_COMPONENT_ID } from '@sanverse/edit-domain'
+import {
+  contentTypeFor,
+  createFfprobeMediaDescriber,
+  createFfprobeMediaProbe,
+  type MediaDescriberPort,
+  type MediaProbePort,
+} from './media/media-probe.ts'
 import { describeFailure, errorCode } from './http/failure-response.ts'
 import { createFakeIntentAdapter } from './intent/fake-intent-adapter.ts'
 import { createIntentProvider, describeIntentProvider, resolveIntentProviderConfig } from './intent/intent-provider-config.ts'
@@ -28,6 +34,7 @@ type ServerOptions = {
   renderService?: ReturnType<typeof createRenderService>
   projectStateService?: ProjectStateService
   mediaProbe?: MediaProbePort
+  mediaDescriber?: MediaDescriberPort
   exportIdGenerator?: () => string
   fontPath?: string
   /** Swaps only the provider; the safety pipeline around it is unchanged. */
@@ -36,6 +43,7 @@ type ServerOptions = {
 }
 
 const CHANGE_SET_ID_ROUTE_PATTERN = /^changeset_[a-z0-9]{8,64}$/
+const ASSET_ID_PATTERN = /^asset_[a-z0-9]{8,64}$/
 
 const MAX_EXPORT_REQUEST_BYTES = 1024 * 1024
 
@@ -157,6 +165,7 @@ export function createSanverseServer(options: ServerOptions) {
   })
   const allowedOrigins = new Set(options.allowedOrigins ?? ['http://127.0.0.1:2000', 'http://localhost:2000'])
   const mediaProbe = options.mediaProbe ?? createFfprobeMediaProbe()
+  const mediaDescriber = options.mediaDescriber ?? createFfprobeMediaDescriber()
   const projectState = options.projectStateService ?? createProjectStateService({ repository, mediaProbe })
   const renderService = options.renderService ?? (options.fontPath ? createRenderService({ renderer: createFfmpegRenderAdapter({ fontPath: options.fontPath, mediaProbe }) }) : undefined)
   const generateExportId = options.exportIdGenerator ?? (() => `export_${randomBytes(16).toString('hex')}`)
@@ -373,7 +382,21 @@ export function createSanverseServer(options: ServerOptions) {
         request.once('aborted', cancelDisconnectedRender)
         response.once('close', cancelDisconnectedRender)
         try {
-          const result = await renderService.exportProject({ project, ...paths, signal: controller.signal })
+          // The exporter is handed a real path for every file the project
+          // holds beyond the footage. Resolving them here, in the one place
+          // that owns storage, keeps filesystem paths out of the render plan.
+          const extraSourcePaths: Record<string, string> = {}
+          for (const asset of project.assets) {
+            if (asset.storageRef === `project/${projectId}/source`) continue
+            const path = await repository.resolveAssetPath(projectId, asset.assetId).catch(() => null)
+            if (path !== null) extraSourcePaths[asset.assetId] = path
+          }
+          const result = await renderService.exportProject({
+            project,
+            ...paths,
+            extraSourcePaths,
+            signal: controller.signal,
+          })
           if (resolve(result.outputPath) !== resolve(paths.outputPath)) throw new Error('Renderer returned an unexpected output path.')
           if (controller.signal.aborted || response.destroyed) return
           json(response, 201, {
@@ -389,6 +412,120 @@ export function createSanverseServer(options: ServerOptions) {
         } finally {
           request.off('aborted', cancelDisconnectedRender)
           response.off('close', cancelDisconnectedRender)
+        }
+        return
+      }
+
+      // Bringing a second file into a project: B-roll, a picture, or music.
+      //
+      // This is NOT an edit. It creates no change set and no undo entry — the
+      // user has put something on the shelf. What kind of thing it is is
+      // decided by LOOKING AT THE FILE, never by trusting the name it arrived
+      // with, because a name is something a user typed.
+      const addAssetMatch = /^\/api\/projects\/([^/]+)\/assets$/.exec(requestUrl.pathname)
+      if (request.method === 'POST' && addAssetMatch) {
+        const projectId = addAssetMatch[1]
+        if (!PROJECT_ID_PATTERN.test(projectId)) { request.resume(); json(response, 404, { error: 'Project was not found.' }); return }
+        const assetId = `asset_${randomBytes(16).toString('hex')}`
+        const staged = await repository.stageAsset({ projectId, assetId, body: request })
+
+        let described
+        try {
+          described = await mediaDescriber.describe({ path: staged.path, cwd: staged.trustedWorkDir })
+        } catch {
+          json(response, 415, { error: 'That file is not a video, a picture, or a piece of music.' })
+          return
+        }
+
+        // Every field is filled in for every kind. The ones that do not apply
+        // to a kind are null rather than invented, so nothing downstream can
+        // trust a number that was never measured.
+        const shared = {
+          schemaVersion: ASSET_SCHEMA_VERSION,
+          assetId,
+          storageRef: `project/${projectId}/assets/${assetId}`,
+          sha256: staged.sha256,
+          byteLength: staged.byteLength,
+        }
+        const asset = described.mediaKind === 'image'
+          ? {
+              ...shared,
+              mediaKind: 'image' as const,
+              duration: null,
+              width: described.width,
+              height: described.height,
+              frameRate: null,
+              hasAudio: false,
+              durationResidualSeconds: 0,
+            }
+          : described.mediaKind === 'audio'
+            ? {
+                ...shared,
+                mediaKind: 'audio' as const,
+                duration: described.duration,
+                width: null,
+                height: null,
+                frameRate: null,
+                hasAudio: true,
+                durationResidualSeconds: described.durationResidualSeconds,
+              }
+            : {
+                ...shared,
+                mediaKind: 'video' as const,
+                duration: described.duration,
+                width: described.width,
+                height: described.height,
+                frameRate: described.frameRate,
+                hasAudio: described.hasAudio,
+                durationResidualSeconds: described.durationResidualSeconds,
+              }
+
+        const project = await projectState.addAsset(projectId, asset)
+        json(response, 201, {
+          project,
+          asset: {
+            assetId,
+            mediaKind: described.mediaKind,
+            mediaUrl: `/api/projects/${projectId}/assets/${assetId}/media`,
+          },
+        })
+        return
+      }
+
+      // Serving one of those files back, so the preview can draw the same
+      // picture the export will contain.
+      const assetMediaMatch = /^\/api\/projects\/([^/]+)\/assets\/([^/]+)\/media$/.exec(requestUrl.pathname)
+      if (request.method === 'GET' && assetMediaMatch) {
+        const [projectId, assetId] = assetMediaMatch.slice(1)
+        if (!PROJECT_ID_PATTERN.test(projectId) || !ASSET_ID_PATTERN.test(assetId)) {
+          json(response, 404, { error: 'That file was not found.' }); return
+        }
+        // The project must know about this file, so a file left on disk by a
+        // failed upload can never be served.
+        const current = await projectState.load(projectId)
+        if (!current.assets.some((candidate) => candidate.assetId === assetId)) {
+          json(response, 404, { error: 'That file was not found.' }); return
+        }
+        const assetPath = await repository.resolveAssetPath(projectId, assetId)
+        const { trustedWorkDir } = await repository.resolveMediaPaths(projectId)
+        // What to call it is worked out by reading the FILE, never from the
+        // request and never from a name a user typed.
+        const described = await mediaDescriber.describe({ path: assetPath, cwd: trustedWorkDir })
+        const media = await repository.openAsset(projectId, assetId)
+        try {
+          response.writeHead(200, {
+            'content-type': contentTypeFor(described),
+            'content-length': media.end - media.start + 1,
+            'accept-ranges': 'bytes',
+            'cache-control': 'private, no-store',
+            // A file the user supplied is never rendered as a document.
+            'x-content-type-options': 'nosniff',
+            'content-disposition': 'inline',
+          })
+          response.flushHeaders()
+          await streamMedia(response, media.body)
+        } finally {
+          await media.close()
         }
         return
       }

@@ -186,8 +186,20 @@ describe('B-roll and pictures', () => {
       plan: plan({ sources: VIDEO_SOURCES, overlays: [brollNode()] }) as never,
     })
     expect(graph).toContain('scale=512:288:force_original_aspect_ratio=decrease')
-    expect(graph).toContain("x='64+(512-overlay_w)/2'")
-    expect(graph).toContain("y='36+(288-overlay_h)/2'")
+    expect(graph).toContain("overlay=x='64+(512-overlay_w)/2':y='36+(288-overlay_h)/2'")
+  })
+
+  it('MOVES the clip onto the moment it appears, instead of leaving it at zero', () => {
+    // The bug this guards against shipped and was found only by a real export:
+    // a 4-second clip reset to time 0 exists from 0s to 4s, so an overlay
+    // enabled at 11s had nothing to composite. The export succeeded, was the
+    // right length, and the B-roll was simply absent.
+    const graph = buildFilterGraph({
+      ...base,
+      plan: plan({ sources: VIDEO_SOURCES, overlays: [brollNode()] }) as never,
+    })
+    expect(graph).toContain('setpts=PTS-STARTPTS+2.000000000/TB')
+    expect(graph).not.toContain('setpts=PTS-STARTPTS,scale=512')
   })
 
   it('reads the requested stretch of the clip, not the start of it', () => {
@@ -204,7 +216,7 @@ describe('B-roll and pictures', () => {
       ...base,
       plan: plan({ sources: VIDEO_SOURCES, overlays: [brollNode(), titleNode()] }) as never,
     })
-    expect(graph.indexOf('overlay:x=')).toBeLessThan(graph.indexOf('drawtext'))
+    expect(graph.indexOf('overlay=x=')).toBeLessThan(graph.indexOf('drawtext'))
   })
 
   it('bounds a looping still picture, so the export can finish', () => {
@@ -295,6 +307,80 @@ describe('music', () => {
   })
 })
 
+describe('the graph is syntactically a filter graph', () => {
+  /**
+   * The guard that would have caught the real bug this batch shipped with.
+   *
+   * A real export failed with "No option name near…" because a filter was
+   * written `overlay:x=…` instead of `overlay=x=…`. FFmpeg joins a filter's
+   * FIRST option to its name with an equals sign; only later options use
+   * colons. Every existing test asserted that PIECES of the string were
+   * present, and every one of them passed while the whole thing was
+   * unparseable.
+   *
+   * This walks every filter in the graph and demands that the part before the
+   * first colon or equals sign is a plain filter name — so a filter whose
+   * first option is attached with the wrong character fails here rather than
+   * three minutes into a user's export.
+   */
+  const filtersIn = (graph: string): string[] =>
+    graph
+      .split(';')
+      .map((chain) => chain.replace(/^(\[[^\]]+\])+/, '').replace(/(\[[^\]]+\])+$/, ''))
+      .flatMap((chain) => splitTopLevel(chain))
+      .filter((filter) => filter.length > 0)
+
+  /** Split a chain on commas that are not inside quotes or brackets. */
+  const splitTopLevel = (chain: string): string[] => {
+    const parts: string[] = []
+    let depth = 0
+    let quoted = false
+    let current = ''
+    for (let index = 0; index < chain.length; index += 1) {
+      const character = chain[index]
+      if (character === '\\') { current += character + (chain[index + 1] ?? ''); index += 1; continue }
+      if (character === "'") { quoted = !quoted; current += character; continue }
+      if (!quoted && (character === '(' || character === '[')) depth += 1
+      if (!quoted && (character === ')' || character === ']')) depth -= 1
+      if (!quoted && depth === 0 && character === ',') { parts.push(current); current = ''; continue }
+      current += character
+    }
+    parts.push(current)
+    return parts.map((part) => part.trim())
+  }
+
+  const CASES: Array<[string, Parameters<typeof testPlan>[0], boolean]> = [
+    ['B-roll', { sources: VIDEO_SOURCES, overlays: [brollNode()] }, true],
+    ['a picture', { sources: IMAGE_SOURCES, overlays: [brollNode({ assetId: 'asset_cccccccc', sourceStartTicks: 0 })] }, true],
+    ['a title', { overlays: [titleNode()] }, true],
+    ['a callout', { overlays: [calloutNode()] }, true],
+    ['music', { sources: MUSIC_SOURCES, music: [musicNode()] }, true],
+    ['music over silent footage', { sources: MUSIC_SOURCES, music: [musicNode()] }, false],
+    ['everything', {
+      sources: [...VIDEO_SOURCES, { assetId: 'asset_dddddddd', mediaKind: 'audio' as const }],
+      overlays: [brollNode(), titleNode(), calloutNode()],
+      music: [musicNode()],
+    }, true],
+  ]
+
+  for (const [name, overrides, hasAudio] of CASES) {
+    it(`writes every filter as name=firstOption for ${name}`, () => {
+      const graph = buildFilterGraph({ ...base, hasAudio, plan: plan(overrides) as never })
+      for (const filter of filtersIn(graph)) {
+        const head = /^[a-z0-9_]+/.exec(filter)?.[0] ?? ''
+        expect(head.length, `filter has no name: ${filter.slice(0, 60)}`).toBeGreaterThan(0)
+        const after = filter.slice(head.length)
+        // Either the filter takes no options at all, or its first option is
+        // attached with '=' — never with ':'.
+        expect(
+          after.length === 0 || after.startsWith('='),
+          `filter "${head}" attaches its first option with "${after.slice(0, 1)}" instead of "="`,
+        ).toBe(true)
+      }
+    })
+  }
+})
+
 describe('everything at once', () => {
   it('builds one graph holding a title, a callout, B-roll, and music', () => {
     const built = {
@@ -309,7 +395,7 @@ describe('everything at once', () => {
     const graph = buildFilterGraph(built)
     const command = buildFfmpegArguments(built)
 
-    expect(graph).toContain('overlay:x=')
+    expect(graph).toContain('overlay=x=')
     expect(graph).toContain("textfile='title-1-0.txt'")
     expect(graph).toContain('drawbox=')
     expect(graph).toContain('amix=')

@@ -48,6 +48,22 @@ export interface ProjectRepository {
   saveProjectState(projectId: string, serializedProject: string): Promise<void>
   /** Where the controlled source media lives, for probing without exporting. */
   resolveMediaPaths(projectId: string): Promise<{ sourcePath: string; trustedWorkDir: string }>
+  /**
+   * Write one extra file — B-roll, a picture, or music — into a project that
+   * already exists, and report what actually landed on disk.
+   *
+   * Separate from `stageSource` because that one CREATES a project from its
+   * first video and can never run twice. This adds to a published project, so
+   * it must be safe to call many times and must refuse to overwrite.
+   */
+  stageAsset(input: {
+    projectId: string
+    assetId: string
+    body: AsyncIterable<Uint8Array>
+  }): Promise<{ path: string; byteLength: number; sha256: string; trustedWorkDir: string }>
+  /** Where one extra file lives, so the exporter can be handed a real path. */
+  resolveAssetPath(projectId: string, assetId: string): Promise<string>
+  openAsset(projectId: string, assetId: string, range?: MediaRange): Promise<OpenMediaResult>
   allocateExport(projectId: string, exportId: string): Promise<ProjectExportPaths>
   inspectExport(projectId: string, exportId: string): Promise<{ size: number }>
   openExport(projectId: string, exportId: string, range?: MediaRange): Promise<OpenMediaResult>

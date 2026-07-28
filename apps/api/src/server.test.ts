@@ -37,6 +37,9 @@ function readRepository(bytes: Uint8Array, bodyFactory: () => AsyncIterable<Uint
   const closeCalls: Array<'media' | 'export'> = []
   const repository: ProjectRepository = {
     async stageSource() { throw new Error('not used') },
+    async stageAsset() { throw new Error('not used') },
+    async resolveAssetPath() { throw new Error('not used') },
+    async openAsset() { throw new Error('not used') },
     async publishProject() { throw new Error('not used') },
     async abortStage() { throw new Error('not used') },
     async inspectMedia(projectId) {

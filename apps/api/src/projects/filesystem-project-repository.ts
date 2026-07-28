@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { chmod, lstat, mkdir, open, readFile, readdir, realpath, rename, rm, stat } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 
@@ -28,6 +28,13 @@ function assertProjectId(projectId: string): void {
   if (!PROJECT_ID_PATTERN.test(projectId)) {
     throw new RepositoryError('INVALID_PROJECT_ID', 'Invalid project ID.')
   }
+}
+
+/** Asset ids come from the server, never from a user, and are checked anyway. */
+const ASSET_ID_PATTERN = /^asset_[a-z0-9]{8,64}$/
+
+function assertAssetId(assetId: string): void {
+  if (!ASSET_ID_PATTERN.test(assetId)) throw new Error('Invalid asset ID.')
 }
 
 function assertExportId(exportId: string): void {
@@ -374,6 +381,91 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
       assertProjectId(projectId)
       const { sourcePath } = await resolvePublishedMedia(projectId)
       return { sourcePath, trustedWorkDir: dirname(sourcePath) }
+    },
+
+    /**
+     * Add one extra file to a project that already exists.
+     *
+     * Written to a temporary name first and renamed into place only once the
+     * whole body has arrived and been flushed to disk. A half-written B-roll
+     * clip can therefore never be visible under its real name — the project
+     * either has the whole file or does not have it at all.
+     *
+     * The file is stored with NO extension. FFmpeg and the browser both detect
+     * the format from the bytes, so nothing downstream depends on a name a user
+     * chose, and a name a user chose can never be read as an instruction.
+     */
+    async stageAsset({ projectId, assetId, body }) {
+      assertProjectId(projectId)
+      assertAssetId(assetId)
+      const { sourcePath } = await resolvePublishedMedia(projectId)
+      const projectDir = dirname(sourcePath)
+      const assetsDir = join(projectDir, 'assets')
+      await mkdir(assetsDir, { recursive: true })
+      const actualAssetsDir = await realpath(assetsDir)
+      if (resolve(actualAssetsDir) !== resolve(assetsDir)) {
+        throw new RepositoryError('PROJECT_NOT_FOUND', 'The asset storage path is not safe.')
+      }
+
+      const finalPath = join(assetsDir, assetId)
+      try {
+        await lstat(finalPath)
+        throw new RepositoryError('PROJECT_COLLISION', 'That asset already exists.')
+      } catch (error) {
+        if (error instanceof RepositoryError) throw error
+        if (!isCode(error, 'ENOENT')) throw error
+      }
+
+      const temporaryPath = join(assetsDir, `.asset-${randomBytes(12).toString('hex')}.tmp`)
+      const hash = createHash('sha256')
+      let byteLength = 0
+      let handle
+      try {
+        handle = await open(temporaryPath, 'wx', 0o600)
+        for await (const chunk of body) {
+          await writeAll(handle, chunk)
+          hash.update(chunk)
+          byteLength += chunk.byteLength
+        }
+        await handle.sync()
+        await handle.close()
+        handle = undefined
+        if (byteLength <= 0) throw new RepositoryError('PROJECT_NOT_FOUND', 'The uploaded file was empty.')
+        await chmod(temporaryPath, 0o444)
+        await rename(temporaryPath, finalPath)
+        await syncDirectory(assetsDir)
+        return {
+          path: finalPath,
+          byteLength,
+          sha256: hash.digest('hex'),
+          trustedWorkDir: projectDir,
+        }
+      } catch (error) {
+        await handle?.close().catch(() => undefined)
+        await rm(temporaryPath, { force: true }).catch(() => undefined)
+        throw error
+      }
+    },
+
+    async resolveAssetPath(projectId: string, assetId: string) {
+      assertProjectId(projectId)
+      assertAssetId(assetId)
+      const { sourcePath } = await resolvePublishedMedia(projectId)
+      const assetPath = join(dirname(sourcePath), 'assets', assetId)
+      const actual = await realpath(assetPath).catch(() => {
+        throw new RepositoryError('PROJECT_NOT_FOUND', 'That file is no longer available.')
+      })
+      // The canonical path must still be the one we asked for, so a link
+      // planted in the assets folder cannot make the exporter read elsewhere.
+      if (resolve(actual) !== resolve(assetPath)) {
+        throw new RepositoryError('PROJECT_NOT_FOUND', 'That file path is not safe.')
+      }
+      return assetPath
+    },
+
+    async openAsset(projectId: string, assetId: string, range?: MediaRange) {
+      const assetPath = await this.resolveAssetPath(projectId, assetId)
+      return openControlledFile(assetPath, 'PROJECT_NOT_FOUND', 'That file is unavailable.', range)
     },
 
     async saveProjectState(projectId: string, serializedProject: string): Promise<void> {

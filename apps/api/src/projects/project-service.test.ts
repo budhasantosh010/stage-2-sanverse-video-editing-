@@ -67,6 +67,15 @@ function memoryRepository(): ProjectRepository & { published: unknown[]; aborted
     async inspectExport() {
       throw new Error('not used')
     },
+    async stageAsset() {
+      throw new Error('not used')
+    },
+    async resolveAssetPath() {
+      throw new Error('not used')
+    },
+    async openAsset() {
+      throw new Error('not used')
+    },
     async openExport() {
       throw new Error('not used')
     },
