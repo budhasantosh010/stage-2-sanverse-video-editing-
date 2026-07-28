@@ -118,15 +118,21 @@ no button offers it yet — the owner cannot get to it from the screen.
 ## G5-C - Useful talking-head workflow
 
 - [ ] G5C-01 Approve the representative full-video job story
-- [ ] G5C-02 Implement multi-asset intake
-- [ ] G5C-02A Implement point/circle/box/arrow/freehand annotation as non-executable intent
-- [ ] G5C-02B Prove annotation coordinates across portrait, landscape, letterboxing, resizing, and fullscreen
-- [ ] G5C-02C Prove annotation marks never enter export unless explicitly converted
-- [ ] G5C-03 Implement image and B-roll overlay clips
-- [ ] G5C-04 Implement title and callout operations
-- [ ] G5C-05 Implement basic audio workflow
-- [ ] G5C-06 Combine cuts, captions, titles, callouts, audio, and B-roll
-- [ ] G5C-07 Add plain-language proposals and direct repair for each family
+- [~] G5C-02 Implement multi-asset intake — domain done (media kinds,
+      addAsset, project v4 migration); NO upload route, so unreachable
+- [x] G5C-02A Implement point/circle/box/arrow/freehand annotation as non-executable intent
+- [x] G5C-02B Prove annotation coordinates across portrait, landscape, letterboxing, resizing, and fullscreen
+- [x] G5C-02C Prove annotation marks never enter export unless explicitly converted
+- [~] G5C-03 Implement image and B-roll overlay clips — domain, plan,
+      exporter, and preview components done; no control on screen
+- [~] G5C-04 Implement title and callout operations — domain, plan,
+      exporter, and preview components done; no control on screen
+- [~] G5C-05 Implement basic audio workflow — music bed with level, fades,
+      and mixing done; no control on screen
+- [~] G5C-06 Combine cuts, captions, titles, callouts, audio, and B-roll —
+      proved at the plan and filter-graph level; not on real media
+- [~] G5C-07 Add plain-language proposals and direct repair for each family —
+      history sentences done for all four; repair panels not started
 - [ ] G5C-08 Add progressive disclosure to Studio
 - [ ] G5C-09 Run complete real-video workflow and output inspection
 - [ ] G5C-10 Measure time saved against the manual baseline

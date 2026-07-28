@@ -1,6 +1,14 @@
 import { PROJECT_TIMESCALE, type AddNameplateOperation, type EditProject } from '@sanverse/edit-domain'
 import { compileProjectToRenderPlan } from '@sanverse/render-contract/compile-project'
-import type { CaptionOverlayNode, RenderNode, RenderPlan, TextOverlayNode } from '@sanverse/render-contract'
+import type {
+  CalloutOverlayNode,
+  CaptionOverlayNode,
+  MediaOverlayNode,
+  RenderNode,
+  RenderPlan,
+  TextOverlayNode,
+  TitleOverlayNode,
+} from '@sanverse/render-contract'
 import {
   NAMEPLATE_STYLE_V1,
   anchorFraction,
@@ -13,6 +21,15 @@ import {
   resolveCaptionMetrics,
   resolveCaptionStyle,
 } from '@sanverse/render-contract/caption-style'
+import {
+  calloutLabelTop,
+  calloutRectPixels,
+  resolveCalloutMetrics,
+  resolveCalloutStyle,
+  resolveTitleMetrics,
+  resolveTitleStyle,
+  titleLineTop,
+} from '@sanverse/render-contract/overlay-style'
 
 /**
  * The preview is compiled from the same project, by the same compiler, into the
@@ -78,6 +95,124 @@ export const visibleCaptions = (plan: RenderPlan, ticks: number): readonly Capti
   plan.overlays.filter(
     (node): node is CaptionOverlayNode => node.kind === 'caption-overlay' && isNodeVisible(node, ticks),
   )
+
+export const visibleTitles = (plan: RenderPlan, ticks: number): readonly TitleOverlayNode[] =>
+  plan.overlays.filter(
+    (node): node is TitleOverlayNode => node.kind === 'title-overlay' && isNodeVisible(node, ticks),
+  )
+
+export const visibleCallouts = (plan: RenderPlan, ticks: number): readonly CalloutOverlayNode[] =>
+  plan.overlays.filter(
+    (node): node is CalloutOverlayNode => node.kind === 'callout-overlay' && isNodeVisible(node, ticks),
+  )
+
+export const visibleMediaOverlays = (plan: RenderPlan, ticks: number): readonly MediaOverlayNode[] =>
+  plan.overlays.filter(
+    (node): node is MediaOverlayNode => node.kind === 'media-overlay' && isNodeVisible(node, ticks),
+  )
+
+export type TitleCssVariables = Readonly<Record<string, string>>
+
+/** The title style contract as CSS values, scaled to the displayed size. */
+export const titleCssVariables = (
+  styleId: string,
+  compositionWidth: number,
+  compositionHeight: number,
+  scale: number,
+): TitleCssVariables => {
+  const style = resolveTitleStyle(styleId)
+  const metrics = resolveTitleMetrics(compositionWidth, compositionHeight, style)
+  return Object.freeze({
+    '--title-headline-size': `${metrics.headlineFontSize * scale}px`,
+    '--title-subhead-size': `${metrics.subheadFontSize * scale}px`,
+    '--title-padding': `${metrics.padding * scale}px`,
+    '--title-color': toCssColor(style.textColor, style.textOpacity),
+    '--title-background': style.backgroundColor === null
+      ? 'transparent'
+      : toCssColor(style.backgroundColor, style.backgroundOpacity),
+  })
+}
+
+/** The top of one title line's plate, in DISPLAY pixels. */
+export const titleLineTopPx = (
+  styleId: string,
+  lineIndex: number,
+  hasSubhead: boolean,
+  placement: 'center' | 'lower-third',
+  compositionWidth: number,
+  compositionHeight: number,
+  scale: number,
+): number => {
+  const style = resolveTitleStyle(styleId)
+  const metrics = resolveTitleMetrics(compositionWidth, compositionHeight, style)
+  return titleLineTop(lineIndex, hasSubhead, placement, compositionHeight, metrics) * scale
+}
+
+export type CalloutBoxStyle = Readonly<{
+  left: number
+  top: number
+  width: number
+  height: number
+  borderWidth: number
+  borderColor: string
+  labelTop: number
+  labelFontSize: number
+  labelPadding: number
+  labelColor: string
+  labelBackground: string
+}>
+
+/**
+ * Everything the preview needs to draw one callout, in DISPLAY pixels.
+ *
+ * The rectangle is computed in composition pixels by the shared contract and
+ * only scaled here, so the browser and FFmpeg draw the same box in the same
+ * place rather than two boxes that happen to look similar.
+ */
+export const calloutBoxStyle = (
+  node: CalloutOverlayNode,
+  compositionWidth: number,
+  compositionHeight: number,
+  scale: number,
+): CalloutBoxStyle => {
+  const style = resolveCalloutStyle(node.styleId)
+  const metrics = resolveCalloutMetrics(compositionWidth, compositionHeight, style)
+  const rect = calloutRectPixels(node.region, compositionWidth, compositionHeight)
+  return Object.freeze({
+    left: rect.x * scale,
+    top: rect.y * scale,
+    width: rect.width * scale,
+    height: rect.height * scale,
+    borderWidth: metrics.borderWidth * scale,
+    borderColor: toCssColor(style.borderColor, style.borderOpacity),
+    labelTop: calloutLabelTop(rect, metrics) * scale,
+    labelFontSize: metrics.labelFontSize * scale,
+    labelPadding: metrics.labelPadding * scale,
+    labelColor: toCssColor(style.labelColor, 1),
+    labelBackground: toCssColor(style.labelBackgroundColor, style.labelBackgroundOpacity),
+  })
+}
+
+/**
+ * The box a B-roll clip or picture occupies, in DISPLAY pixels.
+ *
+ * The clip is drawn with `object-fit: contain` inside this box, which is the
+ * browser's name for exactly what FFmpeg's
+ * `scale=…:force_original_aspect_ratio=decrease` does: fit inside, keep the
+ * clip's own shape, centre what is left over.
+ */
+export const mediaOverlayBox = (
+  node: MediaOverlayNode,
+  compositionWidth: number,
+  compositionHeight: number,
+  scale: number,
+): Readonly<{ left: number; top: number; width: number; height: number; opacity: number }> => Object.freeze({
+  left: Math.round(node.region.x * compositionWidth) * scale,
+  top: Math.round(node.region.y * compositionHeight) * scale,
+  width: Math.max(2, Math.round(node.region.width * compositionWidth)) * scale,
+  height: Math.max(2, Math.round(node.region.height * compositionHeight)) * scale,
+  opacity: node.opacity,
+})
 
 export type CaptionCssVariables = Readonly<Record<string, string>>
 

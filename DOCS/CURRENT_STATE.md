@@ -123,8 +123,46 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
   storage/rendering, quotas, or production SaaS operations
 - Advanced object tracking, segmentation, or a data/model flywheel
 
+## G5-C so far — many kinds of media, and four new overlays
+
+Built and unit-proved this batch; see `ADR-007`. **Not proved on real media,
+and mostly not reachable from the screen yet.**
+
+- A project can now hold several videos, pictures, and music. One asset type
+  with a stated kind; a picture has no length and music has no picture, and
+  those fields are null rather than faked. Project schema is **v4**, with a
+  v3 -> v4 migration that stamps `video` on every existing asset.
+- **Bringing media in is not an edit.** `addAsset` creates no change set and no
+  undo entry.
+- **Annotations** — point, circle, box, arrow, freehand — as marks that carry
+  what "this" meant. Structurally incapable of reaching the export: no
+  capability, no operation kind, never seen by the compiler. Coordinates proved
+  identical across nine display shapes including portrait, letterboxing,
+  resizing, and fullscreen.
+- **Four new operations**: `add-title`, `add-callout`, `add-media-overlay`
+  (B-roll and pictures), `add-music`. Titles, callouts, and B-roll are anchored
+  to the footage. **Music is anchored to the finished video on purpose**, so
+  cutting the middle out does not cut the middle out of the song.
+- Render plan **v3**: a `sources` list naming every file to open, three new
+  overlay node kinds, and music kept out of the overlay list because it is not
+  drawn.
+- FFmpeg: several inputs, B-roll composited under the words, still pictures
+  bounded with `-loop 1 -t`, audio mixed with `normalize=0` so music cannot
+  quietly duck the speech, and a real sound track built for silent footage when
+  music is added.
+
 ## Known limitations
 
+- **G5-C is not reachable from the screen.** There is no upload route for
+  pictures or music, and no control for creating a title, a callout, B-roll, or
+  music. All four are built, tested, and reach the export; none has a button.
+  Progressive disclosure in Studio (G5C-08) and per-family repair (G5C-07's
+  second half) are not started.
+- **No G5-C feature has touched real media.** Everything is proved at the plan
+  and filter-graph level only. By Rule #3 that means it is not yet known to
+  work. No real B-roll clip, picture, or music file has been through an export.
+- A second video cannot be appended to the timeline. Multi-asset intake is the
+  shelf; there is no `append-clip` operation.
 - **The drawn background plate is about 10 px shorter vertically in the export
   than in the preview** at 1080p. Position is identical. Closing it needs the
   font's real ascent and descent read from the TTF. Recorded in ADR-003.

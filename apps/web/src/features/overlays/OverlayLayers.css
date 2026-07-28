@@ -1,0 +1,74 @@
+/*
+ * Every size here arrives as an inline pixel value computed from the shared
+ * style contract and scaled to the displayed size. Nothing in this file picks a
+ * number, because a number picked here would be a number the exporter has never
+ * heard of.
+ */
+
+.title-overlay,
+.callout-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.title-overlay__headline,
+.title-overlay__subhead {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  white-space: pre;
+  font-family: 'DejaVu Sans', 'Liberation Sans', Arial, sans-serif;
+  font-weight: 600;
+  color: var(--title-color, #ffffff);
+}
+
+.title-overlay__headline > span,
+.title-overlay__subhead > span {
+  display: inline-block;
+}
+
+.title-overlay__headline {
+  font-size: var(--title-headline-size, 24px);
+  line-height: var(--title-headline-size, 24px);
+  padding: var(--title-padding, 8px);
+  background: var(--title-background, transparent);
+  /* The plate hugs the words, exactly as FFmpeg's boxborderw does. */
+  box-decoration-break: clone;
+}
+
+.title-overlay__subhead {
+  font-size: var(--title-subhead-size, 14px);
+  line-height: var(--title-subhead-size, 14px);
+  padding: var(--title-padding, 8px);
+  background: var(--title-background, transparent);
+  font-weight: 400;
+}
+
+.callout-overlay__box {
+  position: absolute;
+  border-style: solid;
+  /* FFmpeg's drawbox thickness grows INWARD from the stated rectangle, and this
+     is what makes CSS do the same instead of growing outward. */
+  box-sizing: border-box;
+  background: transparent;
+}
+
+.callout-overlay__label {
+  position: absolute;
+  white-space: pre;
+  font-family: 'DejaVu Sans', 'Liberation Sans', Arial, sans-serif;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.media-overlay {
+  position: absolute;
+  /* The browser's name for the exporter's
+     scale=…:force_original_aspect_ratio=decrease — fit inside, keep the clip's
+     own shape, centre the remainder. */
+  object-fit: contain;
+  pointer-events: none;
+  background: transparent;
+}
