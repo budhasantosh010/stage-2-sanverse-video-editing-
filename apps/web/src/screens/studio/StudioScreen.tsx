@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import type { AddNameplateOperation, EditProject } from '@sanverse/edit-domain'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { AddNameplateOperation, EditProject, TimelineOperation } from '@sanverse/edit-domain'
 import {
+  PROJECT_TIMESCALE,
   TICKS_PER_MILLISECOND as TICKS_PER_MS,
   compositionDuration,
   effectiveComposition,
@@ -12,6 +13,19 @@ import { ChatComposer } from '../../features/conversation/ChatComposer'
 import type { IntentContextInput } from '../../features/conversation/conversation-client'
 import { NameplateRepair } from '../../features/proposal-repair/NameplateRepair'
 import { describeOperation } from '../../features/history/describe-operation'
+import {
+  buildRemoveAtPlayhead,
+  buildSetEnabledAtPlayhead,
+  buildSplitAtPlayhead,
+  timelineBlocks,
+} from '../../features/timeline/timeline-edits'
+import {
+  advancePlayback,
+  isUncutPassthrough,
+  playbackSegments,
+  sourceTimeFor,
+  type PlaybackSegment,
+} from '../../features/render-plan/segment-playback'
 import {
   compilePreviewPlan,
   millisecondsToTicks,
@@ -40,6 +54,8 @@ export type StudioScreenProps = {
   onDiscardProposal(): void
   onAcceptProposal(): void
   onRepairProposal(repair: ProposalRepair): void
+  /** Apply one cut immediately. The server decides the resulting revision. */
+  onTimelineEdit(operation: TimelineOperation): void
   onSendMessage(message: string, context: IntentContextInput): void
   onUndo(): void
   onRedo(): void
@@ -51,6 +67,12 @@ export type StudioScreenProps = {
 
 const EXPORT_DESCRIPTION = 'studio-export-description'
 const KEYBOARD_POINT_STEP = 0.05
+
+function createClipId() {
+  const bytes = new Uint32Array(2)
+  globalThis.crypto.getRandomValues(bytes)
+  return `clip_${Array.from(bytes, (value) => value.toString(16).padStart(8, '0')).join('')}`.slice(0, 24)
+}
 
 function createOperationId() {
   const bytes = new Uint32Array(4)
@@ -115,6 +137,7 @@ export function StudioScreen({
   onDiscardProposal,
   onAcceptProposal,
   onRepairProposal,
+  onTimelineEdit,
   onSendMessage,
   onUndo,
   onRedo,
@@ -134,7 +157,17 @@ export function StudioScreen({
   const [, setVideoLayoutRevision] = useState(0)
   const [pointError, setPointError] = useState<string | null>(null)
   const [playheadMs, setPlayheadMs] = useState(0)
+  /** True while the finished video is sitting on a deliberately empty stretch. */
+  const [isShowingHole, setIsShowingHole] = useState(false)
+  // Playback state the media effect needs but must not re-subscribe for. The
+  // effect is attached once, so what it reads has to arrive through refs.
+  const segmentsRef = useRef<readonly PlaybackSegment[]>([])
+  const segmentIndexRef = useRef(0)
+  const totalTicksRef = useRef(0)
+  const inHoleRef = useRef(false)
   const [proposalResult, setProposalResult] = useState<string | null>(null)
+  /** A plain sentence explaining why a cut was not made. */
+  const [timelineNotice, setTimelineNotice] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const pointModeButtonRef = useRef<HTMLButtonElement>(null)
   const pointLayerRef = useRef<HTMLButtonElement>(null)
@@ -191,10 +224,97 @@ export function StudioScreen({
     if (!video) return
 
     const refreshProjection = () => setVideoLayoutRevision((revision) => revision + 1)
+
+    let holeFrameId: number | null = null
+    const leaveHole = () => {
+      if (holeFrameId !== null) cancelAnimationFrame(holeFrameId)
+      holeFrameId = null
+      inHoleRef.current = false
+      setIsShowingHole(false)
+    }
+
+    /**
+     * Sit on black for a stretch that was deliberately left empty.
+     *
+     * The recording has nothing to play here, so the element is paused and the
+     * playhead is advanced by the clock instead. Without this the preview would
+     * skip straight over the gap and run shorter than the exported file, which
+     * is the preview disagreeing with the export — the exact failure this whole
+     * design exists to prevent.
+     */
+    const enterHole = (fromTicks: number, untilTicks: number) => {
+      if (inHoleRef.current) return
+      inHoleRef.current = true
+      setIsShowingHole(true)
+      const resumePlaying = !video.paused
+      video.pause()
+      const startedAt = performance.now()
+      const step = () => {
+        if (stopped) return
+        const nowTicks = fromTicks + (performance.now() - startedAt) * TICKS_PER_MS
+        if (nowTicks >= untilTicks) {
+          leaveHole()
+          const target = sourceTimeFor(segmentsRef.current, untilTicks)
+          if (!target) {
+            setPlayheadMs(untilTicks / TICKS_PER_MS)
+            return
+          }
+          segmentIndexRef.current = target.segmentIndex
+          video.currentTime = target.sourceTicks / PROJECT_TIMESCALE
+          setPlayheadMs(untilTicks / TICKS_PER_MS)
+          if (resumePlaying) void video.play().catch(() => undefined)
+          return
+        }
+        setPlayheadMs(nowTicks / TICKS_PER_MS)
+        holeFrameId = requestAnimationFrame(step)
+      }
+      holeFrameId = requestAnimationFrame(step)
+    }
+
+    /**
+     * Turn "where the recording is" into "where the finished video is".
+     *
+     * Before the first cut these are the same number and nothing happens. After
+     * a cut they are not, and this is the only place that knows the difference.
+     */
     const updatePlayhead = (currentTime: number) => {
-      setPlayheadMs(
-        Number.isFinite(currentTime) && currentTime >= 0 ? Math.round(currentTime * 1000) : -1,
+      if (!Number.isFinite(currentTime) || currentTime < 0) {
+        setPlayheadMs(-1)
+        return
+      }
+      const segments = segmentsRef.current
+      if (segments.length === 0 || isUncutPassthrough(segments)) {
+        setPlayheadMs(Math.round(currentTime * 1000))
+        return
+      }
+      if (inHoleRef.current) return
+
+      const action = advancePlayback(
+        segments,
+        segmentIndexRef.current,
+        Math.round(currentTime * PROJECT_TIMESCALE),
+        totalTicksRef.current,
       )
+      switch (action.kind) {
+        case 'show':
+          segmentIndexRef.current = action.segmentIndex
+          setPlayheadMs(action.compositionTicks / TICKS_PER_MS)
+          return
+        case 'seek':
+          segmentIndexRef.current = action.segmentIndex
+          video.currentTime = action.sourceTicks / PROJECT_TIMESCALE
+          setPlayheadMs(action.compositionTicks / TICKS_PER_MS)
+          return
+        case 'hole':
+          enterHole(action.compositionTicks, action.untilTicks)
+          return
+        case 'ended':
+          video.pause()
+          setPlayheadMs(action.compositionTicks / TICKS_PER_MS)
+          return
+        default:
+          return
+      }
     }
     const refreshPlayhead = () => updatePlayhead(video.currentTime)
     const hasVideoFrameCallback = typeof video.requestVideoFrameCallback === 'function'
@@ -228,6 +348,7 @@ export function StudioScreen({
 
     return () => {
       stopped = true
+      leaveHole()
       if (
         videoFrameCallbackId !== null &&
         typeof video.cancelVideoFrameCallback === 'function'
@@ -252,6 +373,17 @@ export function StudioScreen({
   // uses. A pending proposal is layered on top without touching saved state.
   // The footage as it now stands: what was imported, plus every accepted cut.
   const composition = effectiveComposition(editProject)
+
+  // What the video is MADE OF depends only on the saved project: a pending
+  // nameplate changes what is drawn, never which footage plays. Deriving the
+  // stretches from the saved project alone keeps playback steady while the user
+  // is still typing into a proposal.
+  const footagePlan = useMemo(() => compilePreviewPlan(editProject), [editProject])
+  const previewSegments = useMemo(
+    () => (footagePlan ? playbackSegments(footagePlan) : []),
+    [footagePlan],
+  )
+
   const previewPlan = compilePreviewPlan(
     proposal ? withPendingProposal(editProject, proposal.operation) : editProject,
   )
@@ -268,10 +400,53 @@ export function StudioScreen({
 
   const compositionDurationTicks = compositionDuration(composition).ticks
 
+  // The media effect is attached once and reads these through refs, so they are
+  // refreshed here rather than by re-subscribing every listener on every cut.
+  useEffect(() => {
+    segmentsRef.current = previewSegments
+    totalTicksRef.current = compositionDurationTicks
+    if (segmentIndexRef.current >= previewSegments.length) segmentIndexRef.current = 0
+  }, [previewSegments, compositionDurationTicks])
+
   // Where the pending proposal actually lands on screen. After a cut this is
   // not a number stored on the proposal; it has to be worked out from the
   // footage that survived, and every place that shows a time uses this one
   // value so the panel and the summary can never disagree.
+  const timelineSections = timelineBlocks(composition, compositionDurationTicks)
+  const playheadTicks = Math.max(0, millisecondsToTicks(playheadMs))
+  const playheadPercent =
+    compositionDurationTicks > 0
+      ? Math.min(100, (playheadTicks / compositionDurationTicks) * 100)
+      : 0
+  // A cut while a proposal is pending would move the footage the proposal is
+  // anchored to, so the two are kept apart rather than racing.
+  const timelineBusy = Boolean(proposal) || isRendering
+
+  /**
+   * Make one cut, at the playhead, and let the server decide the result.
+   *
+   * A cut is applied immediately rather than proposed for approval: unlike a
+   * nameplate there is nothing to word or position, the preview shows the
+   * result at once, and one Undo takes it back. A refusal is shown as a plain
+   * sentence and nothing is sent.
+   */
+  function runTimelineEdit(action: 'split' | 'remove' | 'hide' | 'show') {
+    if (timelineBusy) return
+    const result =
+      action === 'split'
+        ? buildSplitAtPlayhead(composition, playheadTicks, createOperationId, createClipId)
+        : action === 'remove'
+          ? buildRemoveAtPlayhead(composition, playheadTicks, createOperationId)
+          : buildSetEnabledAtPlayhead(composition, playheadTicks, action === 'show', createOperationId)
+
+    if (!result.ok) {
+      setTimelineNotice(result.refusal.reason)
+      return
+    }
+    setTimelineNotice(null)
+    onTimelineEdit(result.operation)
+  }
+
   const proposalPlaced = proposal ? proposalPlacement(editProject, proposal.operation) : null
   const proposalStartMs = proposalPlaced ? proposalPlaced.startTicks / TICKS_PER_MS : 0
   const proposalDurationMs = proposalPlaced ? proposalPlaced.durationTicks / TICKS_PER_MS : 0
@@ -462,6 +637,16 @@ export function StudioScreen({
               >
                 Your browser does not support video playback.
               </video>
+
+              {/*
+                A stretch that was removed but left in place is black in the
+                exported file, so it is black here too. Covering the element
+                rather than hiding it keeps the layout, the point marker, and
+                the overlay positions exactly where they were.
+              */}
+              {isShowingHole ? (
+                <div className="studio-screen__video-hole" data-testid="video-hole" aria-hidden="true" />
+              ) : null}
 
               {videoContentLayerStyle ? (
                 <div
@@ -715,9 +900,49 @@ export function StudioScreen({
           </div>
           <p>Point targeting and text proposals available</p>
         </div>
-        <div className="studio-screen__static-track" aria-hidden="true">
-          <span>Source video</span>
+        <div className="studio-screen__track" data-testid="timeline-track">
+          {timelineSections.map((block) => (
+            <div
+              key={block.clipId}
+              className={
+                block.enabled
+                  ? 'studio-screen__track-block'
+                  : 'studio-screen__track-block studio-screen__track-block--hidden'
+              }
+              style={{ left: `${block.leftPercent}%`, width: `${block.widthPercent}%` }}
+              data-testid="timeline-section"
+              data-clip-id={block.clipId}
+            >
+              <span>{block.enabled ? 'Section' : 'Hidden'}</span>
+            </div>
+          ))}
+          <div
+            className="studio-screen__track-playhead"
+            data-testid="timeline-playhead"
+            style={{ left: `${playheadPercent}%` }}
+            aria-hidden="true"
+          />
         </div>
+
+        <div className="studio-screen__track-actions">
+          <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('split')}>
+            Cut here
+          </button>
+          <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('remove')}>
+            Remove this section
+          </button>
+          <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('hide')}>
+            Hide this section
+          </button>
+          <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('show')}>
+            Bring it back
+          </button>
+        </div>
+        {timelineNotice ? (
+          <p className="studio-screen__track-notice" role="status">
+            {timelineNotice}
+          </p>
+        ) : null}
       </section>
     </main>
   )

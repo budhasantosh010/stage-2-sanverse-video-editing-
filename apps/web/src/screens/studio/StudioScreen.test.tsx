@@ -89,6 +89,7 @@ function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = 
     onDiscardProposal: vi.fn(),
     onAcceptProposal: vi.fn(),
     onRepairProposal: vi.fn(),
+    onTimelineEdit: vi.fn(),
     onSendMessage: vi.fn(),
     onUndo: vi.fn(),
     onRedo: vi.fn(),
@@ -704,6 +705,7 @@ describe('StudioScreen', () => {
         editError={null}
         conversation={{ status: 'ready', lastMessage: '', question: null, notice: null }}
         onRepairProposal={vi.fn()}
+        onTimelineEdit={vi.fn()}
         onSendMessage={vi.fn()}
         onProposal={vi.fn()}
         onDiscardProposal={vi.fn()}
@@ -765,6 +767,7 @@ describe('StudioScreen', () => {
         editError={null}
         conversation={{ status: 'ready', lastMessage: '', question: null, notice: null }}
         onRepairProposal={vi.fn()}
+        onTimelineEdit={vi.fn()}
         onSendMessage={vi.fn()}
         onProposal={vi.fn()}
         onDiscardProposal={vi.fn()}
@@ -786,5 +789,84 @@ describe('StudioScreen', () => {
     renderStudio({ editError: 'This proposal could not be accepted.' })
 
     expect(screen.getByRole('alert')).toHaveTextContent(/could not be accepted/i)
+  })
+})
+
+/**
+ * The time strip is the only place a non-editor can cut. These check the whole
+ * path from "the playhead is here" to "this is the operation the server gets",
+ * because a strip that draws correctly but sends the wrong cut is worse than
+ * one that does not draw at all.
+ */
+describe('StudioScreen time strip', () => {
+  it('shows the whole video as one section before anything is cut', () => {
+    renderStudio()
+
+    const sections = screen.getAllByTestId('timeline-section')
+    expect(sections).toHaveLength(1)
+    expect(sections[0]).toHaveStyle({ left: '0%', width: '100%' })
+  })
+
+  it('sends a cut measured from the start of the section the playhead is in', async () => {
+    const user = userEvent.setup()
+    const onTimelineEdit = vi.fn()
+    const { container } = renderStudio({ onTimelineEdit })
+
+    const video = container.querySelector('video') as HTMLVideoElement
+    prepareVideoForPointing(video, 12)
+    act(() => {
+      video.dispatchEvent(new Event('timeupdate'))
+    })
+
+    await user.click(screen.getByRole('button', { name: /^cut here$/i }))
+
+    expect(onTimelineEdit).toHaveBeenCalledTimes(1)
+    const operation = onTimelineEdit.mock.calls[0][0]
+    expect(operation.kind).toBe('split-clip')
+    expect(operation.atClipTime.ticks).toBe(12 * 1_440_000)
+    // It carries a capability that is actually allowed to produce this kind of
+    // edit, so the server's registry check passes rather than silently failing.
+    expect(operation.capabilityId).toBe('sanverse.timeline.split.primitive/v1')
+  })
+
+  it('explains in plain words why a cut at the very start is not a cut', async () => {
+    const user = userEvent.setup()
+    const onTimelineEdit = vi.fn()
+    renderStudio({ onTimelineEdit })
+
+    await user.click(screen.getByRole('button', { name: /^cut here$/i }))
+
+    expect(onTimelineEdit).not.toHaveBeenCalled()
+    expect(screen.getByText(/edge of a section/i)).toBeInTheDocument()
+  })
+
+  it('refuses to remove the only section, and sends nothing', async () => {
+    const user = userEvent.setup()
+    const onTimelineEdit = vi.fn()
+    const { container } = renderStudio({ onTimelineEdit })
+
+    const video = container.querySelector('video') as HTMLVideoElement
+    prepareVideoForPointing(video, 5)
+    act(() => {
+      video.dispatchEvent(new Event('timeupdate'))
+    })
+
+    await user.click(screen.getByRole('button', { name: /remove this section/i }))
+
+    expect(onTimelineEdit).not.toHaveBeenCalled()
+    expect(screen.getByText(/only section/i)).toBeInTheDocument()
+  })
+
+  it('locks cutting while a proposal is waiting to be approved', () => {
+    // A cut would move the footage the pending nameplate is anchored to, so the
+    // two are kept apart rather than allowed to race.
+    renderStudio({
+      proposal: {
+        operation: testOperation(),
+        origin: { source: 'direct', requestId: null, explanation: null, note: null },
+      },
+    })
+
+    expect(screen.getByRole('button', { name: /^cut here$/i })).toBeDisabled()
   })
 })

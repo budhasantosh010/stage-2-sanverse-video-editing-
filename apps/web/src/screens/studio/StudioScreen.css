@@ -505,6 +505,81 @@
   text-transform: uppercase;
 }
 
+/*
+ * The finished video drawn as its sections, side by side.
+ *
+ * Each block is positioned as a percentage of the whole, so the strip is a
+ * true picture of the result: a section that is a third of the video takes a
+ * third of the width. There is no zoom and no scrolling, because a non-editor
+ * has no reason to learn either.
+ */
+.studio-screen__track {
+  position: relative;
+  min-height: 48px;
+  margin-top: 16px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-track);
+  overflow: hidden;
+}
+
+.studio-screen__track-block {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 680;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* A hidden section still occupies its place, because switching it back on must
+   restore the exact video the user saw. It reads as an empty outline, and the
+   word inside it says "Hidden" rather than relying on the styling alone. */
+.studio-screen__track-block--hidden {
+  background: var(--color-track);
+  border: 1px dashed var(--color-border-strong);
+  opacity: 0.7;
+}
+
+.studio-screen__track-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-text);
+  pointer-events: none;
+}
+
+.studio-screen__track-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.studio-screen__track-notice {
+  margin-top: 8px;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+/* Black over the video for a stretch that was removed but left in place, so the
+   preview shows exactly what the exported file will show. */
+.studio-screen__video-hole {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  pointer-events: none;
+}
+
 .studio-screen__static-track {
   display: flex;
   align-items: center;

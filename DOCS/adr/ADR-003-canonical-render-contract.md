@@ -2,6 +2,11 @@
 
 - Status: Accepted
 - Date: 2026-07-27
+- **Extended by ADR-005 (2026-07-28).** The one-contract rule is unchanged and
+  is now load-bearing in a second way. The plan moved to v2: `segments` says
+  which stretches of footage the video is made of, and `overlays` says what is
+  drawn on them. Both renderers read both lists, which is what stops the preview
+  and the export disagreeing about where a cut landed.
 
 ## The problem
 

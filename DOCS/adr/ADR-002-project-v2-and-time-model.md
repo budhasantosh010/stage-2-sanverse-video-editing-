@@ -3,6 +3,13 @@
 - Status: Accepted
 - Date: 2026-07-27
 - Supersedes: the implicit v1 model in `packages/edit-domain`
+- **Superseded in part by ADR-005 (2026-07-28).** The fixed clock, half-open
+  ranges, clip-instance composition, capability registry, change sets, and
+  revision fencing all still hold exactly as written. Two things changed when
+  cutting arrived: an overlay's timing is now stored against the original
+  footage rather than against a clip, and `project.composition` became the
+  IMPORTED footage — what the viewer sees is `effectiveComposition(project)`,
+  the import with every accepted cut replayed over it. Schema is now v3.
 
 ## The problem
 

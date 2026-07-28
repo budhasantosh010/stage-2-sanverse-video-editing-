@@ -301,6 +301,27 @@ export function App() {
           current.screen === 'studio' ? discardEditProposal(current) : current,
         )
       }}
+      onTimelineEdit={(operation) => {
+        if (appState.screen !== 'studio' || appState.proposal) return
+        resetExport()
+        // A cut travels the same server-authoritative path as an accepted
+        // proposal: the browser asks, and adopts whatever comes back. It never
+        // applies the cut to its own copy and hopes the server agrees.
+        requestEdit((projectId) =>
+          acceptChangeSet(
+            projectId,
+            {
+              schemaVersion: 'sanverse.change-set/v1' as const,
+              changeSetId: `changeset_${operation.operationId.replace(/^operation_/, '').slice(0, 32)}`,
+              baseRevision: appState.editProject.revision,
+              operations: [operation],
+              provenance: { source: 'direct' as const, requestId: null },
+              extensions: {},
+            },
+            fetch,
+          ),
+        )
+      }}
       onAcceptProposal={() => {
         if (appState.screen !== 'studio' || !appState.proposal) return
         const changeSet = buildChangeSet(appState.proposal, appState.editProject.revision)

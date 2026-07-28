@@ -1,16 +1,21 @@
 # Current State
 
-Last updated: 2026-07-27
+Last updated: 2026-07-28
 
 ## Active goal
 
-**G4-B — first safe AI-operated nameplate. Tasks 01 through 11 are built and
-verified. Task 12, connecting one real provider, has not started and is gated
-on the owner's decision about data leaving the machine.**
+**G5-B — cutting. The video can now be cut, sections removed, and the result
+exported, with every edit anchored to the original footage so it survives the
+cut. Built and verified on the owner's own recording (E4).**
 
-The chat box works. A sentence typed into it produces a pending proposal, one
-short question, a plain "cannot do that", or a refusal — and nothing else. The
-provider behind it is a deterministic fake that ships with the build, so no
+What remains in G5-B is reach, not foundation: trim, reorder, and clip audio
+work but have no button; only one frame rate has been exercised; and the owner
+has not run it. `DOCS/plans/PLAN_CHECKLIST.md` has the exact split.
+
+G4-B is finished except the first real API call, which is blocked on the owner's
+keys. The chat box works: a sentence typed into it produces a pending proposal,
+one short question, a plain "cannot do that", or a refusal — and nothing else.
+The provider behind it is a deterministic fake that ships with the build, so no
 network call is made and no data leaves the machine.
 
 G1 remains partly open for the owner's final motion, native drag-and-drop, and
@@ -34,6 +39,20 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
   description of a nameplate. Browser preview and FFmpeg export compile the same
   plan, and a parity test evaluates the exact FFmpeg placement expression
   numerically. The exporter's font is served to the browser. ADR-003.
+- **G5-B cutting (complete in the domain, the renderer, and the screen).**
+  Cuts are ordinary operations in ordinary change sets, so one cut is one Undo
+  and a single cut in the middle of the history can be switched off on its own.
+  Every edit drawn on the picture stores its timing against the ORIGINAL
+  footage, so trimming the front moves a nameplate with the face it was placed
+  on instead of leaving it at a wall-clock moment that now shows something else.
+  Footage deleted outright blocks the edit and says so; it is never relocated.
+  Project and operation schemas moved to v3 with a one-entry upgrade ladder.
+  ADR-005.
+- **G5-B render and playback.** The render plan now separates `segments` (what
+  the video is made of) from `overlays` (what is drawn on it). FFmpeg trims and
+  concatenates, filling deliberate holes with real black and real silence. The
+  browser preview jumps between stretches so it shows the same video the export
+  produces.
 - **G4-B tasks 01–11 (complete, on a fake provider).** `@sanverse/intent-domain` holds a closed
   request shape, a closed untrusted candidate shape, six bounded clarification
   fields, and the evaluation contract. The API holds the provider port, the
@@ -49,13 +68,13 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
 ## Test and build state
 
 ```
-  edit-domain      103
-  render-contract   22
+  edit-domain      134
+  render-contract   28
   intent-domain     27
   api              162
-  web              160
+  web              191
   ------------------------
-  total            474 passing; all workspace builds clean
+  total            542 passing; all workspace builds clean
 ```
 
 ## Owner evidence still open
@@ -72,8 +91,11 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
   reached NVIDIA, opencode, OpenRouter, or LM Studio.** The fake remains the
   default and the only provider that runs. Blocked on the owner's API keys, and
   on verifying LiteLLM's request-body logging is off (G4B-12C).
-- Cut, trim, split, ripple delete, reorder, or a general timeline
-- Captions and audio editing primitives
+- A control on screen for trim, reorder, or clip loudness and fades. All three
+  are built, tested, and reach the export, but nothing offers them yet.
+- Creating a deliberate hole from the screen. The remove button always closes
+  the gap; holes exist in the domain, the preview, and the export only.
+- Captions and speech metadata
 - Transform, crop, scale, rotation, keyframes, easing, spring/bounce,
   transitions, or general effects
 - Reusable versioned titles, callouts, subtitle components, B-roll, or templates
@@ -90,8 +112,11 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
   font's real ascent and descent read from the TTF. Recorded in ADR-003.
 - A 30-second 1080p CPU export takes roughly 60–90 seconds and exposes no
   percentage or time estimate. Deprioritized by the owner.
-- `-c:a copy` is correct only while nothing cuts the timeline. The first cut
-  operation in G5-B must replace it with a real audio conform step.
+- Only one frame rate has been exercised on real media: 30/1 constant. Variable
+  frame rate and 30000/1001 fixtures are G5B-13 and have not been run.
+- A change set holding both a cut and an overlay can have the cut applied while
+  being reported blocked for its overlay. No such change set exists today; G7
+  must resolve it before compound requests ship. ADR-005.
 - No colour or HDR handling; `-pix_fmt yuv420p` is forced. iPhones record HDR by
   default, so washed-out output is plausible and unproven.
 - Parity was measured with Arial only, and by real export only for the

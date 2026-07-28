@@ -84,20 +84,27 @@ Legend:
 
 ## G5-B - Timeline and editorial primitives
 
-- [ ] G5B-01 Approve non-editor timeline workflow and terminology
-- [ ] G5B-02 Implement time selection
-- [ ] G5B-03 Implement split
-- [ ] G5B-04 Implement trim
-- [ ] G5B-05 Implement remove-with-gap
-- [ ] G5B-06 Implement ripple delete
-- [ ] G5B-07 Implement reorder
-- [ ] G5B-08 Implement enable/disable
-- [ ] G5B-09 Implement basic audio level and fades
-- [ ] G5B-10 Implement dependent-edit revalidation
-- [ ] G5B-11 Implement simple Studio time-strip controls
-- [ ] G5B-12 Compile timeline state to preview/export
-- [ ] G5B-13 Run VFR, rational-frame-rate, audio, and boundary fixtures
-- [ ] G5B-14 Owner completes a pacing edit without NLE terminology
+Anchoring decision: ADR-005. Evidence: `DOCS/evidence/2026-07-28-g5b-cutting.md`.
+"Domain only" below means the rule is built, tested, and reaches the export, but
+no button offers it yet — the owner cannot get to it from the screen.
+
+- [ ] G5B-01 Approve non-editor timeline workflow and terminology — owner gate
+- [x] G5B-02 Implement time selection (the playhead selects the section under it)
+- [x] G5B-03 Implement split
+- [ ] G5B-04 Implement trim — domain only, no control on screen
+- [ ] G5B-05 Implement remove-with-gap — domain, preview, and export only; the
+      button always closes the gap, so the owner cannot yet create a hole
+- [x] G5B-06 Implement ripple delete
+- [ ] G5B-07 Implement reorder — domain only, no control on screen
+- [x] G5B-08 Implement enable/disable
+- [ ] G5B-09 Implement basic audio level and fades — domain and export only, no
+      control on screen
+- [x] G5B-10 Implement dependent-edit revalidation
+- [x] G5B-11 Implement simple Studio time-strip controls
+- [x] G5B-12 Compile timeline state to preview/export
+- [ ] G5B-13 Run VFR, rational-frame-rate, audio, and boundary fixtures —
+      only 30/1 constant frame rate has been exercised on real media
+- [ ] G5B-14 Owner completes a pacing edit without NLE terminology — owner gate
 
 ## G5-C - Useful talking-head workflow
 
