@@ -365,3 +365,12 @@
 - Real-browser check: reopened `test-30s.mp4`; Assist was the default; switching to Studio kept the same project, 9 history entries and exactly one video element; Studio exposed the existing simple time strip.
 - No domain schema, operation, render behavior, effect, professional timeline or provider was added. Timeline V1 remains the exact next task only after owner approval.
 - Nonblocking Vite HMR hostname warning and stale authority documents are recorded as FAIL-017 and FAIL-018 rather than repaired in this focused batch.
+
+## 2026-07-30 — P0-E Studio workspace structure
+
+- Reframed the existing mounted StudioScreen into Project media, Program canvas,
+  read-only Inspector, collapsible AI edits, and a meaningful Timeline workspace.
+- Preserved the single editor authority and every existing state/export path.
+- Browser continuity, Point/proposal repair, Cut/Undo/Redo/export, three exact
+  responsive screenshots, 64/64 focused tests, and all builds passed.
+- Found and fixed the video-over-Point overlap defect. P1-A was not started.

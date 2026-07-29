@@ -222,7 +222,7 @@ describe('App', () => {
 
     expect(intakeRequestCount()).toBe(1)
     expect(createObjectURL).not.toHaveBeenCalled()
-    expect(await screen.findByText('cleaned.mp4')).toBeInTheDocument()
+    expect(await screen.findAllByText('cleaned.mp4')).toHaveLength(2)
     expect(container.querySelector('video')).toHaveAttribute('src', '/api/projects/project_1234567890abcdef/media')
     expect(screen.getByText(/draft — not executed/i)).toBeInTheDocument()
     expect(screen.getByText('Tighten the opening pause.')).toBeInTheDocument()
@@ -299,7 +299,7 @@ describe('App', () => {
     await waitFor(() => expect(pendingUpdates).toHaveLength(1))
 
     act(() => pendingUpdates[0]())
-    expect(screen.getByText('first.mp4')).toBeInTheDocument()
+    expect(screen.getAllByText('first.mp4')).toHaveLength(2)
     expect(container.querySelector('video')).toHaveAttribute('src', '/api/projects/project_aaaaaaaaaaaaaaaa/media')
   })
 
@@ -322,7 +322,7 @@ describe('App', () => {
       screen.getByLabelText(/choose video/i),
       new File(['video'], 'first.mp4', { type: 'video/mp4' }),
     )
-    await screen.findByText('first.mp4')
+    expect(await screen.findAllByText('first.mp4')).toHaveLength(2)
 
     const video = container.querySelector('video') as HTMLVideoElement
     Object.defineProperties(video, {
@@ -377,7 +377,7 @@ describe('App', () => {
       screen.getByLabelText(/choose video/i),
       new File(['video'], 'second.mp4', { type: 'video/mp4' }),
     )
-    await screen.findByText('second.mp4')
+    expect(await screen.findAllByText('second.mp4')).toHaveLength(2)
 
     // A different project starts clean; the first project's edits do not leak.
     expect(screen.getByText(/tell sanverse what you want to change/i)).toBeInTheDocument()
@@ -415,7 +415,7 @@ describe('App', () => {
     const { container } = render(<App />)
 
     await user.upload(screen.getByLabelText(/choose video/i), new File(['video'], 'cleaned.mp4', { type: 'video/mp4' }))
-    await screen.findByText('cleaned.mp4')
+    expect(await screen.findAllByText('cleaned.mp4')).toHaveLength(2)
     const video = container.querySelector('video') as HTMLVideoElement
     Object.defineProperties(video, {
       videoWidth: { configurable: true, value: 1920 }, videoHeight: { configurable: true, value: 1080 },

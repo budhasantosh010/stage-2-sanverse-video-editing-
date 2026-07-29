@@ -217,6 +217,8 @@ export function StudioScreen({
   const inHoleRef = useRef(false)
   const [proposalResult, setProposalResult] = useState<string | null>(null)
   const [selectedAssistChangeId, setSelectedAssistChangeId] = useState<string | null>(null)
+  const [isAiPanelCollapsed, setIsAiPanelCollapsed] = useState(false)
+  const [compactSidePanel, setCompactSidePanel] = useState<'media' | 'inspector' | null>(null)
   /** A plain sentence explaining why a cut was not made. */
   const [timelineNotice, setTimelineNotice] = useState<string | null>(null)
   const [trimSeconds, setTrimSeconds] = useState(1)
@@ -506,6 +508,9 @@ export function StudioScreen({
     () => buildAssistChangeItems({ project: editProject, proposal }),
     [editProject, proposal],
   )
+  const selectedInspectorChange = assistChanges.find(
+    (item) => item.id === selectedAssistChangeId,
+  ) ?? null
 
   const compositionDurationTicks = compositionDuration(composition).ticks
 
@@ -793,7 +798,12 @@ export function StudioScreen({
       </header> : null}
 
       <div className="studio-screen__workspace">
-        <section id="studio-primary" className="studio-screen__canvas" aria-label="Video canvas" tabIndex={-1}>
+        <section
+          id="studio-primary"
+          className="studio-screen__canvas"
+          aria-label={workspace === 'studio' ? 'Program canvas' : 'Video canvas'}
+          tabIndex={-1}
+        >
           <div className="studio-screen__canvas-heading">
             <div>
               <span className="studio-screen__section-index">01</span>
@@ -957,17 +967,177 @@ export function StudioScreen({
           ) : null}
         </section>
 
-        <aside className="studio-screen__conversation" aria-label="Conversation">
+        <div
+          className="studio-screen__compact-panel-switcher"
+          aria-label="Studio side panels"
+          hidden={workspace !== 'studio'}
+        >
+          <button
+            type="button"
+            aria-controls="studio-media-region"
+            aria-expanded={compactSidePanel === 'media'}
+            onClick={() => setCompactSidePanel((current) => current === 'media' ? null : 'media')}
+          >
+            Media
+          </button>
+          <button
+            type="button"
+            aria-controls="studio-inspector-region"
+            aria-expanded={compactSidePanel === 'inspector'}
+            onClick={() => setCompactSidePanel((current) => current === 'inspector' ? null : 'inspector')}
+          >
+            Inspector
+          </button>
+        </div>
+
+        <section
+          id="studio-media-region"
+          className={`studio-screen__media${compactSidePanel === 'media' ? ' studio-screen__side-region--compact-open' : ''}`}
+          aria-label="Project media"
+          hidden={workspace !== 'studio'}
+        >
+          <div className="studio-screen__region-heading">
+            <div>
+              <span className="studio-screen__section-index">01</span>
+              <h2>Media</h2>
+            </div>
+            <span>{editProject.assets.length}</span>
+          </div>
+          {editProject.assets.length > 0 ? (
+            <ul className="studio-screen__asset-list" aria-label="Project assets">
+              {editProject.assets.map((asset, index) => (
+                <li key={asset.assetId}>
+                  <div className="studio-screen__asset-name">
+                    <span aria-hidden="true">
+                      {asset.mediaKind === 'video' ? 'V' : asset.mediaKind === 'image' ? 'I' : 'A'}
+                    </span>
+                    <strong title={index === 0 ? project.name : asset.assetId}>
+                      {index === 0
+                        ? project.name
+                        : `${asset.mediaKind === 'video' ? 'Video' : asset.mediaKind === 'image' ? 'Image' : 'Audio'} ${index + 1}`}
+                    </strong>
+                  </div>
+                  <dl>
+                    <div>
+                      <dt>Type</dt>
+                      <dd>{asset.mediaKind === 'video' ? 'Video' : asset.mediaKind === 'image' ? 'Image' : 'Audio'}</dd>
+                    </div>
+                    <div>
+                      <dt>Duration</dt>
+                      <dd>{asset.duration ? formatDuration(toMilliseconds(asset.duration)) : 'Still image'}</dd>
+                    </div>
+                    <div>
+                      <dt>Status</dt>
+                      <dd>Local</dd>
+                    </div>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="studio-screen__empty-copy">No project assets available.</p>
+          )}
+        </section>
+
+        <div className="studio-screen__right-rail">
+          <section
+            id="studio-inspector-region"
+            className={`studio-screen__inspector${compactSidePanel === 'inspector' ? ' studio-screen__side-region--compact-open' : ''}`}
+            aria-label="Inspector"
+            hidden={workspace !== 'studio'}
+          >
+            <div className="studio-screen__region-heading">
+              <div>
+                <span className="studio-screen__section-index">03</span>
+                <h2>Inspector</h2>
+              </div>
+              <span>Read only</span>
+            </div>
+            {selectedInspectorChange ? (
+              <dl className="studio-screen__inspector-facts">
+                <div>
+                  <dt>Type</dt>
+                  <dd>{selectedInspectorChange.operationKind}</dd>
+                </div>
+                <div>
+                  <dt>Timing</dt>
+                  <dd>
+                    {selectedInspectorChange.startTicks === null
+                      ? 'Not timed'
+                      : formatPointTargetTime(
+                          Math.round(selectedInspectorChange.startTicks / (PROJECT_TIMESCALE / 1_000)),
+                        )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Enabled</dt>
+                  <dd>{selectedInspectorChange.status === 'blocked' ? 'Needs attention' : 'Yes'}</dd>
+                </div>
+                <div>
+                  <dt>Summary</dt>
+                  <dd>{selectedInspectorChange.label}</dd>
+                </div>
+              </dl>
+            ) : pointTarget ? (
+              <dl className="studio-screen__inspector-facts">
+                <div><dt>Type</dt><dd>Point target</dd></div>
+                <div><dt>Timing</dt><dd>{formatPointTargetTime(pointTarget.timeMs)}</dd></div>
+                <div><dt>Enabled</dt><dd>Yes</dd></div>
+                <div>
+                  <dt>Summary</dt>
+                  <dd>{`${Math.round(pointTarget.x * 100)}% across, ${Math.round(pointTarget.y * 100)}% down`}</dd>
+                </div>
+              </dl>
+            ) : (
+              <div className="studio-screen__inspector-empty">
+                <strong>Nothing selected</strong>
+                <p>Select a change in Assist or choose Point on the video to inspect its current context.</p>
+              </div>
+            )}
+          </section>
+
+        <aside
+          className={`studio-screen__conversation${workspace === 'studio' && isAiPanelCollapsed ? ' studio-screen__conversation--collapsed' : ''}`}
+          aria-label={workspace === 'studio' ? 'AI edit panel' : 'Conversation'}
+        >
           <div className="studio-screen__panel-heading">
             <div>
-              <span className="studio-screen__section-index">02</span>
-              <h2>{workspace === 'assist' ? 'Ask Sanverse' : 'Conversation'}</h2>
+              <span className="studio-screen__section-index">{workspace === 'assist' ? '02' : '04'}</span>
+              <h2>{workspace === 'assist' ? 'Ask Sanverse' : 'AI edits'}</h2>
             </div>
-            <span className="studio-screen__unavailable-tag">
-              {workspace === 'assist' ? 'Nothing applies without Accept' : 'Preview mode'}
-            </span>
+            <div className="studio-screen__panel-heading-actions">
+              {workspace === 'studio' && isAiPanelCollapsed && proposal ? (
+                <span
+                  className="studio-screen__pending-indicator"
+                  role="status"
+                  aria-label="Pending AI proposal"
+                >
+                  1 pending
+                </span>
+              ) : null}
+              <span className="studio-screen__unavailable-tag">
+                {workspace === 'assist' ? 'Nothing applies without Accept' : 'Preview mode'}
+              </span>
+              {workspace === 'studio' ? (
+                <button
+                  className="studio-screen__ai-toggle"
+                  type="button"
+                  aria-controls="studio-ai-panel-content"
+                  aria-expanded={!isAiPanelCollapsed}
+                  aria-label={isAiPanelCollapsed ? 'Expand AI panel' : 'Collapse AI panel'}
+                  onClick={() => setIsAiPanelCollapsed((current) => !current)}
+                >
+                  {isAiPanelCollapsed ? 'Open' : 'Hide'}
+                </button>
+              ) : null}
+            </div>
           </div>
 
+          <div
+            id="studio-ai-panel-content"
+            className="studio-screen__ai-panel-content"
+            hidden={workspace === 'studio' && isAiPanelCollapsed}
+          >
           <ChatComposer
             conversation={conversation}
             canSend={!proposal}
@@ -1091,7 +1261,9 @@ export function StudioScreen({
             ) : null}
           </section>
 
+          </div>
         </aside>
+        </div>
       </div>
 
       {workspace === 'assist' ? (
@@ -1104,15 +1276,15 @@ export function StudioScreen({
         />
       ) : <section
         className="studio-screen__time-strip"
-        aria-label="Simple time strip"
+        aria-label="Timeline workspace"
       >
         <div className="studio-screen__time-strip-heading">
           <div>
-            <span className="studio-screen__section-index">03</span>
-            <h2>Simple time strip</h2>
+            <span className="studio-screen__section-index">05</span>
+            <h2>Timeline</h2>
           </div>
           <p>
-            Point targeting and text proposals available
+            Direct controls over the current project
           </p>
         </div>
         <div className="studio-screen__track" data-testid="timeline-track">

@@ -1,12 +1,22 @@
 # HANDOFF — everything a new agent needs to continue Sanverse Stage 2
 
-Updated 2026-07-29. P0-D.1 is technically complete on
+Updated 2026-07-30. **P0-E is technically complete and awaits owner layout
+review.** Studio now has a stable five-region professional frame without
+creating a second editor session: Project media, Program canvas, read-only
+Inspector, collapsible AI edits, and the existing direct controls inside a
+meaningful Timeline workspace. Focused tests pass 64/64, all workspace builds
+pass, and the browser continuity/edit/export evidence plus exact-size responsive
+screenshots are in
+`DOCS/evidence/2026-07-30-p0e-studio-structure/P0-E_IMPLEMENTATION_REPORT.md`.
+P1-A and Timeline V1 have not started.
+
+P0-D.1 is technically complete and owner-approved on
 `agent/g6-g8-local-alpha`: the Home composer and Assist hierarchy are corrected,
 dead empty-state actions are contextual, action-disabled reasons are accessible,
 change states have non-color markers, focused tests pass 78/78, and the
-production build passes. Evidence and the owner-only `UX-005` review gate are in
+production build passes. Evidence and the resolved `UX-005` review gate are in
 `DOCS/evidence/2026-07-29-p0d1-visual-corrections/P0-D1_IMPLEMENTATION_REPORT.md`.
-P0-E, P1-A, and production Timeline V1 have not started.
+P1-A and production Timeline V1 have not started.
 
 P0-D is technically complete on
 `agent/g6-g8-local-alpha`: Assist is the video-first default over one persistent

@@ -1,8 +1,20 @@
 # Current State
 
-Last updated: 2026-07-29
+Last updated: 2026-07-30
 
 ## Active goal
+
+**P0-E is technically complete on 2026-07-30 and awaits owner layout review.**
+Studio is now a stable professional workspace frame with Project media, one
+central Program canvas, a read-only Inspector, a collapsible AI panel, and a
+meaningful bottom Timeline workspace containing the existing direct controls.
+It still uses one mounted EditorShell/editor session, one video/playhead, one
+project/revision, one proposal/repair state, one conversation draft, one
+history, and the existing preview/export paths. Focused regression evidence is
+64/64 passing tests, a clean all-workspace production build, a real browser
+continuity/edit/export walkthrough, and exact-size 1440x900, 1280x800, and
+1024x768 screenshots in
+`DOCS/evidence/2026-07-30-p0e-studio-structure/`. P1-A has not started.
 
 **P0-D.1 is technically complete on 2026-07-29.** Home is compact; Assist
 uses a more readable video-first hierarchy; empty proposal and pre-Point dead
@@ -10,8 +22,9 @@ actions are gone; pending/accepted/blocked changes have redundant non-color
 markers; and Undo, Redo, and Export expose exact accessible disabled reasons.
 The focused result is 78/78 passing tests plus a clean production build.
 Responsive before/after evidence and the browser continuity walkthrough are in
-`DOCS/evidence/2026-07-29-p0d1-visual-corrections/`. `UX-005` remains open only
-for owner visual approval. P0-E has not started.
+`DOCS/evidence/2026-07-29-p0d1-visual-corrections/`. The owner approved P0-D.1
+by starting P0-E from its completion commit on 2026-07-30, so `UX-005` is
+resolved.
 
 **P0-D is technically complete on 2026-07-29.** Assist is now the video-first
 default workspace, while the same mounted editor session, project, revision,
@@ -21,7 +34,7 @@ a clean production build, and a real `test-30s.mp4` browser loop through
 proposal, repair, Accept, Undo, Redo, export, and download. Exact-size
 1440×900, 1280×800, and 1024×768 screenshots plus the complete report are in
 `DOCS/evidence/2026-07-29-p0d-assist/`. Owner visual/interaction approval
-remains open. P0-E has not started.
+remains open.
 
 **P0-R is complete on 2026-07-29.** The decision is **C: study OpenCut
 behavior and build a focused Sanverse timeline**. Production Timeline V1 has

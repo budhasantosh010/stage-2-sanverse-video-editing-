@@ -19,7 +19,7 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | UX-002 | P1 | UX/A11Y | Disabled Undo, Redo, and Export lack explanations | RESOLVED | P0-D.1 |
 | [x] | UX-003 | P1 | UX | Empty proposal state exposes an unusable Accept action | RESOLVED | P0-D.1 |
 | [x] | UX-004 | P2 | UX | Add-text control appears before a valid point exists | RESOLVED | P0-D.1 |
-| [ ] | UX-005 | P1 | UX | Assist side-panel text and hierarchy need owner visual approval | IN_PROGRESS | Owner review |
+| [x] | UX-005 | P1 | UX | Assist side-panel text and hierarchy need owner visual approval | RESOLVED | P0-D.1 |
 | [x] | UX-006 | P2 | UX/A11Y | Pending and accepted changes need stronger visual distinction | RESOLVED | P0-D.1 |
 | [ ] | FAIL-021 | P2 | Performance | 30-second export crossed the 60-second walkthrough budget | MONITORING | E5 benchmark |
 | [ ] | FEATURE-001 | P3 | Deferred UX | Optional desktop composer resize preference | PLANNED | Post-P1 |
@@ -540,8 +540,8 @@ RESOLVED.
 
 ## UX-005 — Assist hierarchy needed more readable proportions
 
-- **Done:** [ ]
-- **Status:** IN_PROGRESS
+- **Done:** [x]
+- **Status:** RESOLVED
 - **Severity:** P1
 - **Type:** UX
 - **Found:** 2026-07-29
@@ -599,15 +599,18 @@ No overflow at required widths; one-column video-first layout near 1024px; owner
 - Screenshot: `assist-before-1440x900.png` and `assist-after-*.png`.
 - Walkthrough: `browser-walkthrough.md`.
 - Commit: focused P0-D.1 commit.
-- Decision: owner approval pending.
+- Owner approval: the owner started P0-E from the P0-D.1 completion commit on
+  2026-07-30 and explicitly required UX-005 to be resolved before work began.
 
 ### Resolution
 
-Implementation evidence is complete; subjective product approval is intentionally not self-certified.
+Implementation evidence is complete. Owner approval was supplied by the
+2026-07-30 instruction to begin P0-E from commit
+`645d5804c2cdbee57ff58f0f0a0ea4405b6d4571`.
 
 ### Current status
 
-IN_PROGRESS; the only remaining action is owner visual review.
+RESOLVED by owner approval on 2026-07-30.
 
 ## UX-006 — Pending and accepted changes lacked a strong non-color distinction
 
@@ -830,6 +833,97 @@ All invalid files were replaced; disposable processes and profiles were removed.
 ### Current status
 
 RESOLVED; this was an evidence-tool defect, not a Sanverse product defect.
+
+## FAIL-022 — Studio video overflow covered Point controls
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P1
+- **Type:** Product interaction
+- **Found:** 2026-07-30
+- **Target milestone:** P0-E
+- **Owner:** Codex
+
+### What / where / when / how / why?
+
+In the real P0-E browser walkthrough, clicking `Point` focused the video instead
+of entering Point mode. In Studio, the fixed-height canvas allowed the rendered
+video surface to overflow over the controls below it, so the video intercepted
+the click. This blocked a core pointing workflow even though component tests
+passed.
+
+### What was tried?
+
+Role click, DOM click, and coordinate click all reproduced the same interception.
+The video surface was then bounded to the canvas and Point controls were placed
+in the foreground.
+
+### One-line solution
+
+Constrain Studio video overflow and keep Point controls above the video layer.
+
+### Evidence and status
+
+Re-test entered Point mode, captured 00:01.155, and Inspector showed the target.
+RESOLVED.
+
+## INFRA-002 — Parallel final gates hit Windows spawn EPERM
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P3
+- **Type:** Verification infrastructure
+- **Found:** 2026-07-30
+- **Target milestone:** P0-E
+- **Owner:** Codex
+
+### What / where / when / how / why?
+
+Starting Vitest and the production build concurrently caused esbuild startup to
+fail with `spawn EPERM` on Windows. It occurred only in the parallel gate, due
+to process-policy/contention, and did not identify an application defect.
+
+### What was tried?
+
+The same focused tests and build were rerun sequentially.
+
+### One-line solution
+
+Run esbuild-backed acceptance gates sequentially in this managed Windows session.
+
+### Evidence and status
+
+Focused tests passed 64/64 and the all-workspace build passed. RESOLVED.
+
+## INFRA-003 — P0-E in-app screenshots tiled the page
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P3
+- **Type:** Verification infrastructure
+- **Found:** 2026-07-30
+- **Target milestone:** P0-E
+- **Owner:** Codex
+
+### What / where / when / how / why?
+
+The in-app screenshot surface again returned repeated page tiles after viewport
+calibration. The DOM sizes were correct but the PNG pixels were not truthful,
+due to incompatible backing/device scaling in the desktop capture surface.
+
+### What was tried?
+
+Viewport calibration and recapture still tiled. Invalid images were overwritten
+using disposable headless Edge contexts at the exact required dimensions.
+
+### One-line solution
+
+Visually reject tiled captures and use exact-size disposable Edge evidence.
+
+### Evidence and status
+
+All three final PNGs open as one page at 1440×900, 1280×800, and 1024×768.
+RESOLVED.
 
 ## Entry rules
 

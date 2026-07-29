@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { acceptChangeSet, undoChangeSet, type EditProject } from '@sanverse/edit-domain'
@@ -138,7 +138,7 @@ describe('StudioScreen', () => {
   it('shows the selected filename and a real controlled video preview', () => {
     const { container } = renderStudio()
 
-    expect(screen.getByText('cleaned-interview.mp4')).toBeInTheDocument()
+    expect(screen.getAllByText('cleaned-interview.mp4')).toHaveLength(2)
     const video = container.querySelector('video')
     expect(video).toHaveAttribute('src', 'blob:cleaned-interview')
     expect(video).toHaveAttribute('controls')
@@ -335,13 +335,77 @@ describe('StudioScreen', () => {
     expect(onBack).toHaveBeenCalledOnce()
   })
 
-  it('names the three primary Studio regions for assistive technology', () => {
+  it('builds the five-region Studio frame around one existing video editor', () => {
+    const { container } = renderStudio()
+
+    expect(screen.getByRole('region', { name: 'Project media' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Program canvas' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Inspector' })).toBeInTheDocument()
+    expect(screen.getByRole('complementary', { name: 'AI edit panel' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Timeline workspace' })).toBeInTheDocument()
+    expect(container.querySelectorAll('video')).toHaveLength(1)
+  })
+
+  it('shows the current project assets without inventing media-bin behavior', () => {
     renderStudio()
 
-    expect(screen.getByRole('region', { name: 'Video canvas' })).toBeInTheDocument()
-    expect(screen.getByRole('complementary', { name: 'Conversation' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Simple time strip' })).toBeInTheDocument()
-    expect(screen.getByText(/point targeting and text proposals available/i)).toBeInTheDocument()
+    const media = screen.getByRole('region', { name: 'Project media' })
+    expect(within(media).getByText('cleaned-interview.mp4')).toBeInTheDocument()
+    expect(within(media).getByText('Video')).toBeInTheDocument()
+    expect(within(media).getByText('30 seconds')).toBeInTheDocument()
+    expect(within(media).getByText('Local')).toBeInTheDocument()
+    expect(within(media).queryByText(/drag|drop|import/i)).not.toBeInTheDocument()
+  })
+
+  it('shows honest empty Media and Inspector states without a second selection model', () => {
+    renderStudio({
+      editProject: { ...testProject(), assets: [] },
+    })
+
+    expect(screen.getByRole('region', { name: 'Project media' }))
+      .toHaveTextContent(/no project assets available/i)
+    expect(screen.getByRole('region', { name: 'Inspector' }))
+      .toHaveTextContent(/nothing selected/i)
+  })
+
+  it('keeps the same chat composer and unsent text while the AI panel collapses', async () => {
+    const user = userEvent.setup()
+    renderStudio()
+
+    const composer = screen.getByRole('textbox', { name: /ask for an edit/i })
+    await user.type(composer, 'keep this draft')
+    await user.click(screen.getByRole('button', { name: /collapse ai panel/i }))
+
+    expect(screen.getByRole('button', { name: /expand ai panel/i }))
+      .toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('textbox', { name: /ask for an edit/i, hidden: true })).toBe(composer)
+    expect(composer).toHaveValue('keep this draft')
+
+    await user.click(screen.getByRole('button', { name: /expand ai panel/i }))
+    expect(screen.getByRole('textbox', { name: /ask for an edit/i })).toBe(composer)
+    expect(composer).toHaveValue('keep this draft')
+  })
+
+  it('shows a pending-proposal indicator while the AI panel is collapsed', async () => {
+    const user = userEvent.setup()
+    renderStudio({ proposal: directProposal() })
+
+    await user.click(screen.getByRole('button', { name: /collapse ai panel/i }))
+
+    expect(screen.getByRole('status', { name: /pending ai proposal/i }))
+      .toHaveTextContent(/1 pending/i)
+  })
+
+  it('keeps every existing direct edit control inside the Studio timeline region', () => {
+    renderStudio()
+
+    const timeline = screen.getByRole('region', { name: 'Timeline workspace' })
+    expect(within(timeline).getByRole('button', { name: /^cut here$/i })).toBeInTheDocument()
+    expect(within(timeline).getByRole('button', { name: /remove this section/i })).toBeInTheDocument()
+    expect(within(timeline).getByRole('button', { name: /hide this section/i })).toBeInTheDocument()
+    expect(within(timeline).getByRole('button', { name: /bring it back/i })).toBeInTheDocument()
+    expect(within(timeline).getByText(/adjust this section/i)).toBeInTheDocument()
+    expect(within(timeline).getByText(/^captions$/i)).toBeInTheDocument()
   })
 
   it('never reports that a draft or edit was executed successfully', () => {
