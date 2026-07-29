@@ -1,0 +1,83 @@
+.assist-proposal {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.assist-proposal__heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.assist-proposal__heading h3 {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+.assist-proposal__heading > span {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.assist-proposal__empty,
+.assist-proposal__summary {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+}
+
+.assist-proposal__empty {
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.assist-proposal__summary {
+  border-left: 3px dashed var(--color-ink);
+  padding: 3px 0 3px 12px;
+}
+
+.assist-proposal__summary small,
+.assist-proposal__summary p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.assist-proposal__summary:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.assist-proposal__repair {
+  margin-top: 12px;
+}
+
+.assist-proposal__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.assist-proposal__actions button {
+  min-height: 40px;
+}
+
+.assist-proposal__actions .assist-proposal__accept {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-surface);
+}
+
+.assist-proposal__error {
+  margin-top: 12px;
+  font-weight: 680;
+}

@@ -57,6 +57,11 @@ import { AddOverlayPanel } from '../../features/overlays/AddOverlayPanel'
 import { OverlayRepairPanel } from '../../features/overlays/OverlayRepairPanel'
 import { CalloutOverlay, MediaOverlay, TitleOverlay } from '../../features/overlays/OverlayLayers'
 import {
+  AssistChangeStrip,
+  AssistProposalPanel,
+  buildAssistChangeItems,
+} from '../../editor/assist'
+import {
   capturePointTarget,
   formatPointTargetTime,
   getRenderedVideoContentBox,
@@ -100,6 +105,7 @@ export type StudioScreenProps = {
   saveState: 'idle' | 'saving' | 'saved' | 'error'
   onExport(): void
   onBack(): void
+  onWorkspaceChange?(workspace: EditorWorkspace): void
 }
 
 const EXPORT_DESCRIPTION = 'studio-export-description'
@@ -188,6 +194,7 @@ export function StudioScreen({
   saveState,
   onExport,
   onBack,
+  onWorkspaceChange,
 }: StudioScreenProps) {
   const draftRequest = project.draftRequest.trim()
   const [hasPreviewError, setHasPreviewError] = useState(false)
@@ -209,6 +216,7 @@ export function StudioScreen({
   const totalTicksRef = useRef(0)
   const inHoleRef = useRef(false)
   const [proposalResult, setProposalResult] = useState<string | null>(null)
+  const [selectedAssistChangeId, setSelectedAssistChangeId] = useState<string | null>(null)
   /** A plain sentence explaining why a cut was not made. */
   const [timelineNotice, setTimelineNotice] = useState<string | null>(null)
   const [trimSeconds, setTrimSeconds] = useState(1)
@@ -494,6 +502,10 @@ export function StudioScreen({
   const firstClipId = composition.tracks[0]?.clips[0]?.clipId ?? ''
   const isRendering = exportState.status === 'rendering'
   const canExport = acceptedCount > 0 && !proposal && !isRendering
+  const assistChanges = useMemo(
+    () => buildAssistChangeItems({ project: editProject, proposal }),
+    [editProject, proposal],
+  )
 
   const compositionDurationTicks = compositionDuration(composition).ticks
 
@@ -609,6 +621,12 @@ export function StudioScreen({
   const proposalPlaced = proposal ? proposalPlacement(editProject, proposal.operation) : null
   const proposalStartMs = proposalPlaced ? proposalPlaced.startTicks / TICKS_PER_MS : 0
   const proposalDurationMs = proposalPlaced ? proposalPlaced.durationTicks / TICKS_PER_MS : 0
+
+  function seekAssistChange(ticks: number) {
+    const nextMs = Math.max(0, ticks / TICKS_PER_MS)
+    setPlayheadMs(nextMs)
+    if (videoRef.current) videoRef.current.currentTime = nextMs / 1_000
+  }
 
   /**
    * Everything the assistant is allowed to know about what the user is doing.
@@ -943,8 +961,19 @@ export function StudioScreen({
               <span className="studio-screen__section-index">02</span>
               <h2>{workspace === 'assist' ? 'Ask Sanverse' : 'Conversation'}</h2>
             </div>
-            <span className="studio-screen__unavailable-tag">Preview mode</span>
+            <span className="studio-screen__unavailable-tag">
+              {workspace === 'assist' ? 'Nothing applies without Accept' : 'Preview mode'}
+            </span>
           </div>
+
+          <ChatComposer
+            conversation={conversation}
+            canSend={!proposal}
+            disabledReason={
+              proposal ? 'Accept or reject the pending proposal before asking for another edit.' : null
+            }
+            onSend={(message) => onSendMessage(message, buildIntentContext())}
+          />
 
           <section className="studio-screen__draft" aria-labelledby="studio-draft-label">
             <h3 id="studio-draft-label">Draft — not executed</h3>
@@ -955,44 +984,18 @@ export function StudioScreen({
             )}
           </section>
 
-          <section className="studio-screen__proposal" aria-labelledby="studio-proposal-label">
-            <h3 id="studio-proposal-label">Proposal</h3>
-            {proposal ? (
-              <div
-                ref={proposalSummaryRef}
-                className="studio-screen__proposal-summary"
-                role="status"
-                tabIndex={-1}
-              >
-                <strong>{proposal.operation.primaryText}</strong>
-                {proposal.operation.secondaryText ? <span>{proposal.operation.secondaryText}</span> : null}
-                <small>
-                  Here · {formatPointTargetTime(proposalStartMs)} · {formatDuration(proposalDurationMs)}
-                </small>
-                {proposal.origin.source === 'ai' ? (
-                  <span className="studio-screen__proposal-origin">Suggested by the assistant</span>
-                ) : null}
-                {proposal.origin.note ? (
-                  <span className="studio-screen__proposal-note">{proposal.origin.note}</span>
-                ) : null}
-              </div>
-            ) : (
-              <p className="studio-screen__empty-copy">No pending proposal.</p>
-            )}
-            <div className="studio-screen__proposal-actions">
-              <button
-                type="button"
-                disabled={!proposal}
-                aria-label={proposal ? 'Accept proposal' : 'Accept proposal unavailable'}
-                onClick={handleAcceptProposal}
-              >
-                Accept proposal
-              </button>
-              <button type="button" disabled={!proposal} onClick={handleDiscardProposal}>
-                Discard proposal
-              </button>
-            </div>
-            {editError ? <p role="alert" className="studio-screen__edit-error">{editError}</p> : null}
+          <AssistProposalPanel
+            proposal={proposal}
+            conversation={conversation}
+            editError={editError}
+            placedStartMs={proposalStartMs}
+            durationMs={proposalDurationMs}
+            summaryRef={proposalSummaryRef}
+            onAccept={handleAcceptProposal}
+            onReject={handleDiscardProposal}
+            onOpenStudio={() => onWorkspaceChange?.('studio')}
+            showOpenStudio={workspace === 'assist'}
+          >
             {proposal ? (
               <NameplateRepair
                 placedStartMs={proposalStartMs}
@@ -1003,7 +1006,7 @@ export function StudioScreen({
                 onMovePoint={startMovingProposalPoint}
               />
             ) : null}
-          </section>
+          </AssistProposalPanel>
 
           {proposalResult ? (
             <p
@@ -1017,7 +1020,7 @@ export function StudioScreen({
             </p>
           ) : null}
 
-          <section className="studio-screen__history" aria-labelledby="studio-history-label">
+          {workspace === 'studio' ? <section className="studio-screen__history" aria-labelledby="studio-history-label">
             <h3 id="studio-history-label">History</h3>
             {acceptedCount > 0 ? (
               <ol className="studio-screen__history-list">
@@ -1052,7 +1055,7 @@ export function StudioScreen({
             {!embedded && saveState === 'saving' ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">Saving locally…</p> : null}
             {!embedded && saveState === 'saved' ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">Saved locally</p> : null}
             {!embedded && saveState === 'error' ? <p className="studio-screen__save-error" role="alert">This edit is open, but it could not be saved locally.</p> : null}
-          </section>
+          </section> : null}
 
           <section
             ref={exportResultRef}
@@ -1086,30 +1089,28 @@ export function StudioScreen({
             ) : null}
           </section>
 
-          <ChatComposer
-            conversation={conversation}
-            canSend={!proposal}
-            disabledReason={
-              proposal ? 'Accept or discard the pending proposal before asking for another edit.' : null
-            }
-            onSend={(message) => onSendMessage(message, buildIntentContext())}
-          />
         </aside>
       </div>
 
-      <section
+      {workspace === 'assist' ? (
+        <AssistChangeStrip
+          items={assistChanges}
+          selectedId={selectedAssistChangeId}
+          onSelect={setSelectedAssistChangeId}
+          onSeek={seekAssistChange}
+          onOpenStudio={() => onWorkspaceChange?.('studio')}
+        />
+      ) : <section
         className="studio-screen__time-strip"
-        aria-label={workspace === 'assist' ? 'Change strip' : 'Simple time strip'}
+        aria-label="Simple time strip"
       >
         <div className="studio-screen__time-strip-heading">
           <div>
             <span className="studio-screen__section-index">03</span>
-            <h2>{workspace === 'assist' ? 'Change strip' : 'Simple time strip'}</h2>
+            <h2>Simple time strip</h2>
           </div>
           <p>
-            {workspace === 'assist'
-              ? 'Your accepted and proposed changes'
-              : 'Point targeting and text proposals available'}
+            Point targeting and text proposals available
           </p>
         </div>
         <div className="studio-screen__track" data-testid="timeline-track">
@@ -1285,7 +1286,7 @@ export function StudioScreen({
             </p>
           ) : null}
         </div>
-      </section>
+      </section>}
     </main>
   )
 }

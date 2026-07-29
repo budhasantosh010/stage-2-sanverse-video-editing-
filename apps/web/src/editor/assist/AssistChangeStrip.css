@@ -1,0 +1,118 @@
+.assist-change-strip {
+  max-width: 1320px;
+  margin: 16px auto 0;
+  padding: 18px 20px;
+  border: var(--border-subtle);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-editorial-compact);
+}
+
+.assist-change-strip__heading {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.assist-change-strip__heading span {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.assist-change-strip__heading h2 {
+  margin: 3px 0 0;
+  font-size: 1rem;
+}
+
+.assist-change-strip__heading button {
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.assist-change-strip__empty {
+  margin: 14px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.88rem;
+}
+
+.assist-change-strip__list {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 2px 0 5px;
+  overflow-x: auto;
+  list-style: none;
+}
+
+.assist-change-strip__list li {
+  flex: 0 0 auto;
+}
+
+.assist-change-strip__earlier,
+.assist-change-strip__item {
+  display: grid;
+  min-width: 150px;
+  min-height: 58px;
+  gap: 4px;
+  align-content: center;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--color-surface-subtle);
+  color: var(--color-ink);
+  text-align: left;
+}
+
+button.assist-change-strip__item {
+  cursor: pointer;
+  transition:
+    transform var(--motion-duration-fast) var(--motion-ease-standard),
+    border-color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+button.assist-change-strip__item:hover {
+  transform: translateY(-2px);
+}
+
+.assist-change-strip__item[aria-current='true'] {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.assist-change-strip__item strong {
+  font-size: 0.8rem;
+  font-weight: 680;
+}
+
+.assist-change-strip__item small {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.assist-change-strip__item--pending {
+  border-style: dashed;
+}
+
+.assist-change-strip__item--blocked {
+  border-style: double;
+}
+
+.assist-change-strip__earlier {
+  min-width: auto;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.assist-change-strip__item {
+    transition: none;
+  }
+}

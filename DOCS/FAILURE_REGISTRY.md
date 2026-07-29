@@ -173,6 +173,62 @@ Record failures that can teach the project, including rejected architectural ass
 - **One-line solution:** Use the GitHub connector or approved unrestricted Git
   instead of retrying the dead shell proxy.
 
+### FAIL-020 — P0-D baseline Studio tests encoded browser assumptions
+
+- **What failed:** Two existing Studio tests failed before P0-D behavior was evaluated: one expected collapsed `<details>` content to be absent from the DOM, and one typed `-6` into a number input in a way that jsdom reduced to `6`.
+- **Where:** `apps/web/src/screens/studio/StudioScreen.test.tsx`.
+- **When:** During the focused P0-D baseline and regression run on 2026-07-29.
+- **Who was affected:** The test harness only; the corresponding browser controls remained usable.
+- **Why:** Native `<details>` keeps collapsed descendants in the DOM but hidden, and `userEvent.type()` cannot represent the transient minus-only state of a number input reliably in jsdom.
+- **How reproduced:** The baseline focused suite returned 54 passes and these two failures.
+- **What was tried:** The assertions were corrected to test visibility and to dispatch the final numeric value; the final focused P0-D suite then passed 67/67.
+- **Evidence:** `DOCS/evidence/2026-07-29-p0d-assist/P0-D_IMPLEMENTATION_REPORT.md`.
+- **Blocking:** No; resolved before commit.
+- **One-line solution:** Assert collapsed native controls by visibility and set signed number-input values atomically in jsdom.
+- **Status:** Resolved.
+
+### FAIL-021 — Real 30-second export crossed the 60-second walkthrough wait
+
+- **What failed:** The browser harness timed out while waiting 60 seconds for the Download MP4 action.
+- **Where:** Local P0-D walkthrough of `test-30s.mp4` through the API export path.
+- **When:** After Accept, Undo, and Redo on 2026-07-29.
+- **Who was affected:** A user waiting for this local export; project state and the accepted edit remained safe.
+- **Why:** Local FFmpeg render and verification took slightly longer than the walkthrough's 60-second wait budget.
+- **How reproduced:** The wait timed out once; the immediately following state read showed `Export ready`, `1920 × 1080 · 30s`, and `Download MP4`.
+- **What was tried:** No renderer or performance work was attempted because it is outside P0-D. The download event was then verified and returned an MP4 filename and media URL.
+- **Evidence:** `DOCS/evidence/2026-07-29-p0d-assist/P0-D_IMPLEMENTATION_REPORT.md`.
+- **Blocking:** No; the valid result and download completed.
+- **One-line solution:** Establish the later E5 export-time budget, measure repeated runs, then optimize only if the agreed budget is missed.
+- **Status:** Open performance observation; nonblocking for P0-D.
+
+### FAIL-022 — Managed process sandbox blocked the first screenshot browser launch
+
+- **What failed:** Playwright could not spawn its bundled or system Chromium process directly (`spawn EPERM`), and the first Edge attempt split the spaced profile path into multiple targets.
+- **Where:** The managed Codex browser-evidence harness, outside Sanverse runtime code.
+- **When:** During P0-D responsive screenshot capture on 2026-07-29.
+- **Who was affected:** Automated evidence capture only; the already running app and in-app browser were unaffected.
+- **Why:** The managed process sandbox blocks direct child-process launch, and PowerShell `Start-Process` requires explicit quoting for an argument containing a spaced path.
+- **How reproduced:** Direct Playwright launch returned `spawn EPERM`; the first Edge log returned `Multiple targets are not supported in headless mode`.
+- **What was tried:** One direct Chrome attempt and one malformed Edge attempt; a quoted, hidden Edge CDP launch succeeded.
+- **Evidence:** Exact-size screenshots in `DOCS/evidence/2026-07-29-p0d-assist/`.
+- **Blocking:** No; resolved without product changes.
+- **One-line solution:** Launch the approved hidden system browser with a quoted profile path and connect Playwright over local CDP.
+- **Status:** Resolved environment limitation.
+
+### FAIL-023 — Conversation failure was announced twice
+
+- **What failed:** A single assistant request failure produced two identical accessibility alerts.
+- **Where:** `ChatComposer` and `AssistProposalPanel` inside the same mounted `StudioScreen`.
+- **When:** Found by the independent P0-D pre-commit review on 2026-07-29.
+- **Who was affected:** Screen-reader users would hear repeated interruption; sighted users would see duplicate failure copy.
+- **Why:** Both the composer and the proposal panel rendered `conversation.notice`, although the composer already owns conversation status.
+- **How reproduced:** Rendered `StudioScreen` with `conversation.status = "error"` and found two `role="alert"` nodes.
+- **What was tried:** Removed conversation-error rendering from the proposal panel, kept proposal/edit errors there, and added an integrated one-alert regression test.
+- **Evidence:** Final focused suite passed 67/67.
+- **Blocking:** It was milestone-invalidating for accessible core feedback and was fixed before commit.
+- **One-line solution:** Give each error domain one announcement owner: conversation errors in `ChatComposer`, proposal/edit errors in `AssistProposalPanel`.
+- **Status:** Resolved.
+
 ## Entry rules
 
 Do not delete a failure because it is fixed. Mark it resolved, link evidence, and preserve what prevented recurrence.

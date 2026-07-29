@@ -4,14 +4,20 @@ Last updated: 2026-07-29
 
 ## Active goal
 
+**P0-D is technically complete on 2026-07-29.** Assist is now the video-first
+default workspace, while the same mounted editor session, project, revision,
+video/playhead, proposal, repair state, history, Undo/Redo, preview, and export
+survive Assist ↔ Studio switches. Focused evidence is 67/67 passing web tests,
+a clean production build, and a real `test-30s.mp4` browser loop through
+proposal, repair, Accept, Undo, Redo, export, and download. Exact-size
+1440×900, 1280×800, and 1024×768 screenshots plus the complete report are in
+`DOCS/evidence/2026-07-29-p0d-assist/`. Owner visual/interaction approval
+remains open. P0-E has not started.
+
 **P0-R is complete on 2026-07-29.** The decision is **C: study OpenCut
-behavior and build a focused Sanverse timeline**. A non-routed spike proved
-that selected MIT zoom/pixel math can sit behind a one-way Sanverse adapter and
-emit the existing `split-clip` operation without replacing the project, typed
-operations, revisions, change sets, proposals, Undo/Redo, preview, or export.
-Production Timeline V1 has not started. Decision:
-`DOCS/decisions/P0-R_OPENCUT_TIMELINE_REUSE_DECISION.md`. Next is P0-D, then
-P0-E, then P1-A.
+behavior and build a focused Sanverse timeline**. Production Timeline V1 has
+not started. Decision:
+`DOCS/decisions/P0-R_OPENCUT_TIMELINE_REUSE_DECISION.md`.
 
 **P0-B and P0-C are technically complete on 2026-07-29.** The web app now has
 a small reusable UI kernel and one persistent `EditorShell` with switchable

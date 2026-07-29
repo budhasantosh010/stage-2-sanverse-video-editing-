@@ -355,7 +355,7 @@ describe('App', () => {
 
     fireEvent.timeUpdate(video)
     expect(screen.getByTestId('nameplate-overlay')).toHaveTextContent('Santosh')
-    expect(screen.getByText(/no accepted edits/i)).toBeInTheDocument()
+    expect(screen.getByText(/^pending$/i)).toBeInTheDocument()
 
     // Double-click: the second click must not create a second edit, because
     // one approved request is exactly one change set.
@@ -516,24 +516,47 @@ describe('App', () => {
     const { container } = render(<App />)
 
     await user.click(await screen.findByRole('button', { name: /open cleaned.mp4/i }))
-    await user.type(await screen.findByRole('textbox', { name: /ask for an edit/i }), 'add my name here')
-    await user.click(screen.getByRole('button', { name: /^send$/i }))
-
-    expect(await screen.findByText(/suggested by the assistant/i)).toBeInTheDocument()
-    // Asking changed nothing on the server.
-    expect(api.current().revision).toBe(base.revision)
+    const chat = await screen.findByRole('textbox', { name: /ask for an edit/i })
+    await user.type(chat, 'keep this unsent')
 
     const video = container.querySelector('video')
     expect(video).not.toBeNull()
     if (video) video.currentTime = 7.5
 
     await user.click(screen.getByRole('button', { name: /studio workspace/i }))
+    expect(container.querySelectorAll('video')).toHaveLength(1)
+    expect(container.querySelector('video')).toBe(video)
+    expect(video?.currentTime).toBe(7.5)
+    expect(screen.getByRole('textbox', { name: /ask for an edit/i })).toHaveValue('keep this unsent')
+
+    await user.click(screen.getByRole('button', { name: /assist workspace/i }))
+    expect(container.querySelectorAll('video')).toHaveLength(1)
+    expect(container.querySelector('video')).toBe(video)
+    expect(video?.currentTime).toBe(7.5)
+    expect(screen.getByRole('textbox', { name: /ask for an edit/i })).toHaveValue('keep this unsent')
+
+    await user.clear(chat)
+    await user.type(chat, 'add my name here')
+    await user.click(screen.getByRole('button', { name: /^send$/i }))
+
+    expect(await screen.findByText(/suggested by the assistant/i)).toBeInTheDocument()
+    // Asking changed nothing on the server.
+    expect(api.current().revision).toBe(base.revision)
+
+    const primary = screen.getByLabelText(/main text/i)
+    await user.clear(primary)
+    await user.type(primary, 'Santosh Budha')
+    await user.tab()
+
+    await user.click(screen.getByRole('button', { name: /studio workspace/i }))
     expect(screen.getByText(/suggested by the assistant/i)).toBeInTheDocument()
     expect(container.querySelector('video')).toBe(video)
     expect(video?.currentTime).toBe(7.5)
+    expect(screen.getByLabelText(/main text/i)).toHaveValue('Santosh Budha')
 
     await user.click(screen.getByRole('button', { name: /assist workspace/i }))
     expect(screen.getByText(/suggested by the assistant/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/main text/i)).toHaveValue('Santosh Budha')
     expect(api.current().revision).toBe(base.revision)
 
     await user.click(screen.getByRole('button', { name: /^accept proposal$/i }))
@@ -542,6 +565,9 @@ describe('App', () => {
       source: 'ai',
       requestId: 'request_aaaaaaaa',
     })
+    expect(api.current().changeSets.at(-1)?.changeSet.operations[0]).toEqual(
+      expect.objectContaining({ primaryText: 'Santosh Budha' }),
+    )
     expect(intentCalls).toBe(1)
   })
 })

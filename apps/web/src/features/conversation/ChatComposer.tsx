@@ -41,7 +41,7 @@ export function ChatComposer({ conversation, canSend, disabledReason, onSend }: 
 
   return (
     <form className="chat-composer" onSubmit={submit} aria-label="Ask for an edit">
-      <label htmlFor="studio-chat">Ask for an edit</label>
+      <label htmlFor="editor-chat">Ask Sanverse</label>
 
       {conversation.status === 'clarification' && conversation.question ? (
         <p className="chat-composer__question" role="status" aria-label="Question">
@@ -63,14 +63,15 @@ export function ChatComposer({ conversation, canSend, disabledReason, onSend }: 
 
       <textarea
         ref={inputRef}
-        id="studio-chat"
+        id="editor-chat"
+        aria-label="Ask for an edit"
         rows={3}
         value={message}
         disabled={isSending || !canSend}
         aria-describedby={STATUS_ID}
         placeholder={
           canSend
-            ? 'For example: put "Santosh" and "Founder" here'
+            ? 'Describe what you want to change…'
             : 'Finish the pending proposal first'
         }
         onChange={(event) => setMessage(event.target.value)}
@@ -90,7 +91,7 @@ export function ChatComposer({ conversation, canSend, disabledReason, onSend }: 
       <p id={STATUS_ID} className="chat-composer__status" role="status">
         {isSending
           ? 'Working on it. Nothing has changed yet.'
-          : disabledReason ?? 'Point at the picture first if you want it placed exactly.'}
+          : disabledReason ?? 'Pause and point first when placement matters.'}
       </p>
     </form>
   )

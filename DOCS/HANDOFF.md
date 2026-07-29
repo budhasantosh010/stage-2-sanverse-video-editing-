@@ -1,10 +1,12 @@
 # HANDOFF — everything a new agent needs to continue Sanverse Stage 2
 
-Updated 2026-07-29. The working tree contains the completed G5C/G6/G7/G8
-technical batches and is not committed because this managed session cannot
-write `.git/index.lock` (FAIL-015). API and web TypeScript checks pass; the last
-unrestricted full-suite baseline is historical because this session blocks
-Vitest/Vite child processes with `spawn EPERM` (FAIL-011).
+Updated 2026-07-29. P0-D is technically complete on
+`agent/g6-g8-local-alpha`: Assist is the video-first default over one persistent
+editor session, focused tests pass 67/67, the production build passes, and the
+real `test-30s.mp4` proposal → repair → Accept → Undo → Redo → export →
+download loop passed. Evidence and the owner-review gate are in
+`DOCS/evidence/2026-07-29-p0d-assist/P0-D_IMPLEMENTATION_REPORT.md`. P0-E,
+P1-A, and production Timeline V1 have not started.
 
 **Read this file, then `DOCS/CURRENT_STATE.md`, then the ADRs it names.**
 Nothing else is required to start work.

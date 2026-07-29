@@ -15,30 +15,64 @@
 }
 
 .studio-screen--assist .studio-screen__workspace {
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
-  max-width: 1320px;
+  grid-template-columns: minmax(0, 1.55fr) minmax(330px, 0.7fr);
+  max-width: 1400px;
 }
 
 .studio-screen--assist .studio-screen__canvas,
-.studio-screen--assist .studio-screen__conversation,
-.studio-screen--assist .studio-screen__time-strip {
+.studio-screen--assist .studio-screen__conversation {
   border-radius: var(--radius-panel);
   background: var(--color-surface);
   box-shadow: var(--shadow-editorial-compact);
 }
 
-.studio-screen--assist .studio-screen__time-strip {
-  max-width: 1320px;
+.studio-screen--assist .studio-screen__canvas {
+  min-height: 610px;
 }
 
-.studio-screen--assist .studio-screen__time-strip > .studio-screen__track-actions,
-.studio-screen--assist .studio-screen__section-adjustments,
-.studio-screen--assist .studio-screen__captions {
+.studio-screen--assist .studio-screen__draft,
+.studio-screen--assist .studio-screen__history {
   display: none;
 }
 
 .studio-screen--assist .studio-screen__unavailable-tag {
   border-radius: 999px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.studio-screen--assist .studio-screen__conversation {
+  min-height: 610px;
+}
+
+.studio-screen--assist .chat-composer {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 14px;
+  background: var(--color-surface-raised);
+}
+
+.studio-screen--assist .chat-composer label {
+  color: var(--color-ink);
+  font-size: 0.9rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.studio-screen--assist .chat-composer textarea {
+  min-height: 104px;
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.studio-screen--assist .studio-screen__export-result {
+  margin-top: auto;
+}
+
+.studio-screen--assist .studio-screen__conversation,
+.studio-screen--studio .studio-screen__conversation {
+  animation: sanverse-workspace-arrive 160ms var(--motion-ease-standard);
 }
 
 .studio-screen--studio {
@@ -341,6 +375,18 @@
   to {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes sanverse-workspace-arrive {
+  from {
+    opacity: 0.72;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -667,6 +713,17 @@
   text-transform: uppercase;
 }
 
+@media (max-width: 1100px) {
+  .studio-screen--assist .studio-screen__workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-screen--assist .studio-screen__canvas,
+  .studio-screen--assist .studio-screen__conversation {
+    min-height: auto;
+  }
+}
+
 @media (max-width: 920px) {
   .studio-screen {
     padding: 0 20px 24px;
@@ -717,6 +774,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .studio-screen--assist .studio-screen__conversation,
+  .studio-screen--studio .studio-screen__conversation,
   .studio-screen__point-layer,
   .studio-screen__point-marker,
   .studio-screen__point-cursor {

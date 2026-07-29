@@ -234,6 +234,20 @@ describe('StudioScreen', () => {
     expect(screen.getByText('What should the text say?')).toBeInTheDocument()
   })
 
+  it('announces one conversation failure instead of duplicating it in the proposal panel', () => {
+    renderStudio({
+      conversation: {
+        status: 'error',
+        lastMessage: 'add my name',
+        question: null,
+        notice: 'We could not prepare that proposal. Your accepted edits are still safe.',
+      },
+    })
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByRole('alert')).toHaveTextContent(/accepted edits are still safe/i)
+  })
+
   it('says plainly when an edit is not supported yet', () => {
     renderStudio({
       conversation: {
@@ -675,14 +689,14 @@ describe('StudioScreen', () => {
     expect(proposalSection).not.toHaveTextContent(/· 5 seconds/i)
   })
 
-  it('offers explicit accept and discard actions for a pending proposal', async () => {
+  it('offers explicit accept and reject actions for a pending proposal', async () => {
     const user = userEvent.setup()
     const onAcceptProposal = vi.fn()
     const onDiscardProposal = vi.fn()
     renderStudio({ proposal: directProposal(), onAcceptProposal, onDiscardProposal })
 
     await user.click(screen.getByRole('button', { name: /^accept proposal$/i }))
-    await user.click(screen.getByRole('button', { name: /^discard proposal$/i }))
+    await user.click(screen.getByRole('button', { name: /^reject proposal$/i }))
 
     expect(onAcceptProposal).toHaveBeenCalledOnce()
     expect(onDiscardProposal).toHaveBeenCalledOnce()
@@ -886,7 +900,7 @@ describe('StudioScreen time strip', () => {
     const user = userEvent.setup()
     renderStudio()
 
-    expect(screen.queryByRole('button', { name: /shorten the start/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /shorten the start/i, hidden: true })).not.toBeVisible()
     await user.click(screen.getByText(/adjust this section/i))
 
     expect(screen.getByRole('button', { name: /shorten the start/i })).toBeInTheDocument()
@@ -918,8 +932,7 @@ describe('StudioScreen time strip', () => {
     }))
 
     const loudness = screen.getByRole('spinbutton', { name: /loudness change/i })
-    await user.clear(loudness)
-    await user.type(loudness, '-6')
+    fireEvent.change(loudness, { target: { value: '-6' } })
     await user.click(screen.getByRole('button', { name: /apply sound/i }))
 
     expect(onTimelineEdit).toHaveBeenLastCalledWith(expect.objectContaining({

@@ -46,7 +46,7 @@
   --focus-ring: 3px solid var(--color-ink);
   --focus-offset: 3px;
 
-  --motion-duration-fast: 240ms;
+  --motion-duration-fast: 180ms;
   --motion-duration-control: 160ms;
   --motion-duration-screen: 420ms;
   --motion-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);

@@ -339,6 +339,7 @@ export function App() {
       <StudioScreen
       embedded
       workspace={workspace}
+      onWorkspaceChange={setWorkspace}
       project={appState.project}
       proposal={appState.proposal}
       conversation={appState.conversation}
