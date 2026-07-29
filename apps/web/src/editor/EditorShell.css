@@ -1,0 +1,124 @@
+.editor-shell {
+  min-height: 100vh;
+  background: var(--color-workspace);
+}
+
+.editor-shell__topbar {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto minmax(360px, 1fr);
+  gap: var(--space-4);
+  align-items: center;
+  min-height: 64px;
+  border-bottom: 1px solid var(--color-border);
+  padding: 8px 20px;
+  background: rgb(247 247 245 / 94%);
+  backdrop-filter: blur(14px);
+}
+
+.editor-shell__start,
+.editor-shell__actions,
+.editor-shell__identity {
+  display: flex;
+  align-items: center;
+}
+
+.editor-shell__start {
+  min-width: 0;
+  gap: var(--space-3);
+}
+
+.editor-shell__identity {
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.editor-shell__identity > div {
+  min-width: 0;
+}
+
+.editor-shell__mark {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--color-ink);
+  color: var(--color-surface);
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.editor-shell__brand {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.editor-shell__identity strong {
+  display: block;
+  overflow: hidden;
+  max-width: 280px;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-shell__actions {
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.editor-shell__save {
+  margin-right: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.editor-shell__save--error {
+  color: var(--color-danger);
+}
+
+.editor-shell__workspace {
+  min-height: calc(100vh - 64px);
+}
+
+.editor-shell__workspace > .studio-screen {
+  min-height: calc(100vh - 64px);
+}
+
+@media (max-width: 980px) {
+  .editor-shell__topbar {
+    grid-template-columns: minmax(220px, 1fr) auto;
+  }
+
+  .editor-shell__actions {
+    grid-column: 1 / -1;
+    justify-content: stretch;
+  }
+
+  .editor-shell__save {
+    margin-right: auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .editor-shell__topbar {
+    position: relative;
+    grid-template-columns: 1fr;
+  }
+
+  .editor-shell__topbar > .sv-segmented {
+    width: 100%;
+  }
+
+  .editor-shell__actions {
+    grid-column: auto;
+  }
+}

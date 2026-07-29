@@ -5,6 +5,8 @@ import type { EditProject } from '@sanverse/edit-domain'
 import {
   applyServerProject,
   buildChangeSet,
+  canRedoProject,
+  canUndoProject,
   createInitialState,
   discardEditProposal,
   openLocalProject,
@@ -40,6 +42,7 @@ import {
 import { transitionView } from '../features/view-transition/view-transition'
 import { HomeScreen } from '../screens/home/HomeScreen'
 import { StudioScreen } from '../screens/studio/StudioScreen'
+import { EditorShell, type EditorWorkspace } from '../editor/EditorShell'
 
 export function App() {
   const [appState, setAppState] = useState<AppState>(createInitialState)
@@ -50,6 +53,7 @@ export function App() {
   const [libraryError, setLibraryError] = useState('')
   const [isOpeningRecent, setIsOpeningRecent] = useState(false)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [workspace, setWorkspace] = useState<EditorWorkspace>('assist')
   const intakeAbortRef = useRef<AbortController | null>(null)
   const intakeInFlightRef = useRef(false)
   const transitionSequenceRef = useRef(0)
@@ -279,8 +283,62 @@ export function App() {
     )
   }
 
+  const canExport = !appState.proposal
+    && appState.editProject.changeSets.length > 0
+    && exportState.status !== 'rendering'
+
   return (
-    <StudioScreen
+    <EditorShell
+      workspace={workspace}
+      projectName={appState.project.name}
+      saveState={saveState}
+      canUndo={canUndoProject(appState)}
+      canRedo={canRedoProject(appState)}
+      canExport={canExport}
+      isExporting={exportState.status === 'rendering'}
+      onWorkspaceChange={setWorkspace}
+      onBack={() => {
+        resetExport()
+        const transitionSequence = transitionSequenceRef.current + 1
+        transitionSequenceRef.current = transitionSequence
+        transitionView(() => {
+          if (transitionSequence !== transitionSequenceRef.current) return
+          flushSync(() => {
+            setAppState((current) =>
+              current.screen === 'studio' ? returnHome(current) : current,
+            )
+            setWorkspace('assist')
+            saveSequenceRef.current += 1
+            setSaveState('idle')
+          })
+        })
+      }}
+      onUndo={() => requestEdit((projectId) => undoProject(projectId, fetch))}
+      onRedo={() => requestEdit((projectId) => redoProject(projectId, fetch))}
+      onExport={() => {
+        if (exportInFlightRef.current || appState.proposal || appState.editProject.changeSets.length === 0) return
+        exportInFlightRef.current = true
+        const controller = new AbortController()
+        exportAbortRef.current = controller
+        setExportState({ status: 'rendering' })
+        void exportProject(appState.project.id, fetch, controller.signal)
+          .then((result) => {
+            if (exportAbortRef.current !== controller || controller.signal.aborted) return
+            exportAbortRef.current = null
+            exportInFlightRef.current = false
+            setExportState({ status: 'ready', result })
+          })
+          .catch((error: unknown) => {
+            if (exportAbortRef.current !== controller || controller.signal.aborted) return
+            exportAbortRef.current = null
+            exportInFlightRef.current = false
+            setExportState({ status: 'error', message: error instanceof Error ? error.message : 'We could not export the video. Your accepted edits are still safe.' })
+          })
+      }}
+    >
+      <StudioScreen
+      embedded
+      workspace={workspace}
       project={appState.project}
       proposal={appState.proposal}
       conversation={appState.conversation}
@@ -417,24 +475,8 @@ export function App() {
             setExportState({ status: 'error', message: error instanceof Error ? error.message : 'We could not export the video. Your accepted edits are still safe.' })
           })
       }}
-      onBack={() => {
-        resetExport()
-        const transitionSequence = transitionSequenceRef.current + 1
-        transitionSequenceRef.current = transitionSequence
-        transitionView(() => {
-          if (transitionSequence !== transitionSequenceRef.current) {
-            return
-          }
-
-          flushSync(() => {
-            setAppState((current) =>
-              current.screen === 'studio' ? returnHome(current) : current,
-            )
-            saveSequenceRef.current += 1
-            setSaveState('idle')
-          })
-        })
-      }}
+      onBack={() => {}}
     />
+    </EditorShell>
   )
 }

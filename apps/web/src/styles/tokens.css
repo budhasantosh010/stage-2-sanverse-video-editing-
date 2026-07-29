@@ -14,6 +14,10 @@
   --color-status: #d6d6d1;
   --color-shadow: #dfdfda;
   --color-video-frame: #171717;
+  --color-danger: #8b1e1e;
+  --color-warning: #7a5412;
+  --color-success: #245c3a;
+  --color-selection: #2d5bd1;
 
   --color-text-muted: #5f5f5b;
   --color-text-secondary: #6a6a66;
@@ -34,14 +38,27 @@
   --border-subtle: 1px solid var(--color-border);
   --border-strong: 1px solid var(--color-border-ink);
   --radius-small: 10px;
+  --radius-control: 10px;
   --radius-panel: 16px;
+  --shadow-control: 0 4px 14px rgba(17, 17, 17, 0.12);
   --shadow-editorial: 0 18px 50px rgba(17, 17, 17, 0.08);
   --shadow-editorial-compact: 0 12px 32px rgba(17, 17, 17, 0.08);
   --focus-ring: 3px solid var(--color-ink);
   --focus-offset: 3px;
 
   --motion-duration-fast: 240ms;
+  --motion-duration-control: 160ms;
   --motion-duration-screen: 420ms;
   --motion-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --control-height-compact: 36px;
+  --control-height-regular: 42px;
 }

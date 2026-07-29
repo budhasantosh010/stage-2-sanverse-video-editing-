@@ -4,6 +4,15 @@ Last updated: 2026-07-29
 
 ## Active goal
 
+**P0-B and P0-C are technically complete on 2026-07-29.** The web app now has
+a small reusable UI kernel and one persistent `EditorShell` with switchable
+**Assist** and **Studio** workspaces. The same mounted editor, project, revision,
+playhead/video element, pending proposal, history, Undo/Redo, save state, and
+export state survive the switch. Assist exposes the current canvas,
+conversation, pointing, proposal/history, and a compact change strip; Studio
+retains the current engineering controls. Timeline V1 has not started and must
+wait for the owner's shell/workspace walkthrough.
+
 **The executable G6/G8 technical batch is complete: G6-11 and
 G8-02 through G8-10 are complete. Remaining G8 work is owner approval,
 repeated owner workflows, representative non-editor smoke tests, and agreed E5
@@ -91,6 +100,12 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
   ------------------------
   total            658 passing; all workspace builds clean
 ```
+
+Focused P0-B/P0-C evidence on 2026-07-29: 12/12 web continuity tests passed
+(`EditorShell.test.tsx` plus `App.test.tsx`) and the web production build passed.
+A real browser reopened `test-30s.mp4`, switched Assist → Studio without a
+reload, retained 9 history entries, and kept exactly one video element. This is
+technical browser evidence, not the owner's visual/interaction approval.
 
 ## Owner evidence still open
 

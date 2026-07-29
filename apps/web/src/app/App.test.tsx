@@ -513,7 +513,7 @@ describe('App', () => {
       }
       return api.handle(url, options) ?? new Response('{}', { status: 404 })
     })
-    render(<App />)
+    const { container } = render(<App />)
 
     await user.click(await screen.findByRole('button', { name: /open cleaned.mp4/i }))
     await user.type(await screen.findByRole('textbox', { name: /ask for an edit/i }), 'add my name here')
@@ -521,6 +521,19 @@ describe('App', () => {
 
     expect(await screen.findByText(/suggested by the assistant/i)).toBeInTheDocument()
     // Asking changed nothing on the server.
+    expect(api.current().revision).toBe(base.revision)
+
+    const video = container.querySelector('video')
+    expect(video).not.toBeNull()
+    if (video) video.currentTime = 7.5
+
+    await user.click(screen.getByRole('button', { name: /studio workspace/i }))
+    expect(screen.getByText(/suggested by the assistant/i)).toBeInTheDocument()
+    expect(container.querySelector('video')).toBe(video)
+    expect(video?.currentTime).toBe(7.5)
+
+    await user.click(screen.getByRole('button', { name: /assist workspace/i }))
+    expect(screen.getByText(/suggested by the assistant/i)).toBeInTheDocument()
     expect(api.current().revision).toBe(base.revision)
 
     await user.click(screen.getByRole('button', { name: /^accept proposal$/i }))

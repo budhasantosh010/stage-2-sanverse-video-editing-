@@ -354,3 +354,14 @@
 - Removed the accidental empty `.sanverse-data/projects/projects` directory. Native human drag-and-drop and final owner UX acceptance remain open because automation cannot honestly supply that evidence.
 - Independent pre-commit review found and blocked two remaining handle-release defects: pre-stream header errors were outside `finally`, and close rejection was swallowed. Focused RED/GREEN correction closed both; final independent re-review passed with no security or logic errors.
 - Verification boundary: API/domain/web TypeScript builds and direct HTTP/filesystem checks pass. A fresh full Vitest/Vite run remains blocked by the managed session's `spawn EPERM` policy (FAIL-011); the last unrestricted baseline remains 220/220.
+
+## 2026-07-29 — Dual-workspace UI kernel and persistent EditorShell
+
+- Saved GPT's complete 1,606-line implementation context verbatim at `DOCS/plans/SANVERSE_DUAL_WORKSPACE_PRODUCT_AND_UI_IMPLEMENTATION_CONTEXT.md`.
+- Verified the active repository truth before implementation: branch `agent/g6-g8-local-alpha`, starting commit `9f53005`; no assumption was made that `main` contains this branch.
+- Added only P0-B/P0-C: shared Button, IconButton, SegmentedControl, Panel, Tabs and tokens; one persistent EditorShell; Assist/Studio selector; shared project/save/Undo/Redo/export top bar; restrained workspace-specific layout.
+- Preserved one mounted `StudioScreen`. Switching changes presentation, not the project or editor instance, so playhead/video state, pending proposal, revision, history and export state are not converted or reset.
+- RED evidence: the new shell module and workspace controls were absent. GREEN evidence: 12/12 focused continuity tests pass and the required web production build passes.
+- Real-browser check: reopened `test-30s.mp4`; Assist was the default; switching to Studio kept the same project, 9 history entries and exactly one video element; Studio exposed the existing simple time strip.
+- No domain schema, operation, render behavior, effect, professional timeline or provider was added. Timeline V1 remains the exact next task only after owner approval.
+- Nonblocking Vite HMR hostname warning and stale authority documents are recorded as FAIL-017 and FAIL-018 rather than repaired in this focused batch.

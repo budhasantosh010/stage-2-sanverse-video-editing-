@@ -63,8 +63,11 @@ import {
   type CapturedPointTarget,
 } from '../../features/point-target/point-target'
 import './StudioScreen.css'
+import type { EditorWorkspace } from '../../editor/EditorShell'
 
 export type StudioScreenProps = {
+  embedded?: boolean
+  workspace?: EditorWorkspace
   project: StudioState['project']
   proposal: PendingProposal | null
   conversation: ConversationState
@@ -162,6 +165,8 @@ function getVideoContentLayerStyle(video: HTMLVideoElement) {
 }
 
 export function StudioScreen({
+  embedded = false,
+  workspace = 'studio',
   project,
   proposal,
   conversation,
@@ -744,9 +749,9 @@ export function StudioScreen({
   }
 
   return (
-    <main className="studio-screen" onKeyDown={handlePointModeKeyDown}>
+    <main className={`studio-screen studio-screen--${workspace}`} onKeyDown={handlePointModeKeyDown}>
       <a className="skip-link" href="#studio-primary">Skip to video editor</a>
-      <header className="studio-screen__topbar">
+      {!embedded ? <header className="studio-screen__topbar">
         <button className="studio-screen__back" type="button" onClick={onBack}>
           <span aria-hidden="true">←</span>
           Back to Home
@@ -767,14 +772,14 @@ export function StudioScreen({
         >
           {isRendering ? 'Exporting…' : 'Export'}
         </button>
-      </header>
+      </header> : null}
 
       <div className="studio-screen__workspace">
         <section id="studio-primary" className="studio-screen__canvas" aria-label="Video canvas" tabIndex={-1}>
           <div className="studio-screen__canvas-heading">
             <div>
               <span className="studio-screen__section-index">01</span>
-              <h1>Video preview</h1>
+              <h1>{workspace === 'assist' ? 'Your video' : 'Video preview'}</h1>
             </div>
             <span className="studio-screen__local-badge">Local source</span>
           </div>
@@ -936,7 +941,7 @@ export function StudioScreen({
           <div className="studio-screen__panel-heading">
             <div>
               <span className="studio-screen__section-index">02</span>
-              <h2>Conversation</h2>
+              <h2>{workspace === 'assist' ? 'Ask Sanverse' : 'Conversation'}</h2>
             </div>
             <span className="studio-screen__unavailable-tag">Preview mode</span>
           </div>
@@ -1026,7 +1031,7 @@ export function StudioScreen({
             ) : (
               <p className="studio-screen__empty-copy">No accepted edits.</p>
             )}
-            <div className="studio-screen__history-actions">
+            {!embedded ? <div className="studio-screen__history-actions">
               <button
                 type="button"
                 aria-label="Undo edit"
@@ -1043,10 +1048,10 @@ export function StudioScreen({
               >
                 Redo
               </button>
-            </div>
-            {saveState === 'saving' ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">Saving locally…</p> : null}
-            {saveState === 'saved' ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">Saved locally</p> : null}
-            {saveState === 'error' ? <p className="studio-screen__save-error" role="alert">This edit is open, but it could not be saved locally.</p> : null}
+            </div> : null}
+            {!embedded && saveState === 'saving' ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">Saving locally…</p> : null}
+            {!embedded && saveState === 'saved' ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">Saved locally</p> : null}
+            {!embedded && saveState === 'error' ? <p className="studio-screen__save-error" role="alert">This edit is open, but it could not be saved locally.</p> : null}
           </section>
 
           <section
@@ -1092,13 +1097,20 @@ export function StudioScreen({
         </aside>
       </div>
 
-      <section className="studio-screen__time-strip" aria-label="Simple time strip">
+      <section
+        className="studio-screen__time-strip"
+        aria-label={workspace === 'assist' ? 'Change strip' : 'Simple time strip'}
+      >
         <div className="studio-screen__time-strip-heading">
           <div>
             <span className="studio-screen__section-index">03</span>
-            <h2>Simple time strip</h2>
+            <h2>{workspace === 'assist' ? 'Change strip' : 'Simple time strip'}</h2>
           </div>
-          <p>Point targeting and text proposals available</p>
+          <p>
+            {workspace === 'assist'
+              ? 'Your accepted and proposed changes'
+              : 'Point targeting and text proposals available'}
+          </p>
         </div>
         <div className="studio-screen__track" data-testid="timeline-track">
           {timelineSections.map((block) => (

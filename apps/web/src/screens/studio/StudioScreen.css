@@ -6,6 +6,45 @@
   font-family: var(--font-body);
 }
 
+.editor-shell .studio-screen {
+  padding-top: 0;
+}
+
+.studio-screen--assist {
+  background: var(--color-canvas);
+}
+
+.studio-screen--assist .studio-screen__workspace {
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  max-width: 1320px;
+}
+
+.studio-screen--assist .studio-screen__canvas,
+.studio-screen--assist .studio-screen__conversation,
+.studio-screen--assist .studio-screen__time-strip {
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-editorial-compact);
+}
+
+.studio-screen--assist .studio-screen__time-strip {
+  max-width: 1320px;
+}
+
+.studio-screen--assist .studio-screen__time-strip > .studio-screen__track-actions,
+.studio-screen--assist .studio-screen__section-adjustments,
+.studio-screen--assist .studio-screen__captions {
+  display: none;
+}
+
+.studio-screen--assist .studio-screen__unavailable-tag {
+  border-radius: 999px;
+}
+
+.studio-screen--studio {
+  background: var(--color-workspace);
+}
+
 .studio-screen button,
 .studio-screen textarea {
   font: inherit;

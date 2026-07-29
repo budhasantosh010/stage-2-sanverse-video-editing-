@@ -130,6 +130,30 @@ Record failures that can teach the project, including rejected architectural ass
 - **Status:** Open documentation defect; it does not establish a runtime defect.
 - **One-line solution:** Replace the obsolete bullet with a precise statement that the domain/render foundation exists while professional controls and broader effect coverage remain incomplete.
 
+### FAIL-017 — Older authority documents report pre-G4 status
+
+- **What failed:** `START_HERE.md` and `DOCS/GOALS.md` still describe G4-A through G8 as unimplemented even though the current branch contains and documents those completed technical batches.
+- **Where:** The current-gate and status sections of `START_HERE.md` and `DOCS/GOALS.md`.
+- **When:** Confirmed before P0-B/P0-C implementation on 2026-07-29.
+- **Who was affected:** The owner and any future agent that reads those files without checking current code, `CURRENT_STATE.md`, and `HANDOFF.md`.
+- **Why:** Later batches advanced the product without reconciling every older authority document in the same change set.
+- **How reproduced:** Reading the files on commit `9f53005` reports G4-A as not started while the branch contains Project v2, intent, caption, timeline, overlay, motion, component and local-alpha code.
+- **What was tried:** Branch and code truth were checked; the supplied 1,606-line context was saved; no broad documentation rewrite was attempted in the focused UI task.
+- **Status:** Open documentation defect; P0-B/P0-C used current code plus `CURRENT_STATE.md` and `HANDOFF.md` as authority.
+- **One-line solution:** Reconcile `START_HERE.md`, `GOALS.md`, and the canonical checklist together in one dedicated documentation-only change.
+
+### FAIL-018 — Vite development WebSocket hostname mismatch
+
+- **What failed:** The browser console reported that Vite's hot-reload WebSocket could not connect, even though the app loaded normally over HTTP.
+- **Where:** `http://localhost:2000/@vite/client` while the server advertised `127.0.0.1:2000`.
+- **When:** During the P0-B/P0-C real-browser walkthrough on 2026-07-29.
+- **Who was affected:** Developers expecting automatic hot reload; the loaded Assist/Studio app and saved project were not blocked.
+- **Why:** The browser hostname and the development server WebSocket hostname differ; the exact configuration cause was not investigated in this focused batch.
+- **How reproduced:** Reloading `http://localhost:2000/` loaded the new shell, while the browser error log retained one failed WebSocket connection.
+- **What was tried:** One reload proved current code was served over HTTP; no HMR configuration debugging was attempted.
+- **Status:** Open nonblocking development-only problem.
+- **One-line solution:** Configure Vite HMR to use the same public hostname as the page, or use `127.0.0.1:2000` consistently, then verify the WebSocket connects.
+
 ## Entry rules
 
 Do not delete a failure because it is fixed. Mark it resolved, link evidence, and preserve what prevented recurrence.
