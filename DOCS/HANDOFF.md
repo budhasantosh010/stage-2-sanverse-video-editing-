@@ -1,7 +1,10 @@
 # HANDOFF — everything a new agent needs to continue Sanverse Stage 2
 
-Written 2026-07-29, at commit `9a895e4`, working tree clean, 749 tests passing,
-all five workspace builds clean.
+Updated 2026-07-29. The working tree contains the completed G5C/G6/G7/G8
+technical batches and is not committed because this managed session cannot
+write `.git/index.lock` (FAIL-015). API and web TypeScript checks pass; the last
+unrestricted full-suite baseline is historical because this session blocks
+Vitest/Vite child processes with `spawn EPERM` (FAIL-011).
 
 **Read this file, then `DOCS/CURRENT_STATE.md`, then the ADRs it names.**
 Nothing else is required to start work.
@@ -289,51 +292,56 @@ real browser or real API, real export, output inspected.
 
 | Task | What is missing, precisely |
 |---|---|
-| **G5C-07 (half)** | **Repair panels.** A title, callout, B-roll clip, or piece of music can be created and undone, but **not adjusted in place**. There is no way to change a title's wording, retime a callout, or change the music level without undoing and redoing. `NameplateRepair.tsx` is the pattern to follow. |
 | **Callout dragging** | A callout always appears at a fixed `{x:0.55, y:0.25, w:0.3, h:0.3}`. It cannot be moved or resized on screen. |
 | **Caption editing controls** | `set-caption-cue`, `remove-caption-cue`, and `set-caption-style` are built, tested, and reach the export. **Nothing on screen offers them.** |
-| **Timeline controls** | `trim-clip`, `reorder-clip`, and `set-clip-audio` are built and tested. Only split / remove / hide have buttons. |
 | **Click-through by hand** | The Add panel, the upload route, and the preview layers were type-checked and their API path was exercised directly with real files. **They were never clicked in a browser.** Do this and record it. |
-| **G5B-13** | Only 30/1 constant frame rate has been exercised on real media. Variable frame rate and 30000/1001 fixtures are unrun. |
 | **G4B-12C / 12D / 13B / 14** | The first REAL AI call. Only keys are missing. Order is fixed: verify LiteLLM request-body logging is off → run the 18-case corpus **unchanged** against NVIDIA → then opencode Zen. No blind retries. |
 
-### 5.2 G6 — composition, motion, effects (12 tasks, none started)
-`G6-01` motion reference fixtures and quality rubric · `G6-02`
-position/scale/rotation/opacity · `G6-03` crop, layer order, masks · `G6-04`
-property tracks and keyframes · `G6-05` easing curves · `G6-06` spring/bounce ·
-`G6-07` transitions · `G6-08` bounded basic effects · `G6-09` renderer
-architecture spike on motion fixtures · `G6-10` winning preview/export adapter
-path · `G6-11` seek, timing, reduced-motion, fidelity · `G6-12` owner gate.
+Completed after this handoff was first written:
 
-**Architectural note for whoever does G6:** motion means a property changes over
-time, which the current render plan cannot express — every node has one fixed
-value. `G6-04` (property tracks and keyframes) is therefore the load-bearing
-task, and it will require a render plan v4. Do the ADR before the code.
+- **G5C-07 direct repair.** Titles, callouts, B-roll/pictures, and music have a
+  shared adjustment panel. Repairs are full `set-title`, `set-callout`,
+  `set-media-overlay`, or `set-music` operations folded over the original item.
+  One repair is one history entry and one Undo. The canonical render compiler
+  consumes only the folded state. Focused direct domain/render evidence and all
+  relevant TypeScript checks pass; a real browser click-through was not run in
+  the managed environment.
+- **G5B-04/05/07/09 controls.** Trim, remove-with-gap, reorder, loudness, and
+  fades are available under the progressively disclosed “Adjust this section”
+  panel.
+- **G5B-13 fixtures.** Real 30000/1001-with-audio, VFR-with-audio, and
+  three-frame-silent fixtures were conformed and probed successfully.
+- **G6 contracts and measured adapter path.** ADR-008,
+  `set-visual-properties`, bounded
+  transforms/crop/layers/masks, deterministic keyframes, cubic-Bezier easing,
+  spring/bounce, bounded effects, and render plan v5 are complete. The browser
+  consumes all visual nodes; FFmpeg consumes media and isolated written visual
+  layers. The hybrid renderer was retained after real native motion exports.
 
-### 5.3 G7 — components and compound AI (11 tasks, none started)
-`G7-01` component and recipe contract · `G7-02` component versions and
-compatibility · `G7-03` nameplate/caption/callout/title/motion recipes · `G7-04`
-component migration tests · `G7-05` outcome-workflow registry · `G7-06`
-multi-action planning · `G7-07` dependency-aware clarification · `G7-08`
-compound preview and repair · `G7-09` prove one request / one approval / one
-undo · `G7-10` prove old projects retain component appearance · `G7-11` owner
-gate.
+### 5.2 G6 — composition, motion, effects
+G6-02 through G6-11 are complete except the owner-only G6-01 rubric approval.
+`G6-12` remains the owner motion-feel/export verdict.
 
-**G7 MUST fix a known defect:** a change set holding both a cut and an overlay
-can have the cut applied while being reported blocked for its overlay. No such
-change set exists today because nothing creates one — but `G7-06` multi-action
-planning will, so it must be resolved before compound requests ship. See
-ADR-005.
+**Architecture:** ADR-008 and render plan v5 carry complete visual state and
+property tracks. See `DOCS/evidence/2026-07-29-g6-motion-adapter-spike.md` for
+the measured adapter decision and exact remaining boundary.
 
-### 5.4 G8 — trustworthy local alpha (13 tasks, none started)
-`G8-01` evidence matrix and budgets · `G8-02` autosave and crash recovery ·
-`G8-03` resumable local jobs and progress · `G8-04` project portability and
-integrity · `G8-05` proxies and caches where measured · `G8-06` local
-diagnostics and observable errors · `G8-07` safe media cleanup and retention ·
-`G8-08` accessibility and keyboard audit · `G8-09` malicious/corrupt media and
-recovery tests · `G8-10` profile and remove the largest bottleneck · `G8-11`
-repeated owner full-video workflows · `G8-12` non-editor smoke tests · `G8-13`
-reach agreed E5 budgets.
+### 5.3 G7 — components and compound AI
+G7-02 through G7-10 are complete. Remaining: `G7-01` owner contract approval
+and `G7-11` owner compound natural-language workflow. ADR-009 is the code-owned
+contract; the G7-10 migration/reopen fixture pins the old nameplate appearance.
+
+**Mixed cut/overlay boundary:** the current workflow registry intentionally
+contains no timeline recipes, so G7 planning cannot create the known mixed
+cut/overlay replay case. That replay defect must be fixed before any future
+workflow is allowed to combine timeline cuts with overlays. See ADR-005.
+
+### 5.4 G8 — trustworthy local alpha
+G8-02 through G8-10 are complete: atomic state, durable resumable export jobs,
+portable integrity-checked archives, measured no-cache decision, diagnostics,
+protected cleanup, keyboard/accessibility controls, corrupt-media/recovery
+contracts, and a measured 2.38x encoder speedup. Remaining human gates:
+`G8-01`, `G8-11`, `G8-12`, and `G8-13`.
 
 ### 5.5 Deferred by the owner's own instruction
 - A **real timeline** users can drive. The current four time-strip buttons
@@ -401,8 +409,9 @@ two caption sets on screen at once · karaoke word-by-word highlighting.
 - The drawn nameplate plate is ~10 px shorter vertically in export than in
   preview at 1080p. Position is identical. Closing it needs the font's real
   ascent and descent read from the TTF. ADR-003.
-- A 30-second 1080p CPU export takes 60–90 s and shows no percentage or estimate.
-  Deprioritised by the owner.
+- The old one-thread 30-second observation was 60–90 s. Four fixed threads are
+  now 2.38x faster on the representative 10-second benchmark. Job progress is
+  durable milestone progress rather than a fabricated frame estimate.
 - The transcript format is an **assumption**: `sidecar-import.ts` implements the
   published Whisper word-timing shape and has never seen a real Stage 1 file.
 - Captions proved on one English **synthetic** transcript. Right-to-left scripts

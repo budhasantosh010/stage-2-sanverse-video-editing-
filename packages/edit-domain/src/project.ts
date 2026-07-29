@@ -17,14 +17,23 @@ import {
   isCaptionOperation,
   isOverlayFamilyOperation,
   isTimelineOperation,
+  isVisualPropertiesOperation,
   validateOperationAgainstComposition,
   type EditOperation,
   type OperationError,
 } from './operations.ts'
-import type { OverlayOperation } from './overlay-operations.ts'
+import {
+  foldOverlayOperations,
+  type OverlayOperation,
+  type ResolvedOverlayOperation,
+} from './overlay-operations.ts'
 import { foldCaptionOperations, type CaptionSet } from './caption-operations.ts'
 import { applyTimelineOperation } from './timeline-operations.ts'
 import { PROJECT_TIMESCALE } from './time.ts'
+import {
+  foldVisualPropertiesOperations,
+  type SetVisualPropertiesOperation,
+} from './visual-properties.ts'
 
 /**
  * The whole editable state of one video.
@@ -354,7 +363,7 @@ export const evaluateProject = (project: EditProject): ProjectEvaluation => {
   // the video is made of. Letting it do so would mean removing a cut could make
   // an overlay valid again, which could re-apply the cut, which could invalidate
   // the overlay — a loop with no settled answer.
-  const records = project.changeSets.map((record, index) => {
+  const compositionCheckedRecords = project.changeSets.map((record, index) => {
     if (!record.active) return cleared(record)
     const cutFailure = cutFailures.get(index)
     if (cutFailure !== undefined) return Object.freeze({ ...record, blockedReason: cutFailure })
@@ -367,6 +376,28 @@ export const evaluateProject = (project: EditProject): ProjectEvaluation => {
       }
     }
     return cleared(record)
+  })
+
+  const availableVisualIds = new Set<string>()
+  for (const record of compositionCheckedRecords) {
+    if (!record.active || record.blockedReason !== null) continue
+    for (const operation of record.changeSet.operations) {
+      if (operation.kind === 'add-nameplate') availableVisualIds.add(operation.operationId)
+      if (operation.kind === 'add-captions') availableVisualIds.add(operation.captionSetId)
+      if (operation.kind === 'add-title') availableVisualIds.add(operation.titleId)
+      if (operation.kind === 'add-callout') availableVisualIds.add(operation.calloutId)
+      if (operation.kind === 'add-media-overlay') availableVisualIds.add(operation.overlayId)
+    }
+  }
+
+  const records = compositionCheckedRecords.map((record) => {
+    if (!record.active || record.blockedReason !== null) return record
+    const missingTarget = record.changeSet.operations.find(
+      (operation) => isVisualPropertiesOperation(operation) && !availableVisualIds.has(operation.visualId),
+    )
+    return missingTarget
+      ? Object.freeze({ ...record, blockedReason: 'VISUAL_TARGET_UNKNOWN' })
+      : record
   })
 
   return Object.freeze({ composition, records: Object.freeze(records) })
@@ -526,9 +557,13 @@ export const blockedChangeSets = (project: EditProject): readonly ChangeSetRecor
 export const activeCaptionSets = (project: EditProject): readonly CaptionSet[] =>
   foldCaptionOperations(activeOperations(project).filter(isCaptionOperation))
 
-/** Titles, callouts, B-roll, and music that currently affect the exported video. */
-export const activeOverlayOperations = (project: EditProject): readonly OverlayOperation[] =>
-  Object.freeze(activeOperations(project).filter(isOverlayFamilyOperation))
+/** Titles, callouts, B-roll, and music as they stand after accepted repairs. */
+export const activeOverlayOperations = (project: EditProject): readonly ResolvedOverlayOperation[] =>
+  foldOverlayOperations(activeOperations(project).filter(isOverlayFamilyOperation))
+
+/** Latest accepted transform/motion state for each visual in the project. */
+export const activeVisualProperties = (project: EditProject): readonly SetVisualPropertiesOperation[] =>
+  foldVisualPropertiesOperations(activeOperations(project).filter(isVisualPropertiesOperation))
 
 export const canUndo = (project: EditProject): boolean => project.changeSets.length > 0
 export const canRedo = (project: EditProject): boolean => project.redoStack.length > 0
@@ -593,10 +628,14 @@ export {
   MAX_HEADLINE_LENGTH,
   MAX_MUSIC_GAIN_DB,
   MAX_SUBHEAD_LENGTH,
+  MEDIA_OVERLAY_ID_PATTERN,
   MIN_MUSIC_GAIN_DB,
+  MUSIC_ID_PATTERN,
   OVERLAY_OPERATION_KINDS,
+  TITLE_ID_PATTERN,
   TITLE_PLACEMENTS,
   TITLE_STYLE_IDS,
+  foldOverlayOperations,
   isOverlayOperationKind,
   validateOverlayOperation,
   type AddCalloutOperation,
@@ -606,6 +645,11 @@ export {
   type CalloutStyleId,
   type NormalizedRect,
   type OverlayOperation,
+  type ResolvedOverlayOperation,
+  type SetCalloutOperation,
+  type SetMediaOverlayOperation,
+  type SetMusicOperation,
+  type SetTitleOperation,
   type TitlePlacement,
   type TitleStyleId,
 } from './overlay-operations.ts'
@@ -640,10 +684,70 @@ export {
   isOverlayFamilyOperation,
   isSourceAnchoredOperation,
   isTimelineOperation,
+  isVisualPropertiesOperation,
   validateOperation,
   validateOperationAgainstComposition,
   type AddNameplateOperation,
 } from './operations.ts'
+export {
+  DEFAULT_VISUAL_PROPERTIES,
+  MAX_KEYFRAMES_PER_TRACK,
+  MAX_VISUAL_TRACKS,
+  VISUAL_ID_PATTERN,
+  VISUAL_PROPERTIES,
+  VISUAL_PROPERTIES_OPERATION_KIND,
+  applyVisualEasing,
+  evaluatePropertyTrack,
+  evaluateVisualProperties,
+  foldVisualPropertiesOperations,
+  validateVisualPropertiesOperation,
+  type BounceEasing,
+  type CubicBezierEasing,
+  type LinearEasing,
+  type SetVisualPropertiesOperation,
+  type SpringEasing,
+  type VisualCrop,
+  type EvaluatedVisualProperties,
+  type VisualEasing,
+  type VisualEffect,
+  type VisualKeyframe,
+  type VisualMask,
+  type VisualProperties,
+  type VisualProperty,
+  type VisualPropertyTrack,
+  type VisualTransform,
+  type VisualTransition,
+  type VisualTransitionKind,
+  type VisualTransitionPhase,
+} from './visual-properties.ts'
+export {
+  BOUNCY_TITLE_RECIPE_ID,
+  CALLOUT_RECIPE_ID,
+  CAPTIONS_RECIPE_ID,
+  COMPONENT_RECIPES,
+  COMPONENT_SELECTION_SCHEMA_VERSION,
+  HIGHLIGHT_MOMENT_WORKFLOW_ID,
+  INTRO_WORKFLOW_ID,
+  NAMEPLATE_RECIPE_ID,
+  OUTCOME_WORKFLOW_REGISTRY,
+  POLISH_TALKING_HEAD_WORKFLOW_ID,
+  READABLE_VIDEO_WORKFLOW_ID,
+  TITLE_RECIPE_ID,
+  findComponentRecipe,
+  findOutcomeWorkflow,
+  migrateComponentSelection,
+  planAtomicWorkflow,
+  recipeSupportsOperation,
+  repairWorkflowAction,
+  type AtomicWorkflowPlanError,
+  type AtomicWorkflowPlanInput,
+  type ComponentRecipe,
+  type ComponentSelection,
+  type ComponentSelectionMigrationError,
+  type OutcomeWorkflow,
+  type WorkflowAction,
+  type WorkflowRepairResult,
+} from './component-recipes.ts'
 export {
   CAPTION_CUE_ID_PATTERN,
   CAPTION_OPERATION_KINDS,
@@ -702,6 +806,7 @@ export {
   type RemoveClipOperation,
   type ReorderClipOperation,
   type SetClipAudioOperation,
+  type SetClipTransitionOperation,
   type SetClipEnabledOperation,
   type SplitClipOperation,
   type TimelineApplyCode,
@@ -723,6 +828,8 @@ export {
   CAPTION_CUE_PRIMITIVE_ID,
   CAPTION_STYLE_PRIMITIVE_ID,
   CLIP_AUDIO_PRIMITIVE_ID,
+  CLIP_TRANSITION_COMPONENT_ID,
+  CLIP_TRANSITION_PRIMITIVE_ID,
   CLIP_ENABLED_PRIMITIVE_ID,
   CALLOUT_COMPONENT_ID,
   CALLOUT_PRIMITIVE_ID,
@@ -739,6 +846,7 @@ export {
   REORDER_PRIMITIVE_ID,
   SPLIT_PRIMITIVE_ID,
   TRIM_PRIMITIVE_ID,
+  VISUAL_PROPERTIES_PRIMITIVE_ID,
   capabilityProduces,
   expandCapability,
   findCapability,

@@ -42,9 +42,13 @@ import { validateMediaTime, validateTimeRange, type MediaTime, type TimeRange } 
 
 export const OVERLAY_OPERATION_KINDS = [
   'add-title',
+  'set-title',
   'add-callout',
+  'set-callout',
   'add-media-overlay',
+  'set-media-overlay',
   'add-music',
+  'set-music',
 ] as const
 
 export type OverlayOperationKind = (typeof OVERLAY_OPERATION_KINDS)[number]
@@ -234,7 +238,27 @@ export type AddMusicOperation = Readonly<{
   extensions: Extensions
 }>
 
+/**
+ * A repair carries the complete new state, never a patch. That makes one
+ * accepted repair one Undo and prevents two callers from disagreeing about
+ * what an omitted field means.
+ */
+export type SetTitleOperation = Readonly<Omit<AddTitleOperation, 'kind'> & { kind: 'set-title' }>
+export type SetCalloutOperation = Readonly<Omit<AddCalloutOperation, 'kind'> & { kind: 'set-callout' }>
+export type SetMediaOverlayOperation = Readonly<Omit<AddMediaOverlayOperation, 'kind'> & { kind: 'set-media-overlay' }>
+export type SetMusicOperation = Readonly<Omit<AddMusicOperation, 'kind'> & { kind: 'set-music' }>
+
 export type OverlayOperation =
+  | AddTitleOperation
+  | SetTitleOperation
+  | AddCalloutOperation
+  | SetCalloutOperation
+  | AddMediaOverlayOperation
+  | SetMediaOverlayOperation
+  | AddMusicOperation
+  | SetMusicOperation
+
+export type ResolvedOverlayOperation =
   | AddTitleOperation
   | AddCalloutOperation
   | AddMediaOverlayOperation
@@ -264,7 +288,15 @@ const KEYS: Readonly<Record<OverlayOperationKind, readonly string[]>> = Object.f
     'schemaVersion', 'operationId', 'kind', 'capabilityId', 'titleId', 'assetId',
     'sourceInterval', 'headline', 'subhead', 'placement', 'styleId', 'extensions',
   ]),
+  'set-title': Object.freeze([
+    'schemaVersion', 'operationId', 'kind', 'capabilityId', 'titleId', 'assetId',
+    'sourceInterval', 'headline', 'subhead', 'placement', 'styleId', 'extensions',
+  ]),
   'add-callout': Object.freeze([
+    'schemaVersion', 'operationId', 'kind', 'capabilityId', 'calloutId', 'assetId',
+    'sourceInterval', 'region', 'label', 'styleId', 'extensions',
+  ]),
+  'set-callout': Object.freeze([
     'schemaVersion', 'operationId', 'kind', 'capabilityId', 'calloutId', 'assetId',
     'sourceInterval', 'region', 'label', 'styleId', 'extensions',
   ]),
@@ -272,7 +304,15 @@ const KEYS: Readonly<Record<OverlayOperationKind, readonly string[]>> = Object.f
     'schemaVersion', 'operationId', 'kind', 'capabilityId', 'overlayId', 'overlayAssetId',
     'assetId', 'sourceInterval', 'overlaySourceStart', 'region', 'opacity', 'useOverlayAudio', 'extensions',
   ]),
+  'set-media-overlay': Object.freeze([
+    'schemaVersion', 'operationId', 'kind', 'capabilityId', 'overlayId', 'overlayAssetId',
+    'assetId', 'sourceInterval', 'overlaySourceStart', 'region', 'opacity', 'useOverlayAudio', 'extensions',
+  ]),
   'add-music': Object.freeze([
+    'schemaVersion', 'operationId', 'kind', 'capabilityId', 'musicId', 'assetId',
+    'compositionStart', 'sourceStart', 'gainDb', 'fadeIn', 'fadeOut', 'extensions',
+  ]),
+  'set-music': Object.freeze([
     'schemaVersion', 'operationId', 'kind', 'capabilityId', 'musicId', 'assetId',
     'compositionStart', 'sourceStart', 'gainDb', 'fadeIn', 'fadeOut', 'extensions',
   ]),
@@ -351,7 +391,7 @@ export const validateOverlayOperation = (
   }
   const readExtensions = () => (extensions.ok ? extensions.value : emptyExtensions())
 
-  if (kind === 'add-music') {
+  if (kind === 'add-music' || kind === 'set-music') {
     // Music is the one kind with no source interval, because it is not pinned
     // to a moment of footage at all.
     if (typeof input.musicId !== 'string' || !MUSIC_ID_PATTERN.test(input.musicId)) {
@@ -376,7 +416,7 @@ export const validateOverlayOperation = (
     return ok(Object.freeze({
       schemaVersion: OPERATION_SCHEMA_VERSION,
       operationId: input.operationId as string,
-      kind: 'add-music' as const,
+      kind,
       capabilityId: input.capabilityId as string,
       musicId: input.musicId as string,
       assetId: input.assetId as string,
@@ -395,7 +435,7 @@ export const validateOverlayOperation = (
   }
   const interval = sourceInterval.ok ? sourceInterval.value : null
 
-  if (kind === 'add-title') {
+  if (kind === 'add-title' || kind === 'set-title') {
     if (typeof input.titleId !== 'string' || !TITLE_ID_PATTERN.test(input.titleId)) {
       issues.push({ path: `${path}.titleId`, code: 'VALUE_OUT_OF_RANGE' })
     }
@@ -411,7 +451,7 @@ export const validateOverlayOperation = (
     return ok(Object.freeze({
       schemaVersion: OPERATION_SCHEMA_VERSION,
       operationId: input.operationId as string,
-      kind: 'add-title' as const,
+      kind,
       capabilityId: input.capabilityId as string,
       titleId: input.titleId as string,
       assetId: input.assetId as string,
@@ -424,7 +464,7 @@ export const validateOverlayOperation = (
     }))
   }
 
-  if (kind === 'add-callout') {
+  if (kind === 'add-callout' || kind === 'set-callout') {
     if (typeof input.calloutId !== 'string' || !CALLOUT_ID_PATTERN.test(input.calloutId)) {
       issues.push({ path: `${path}.calloutId`, code: 'VALUE_OUT_OF_RANGE' })
     }
@@ -439,7 +479,7 @@ export const validateOverlayOperation = (
     return ok(Object.freeze({
       schemaVersion: OPERATION_SCHEMA_VERSION,
       operationId: input.operationId as string,
-      kind: 'add-callout' as const,
+      kind,
       capabilityId: input.capabilityId as string,
       calloutId: input.calloutId as string,
       assetId: input.assetId as string,
@@ -451,7 +491,7 @@ export const validateOverlayOperation = (
     }))
   }
 
-  // add-media-overlay
+  // add-media-overlay or set-media-overlay
   if (typeof input.overlayId !== 'string' || !MEDIA_OVERLAY_ID_PATTERN.test(input.overlayId)) {
     issues.push({ path: `${path}.overlayId`, code: 'VALUE_OUT_OF_RANGE' })
   }
@@ -478,7 +518,7 @@ export const validateOverlayOperation = (
   return ok(Object.freeze({
     schemaVersion: OPERATION_SCHEMA_VERSION,
     operationId: input.operationId as string,
-    kind: 'add-media-overlay' as const,
+    kind,
     capabilityId: input.capabilityId as string,
     overlayId: input.overlayId as string,
     overlayAssetId: input.overlayAssetId as string,
@@ -490,4 +530,62 @@ export const validateOverlayOperation = (
     useOverlayAudio: input.useOverlayAudio as boolean,
     extensions: readExtensions(),
   }))
+}
+
+/**
+ * Replay accepted overlay additions and repairs into the four items that exist
+ * now. A repair whose original is inactive contributes nothing; it can never
+ * invent a new title, callout, B-roll clip, or music bed.
+ */
+export const foldOverlayOperations = (
+  operations: readonly OverlayOperation[],
+): readonly ResolvedOverlayOperation[] => {
+  const items = new Map<string, ResolvedOverlayOperation>()
+
+  for (const operation of operations) {
+    switch (operation.kind) {
+      case 'add-title':
+        if (!items.has(operation.titleId)) items.set(operation.titleId, operation)
+        break
+      case 'set-title': {
+        const current = items.get(operation.titleId)
+        if (current?.kind === 'add-title') {
+          items.set(operation.titleId, Object.freeze({ ...operation, kind: 'add-title' }))
+        }
+        break
+      }
+      case 'add-callout':
+        if (!items.has(operation.calloutId)) items.set(operation.calloutId, operation)
+        break
+      case 'set-callout': {
+        const current = items.get(operation.calloutId)
+        if (current?.kind === 'add-callout') {
+          items.set(operation.calloutId, Object.freeze({ ...operation, kind: 'add-callout' }))
+        }
+        break
+      }
+      case 'add-media-overlay':
+        if (!items.has(operation.overlayId)) items.set(operation.overlayId, operation)
+        break
+      case 'set-media-overlay': {
+        const current = items.get(operation.overlayId)
+        if (current?.kind === 'add-media-overlay') {
+          items.set(operation.overlayId, Object.freeze({ ...operation, kind: 'add-media-overlay' }))
+        }
+        break
+      }
+      case 'add-music':
+        if (!items.has(operation.musicId)) items.set(operation.musicId, operation)
+        break
+      case 'set-music': {
+        const current = items.get(operation.musicId)
+        if (current?.kind === 'add-music') {
+          items.set(operation.musicId, Object.freeze({ ...operation, kind: 'add-music' }))
+        }
+        break
+      }
+    }
+  }
+
+  return Object.freeze([...items.values()])
 }

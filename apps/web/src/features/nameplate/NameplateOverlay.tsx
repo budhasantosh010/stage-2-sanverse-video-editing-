@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import type { TextOverlayNode } from '@sanverse/render-contract'
 
 import { previewPlacement, secondaryLineOffset } from '../render-plan/render-plan-preview'
@@ -11,6 +11,7 @@ export type NameplateOverlayProps = {
   compositionHeight: number
   /** Display pixels per composition pixel. */
   scale: number
+  visualStyle?: CSSProperties
 }
 
 type LineProps = NameplateOverlayProps & {
@@ -82,12 +83,12 @@ function NameplateLine({ node, compositionWidth, compositionHeight, scale, text,
 }
 
 export function NameplateOverlay(props: NameplateOverlayProps) {
-  const { node, compositionWidth, compositionHeight, scale } = props
+  const { node, compositionWidth, compositionHeight, scale, visualStyle } = props
   const offset = secondaryLineOffset(compositionWidth, compositionHeight)
   const metrics = resolveNameplateMetrics(compositionWidth, compositionHeight)
 
   return (
-    <div className="nameplate-overlay" data-testid="nameplate-overlay" data-node-id={node.nodeId}>
+    <div className="nameplate-overlay" data-testid="nameplate-overlay" data-node-id={node.nodeId} style={visualStyle}>
       <NameplateLine
         {...props}
         text={node.primaryText}

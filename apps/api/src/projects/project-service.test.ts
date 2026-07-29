@@ -64,6 +64,12 @@ function memoryRepository(): ProjectRepository & { published: unknown[]; aborted
     async allocateExport() {
       throw new Error('not used')
     },
+    async listExports() {
+      return []
+    },
+    async deleteExport() {
+      throw new Error('not used')
+    },
     async inspectExport() {
       throw new Error('not used')
     },

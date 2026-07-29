@@ -65,6 +65,8 @@ export interface ProjectRepository {
   resolveAssetPath(projectId: string, assetId: string): Promise<string>
   openAsset(projectId: string, assetId: string, range?: MediaRange): Promise<OpenMediaResult>
   allocateExport(projectId: string, exportId: string): Promise<ProjectExportPaths>
+  listExports(projectId: string): Promise<readonly { exportId: string; size: number; modifiedAt: string }[]>
+  deleteExport(projectId: string, exportId: string): Promise<void>
   inspectExport(projectId: string, exportId: string): Promise<{ size: number }>
   openExport(projectId: string, exportId: string, range?: MediaRange): Promise<OpenMediaResult>
 }

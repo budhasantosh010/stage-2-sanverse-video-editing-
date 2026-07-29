@@ -97,6 +97,12 @@ G6 introduces motion, which is when plate geometry starts to matter.
 
 ## Other renderer decisions
 
+- G8-10 supersedes the older one-thread note below: `-threads 4` is now the
+  pinned local-alpha contract. The same representative 10-second 1080p encode
+  measured 33.090 seconds with one thread and 13.917 seconds with four threads,
+  a 2.38x speedup at the same `medium` preset and CRF 18. Output sizes were
+  4,580,951 and 4,581,325 bytes. Earlier one-thread hashes are historical and
+  must not be compared byte-for-byte with new four-thread exports.
 - `-threads 1` is a deliberate contract, not a performance dial: it keeps an
   exported file's hash reproducible. Raising it changes output bytes.
   Reproducibility survives any pinned thread count, so this may be raised —

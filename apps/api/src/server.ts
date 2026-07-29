@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
@@ -25,6 +25,16 @@ import { createIntentService, type IntentService } from './intent/intent-service
 import { buildCaptionsChangeSet } from './transcripts/build-captions.ts'
 import { createFfmpegRenderAdapter } from './render/ffmpeg-render-adapter.ts'
 import { createRenderService } from './render/render-service.ts'
+import { buildLocalDiagnostics } from './diagnostics/local-diagnostics.ts'
+import {
+  createLocalExportJobStore,
+  EXPORT_JOB_ID_PATTERN,
+  type LocalExportJobStore,
+} from './jobs/local-export-job-store.ts'
+import {
+  buildPortableProjectArchive,
+  restorePortableProject,
+} from './projects/portable-project.ts'
 
 type ServerOptions = {
   dataRoot: string
@@ -36,6 +46,8 @@ type ServerOptions = {
   mediaProbe?: MediaProbePort
   mediaDescriber?: MediaDescriberPort
   exportIdGenerator?: () => string
+  exportJobIdGenerator?: () => string
+  exportJobStore?: LocalExportJobStore
   fontPath?: string
   /** Swaps only the provider; the safety pipeline around it is unchanged. */
   intentProvider?: IntentProviderPort
@@ -169,16 +181,84 @@ export function createSanverseServer(options: ServerOptions) {
   const projectState = options.projectStateService ?? createProjectStateService({ repository, mediaProbe })
   const renderService = options.renderService ?? (options.fontPath ? createRenderService({ renderer: createFfmpegRenderAdapter({ fontPath: options.fontPath, mediaProbe }) }) : undefined)
   const generateExportId = options.exportIdGenerator ?? (() => `export_${randomBytes(16).toString('hex')}`)
+  const generateExportJobId = options.exportJobIdGenerator ?? (() => `job_${randomBytes(16).toString('hex')}`)
+  const exportJobs = options.exportJobStore ?? createLocalExportJobStore(options.dataRoot)
+  const runningExportJobs = new Map<string, AbortController>()
   // The fake provider is the default on purpose. Nothing leaves this machine
   // until a real provider is deliberately configured and the owner has approved
   // what the outbound allowlist sends.
+  const intentProvider = options.intentProvider ?? createFakeIntentAdapter()
   const intentService = options.intentService ?? createIntentService({
-    provider: options.intentProvider ?? createFakeIntentAdapter(),
+    provider: intentProvider,
     loadProject: (projectId) => projectState.load(projectId),
     createOperationId: () => `operation_${randomBytes(16).toString('hex')}`,
   })
 
-  return createServer(async (request, response) => {
+  const executeExportJob = async (jobId: string): Promise<void> => {
+    if (runningExportJobs.has(jobId) || !renderService) return
+    const initial = await exportJobs.read(jobId)
+    if (!initial || initial.status !== 'queued') return
+    const controller = new AbortController()
+    runningExportJobs.set(jobId, controller)
+    try {
+      const job = await exportJobs.update(jobId, {
+        status: 'running',
+        progress: 0.05,
+        attempts: initial.attempts + 1,
+        error: undefined,
+      })
+      const paths = await repository.allocateExport(job.projectId, job.exportId)
+      const extraSourcePaths: Record<string, string> = {}
+      for (const asset of job.projectSnapshot.assets) {
+        if (asset.storageRef === `project/${job.projectId}/source`) continue
+        const path = await repository.resolveAssetPath(job.projectId, asset.assetId).catch(() => null)
+        if (path !== null) extraSourcePaths[asset.assetId] = path
+      }
+      await exportJobs.update(jobId, { progress: 0.15 })
+      const result = await renderService.exportProject({
+        project: job.projectSnapshot,
+        ...paths,
+        extraSourcePaths,
+        signal: controller.signal,
+      })
+      if (resolve(result.outputPath) !== resolve(paths.outputPath)) throw new Error('Renderer returned an unexpected output path.')
+      const current = await exportJobs.read(jobId)
+      if (controller.signal.aborted || current?.status === 'cancelled') return
+      await exportJobs.update(jobId, {
+        status: 'succeeded',
+        progress: 1,
+        result: {
+          id: job.exportId,
+          mediaUrl: `/api/projects/${job.projectId}/exports/${job.exportId}/media`,
+          sha256: result.sha256,
+          width: result.width,
+          height: result.height,
+          durationMs: result.durationMs,
+          hasAudio: result.hasAudio,
+          projectRevision: result.projectRevision,
+        },
+      })
+    } catch (error) {
+      const current = await exportJobs.read(jobId).catch(() => null)
+      if (current?.status !== 'cancelled') {
+        const answer = describeFailure(error)
+        await exportJobs.update(jobId, {
+          status: controller.signal.aborted ? 'cancelled' : 'failed',
+          progress: 1,
+          error: controller.signal.aborted
+            ? { code: 'RENDER_CANCELLED', message: 'Export was cancelled.' }
+            : {
+                code: answer?.code ?? errorCode(error) ?? 'EXPORT_FAILED',
+                message: answer?.message ?? 'The local renderer could not complete this export.',
+              },
+        }).catch(() => undefined)
+      }
+    } finally {
+      runningExportJobs.delete(jobId)
+    }
+  }
+
+  const server = createServer(async (request, response) => {
     const origin = firstHeader(request, 'origin')
     if (origin && !allowedOrigins.has(origin)) {
       request.resume()
@@ -188,6 +268,19 @@ export function createSanverseServer(options: ServerOptions) {
 
     const requestUrl = new URL(request.url ?? '/', 'http://127.0.0.1')
     try {
+      if (request.method === 'GET' && requestUrl.pathname === '/api/diagnostics') {
+        const jobs = await exportJobs.list()
+        json(response, 200, buildLocalDiagnostics({
+          rendererConfigured: renderService !== undefined,
+          intentProviderName: intentProvider.name,
+          jobs: {
+            queued: jobs.filter((job) => job.status === 'queued').length,
+            running: jobs.filter((job) => job.status === 'running').length,
+            failed: jobs.filter((job) => job.status === 'failed').length,
+          },
+        }))
+        return
+      }
       if (request.method === 'POST' && requestUrl.pathname === '/api/projects') {
         const filename = firstHeader(request, 'x-sanverse-filename')
         if (!filename) {
@@ -370,49 +463,90 @@ export function createSanverseServer(options: ServerOptions) {
         if (!PROJECT_ID_PATTERN.test(projectId)) { request.resume(); json(response, 404, { error: 'Project was not found.' }); return }
         if (!renderService) { request.resume(); json(response, 503, { error: 'The local renderer is not configured.' }); return }
         request.resume()
-        // The export renders the saved project, compiled on the server. The
-        // browser cannot supply the edit list, so what is exported is always
-        // what was accepted and stored.
         const project = await projectState.load(projectId)
         const exportId = generateExportId()
+        const jobId = generateExportJobId()
         if (!EXPORT_ID_PATTERN.test(exportId)) throw new Error('exportIdGenerator returned an invalid opaque export ID.')
-        const paths = await repository.allocateExport(projectId, exportId)
-        const controller = new AbortController()
-        const cancelDisconnectedRender = () => { if (!response.writableEnded) controller.abort() }
-        request.once('aborted', cancelDisconnectedRender)
-        response.once('close', cancelDisconnectedRender)
-        try {
-          // The exporter is handed a real path for every file the project
-          // holds beyond the footage. Resolving them here, in the one place
-          // that owns storage, keeps filesystem paths out of the render plan.
-          const extraSourcePaths: Record<string, string> = {}
-          for (const asset of project.assets) {
-            if (asset.storageRef === `project/${projectId}/source`) continue
-            const path = await repository.resolveAssetPath(projectId, asset.assetId).catch(() => null)
-            if (path !== null) extraSourcePaths[asset.assetId] = path
-          }
-          const result = await renderService.exportProject({
-            project,
-            ...paths,
-            extraSourcePaths,
-            signal: controller.signal,
-          })
-          if (resolve(result.outputPath) !== resolve(paths.outputPath)) throw new Error('Renderer returned an unexpected output path.')
-          if (controller.signal.aborted || response.destroyed) return
-          json(response, 201, {
-            id: exportId,
-            mediaUrl: `/api/projects/${projectId}/exports/${exportId}/media`,
-            sha256: result.sha256,
-            width: result.width,
-            height: result.height,
-            durationMs: result.durationMs,
-            hasAudio: result.hasAudio,
-            projectRevision: result.projectRevision,
-          })
-        } finally {
-          request.off('aborted', cancelDisconnectedRender)
-          response.off('close', cancelDisconnectedRender)
+        if (!EXPORT_JOB_ID_PATTERN.test(jobId)) throw new Error('exportJobIdGenerator returned an invalid opaque job ID.')
+        const idempotencyKey = createHash('sha256')
+          .update(`${project.projectId}:${project.revision}:sanverse.render-plan/v5`)
+          .digest('hex')
+        const created = await exportJobs.create({ jobId, project, exportId, idempotencyKey })
+        json(response, 202, exportJobs.publicJob(created.job))
+        if (created.job.status === 'queued') void executeExportJob(created.job.jobId)
+        return
+      }
+
+      const exportJobMatch = /^\/api\/projects\/([^/]+)\/export-jobs\/([^/]+)$/.exec(requestUrl.pathname)
+      if (exportJobMatch && (request.method === 'GET' || request.method === 'DELETE')) {
+        request.resume()
+        const [projectId, jobId] = exportJobMatch.slice(1)
+        if (!PROJECT_ID_PATTERN.test(projectId) || !EXPORT_JOB_ID_PATTERN.test(jobId)) {
+          json(response, 404, { error: 'Export job was not found.' })
+          return
         }
+        const job = await exportJobs.read(jobId)
+        if (!job || job.projectId !== projectId) {
+          json(response, 404, { error: 'Export job was not found.' })
+          return
+        }
+        if (request.method === 'DELETE' && (job.status === 'queued' || job.status === 'running')) {
+          runningExportJobs.get(jobId)?.abort()
+          const cancelled = await exportJobs.update(jobId, {
+            status: 'cancelled',
+            progress: 1,
+            error: { code: 'RENDER_CANCELLED', message: 'Export was cancelled.' },
+          })
+          json(response, 200, exportJobs.publicJob(cancelled))
+          return
+        }
+        json(response, 200, exportJobs.publicJob(job))
+        return
+      }
+
+      const retentionMatch = /^\/api\/projects\/([^/]+)\/retention$/.exec(requestUrl.pathname)
+      if (request.method === 'GET' && retentionMatch) {
+        const projectId = retentionMatch[1]
+        if (!PROJECT_ID_PATTERN.test(projectId)) { json(response, 404, { error: 'Project was not found.' }); return }
+        json(response, 200, {
+          schemaVersion: 'sanverse.local-retention/v1',
+          protected: ['source-media', 'project-state', 'imported-assets'],
+          deletable: (await repository.listExports(projectId)).map((item) => ({
+            kind: 'export',
+            id: item.exportId,
+            byteLength: item.size,
+            modifiedAt: item.modifiedAt,
+          })),
+          automaticDeletion: false,
+        })
+        return
+      }
+
+      const portableMatch = /^\/api\/projects\/([^/]+)\/portable-archive$/.exec(requestUrl.pathname)
+      if (portableMatch && (request.method === 'GET' || request.method === 'POST')) {
+        const projectId = portableMatch[1]
+        if (!PROJECT_ID_PATTERN.test(projectId)) { request.resume(); json(response, 404, { error: 'Project was not found.' }); return }
+        if (request.method === 'GET') {
+          json(response, 200, buildPortableProjectArchive(await projectState.load(projectId)))
+          return
+        }
+        const archive = await readJsonBody(request)
+        const restored = restorePortableProject(archive, await projectState.load(projectId))
+        json(response, 200, { project: await projectState.restorePortable(projectId, restored) })
+        return
+      }
+
+      const deleteExportMatch = /^\/api\/projects\/([^/]+)\/exports\/([^/]+)$/.exec(requestUrl.pathname)
+      if (request.method === 'DELETE' && deleteExportMatch) {
+        request.resume()
+        const [projectId, exportId] = deleteExportMatch.slice(1)
+        if (!PROJECT_ID_PATTERN.test(projectId) || !EXPORT_ID_PATTERN.test(exportId)) {
+          json(response, 404, { error: 'Export was not found.' })
+          return
+        }
+        await repository.deleteExport(projectId, exportId)
+        response.writeHead(204, { 'cache-control': 'no-store' })
+        response.end()
         return
       }
 
@@ -623,6 +757,13 @@ export function createSanverseServer(options: ServerOptions) {
       json(response, answer.status, { error: answer.message, ...(answer.code ? { code: answer.code } : {}) })
     }
   })
+
+  if (renderService) {
+    void exportJobs.recoverRunnable()
+      .then((jobs) => Promise.all(jobs.map((job) => executeExportJob(job.jobId))))
+      .catch((error) => console.error('Local export job recovery failed.', error))
+  }
+  return server
 }
 
 function parseConfiguredLimit(value: string | undefined): number {

@@ -571,6 +571,39 @@
   font-size: 0.82rem;
 }
 
+.studio-screen__section-adjustments {
+  margin-top: 12px;
+  border: 1px solid var(--color-border);
+  padding: 10px 12px;
+}
+
+.studio-screen__section-adjustments > summary {
+  cursor: pointer;
+  font-weight: 680;
+}
+
+.studio-screen__section-adjustment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.studio-screen__section-adjustment-grid label {
+  display: grid;
+  gap: 5px;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.studio-screen__section-adjustment-grid input {
+  min-width: 0;
+  border: 1px solid var(--color-border-strong);
+  padding: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
 /* Black over the video for a stretch that was removed but left in place, so the
    preview shows exactly what the exported file will show. */
 .studio-screen__video-hole {

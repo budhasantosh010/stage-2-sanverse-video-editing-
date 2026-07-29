@@ -21,6 +21,7 @@ import {
   MUSIC_COMPONENT_ID,
   TITLE_COMPONENT_ID,
   CLIP_AUDIO_PRIMITIVE_ID,
+  CLIP_TRANSITION_PRIMITIVE_ID,
   CLIP_ENABLED_PRIMITIVE_ID,
   REMOVE_PRIMITIVE_ID,
   REORDER_PRIMITIVE_ID,
@@ -218,6 +219,18 @@ export const testSetAudio = (
   gainDb: -6,
   fadeIn: ms(500),
   fadeOut: ms(500),
+  ...overrides,
+})
+
+export const testTransition = (
+  overrides: Partial<Extract<TimelineOperation, { kind: 'set-clip-transition' }>> = {},
+): TimelineOperation => ({
+  ...timelineDefaults('operation_trans001', CLIP_TRANSITION_PRIMITIVE_ID),
+  kind: 'set-clip-transition',
+  nextClipId: 'clip_bbbbbbbb',
+  style: 'dip-to-black',
+  duration: ms(500),
+  audio: 'fade-through-silence',
   ...overrides,
 })
 

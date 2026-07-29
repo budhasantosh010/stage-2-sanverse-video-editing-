@@ -1,5 +1,92 @@
 # Project Log
 
+## 2026-07-29 — G6/G8 executable technical batch complete
+
+- Completed G6-11 deterministic seek-boundary, easing, reduced-motion, and
+  shared preview/export evaluator contracts.
+- Completed G8-03 durable export jobs with revision snapshots, idempotency,
+  progress, cancellation, results/errors, restart recovery, and diagnostics.
+- Completed G8-04 content-addressed portable archives with closed-schema,
+  compatibility, integrity, and matching-media restore gates.
+- Completed G8-07 protected retention: only controlled exports are deletable.
+- Completed G8-08 code/keyboard accessibility audit with skip links, live/focus
+  semantics, reduced motion, and 44-pixel repair targets.
+- Completed G8-09 corrupt/malicious media and recovery matrix; new direct
+  contracts passed 5/5.
+- Completed G8-10: four fixed encoder threads reduced the representative
+  10-second encode from 33.090s to 13.917s, a 2.38x speedup.
+- API build and web application TypeScript check passed. The managed environment
+  still blocks Vitest/Vite worker creation with the recorded FAIL-011.
+- Only owner/external-evidence G8 gates remain; G9 entry is not bypassed.
+
+## 2026-07-29 — Second batch in progress: transitions, adapters, compatibility, local trust
+
+- Completed G6-07 with a bounded adjacent-clip dip-to-black, explicit audio
+  policy, exact preview opacity, render-plan v5 ramps, and FFmpeg filters.
+- Completed G6-10 by isolating every written overlay on a transparent layer
+  before applying shared transforms/effects; a real 90-frame callout fixture
+  rendered successfully.
+- Completed G7-10 with a v1 saved-project migration/reopen fixture that retains
+  the exact component/style, words, point, and anchor.
+- Confirmed G8-02 atomic autosave/recovery at the existing repository/service
+  boundary and recorded its exact limits.
+- Completed G8-06 safe local diagnostics at `GET /api/diagnostics`.
+- Completed G8-05 as a measured no-proxy/no-cache decision; first-time CPU
+  encoding, not repeated identical reads, is the observed bottleneck.
+- Historical note: G6-11, G8-03, and G8-04 were open at this point; the later
+  batch above completed them.
+
+## 2026-07-29 — Ten-task batch: renderer evidence and compound components
+
+- Completed G6-08 bounded basic effects and G6-09 measured renderer
+  re-evaluation. The existing browser CSS/native FFmpeg hybrid remains selected.
+- Added browser visual-property consumption for every overlay family and native
+  FFmpeg visual-property consumption for media overlays.
+- Produced a real 1280x720, 30 fps, 240-frame native export and focused
+  exact-clock, reduced-motion, and normalized-translation evidence.
+- Did not falsely close G6-07: visual enter/exit transitions are not the
+  required adjacent/overlapping clip video/audio transition primitive.
+- Did not falsely close G6-10/G6-11: written-overlay FFmpeg layering and full
+  extracted-frame fidelity remain.
+- Completed G7-02 through G7-09: exact component compatibility, five immutable
+  recipes, idempotent/fail-closed migration, four workflow registry entries,
+  atomic multi-action planning, dependency checks, detached compound preview,
+  targeted action repair, and one-approval/one-Undo proof.
+- Relevant edit-domain, web, and API TypeScript boundaries pass. Focused direct
+  contracts and the real FFmpeg fixture pass.
+
+## 2026-07-29 — Ten-task batch: G5B completion and G6 motion foundation
+
+- Completed Studio controls for G5B-04 trim, G5B-05 remove-with-gap, G5B-07
+  reorder, and G5B-09 clip loudness/fades behind one disclosure.
+- Completed G5B-13 using real 30000/1001 audio, VFR audio, and three-frame
+  silent fixtures; conformed outputs retained the expected duration, rate,
+  frame count, and audio policy.
+- Accepted ADR-008 and created the owner-pending G6 motion-quality rubric.
+- Completed G6-02 through G6-06 at the domain/compiler boundary: transforms,
+  crop/layer/masks, project-clock keyframes, cubic-Bezier easing, spring, and
+  bounce.
+- Raised the renderer-neutral plan to v4 and bound visual state to exact
+  concrete overlay nodes after cuts.
+- Focused direct RED/GREEN contracts passed. Edit-domain, render-contract, web,
+  and API TypeScript boundaries pass.
+- Browser/FFmpeg motion is not claimed; it remains G6-09/G6-10.
+
+## 2026-07-29 — G5C-07 direct repair completed in code
+
+- Added full-state `set-title`, `set-callout`, `set-media-overlay`, and
+  `set-music` operations with closed validation.
+- Added deterministic folding so repairs update one existing overlay family
+  without creating duplicate render nodes.
+- Preserved one repair as one history entry and one Undo.
+- Changed the canonical render compiler to consume folded overlay state.
+- Added one progressively disclosed adjustment panel for all four families.
+- Focused direct domain/render contract passed; edit-domain, render-contract,
+  and web TypeScript checks passed.
+- Vitest and Vite packaging remain blocked inside the managed environment by
+  existing FAIL-011 (`spawn EPERM`); not debugged again.
+- Real browser click-through was not run and is not claimed.
+
 ## 2026-07-27 — G4-B tasks 01–09: the first AI-proposed edit, on a fake provider
 
 - Added `@sanverse/intent-domain`: a closed request shape, an untrusted candidate

@@ -25,7 +25,8 @@
     "./legacy-project-v1": "./src/legacy-project-v1.ts",
     "./migrations/upgrade-project": "./src/migrations/upgrade-project.ts",
     "./annotations": "./src/annotations.ts",
-    "./overlay-operations": "./src/overlay-operations.ts"
+    "./overlay-operations": "./src/overlay-operations.ts",
+    "./component-recipes": "./src/component-recipes.ts"
   },
   "scripts": {
     "test": "vitest run",

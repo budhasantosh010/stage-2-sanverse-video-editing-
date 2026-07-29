@@ -62,6 +62,8 @@ function readRepository(bytes: Uint8Array, bodyFactory: () => AsyncIterable<Uint
     async allocateExport(projectId, exportId) {
       return { sourcePath: `C:\\safe\\${projectId}\\source.mp4`, outputPath: `C:\\safe\\${projectId}\\exports\\${exportId}.mp4`, trustedWorkDir: `C:\\safe\\${projectId}` }
     },
+    async listExports() { return [] },
+    async deleteExport() { throw new Error('not used') },
     async inspectExport() { return { size: bytes.length } },
     async openExport(_projectId, _exportId, range) {
       const start = range?.start ?? 0

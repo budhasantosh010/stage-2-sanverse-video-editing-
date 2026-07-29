@@ -77,7 +77,7 @@ const randomId = (prefix: string): string => {
  * when the playhead is sitting in a deliberate hole, where there is no footage
  * to pin anything to.
  */
-const sourceMomentAt = (
+export const sourceMomentAt = (
   project: EditProject,
   playheadMs: number,
 ): { assetId: string; startTicks: number; remainingTicks: number } | null => {

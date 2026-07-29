@@ -1,0 +1,39 @@
+.overlay-repair {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.65rem 0;
+  border-top: 1px solid var(--line, #d5d5d5);
+}
+
+.overlay-repair > span {
+  text-transform: capitalize;
+}
+
+.overlay-repair--open label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.overlay-repair--open input,
+.overlay-repair--open select {
+  min-height: 44px;
+  border: 1px solid var(--ink, #111);
+  background: var(--paper, #fff);
+  color: var(--ink, #111);
+}
+
+.overlay-repair__region {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.overlay-repair__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.overlay-repair__actions button {
+  min-height: 44px;
+}

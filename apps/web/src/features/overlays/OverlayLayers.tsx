@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type {
   CalloutOverlayNode,
   MediaOverlayNode,
@@ -16,6 +17,7 @@ type Shared = {
   compositionHeight: number
   /** Display pixels per composition pixel. */
   scale: number
+  visualStyle?: CSSProperties
 }
 
 /**
@@ -26,14 +28,14 @@ type Shared = {
  * arithmetic are enough. Neither renderer measures anything, so neither can
  * measure it differently.
  */
-export function TitleOverlay({ node, compositionWidth, compositionHeight, scale }: Shared & { node: TitleOverlayNode }) {
+export function TitleOverlay({ node, compositionWidth, compositionHeight, scale, visualStyle }: Shared & { node: TitleOverlayNode }) {
   if (scale <= 0) return null
   const hasSubhead = node.subhead.length > 0
   const top = (lineIndex: number) =>
     titleLineTopPx(node.styleId, lineIndex, hasSubhead, node.placement, compositionWidth, compositionHeight, scale)
 
   return (
-    <div className="title-overlay" data-testid="title-overlay" data-node-id={node.nodeId}>
+    <div className="title-overlay" data-testid="title-overlay" data-node-id={node.nodeId} style={visualStyle}>
       <div className="title-overlay__headline" style={{ top: `${top(0)}px` }}>
         {node.headline}
       </div>
@@ -58,12 +60,13 @@ export function CalloutOverlay({
   compositionWidth,
   compositionHeight,
   scale,
+  visualStyle,
 }: Shared & { node: CalloutOverlayNode }) {
   if (scale <= 0) return null
   const box = calloutBoxStyle(node, compositionWidth, compositionHeight, scale)
 
   return (
-    <div className="callout-overlay" data-testid="callout-overlay" data-node-id={node.nodeId}>
+    <div className="callout-overlay" data-testid="callout-overlay" data-node-id={node.nodeId} style={visualStyle}>
       <div
         className="callout-overlay__box"
         style={{
@@ -124,15 +127,17 @@ export function MediaOverlay({
   compositionWidth,
   compositionHeight,
   scale,
+  visualStyle,
 }: MediaOverlayProps) {
   if (scale <= 0 || sourceUrl === null) return null
   const box = mediaOverlayBox(node, compositionWidth, compositionHeight, scale)
   const style = {
+    ...visualStyle,
     left: `${box.left}px`,
     top: `${box.top}px`,
     width: `${box.width}px`,
     height: `${box.height}px`,
-    opacity: box.opacity,
+    opacity: box.opacity * (typeof visualStyle?.opacity === 'number' ? visualStyle.opacity : 1),
   }
 
   if (isStill) {

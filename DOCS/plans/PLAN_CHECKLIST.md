@@ -100,19 +100,22 @@ no button offers it yet — the owner cannot get to it from the screen.
 - [ ] G5B-01 Approve non-editor timeline workflow and terminology — owner gate
 - [x] G5B-02 Implement time selection (the playhead selects the section under it)
 - [x] G5B-03 Implement split
-- [ ] G5B-04 Implement trim — domain only, no control on screen
-- [ ] G5B-05 Implement remove-with-gap — domain, preview, and export only; the
-      button always closes the gap, so the owner cannot yet create a hole
+- [x] G5B-04 Implement trim — progressively disclosed Studio control now sends
+      one bounded `trim-clip` operation
+- [x] G5B-05 Implement remove-with-gap — Studio now offers the explicit plain
+      action “Remove and leave empty space”
 - [x] G5B-06 Implement ripple delete
-- [ ] G5B-07 Implement reorder — domain only, no control on screen
+- [x] G5B-07 Implement reorder — Studio offers “Move earlier” and “Move later”
+      without exposing indexes
 - [x] G5B-08 Implement enable/disable
-- [ ] G5B-09 Implement basic audio level and fades — domain and export only, no
-      control on screen
+- [x] G5B-09 Implement basic audio level and fades — Studio offers loudness,
+      fade-in, and fade-out values for the section under the playhead
 - [x] G5B-10 Implement dependent-edit revalidation
 - [x] G5B-11 Implement simple Studio time-strip controls
 - [x] G5B-12 Compile timeline state to preview/export
-- [ ] G5B-13 Run VFR, rational-frame-rate, audio, and boundary fixtures —
-      only 30/1 constant frame rate has been exercised on real media
+- [x] G5B-13 Run VFR, rational-frame-rate, audio, and boundary fixtures —
+      three real generated inputs were conformed and probed; see
+      `DOCS/evidence/2026-07-29-g5b13-media-fixtures.md`
 - [ ] G5B-14 Owner completes a pacing edit without NLE terminology — owner gate
 
 ## G5-C - Useful talking-head workflow
@@ -130,8 +133,13 @@ no button offers it yet — the owner cannot get to it from the screen.
       real export and proved to stop when the song ends
 - [x] G5C-06 Combine cuts, captions, titles, callouts, audio, and B-roll —
       proved in a real export, before and after a cut
-- [~] G5C-07 Add plain-language proposals and direct repair for each family —
-      history sentences done for all four; REPAIR PANELS NOT STARTED
+- [x] G5C-07 Add plain-language proposals and direct repair for each family —
+      accepted titles, callouts, B-roll/pictures, and music now share one
+      adjustment panel. Each repair is a full `set-*` operation, one history
+      entry, and one Undo. The render compiler folds repairs before producing
+      the single render plan. Focused domain/render-contract evidence and all
+      relevant TypeScript checks pass. Browser click-through remains a separate
+      evidence gap, not missing implementation.
 - [x] G5C-08 Add progressive disclosure to Studio — one button, four plain
       choices, one short form; never more than four things visible
 - [x] G5C-09 Run complete real-video workflow and output inspection —
@@ -141,45 +149,75 @@ no button offers it yet — the owner cannot get to it from the screen.
 
 ## G6 - Composition, motion, and effects
 
-- [ ] G6-01 Approve motion reference fixtures and quality rubric
-- [ ] G6-02 Implement position/scale/rotation/opacity
-- [ ] G6-03 Implement crop, layer order, and masks
-- [ ] G6-04 Implement property tracks and keyframes
-- [ ] G6-05 Implement easing curves
-- [ ] G6-06 Implement spring/bounce
-- [ ] G6-07 Implement transitions
-- [ ] G6-08 Implement bounded basic effects
-- [ ] G6-09 Re-run renderer architecture spike on motion fixtures
-- [ ] G6-10 Implement winning preview/export adapter path
-- [ ] G6-11 Prove seek, timing, reduced-motion controls, and fidelity
+- [ ] G6-01 Approve motion reference fixtures and quality rubric — rubric is
+      written; explicit owner approval remains
+- [x] G6-02 Implement position/scale/rotation/opacity — closed bounded operation
+      contract and render-plan v5 binding
+- [x] G6-03 Implement crop, layer order, and masks — normalized crop, bounded
+      layer, rectangle/ellipse/none mask, and feather contract
+- [x] G6-04 Implement property tracks and keyframes — ordered bounded tracks on
+      the exact project clock with deterministic evaluation
+- [x] G6-05 Implement easing curves — linear and cubic-Bezier evaluation
+- [x] G6-06 Implement spring/bounce — bounded physical spring and bounce curves
+- [x] G6-07 Implement transitions — bounded adjacent-clip dip-to-black with
+      explicit video and audio ramps in preview and native export
+- [x] G6-08 Implement bounded basic effects — blur, brightness, contrast,
+      saturation, and grayscale are closed, bounded, and adapter-consumable
+- [x] G6-09 Re-run renderer architecture spike on motion fixtures — hybrid
+      browser CSS/native FFmpeg retained with measured real-render evidence
+- [x] G6-10 Implement winning preview/export adapter path — browser CSS plus
+      native FFmpeg media and isolated written-overlay layers
+- [x] G6-11 Prove seek, timing, reduced-motion controls, and fidelity —
+      canonical boundary samples cover every visual property/easing family;
+      browser/export share the evaluator and real adapter fixtures consume it
 - [ ] G6-12 Owner approves motion feel and exported result
 
 ## G7 - Components and compound AI
 
 - [ ] G7-01 Approve component and recipe contract
-- [ ] G7-02 Implement component versions and compatibility
-- [ ] G7-03 Implement nameplate, caption, callout, title, and motion recipes
-- [ ] G7-04 Implement component migration tests
-- [ ] G7-05 Implement outcome-workflow registry
-- [ ] G7-06 Implement multi-action planning
-- [ ] G7-07 Implement dependency-aware clarification
-- [ ] G7-08 Implement compound preview and repair
-- [ ] G7-09 Prove one request/one approval/one undo
-- [ ] G7-10 Prove old projects retain component appearance
+- [x] G7-02 Implement component versions and compatibility — exact recipe,
+      component, operation-schema, capability, and appearance versions
+- [x] G7-03 Implement nameplate, caption, callout, title, and motion recipes
+- [x] G7-04 Implement component migration tests — idempotent and fail-closed
+      when an old selection did not pin a version
+- [x] G7-05 Implement outcome-workflow registry — intro, readable video,
+      highlight moment, and polish talking head
+- [x] G7-06 Implement multi-action planning — whole-plan validation produces one
+      atomic change set or nothing
+- [x] G7-07 Implement dependency-aware clarification — stable action IDs,
+      topological ordering, missing dependency and cycle errors
+- [x] G7-08 Implement compound preview and repair — detached generic change-set
+      preview and one-action repair without reinterpreting other actions
+- [x] G7-09 Prove one request/one approval/one undo — two actions accepted in one
+      change set and removed by one Undo
+- [x] G7-10 Prove old projects retain component appearance — migrated v1
+      nameplate preserves words, point, top-left anchor, component/style v1, and
+      produces an identical render plan after reopen
 - [ ] G7-11 Owner completes a compound natural-language edit
 
 ## G8 - Trustworthy local alpha
 
 - [ ] G8-01 Approve representative workflow/evidence matrix and budgets
-- [ ] G8-02 Implement autosave and crash recovery
-- [ ] G8-03 Implement resumable local jobs and progress
-- [ ] G8-04 Implement project portability and integrity verification
-- [ ] G8-05 Implement proxies, caches, and invalidation where measured
-- [ ] G8-06 Implement local diagnostics and observable errors
-- [ ] G8-07 Implement safe media cleanup and retention controls
-- [ ] G8-08 Complete accessibility and keyboard audit
-- [ ] G8-09 Complete malicious/corrupt media and recovery tests
-- [ ] G8-10 Profile and remove the largest measured bottleneck
+- [x] G8-02 Implement autosave and crash recovery — every accepted state change
+      is bounded, flushed, same-directory atomically renamed, and reloaded
+- [x] G8-03 Implement resumable local jobs and progress — durable revision
+      snapshots, idempotency, bounded progress, cancellation, and restart replay
+- [x] G8-04 Implement project portability and integrity verification —
+      content-addressed archive, compatibility manifest, SHA-256 integrity,
+      fail-closed restore against matching imported media
+- [x] G8-05 Implement proxies, caches, and invalidation where measured —
+      measured decision: no proxy/cache; first-time CPU encoding is the
+      bottleneck and exact-revision caching would not improve it
+- [x] G8-06 Implement local diagnostics and observable errors — safe versioned
+      `/api/diagnostics`, stable state/code fields, no secrets or private paths
+- [x] G8-07 Implement safe media cleanup and retention controls — only
+      controlled exports are deletable; originals/state/assets are protected
+- [x] G8-08 Complete accessibility and keyboard audit — skip links, focus/live
+      semantics, reduced motion, names, and 44-pixel repair controls
+- [x] G8-09 Complete malicious/corrupt media and recovery tests — bounded
+      intake/storage/render/archive/job failure matrix passes
+- [x] G8-10 Profile and remove the largest measured bottleneck — fixed four
+      encoder threads measured 2.38x faster than the old one-thread contract
 - [ ] G8-11 Run repeated owner full-video workflows
 - [ ] G8-12 Run bounded representative non-editor smoke tests
 - [ ] G8-13 Reach agreed E5 reliability, time, quality, and recovery budgets

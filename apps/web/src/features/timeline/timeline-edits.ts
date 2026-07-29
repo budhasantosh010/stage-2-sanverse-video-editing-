@@ -1,9 +1,14 @@
 import {
+  CLIP_AUDIO_PRIMITIVE_ID,
   CLIP_ENABLED_PRIMITIVE_ID,
+  MAX_CLIP_GAIN_DB,
+  MIN_CLIP_GAIN_DB,
   OPERATION_SCHEMA_VERSION,
   PROJECT_TIMESCALE,
   REMOVE_PRIMITIVE_ID,
+  REORDER_PRIMITIVE_ID,
   SPLIT_PRIMITIVE_ID,
+  TRIM_PRIMITIVE_ID,
   clipAtCompositionTime,
   type Clip,
   type Composition,
@@ -81,6 +86,7 @@ export const buildRemoveAtPlayhead = (
   composition: Composition,
   playheadTicks: number,
   makeOperationId: IdMaker,
+  closeGap = true,
 ): TimelineEditResult => {
   const clip = clipAt(composition, playheadTicks)
   if (!clip) return refuse('There is nothing to remove at this moment.')
@@ -96,7 +102,110 @@ export const buildRemoveAtPlayhead = (
       kind: 'remove-clip' as const,
       capabilityId: REMOVE_PRIMITIVE_ID,
       clipId: clip.clipId,
-      ripple: true,
+      ripple: closeGap,
+      extensions: Object.freeze({}),
+    }) as TimelineOperation,
+  })
+}
+
+/** Shorten the start or end of the section under the playhead. */
+export const buildTrimAtPlayhead = (
+  composition: Composition,
+  playheadTicks: number,
+  edge: 'start' | 'end',
+  amountTicks: number,
+  closeGap: boolean,
+  makeOperationId: IdMaker,
+): TimelineEditResult => {
+  const clip = clipAt(composition, playheadTicks)
+  if (!clip) return refuse('There is nothing to shorten at this moment.')
+  const amount = Math.round(amountTicks)
+  if (amount <= 0) return refuse('Choose an amount greater than zero.')
+  if (amount >= clip.sourceRange.duration.ticks) {
+    return refuse('That would remove the whole section. Choose a shorter amount.')
+  }
+  const zero = Object.freeze({ ticks: 0, timescale: PROJECT_TIMESCALE })
+  const trim = Object.freeze({ ticks: amount, timescale: PROJECT_TIMESCALE })
+  return Object.freeze({
+    ok: true,
+    operation: Object.freeze({
+      schemaVersion: OPERATION_SCHEMA_VERSION,
+      operationId: makeOperationId(),
+      kind: 'trim-clip' as const,
+      capabilityId: TRIM_PRIMITIVE_ID,
+      clipId: clip.clipId,
+      trimStart: edge === 'start' ? trim : zero,
+      trimEnd: edge === 'end' ? trim : zero,
+      ripple: closeGap,
+      extensions: Object.freeze({}),
+    }) as TimelineOperation,
+  })
+}
+
+/** Move the section under the playhead by one place, in plain directional terms. */
+export const buildMoveAtPlayhead = (
+  composition: Composition,
+  playheadTicks: number,
+  direction: 'earlier' | 'later',
+  makeOperationId: IdMaker,
+): TimelineEditResult => {
+  const clip = clipAt(composition, playheadTicks)
+  if (!clip) return refuse('There is nothing to move at this moment.')
+  const track = composition.tracks.find((candidate) =>
+    candidate.clips.some((item) => item.clipId === clip.clipId),
+  )
+  if (!track) return refuse('That section could not be found.')
+  const ordered = [...track.clips].sort(
+    (left, right) => left.compositionStart.ticks - right.compositionStart.ticks,
+  )
+  const index = ordered.findIndex((item) => item.clipId === clip.clipId)
+  const toIndex = direction === 'earlier' ? index - 1 : index + 1
+  if (toIndex < 0) return refuse('This section is already first.')
+  if (toIndex >= ordered.length) return refuse('This section is already last.')
+  return Object.freeze({
+    ok: true,
+    operation: Object.freeze({
+      schemaVersion: OPERATION_SCHEMA_VERSION,
+      operationId: makeOperationId(),
+      kind: 'reorder-clip' as const,
+      capabilityId: REORDER_PRIMITIVE_ID,
+      clipId: clip.clipId,
+      toIndex,
+      extensions: Object.freeze({}),
+    }) as TimelineOperation,
+  })
+}
+
+/** Set loudness and fades for the section under the playhead. */
+export const buildSetAudioAtPlayhead = (
+  composition: Composition,
+  playheadTicks: number,
+  gainDb: number,
+  fadeInTicks: number,
+  fadeOutTicks: number,
+  makeOperationId: IdMaker,
+): TimelineEditResult => {
+  const clip = clipAt(composition, playheadTicks)
+  if (!clip) return refuse('There is nothing to adjust at this moment.')
+  if (!Number.isFinite(gainDb) || gainDb < MIN_CLIP_GAIN_DB || gainDb > MAX_CLIP_GAIN_DB) {
+    return refuse(`Choose a loudness between ${MIN_CLIP_GAIN_DB} and ${MAX_CLIP_GAIN_DB} dB.`)
+  }
+  const fadeIn = Math.max(0, Math.round(fadeInTicks))
+  const fadeOut = Math.max(0, Math.round(fadeOutTicks))
+  if (fadeIn + fadeOut > clip.sourceRange.duration.ticks) {
+    return refuse('The fades cannot be longer than this section.')
+  }
+  return Object.freeze({
+    ok: true,
+    operation: Object.freeze({
+      schemaVersion: OPERATION_SCHEMA_VERSION,
+      operationId: makeOperationId(),
+      kind: 'set-clip-audio' as const,
+      capabilityId: CLIP_AUDIO_PRIMITIVE_ID,
+      clipId: clip.clipId,
+      gainDb,
+      fadeIn: Object.freeze({ ticks: fadeIn, timescale: PROJECT_TIMESCALE }),
+      fadeOut: Object.freeze({ ticks: fadeOut, timescale: PROJECT_TIMESCALE }),
       extensions: Object.freeze({}),
     }) as TimelineOperation,
   })

@@ -16,6 +16,7 @@ export type ProjectExportState =
 
 const PROJECT_ID = /^project_[a-z0-9]{16,64}$/
 const EXPORT_ID = /^export_[a-z0-9]{16,64}$/
+const EXPORT_JOB_ID = /^job_[a-z0-9]{16,64}$/
 const EXPORT_ERROR = 'We could not export the video. Your accepted edits are still safe.'
 const EXPORT_ERROR_CODES = [
   'RENDER_PROJECT_INVALID',
@@ -81,6 +82,49 @@ function isExportResult(value: unknown, projectId: string): value is ProjectExpo
   )
 }
 
+type ExportJobResponse = {
+  jobId: string
+  projectId: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+  progress: number
+  result?: ProjectExportResult
+  error?: { code: string; message: string }
+}
+
+function isExportJob(value: unknown, projectId: string): value is ExportJobResponse {
+  if (typeof value !== 'object' || value === null) return false
+  const job = value as Record<string, unknown>
+  return (
+    typeof job.jobId === 'string' && EXPORT_JOB_ID.test(job.jobId) &&
+    job.projectId === projectId &&
+    typeof job.status === 'string' &&
+    ['queued', 'running', 'succeeded', 'failed', 'cancelled'].includes(job.status) &&
+    typeof job.progress === 'number' &&
+    Number.isFinite(job.progress) &&
+    job.progress >= 0 &&
+    job.progress <= 1
+  )
+}
+
+function waitForPoll(signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'))
+      return
+    }
+    const timer = window.setTimeout(done, 350)
+    function done() {
+      signal?.removeEventListener('abort', aborted)
+      resolve()
+    }
+    function aborted() {
+      window.clearTimeout(timer)
+      reject(new DOMException('Aborted', 'AbortError'))
+    }
+    signal?.addEventListener('abort', aborted, { once: true })
+  })
+}
+
 /**
  * Ask the server to export.
  *
@@ -94,12 +138,13 @@ export async function exportProject(
   signal?: AbortSignal,
 ): Promise<ProjectExportResult> {
   if (!PROJECT_ID.test(projectId)) throw new Error(EXPORT_ERROR)
+  let activeJobId: string | undefined
   try {
     const response = await fetcher(`/api/projects/${projectId}/exports`, {
       method: 'POST',
       signal,
     })
-    if (response.status !== 201) {
+    if (response.status !== 202) {
       let code: ProjectExportErrorCode = 'EXPORT_FAILED'
       try {
         const failure: unknown = await response.json()
@@ -111,11 +156,28 @@ export async function exportProject(
       }
       throw new ProjectExportError(code, exportErrorMessage(code))
     }
-    const value: unknown = await response.json()
-    if (!isExportResult(value, projectId)) throw new Error('invalid export response')
-    return value
+    const created: unknown = await response.json()
+    if (!isExportJob(created, projectId)) throw new Error('invalid export job response')
+    let job = created
+    activeJobId = job.jobId
+    while (job.status === 'queued' || job.status === 'running') {
+      await waitForPoll(signal)
+      const polled = await fetcher(`/api/projects/${projectId}/export-jobs/${job.jobId}`, { signal })
+      if (polled.status !== 200) throw new Error('export job unavailable')
+      const value: unknown = await polled.json()
+      if (!isExportJob(value, projectId)) throw new Error('invalid export job response')
+      job = value
+    }
+    if (job.status === 'succeeded' && isExportResult(job.result, projectId)) return job.result
+    const code = isExportErrorCode(job.error?.code) ? job.error.code : 'EXPORT_FAILED'
+    throw new ProjectExportError(code, exportErrorMessage(code))
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      if (activeJobId) {
+        void fetcher(`/api/projects/${projectId}/export-jobs/${activeJobId}`, { method: 'DELETE' }).catch(() => undefined)
+      }
+      throw error
+    }
     if (error instanceof ProjectExportError) throw error
     throw new ProjectExportError('EXPORT_FAILED', EXPORT_ERROR, { cause: error })
   }

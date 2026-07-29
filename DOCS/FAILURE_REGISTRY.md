@@ -18,8 +18,27 @@ Record failures that can teach the project, including rejected architectural ass
 | FAIL-012 | 2026-07-26 | Local data hygiene | An accidental empty `.sanverse-data/projects/projects` directory remained from a launch that used the projects folder as the data root | Resolved in cleanup change | Verify the exact target is empty and inside `.sanverse-data/projects`, then remove only that directory |
 | FAIL-013 | 2026-07-26 | HTTP resource cleanup | The first ownership fix entered `try/finally` only after response headers were created, so a metadata/header failure after opening media could still skip `close()` | Resolved during independent review | Enter `try/finally` immediately after `openMedia`/`openExport`, before reading response metadata or writing headers |
 | FAIL-014 | 2026-07-26 | Error observability | The first idempotent `close()` implementation swallowed `FileHandle.close()` rejection, making a failed release appear successful | Resolved during independent review | Memoize and return the original close promise without converting rejection into success |
+| FAIL-015 | 2026-07-29 | Git environment | The managed Codex session can edit the project but cannot create `.git/index.lock`, so the completed G5C-07 batch cannot be staged or committed here | Open environment limitation; files are complete and uncommitted | Commit the existing working tree from normal PowerShell outside the managed sandbox |
+| FAIL-016 | 2026-07-29 | Job durability | Windows rejected directory `fsync` with `EPERM` after an export-job file was atomically renamed, causing job creation to report failure even though the file write itself was valid | Resolved in G8-03 | Preserve file flush/atomic rename; tolerate only Windows directory-sync `EPERM`, then prove restart recovery |
 
 ## 2026-07-26 cleanup incident details
+
+### FAIL-016 — Windows directory sync blocked durable job creation
+
+- **What failed:** The first persisted export-job creation returned `EPERM`.
+- **Where:** Directory `fsync` after atomic rename in
+  `apps/api/src/jobs/local-export-job-store.ts`.
+- **When:** The focused G8-03 restart-recovery contract on 2026-07-29.
+- **Who was affected:** Windows local-alpha export jobs.
+- **Why:** Windows does not consistently permit `fsync` on a directory handle.
+- **How reproduced:** Creating the first job in a fresh temporary data root
+  failed after the job file itself was flushed and renamed.
+- **What was tried:** No retry loop. The file flush and atomic rename were kept;
+  only Windows directory-sync `EPERM` was treated as unsupported.
+- **Status:** Resolved; persistence, concurrent idempotency, and restart recovery
+  contract passes.
+- **One-line solution:** Keep file `fsync` plus atomic rename, and tolerate only
+  Windows directory-handle `EPERM`.
 
 ### FAIL-009 — Open media handles lacked explicit ownership
 
@@ -86,6 +105,18 @@ Record failures that can teach the project, including rejected architectural ass
 - **What was tried:** Removed the swallowing catch while retaining a single memoized promise, so repeated callers observe the same success or failure.
 - **Status:** Resolved.
 - **One-line solution:** Preserve the original memoized close promise and never report a failed resource release as success.
+
+### FAIL-015 — Managed sandbox blocks the Git index
+
+- **What failed:** `git add` and `git commit` could not start because Git could not create its index lock.
+- **Where:** `.git/index.lock` in the authoritative Stage 2 project.
+- **When:** After G5C-07 implementation, focused checks, and documentation were complete on 2026-07-29.
+- **Who was affected:** Only the local commit step in this managed Codex session; the completed working-tree files are intact.
+- **Why:** The session grants project-file writes but exposes the repository's `.git` directory as read-only.
+- **How reproduced:** The focused `git add` command returned `fatal: Unable to create '.git/index.lock': Permission denied`; `git commit` returned the same failure.
+- **What was tried:** One focused stage-and-commit attempt. No retry or permission-debugging loop was performed.
+- **Status:** Open environment limitation. G5C-07 is complete but uncommitted.
+- **One-line solution:** From normal PowerShell, stage the listed G5C-07 files and run `git commit -m "[wip] feat(web): repair titles callouts media and music"`.
 
 ## Entry rules
 

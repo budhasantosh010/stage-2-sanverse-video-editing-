@@ -9,9 +9,12 @@ import {
 
 import { testAsset, testProject } from '../../test-fixtures'
 import {
+  buildMoveAtPlayhead,
   buildRemoveAtPlayhead,
+  buildSetAudioAtPlayhead,
   buildSetEnabledAtPlayhead,
   buildSplitAtPlayhead,
+  buildTrimAtPlayhead,
   timelineBlocks,
 } from './timeline-edits'
 
@@ -94,6 +97,48 @@ describe('removing at the playhead', () => {
     expect(result).toMatchObject({ ok: false })
     if (result.ok) return
     expect(result.refusal.reason).toMatch(/only section/i)
+  })
+
+  it('can deliberately leave the removed section as empty space', () => {
+    const split = buildSplitAtPlayhead(base, 10 * S, operationId, clipId)
+    if (!split.ok) throw new Error('setup failed')
+    const twoSections = applied(base, split.operation)
+
+    const remove = buildRemoveAtPlayhead(twoSections, 2 * S, operationId, false)
+    expect(remove.ok).toBe(true)
+    if (!remove.ok || remove.operation.kind !== 'remove-clip') return
+    expect(remove.operation.ripple).toBe(false)
+  })
+})
+
+describe('adjusting the section at the playhead', () => {
+  it('trims a bounded amount from either edge', () => {
+    const result = buildTrimAtPlayhead(base, 5 * S, 'start', 2 * S, true, operationId)
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.operation.kind !== 'trim-clip') return
+    expect(result.operation.trimStart.ticks).toBe(2 * S)
+    expect(result.operation.trimEnd.ticks).toBe(0)
+    expect(result.operation.ripple).toBe(true)
+  })
+
+  it('moves a section earlier or later without exposing indexes', () => {
+    const split = buildSplitAtPlayhead(base, 10 * S, operationId, clipId)
+    if (!split.ok) throw new Error('setup failed')
+    const twoSections = applied(base, split.operation)
+
+    const result = buildMoveAtPlayhead(twoSections, 20 * S, 'earlier', operationId)
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.operation.kind !== 'reorder-clip') return
+    expect(result.operation.toIndex).toBe(0)
+  })
+
+  it('sets loudness and fades in seconds on the section under the playhead', () => {
+    const result = buildSetAudioAtPlayhead(base, 5 * S, -6, 2 * S, 3 * S, operationId)
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.operation.kind !== 'set-clip-audio') return
+    expect(result.operation.gainDb).toBe(-6)
+    expect(result.operation.fadeIn.ticks).toBe(2 * S)
+    expect(result.operation.fadeOut.ticks).toBe(3 * S)
   })
 })
 

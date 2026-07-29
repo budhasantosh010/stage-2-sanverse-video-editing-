@@ -37,6 +37,21 @@ input {
   background: var(--color-ink);
 }
 
+.skip-link {
+  position: fixed;
+  z-index: 10000;
+  top: 8px;
+  left: 8px;
+  padding: 10px 14px;
+  color: var(--color-surface);
+  background: var(--color-ink);
+  transform: translateY(-160%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 [data-view-transition='fallback'] .home-screen,
 [data-view-transition='fallback'] .studio-screen {
   transform-origin: center top;

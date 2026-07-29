@@ -1,16 +1,18 @@
 # Current State
 
-Last updated: 2026-07-28
+Last updated: 2026-07-29
 
 ## Active goal
 
-**G5-B — cutting. The video can now be cut, sections removed, and the result
-exported, with every edit anchored to the original footage so it survives the
-cut. Built and verified on the owner's own recording (E4).**
+**The executable G6/G8 technical batch is complete: G6-11 and
+G8-02 through G8-10 are complete. Remaining G8 work is owner approval,
+repeated owner workflows, representative non-editor smoke tests, and agreed E5
+budgets. These human evidence gates are not implementation tasks.**
 
-What remains in G5-B is reach, not foundation: trim, reorder, and clip audio
-work but have no button; only one frame rate has been exercised; and the owner
-has not run it. `DOCS/plans/PLAN_CHECKLIST.md` has the exact split.
+G5-B's technical controls and media-fixture gate are complete. Trim,
+remove-with-gap, reorder, loudness, and fades are reachable from Studio, and
+VFR/rational-rate/audio/boundary fixtures have been conformed and probed. The
+owner workflow gates remain owner decisions.
 
 G4-B is finished except the first real API call, which is blocked on the owner's
 keys. The chat box works: a sentence typed into it produces a pending proposal,
@@ -118,8 +120,8 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
   transitions, or general effects
 - Reusable versioned titles, callouts, subtitle components, B-roll, or templates
 - Compound requests that produce more than one operation
-- Background export jobs, percentage progress, or accelerated rendering
-- Project portability, accounts, authentication, tenancy, billing, cloud
+- Per-frame export percentage; durable milestone progress is implemented
+- Accounts, authentication, tenancy, billing, cloud
   storage/rendering, quotas, or production SaaS operations
 - Advanced object tracking, segmentation, or a data/model flywheel
 
@@ -151,12 +153,29 @@ defects 741 passing tests had missed, both now fixed and guarded.
   bounded with `-loop 1 -t`, audio mixed with `normalize=0` so music cannot
   quietly duck the speech, and a real sound track built for silent footage when
   music is added.
+- **Direct repair is implemented for all four families.** A title, callout,
+  B-roll/picture, or music bed can be adjusted without undoing and recreating
+  it. Each adjustment is a complete `set-*` operation, one history entry, and
+  one Undo. The compiler folds repairs before creating the shared render plan.
+  Focused direct domain/render evidence and relevant TypeScript checks pass;
+  browser click-through is not yet E4-verified.
+- **G6 visual properties have one shared motion model.** The closed
+  `set-visual-properties` operation covers transform, crop, layer, mask,
+  keyframes, cubic-Bezier easing, spring, and bounce. Render plan v5 binds that
+  state to concrete nodes after cuts. Bounded basic effects are registered,
+  browser CSS consumes visual state for every overlay family, and native FFmpeg
+  consumes it for media overlays. The hybrid architecture was retained after a
+  measured real motion render. ADR-008 and the G6 adapter evidence.
+- **G7-02 through G7-09 are implemented.** Five immutable recipes, four outcome
+  workflows, exact version compatibility, fail-closed migrations, dependency
+  ordering, atomic multi-action plans, detached compound preview, targeted
+  repair, and one-approval/one-Undo proof are recorded in ADR-009.
 
 ## Known limitations
 
-- **No repair panel for the four new families.** A title, callout, B-roll clip,
-  or piece of music can be created and undone, but not adjusted in place.
-  G5C-07's second half is not started.
+- **The new repair panel has not been clicked through in a real browser.** Its
+  domain/render contract and TypeScript boundaries pass, but this is not E4
+  usability evidence.
 - **A callout cannot be moved or resized on screen.** It appears in a fixed
   sensible place over the middle-right of the picture.
 - **The on-screen controls were not driven by hand.** The Add panel, the upload
@@ -171,10 +190,15 @@ defects 741 passing tests had missed, both now fixed and guarded.
 - **The drawn background plate is about 10 px shorter vertically in the export
   than in the preview** at 1080p. Position is identical. Closing it needs the
   font's real ascent and descent read from the TTF. Recorded in ADR-003.
-- A 30-second 1080p CPU export takes roughly 60–90 seconds and exposes no
-  percentage or time estimate. Deprioritized by the owner.
-- Only one frame rate has been exercised on real media: 30/1 constant. Variable
-  frame rate and 30000/1001 fixtures are G5B-13 and have not been run.
+- The previous one-thread 30-second observation was 60–90 seconds. G8-10 now
+  pins four threads after a 2.38x representative benchmark. Progress is durable
+  milestone progress, not an invented per-frame estimate.
+- **G6-07 and G6-10 are implemented.** Adjacent-clip dip transitions carry
+  explicit video/audio ramps through preview and native export. Media and
+  written overlay families consume the shared visual adapter path; written
+  families are isolated on transparent layers before effects are applied.
+- G6-11 evaluator/adapter fidelity contracts cover every authored property and
+  easing family at seek boundaries. G6-12 owner motion-feel approval remains.
 - Captions have been proved with one English, synthetic transcript on one
   recording. Right-to-left scripts and CJK line breaking are untested; the
   segmentation rules (42 characters, 17 characters per second) are Latin-script
@@ -182,8 +206,13 @@ defects 741 passing tests had missed, both now fixed and guarded.
 - A transcript upload is capped at 1 MB by the shared JSON body limit, which is
   roughly a 20-minute transcript with word timings.
 - A change set holding both a cut and an overlay can have the cut applied while
-  being reported blocked for its overlay. No such change set exists today; G7
-  must resolve it before compound requests ship. ADR-005.
+  being reported blocked for its overlay. The G7 workflow registry cannot
+  create this case because it exposes no timeline recipes. The replay defect
+  must be fixed before a future workflow is allowed to mix cuts and overlays.
+  ADR-005.
+- Durable resumable render jobs, real diagnostics counts, content-addressed
+  portable archives, and fail-closed restore are built. Portable restore
+  requires matching media to be imported first; video bytes are not embedded.
 - No colour or HDR handling; `-pix_fmt yuv420p` is forced. iPhones record HDR by
   default, so washed-out output is plausible and unproven.
 - Parity was measured with Arial only, and by real export only for the

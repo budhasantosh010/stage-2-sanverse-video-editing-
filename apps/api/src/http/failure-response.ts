@@ -129,6 +129,16 @@ export const describeFailure = (error: unknown): FailureAnswer | null => {
   if (code === 'PROJECT_STATE_INVALID') {
     return { status: 500, message: 'The saved project history is invalid.', code, log: true }
   }
+  if (code === 'PORTABLE_MEDIA_MISSING') {
+    return { status: 409, message: 'Matching source media is required before this project can be restored.', code }
+  }
+  if (
+    code === 'PORTABLE_ARCHIVE_INVALID' ||
+    code === 'PORTABLE_ARCHIVE_CORRUPT' ||
+    code === 'PORTABLE_PROJECT_UNSUPPORTED'
+  ) {
+    return { status: 400, message: 'The portable project archive is invalid, corrupt, or unsupported.', code }
+  }
 
   return null
 }

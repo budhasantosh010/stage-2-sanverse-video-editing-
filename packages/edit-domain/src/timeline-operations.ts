@@ -110,6 +110,18 @@ export type SetClipAudioOperation = Common &
     fadeOut: MediaTime
   }>
 
+export type SetClipTransitionOperation = Common &
+  Readonly<{
+    kind: 'set-clip-transition'
+    clipId: string
+    /** The outgoing clip is `clipId`; this is the immediately following clip. */
+    nextClipId: string
+    style: 'none' | 'dip-to-black'
+    /** Length of each side's ramp. The timeline duration itself is unchanged. */
+    duration: MediaTime
+    audio: 'cut' | 'fade-through-silence'
+  }>
+
 export type TimelineOperation =
   | SplitClipOperation
   | TrimClipOperation
@@ -117,6 +129,7 @@ export type TimelineOperation =
   | ReorderClipOperation
   | SetClipEnabledOperation
   | SetClipAudioOperation
+  | SetClipTransitionOperation
 
 export const TIMELINE_OPERATION_KINDS: readonly string[] = Object.freeze([
   'split-clip',
@@ -125,6 +138,7 @@ export const TIMELINE_OPERATION_KINDS: readonly string[] = Object.freeze([
   'reorder-clip',
   'set-clip-enabled',
   'set-clip-audio',
+  'set-clip-transition',
 ])
 
 export const isTimelineOperationKind = (kind: unknown): boolean =>
@@ -152,6 +166,14 @@ const KEYS_BY_KIND: Readonly<Record<string, readonly string[]>> = Object.freeze(
   'reorder-clip': Object.freeze([...COMMON_KEYS, 'clipId', 'toIndex']),
   'set-clip-enabled': Object.freeze([...COMMON_KEYS, 'clipId', 'enabled']),
   'set-clip-audio': Object.freeze([...COMMON_KEYS, 'clipId', 'gainDb', 'fadeIn', 'fadeOut']),
+  'set-clip-transition': Object.freeze([
+    ...COMMON_KEYS,
+    'clipId',
+    'nextClipId',
+    'style',
+    'duration',
+    'audio',
+  ]),
 })
 
 export const OPERATION_ID_PATTERN = /^operation_[a-z0-9]{8,64}$/
@@ -269,6 +291,34 @@ export const validateTimelineOperation = (
       extra = { gainDb, fadeIn, fadeOut }
       break
     }
+    case 'set-clip-transition': {
+      if (typeof input.nextClipId !== 'string' || !CLIP_ID_PATTERN.test(input.nextClipId)) {
+        issues.push({ path: `${path}.nextClipId`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      if (input.style !== 'none' && input.style !== 'dip-to-black') {
+        issues.push({ path: `${path}.style`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      const duration = time(input.duration, 'duration')
+      if (
+        duration !== null &&
+        (
+          duration.ticks > 2_880_000 ||
+          (input.style === 'none' ? duration.ticks !== 0 : duration.ticks <= 0)
+        )
+      ) {
+        issues.push({ path: `${path}.duration`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      if (input.audio !== 'cut' && input.audio !== 'fade-through-silence') {
+        issues.push({ path: `${path}.audio`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      extra = {
+        nextClipId: input.nextClipId,
+        style: input.style,
+        duration,
+        audio: input.audio,
+      }
+      break
+    }
     default:
       break
   }
@@ -294,6 +344,8 @@ export type TimelineApplyCode =
   | 'TRACK_HAS_GAPS'
   | 'INDEX_OUT_OF_RANGE'
   | 'FADE_LONGER_THAN_CLIP'
+  | 'TRANSITION_TARGET_INVALID'
+  | 'TRANSITION_LONGER_THAN_CLIP'
   | 'COMPOSITION_WOULD_BE_EMPTY'
   | 'TOO_MANY_CLIPS'
   | 'RESULT_INVALID'
@@ -493,6 +545,29 @@ export const applyTimelineOperation = (
           : candidate,
       )
       break
+    }
+
+    case 'set-clip-transition': {
+      const running = ordered(track)
+      const index = running.findIndex((candidate) => candidate.clipId === clip.clipId)
+      const next = running[index + 1]
+      if (
+        !next ||
+        next.clipId !== operation.nextClipId ||
+        clip.compositionStart.ticks + clip.sourceRange.duration.ticks !== next.compositionStart.ticks
+      ) {
+        return err(fail('TRANSITION_TARGET_INVALID'))
+      }
+      if (
+        operation.duration.ticks > clip.sourceRange.duration.ticks ||
+        operation.duration.ticks > next.sourceRange.duration.ticks
+      ) {
+        return err(fail('TRANSITION_LONGER_THAN_CLIP'))
+      }
+      // Transition state lives in the accepted operation and is compiled onto
+      // the two segment nodes. The composition remains non-overlapping and its
+      // duration therefore cannot drift.
+      return ok(composition)
     }
 
     default: {

@@ -1,4 +1,10 @@
-import type { SpatialTarget, TimeRange } from '@sanverse/edit-domain'
+import {
+  VISUAL_PROPERTIES_PRIMITIVE_ID,
+  validateVisualPropertiesOperation,
+  type SpatialTarget,
+  type TimeRange,
+  type VisualProperties,
+} from '@sanverse/edit-domain'
 
 /**
  * What to draw, with every decision already made.
@@ -33,6 +39,12 @@ export type SourceSegmentNode = Readonly<{
   fadeInTicks: number
   /** Full-to-silence ramp at the tail of this piece, in ticks. */
   fadeOutTicks: number
+  /** Picture-only ramps created by an explicit adjacent-clip transition. */
+  videoFadeInTicks: number
+  videoFadeOutTicks: number
+  /** Additional sound ramps for that transition; zero when audio stays cut. */
+  transitionAudioFadeInTicks: number
+  transitionAudioFadeOutTicks: number
 }>
 
 export type TextOverlayNode = Readonly<{
@@ -144,8 +156,14 @@ export type RenderSource = Readonly<{
   mediaKind: 'video' | 'image' | 'audio'
 }>
 
+/** One authored visual state bound to the concrete nodes produced after cuts. */
+export type VisualPropertiesNode = VisualProperties & Readonly<{
+  visualId: string
+  nodeIds: readonly string[]
+}>
+
 export type RenderPlan = Readonly<{
-  schemaVersion: 'sanverse.render-plan/v3'
+  schemaVersion: 'sanverse.render-plan/v5'
   projectId: string
   /**
    * The revision this plan was compiled from. An export carries it, so a file
@@ -169,6 +187,8 @@ export type RenderPlan = Readonly<{
   segments: readonly SourceSegmentNode[]
   /** What is drawn on top of that footage. */
   overlays: readonly RenderNode[]
+  /** Transform, crop, layer, mask, and time-varying properties for drawn nodes. */
+  visuals: readonly VisualPropertiesNode[]
   /** What is heard under it. Empty when there is no music. */
   music: readonly MusicNode[]
 }>
@@ -190,7 +210,7 @@ export type RenderPlanError = {
   readonly issues: readonly { readonly path: string; readonly code: RenderPlanIssueCode }[]
 }
 
-export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v3'
+export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v5'
 /**
  * Raised from 512 because captions produce one node per line of speech. A
  * ten-minute talk is roughly 200 cues before cutting, and a cut through a cue
@@ -217,6 +237,7 @@ const PLAN_KEYS = [
   'sources',
   'segments',
   'overlays',
+  'visuals',
   'music',
 ] as const
 
@@ -305,6 +326,20 @@ const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]
       (fadeIn as number) + (fadeOut as number) > interval.duration
     ) {
       issues.push({ path: `${path}.fadeInTicks`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    const transitionFades = [
+      segment.videoFadeInTicks,
+      segment.videoFadeOutTicks,
+      segment.transitionAudioFadeInTicks,
+      segment.transitionAudioFadeOutTicks,
+    ]
+    if (
+      transitionFades.some((value) => !Number.isSafeInteger(value) || (value as number) < 0) ||
+      (segment.videoFadeInTicks as number) + (segment.videoFadeOutTicks as number) > interval.duration ||
+      (segment.transitionAudioFadeInTicks as number) +
+        (segment.transitionAudioFadeOutTicks as number) > interval.duration
+    ) {
+      issues.push({ path: `${path}.videoFadeInTicks`, code: 'VALUE_OUT_OF_RANGE' })
     }
 
     spans.push({ start: interval.start, end: interval.start + interval.duration })
@@ -546,6 +581,68 @@ export const validateRenderPlan = (
         if (!isRecord(node.target) || !isRecord(node.target.point) || typeof node.target.anchor !== 'string') {
           issues.push({ path: `${path}.target`, code: 'TYPE_INVALID' })
         }
+      }
+    })
+  }
+
+  if (!Array.isArray(input.visuals)) {
+    issues.push({ path: 'visuals', code: 'TYPE_INVALID' })
+  } else if (input.visuals.length > MAX_RENDER_NODES) {
+    issues.push({ path: 'visuals', code: 'VALUE_OUT_OF_RANGE' })
+  } else {
+    const overlayIds = new Set(
+      Array.isArray(input.overlays)
+        ? input.overlays.filter(isRecord).map((node) => node.nodeId).filter((id): id is string => typeof id === 'string')
+        : [],
+    )
+    const claimedNodes = new Set<string>()
+    const seenVisualIds = new Set<string>()
+    input.visuals.forEach((visual, index) => {
+      const path = `visuals[${index}]`
+      if (!isRecord(visual)) {
+        issues.push({ path, code: 'TYPE_INVALID' })
+        return
+      }
+      const keys = ['visualId', 'nodeIds', 'transform', 'crop', 'layer', 'mask', 'tracks', 'transition', 'effects']
+      if (Object.keys(visual).some((key) => !keys.includes(key)) || keys.some((key) => !Object.hasOwn(visual, key))) {
+        issues.push({ path, code: 'FIELD_UNKNOWN' })
+        return
+      }
+      if (typeof visual.visualId !== 'string' || seenVisualIds.has(visual.visualId)) {
+        issues.push({ path: `${path}.visualId`, code: 'VALUE_OUT_OF_RANGE' })
+      } else {
+        seenVisualIds.add(visual.visualId)
+      }
+      if (
+        !Array.isArray(visual.nodeIds) ||
+        visual.nodeIds.length === 0 ||
+        visual.nodeIds.some((nodeId) =>
+          typeof nodeId !== 'string' || !overlayIds.has(nodeId) || claimedNodes.has(nodeId)
+        )
+      ) {
+        issues.push({ path: `${path}.nodeIds`, code: 'VALUE_OUT_OF_RANGE' })
+      } else {
+        visual.nodeIds.forEach((nodeId) => claimedNodes.add(nodeId as string))
+      }
+      const checked = validateVisualPropertiesOperation({
+        schemaVersion: 'sanverse.operation/v3',
+        operationId: 'operation_plancheck',
+        kind: 'set-visual-properties',
+        capabilityId: VISUAL_PROPERTIES_PRIMITIVE_ID,
+        visualId: visual.visualId,
+        transform: visual.transform,
+        crop: visual.crop,
+        layer: visual.layer,
+        mask: visual.mask,
+        tracks: visual.tracks,
+        transition: visual.transition,
+        effects: visual.effects,
+        extensions: {},
+      }, path)
+      if (!checked.ok) {
+        checked.error.issues.forEach((issue) =>
+          issues.push({ path: issue.path, code: 'VALUE_OUT_OF_RANGE' }),
+        )
       }
     })
   }

@@ -12,6 +12,7 @@ import {
   testOperation,
   testRemove,
   testSplit,
+  testTransition,
   testTitle,
 } from '@sanverse/edit-domain/test-fixtures'
 
@@ -104,7 +105,67 @@ describe('drawing order', () => {
   })
 })
 
+describe('render-plan v5 visual properties', () => {
+  it('binds one transform and motion contract to every concrete node made from its visual', () => {
+    let project = testMultiAssetProject()
+    project = accept(project, 'changeset_title001', [testTitle({ titleId: 'title_visual01' })])
+    project = accept(project, 'changeset_visual01', [{
+      schemaVersion: 'sanverse.operation/v3',
+      operationId: 'operation_visual01',
+      kind: 'set-visual-properties',
+      capabilityId: 'sanverse.visual.properties.primitive/v1',
+      visualId: 'title_visual01',
+      transform: { translateX: 0.1, translateY: 0, scale: 1.2, rotationDegrees: 8, opacity: 0.9 },
+      crop: { top: 0, right: 0, bottom: 0, left: 0 },
+      layer: 3,
+      mask: { shape: 'none', feather: 0 },
+      tracks: [{
+        property: 'scale',
+        keyframes: [
+          { at: ms(0), value: 0.8, easing: { kind: 'spring', mass: 1, stiffness: 180, damping: 12, velocity: 0 } },
+          { at: ms(500), value: 1.2, easing: { kind: 'linear' } },
+        ],
+      }],
+      transition: {
+        enter: { kind: 'fade', duration: ms(250), easing: { kind: 'linear' } },
+        exit: { kind: 'none', duration: ms(0), easing: { kind: 'linear' } },
+      },
+      effects: [{ kind: 'saturation', amount: 0.8 }],
+      extensions: {},
+    }])
+
+    const plan = compile(project)
+    expect(plan.schemaVersion).toBe('sanverse.render-plan/v5')
+    expect(plan.visuals).toHaveLength(1)
+    expect(plan.visuals[0]).toMatchObject({
+      visualId: 'title_visual01',
+      nodeIds: ['title_visual01'],
+      transform: { translateX: 0.1, scale: 1.2, rotationDegrees: 8, opacity: 0.9 },
+      layer: 3,
+      tracks: [{ property: 'scale' }],
+      transition: { enter: { kind: 'fade' } },
+      effects: [{ kind: 'saturation', amount: 0.8 }],
+    })
+    expect(validateRenderPlan(plan).ok).toBe(true)
+  })
+})
+
 describe('what a cut does to each family', () => {
+  it('compiles an adjacent dip-to-black with explicit video and audio ramps', () => {
+    let project = testMultiAssetProject()
+    project = accept(project, 'changeset_split001', [testSplit({ atClipTime: ms(10_000) })])
+    project = accept(project, 'changeset_trans001', [testTransition()])
+    const plan = compile(project)
+    expect(plan.segments[0]).toMatchObject({
+      videoFadeOutTicks: ms(500).ticks,
+      transitionAudioFadeOutTicks: ms(500).ticks,
+    })
+    expect(plan.segments[1]).toMatchObject({
+      videoFadeInTicks: ms(500).ticks,
+      transitionAudioFadeInTicks: ms(500).ticks,
+    })
+  })
+
   it('moves a title with the footage it was pinned to', () => {
     let project = testMultiAssetProject()
     // A title over source seconds 10-13.

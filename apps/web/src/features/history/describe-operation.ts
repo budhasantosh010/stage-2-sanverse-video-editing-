@@ -41,6 +41,10 @@ export const describeOperation = (operation: EditOperation): string => {
       if (operation.fadeOut.ticks > 0) parts.push('faded out')
       return parts.length > 0 ? `Sound: ${parts.join(', ')}` : 'Sound left unchanged'
     }
+    case 'set-clip-transition':
+      return operation.style === 'none'
+        ? 'Removed the transition between two sections'
+        : 'Added a smooth dip between two sections'
     case 'add-captions': {
       const count = operation.cues.length
       return `Added captions — ${count} ${count === 1 ? 'line' : 'lines'}`
@@ -59,13 +63,25 @@ export const describeOperation = (operation: EditOperation): string => {
       return operation.subhead
         ? `Title: “${operation.headline}” — ${operation.subhead}`
         : `Title: “${operation.headline}”`
+    case 'set-title':
+      return operation.subhead
+        ? `Changed title to “${operation.headline}” — ${operation.subhead}`
+        : `Changed title to “${operation.headline}”`
     case 'add-callout':
       return operation.label
         ? `Pointed out “${operation.label}”`
         : 'Drew a box on the picture'
+    case 'set-callout':
+      return operation.label
+        ? `Changed callout to “${operation.label}”`
+        : 'Moved or resized a callout'
     case 'add-media-overlay': {
       const length = seconds(operation.sourceInterval.duration.ticks)
       return `Showed another clip for ${length}s`
+    }
+    case 'set-media-overlay': {
+      const length = seconds(operation.sourceInterval.duration.ticks)
+      return `Changed another clip to ${length}s`
     }
     case 'add-music': {
       // The loudness is said the way a person would ask for it, not in decibels
@@ -79,6 +95,12 @@ export const describeOperation = (operation: EditOperation): string => {
             : 'full volume'
       return `Added music, ${level}`
     }
+    case 'set-music':
+      return 'Changed the music'
+    case 'set-visual-properties':
+      return operation.tracks.length > 0
+        ? 'Changed how something moves'
+        : 'Changed its position or appearance'
     default: {
       const unreachable: never = operation
       void unreachable

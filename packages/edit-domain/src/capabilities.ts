@@ -29,6 +29,7 @@ export const REMOVE_PRIMITIVE_ID = 'sanverse.timeline.remove.primitive/v1'
 export const REORDER_PRIMITIVE_ID = 'sanverse.timeline.reorder.primitive/v1'
 export const CLIP_ENABLED_PRIMITIVE_ID = 'sanverse.timeline.enabled.primitive/v1'
 export const CLIP_AUDIO_PRIMITIVE_ID = 'sanverse.timeline.audio.primitive/v1'
+export const CLIP_TRANSITION_PRIMITIVE_ID = 'sanverse.timeline.transition.primitive/v1'
 
 export const CAPTIONS_PRIMITIVE_ID = 'sanverse.captions.add.primitive/v1'
 export const CAPTION_CUE_PRIMITIVE_ID = 'sanverse.captions.cue.primitive/v1'
@@ -40,6 +41,7 @@ export const TITLE_PRIMITIVE_ID = 'sanverse.title.primitive/v1'
 export const CALLOUT_PRIMITIVE_ID = 'sanverse.callout.primitive/v1'
 export const MEDIA_OVERLAY_PRIMITIVE_ID = 'sanverse.broll.primitive/v1'
 export const MUSIC_PRIMITIVE_ID = 'sanverse.music.primitive/v1'
+export const VISUAL_PROPERTIES_PRIMITIVE_ID = 'sanverse.visual.properties.primitive/v1'
 
 /** "Put a title on it." */
 export const TITLE_COMPONENT_ID = 'sanverse.title.component/v1'
@@ -54,6 +56,7 @@ export const MUSIC_COMPONENT_ID = 'sanverse.music.component/v1'
 export const REMOVE_RANGE_COMPONENT_ID = 'sanverse.timeline.remove-range.component/v1'
 /** "Make this stretch quieter, or fade it." */
 export const AUDIO_LEVEL_COMPONENT_ID = 'sanverse.timeline.audio-level.component/v1'
+export const CLIP_TRANSITION_COMPONENT_ID = 'sanverse.timeline.transition.component/v1'
 
 /**
  * G4-A registers only what already exists. Workflow-level capabilities begin
@@ -161,7 +164,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     version: 1,
     level: 'primitive' as const,
     accepts: 'One piece of footage, a moment on it, up to two lines of words, and where they sit.',
-    produces: Object.freeze(['add-title']),
+    produces: Object.freeze(['add-title', 'set-title']),
     requires: Object.freeze([]),
   }),
   Object.freeze({
@@ -169,7 +172,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     version: 1,
     level: 'primitive' as const,
     accepts: 'One piece of footage, a moment on it, a rectangle on the picture, and an optional label.',
-    produces: Object.freeze(['add-callout']),
+    produces: Object.freeze(['add-callout', 'set-callout']),
     requires: Object.freeze([]),
   }),
   Object.freeze({
@@ -177,7 +180,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     version: 1,
     level: 'primitive' as const,
     accepts: 'A second video or a picture, the moment of footage it covers, and the box it is drawn in.',
-    produces: Object.freeze(['add-media-overlay']),
+    produces: Object.freeze(['add-media-overlay', 'set-media-overlay']),
     requires: Object.freeze([]),
   }),
   Object.freeze({
@@ -185,7 +188,23 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     version: 1,
     level: 'primitive' as const,
     accepts: 'One piece of music, when it starts on the finished video, how loud, and its ramps.',
-    produces: Object.freeze(['add-music']),
+    produces: Object.freeze(['add-music', 'set-music']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: CLIP_TRANSITION_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'Two adjacent clips, a bounded transition duration, and explicit audio behavior.',
+    produces: Object.freeze(['set-clip-transition']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: VISUAL_PROPERTIES_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One existing visual, its transform, crop, layer, mask, and bounded property tracks.',
+    produces: Object.freeze(['set-visual-properties']),
     requires: Object.freeze([]),
   }),
   Object.freeze({
@@ -237,6 +256,14 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     accepts: 'A stretch of the video and how much quieter or louder it should be.',
     produces: Object.freeze(['set-clip-audio']),
     requires: Object.freeze([CLIP_AUDIO_PRIMITIVE_ID]),
+  }),
+  Object.freeze({
+    capabilityId: CLIP_TRANSITION_COMPONENT_ID,
+    version: 1,
+    level: 'component' as const,
+    accepts: 'A smooth dip between two adjacent pieces, with an explicit sound fade policy.',
+    produces: Object.freeze(['set-clip-transition']),
+    requires: Object.freeze([CLIP_TRANSITION_PRIMITIVE_ID]),
   }),
 ])
 

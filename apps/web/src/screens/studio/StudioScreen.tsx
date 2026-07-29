@@ -3,6 +3,7 @@ import type { AddNameplateOperation, EditProject, TimelineOperation } from '@san
 import {
   DEFAULT_CAPTION_STYLE_ID,
   DEFAULT_TITLE_STYLE_ID,
+  activeOverlayOperations,
   type EditOperation,
   type MediaAsset,
   PROJECT_TIMESCALE,
@@ -18,9 +19,12 @@ import type { IntentContextInput } from '../../features/conversation/conversatio
 import { NameplateRepair } from '../../features/proposal-repair/NameplateRepair'
 import { describeOperation } from '../../features/history/describe-operation'
 import {
+  buildMoveAtPlayhead,
   buildRemoveAtPlayhead,
+  buildSetAudioAtPlayhead,
   buildSetEnabledAtPlayhead,
   buildSplitAtPlayhead,
+  buildTrimAtPlayhead,
   timelineBlocks,
 } from '../../features/timeline/timeline-edits'
 import {
@@ -35,11 +39,13 @@ import {
   compilePreviewPlan,
   millisecondsToTicks,
   nameplateCssVariables,
+  segmentVideoOpacityAt,
   visibleCallouts,
   visibleCaptions,
   visibleMediaOverlays,
   visibleTitles,
   titleCssVariables,
+  visualCssStyleAt,
   visibleNameplates,
   withPendingProposal,
 } from '../../features/render-plan/render-plan-preview'
@@ -48,6 +54,7 @@ import { NameplateComposer } from '../../features/nameplate/NameplateComposer'
 import { NameplateOverlay } from '../../features/nameplate/NameplateOverlay'
 import { CaptionOverlay } from '../../features/captions/CaptionOverlay'
 import { AddOverlayPanel } from '../../features/overlays/AddOverlayPanel'
+import { OverlayRepairPanel } from '../../features/overlays/OverlayRepairPanel'
 import { CalloutOverlay, MediaOverlay, TitleOverlay } from '../../features/overlays/OverlayLayers'
 import {
   capturePointTarget,
@@ -199,6 +206,10 @@ export function StudioScreen({
   const [proposalResult, setProposalResult] = useState<string | null>(null)
   /** A plain sentence explaining why a cut was not made. */
   const [timelineNotice, setTimelineNotice] = useState<string | null>(null)
+  const [trimSeconds, setTrimSeconds] = useState(1)
+  const [clipGainDb, setClipGainDb] = useState(0)
+  const [fadeInSeconds, setFadeInSeconds] = useState(0)
+  const [fadeOutSeconds, setFadeOutSeconds] = useState(0)
   const [captionsNotice, setCaptionsNotice] = useState<string | null>(null)
   const [captionsBusy, setCaptionsBusy] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -429,6 +440,29 @@ export function StudioScreen({
   const assetKinds = new Map(editProject.assets.map((asset) => [asset.assetId, asset.mediaKind]))
   const contentBox = video ? getRenderedVideoContentBox(video.getBoundingClientRect(), video.videoWidth, video.videoHeight) : null
   const previewScale = contentBox && composition.width > 0 ? contentBox.width / composition.width : 0
+  const reducedMotion =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const transitionSegment = footagePlan?.segments.find(
+    (segment) =>
+      playheadPreviewTicks >= segment.interval.start.ticks &&
+      playheadPreviewTicks < segment.interval.start.ticks + segment.interval.duration.ticks,
+  )
+  const transitionOpacity = transitionSegment
+    ? segmentVideoOpacityAt(transitionSegment, playheadPreviewTicks, reducedMotion)
+    : 1
+  const motionStyle = (node: Parameters<typeof visualCssStyleAt>[1]) =>
+    previewPlan
+      ? visualCssStyleAt(
+          previewPlan,
+          node,
+          playheadPreviewTicks,
+          composition.width,
+          composition.height,
+          reducedMotion,
+        )
+      : undefined
   const nameplateVariables = nameplateCssVariables(composition.width, composition.height, previewScale)
   // Only one caption is ever on screen, so one set of variables is enough. Two
   // caption sets with different looks would need one layer each; that arrives
@@ -450,6 +484,7 @@ export function StudioScreen({
   )
 
   const acceptedRecords = editProject.changeSets
+  const acceptedOverlays = activeOverlayOperations(editProject)
   const acceptedCount = acceptedRecords.length
   const firstClipId = composition.tracks[0]?.clips[0]?.clipId ?? ''
   const isRendering = exportState.status === 'rendering'
@@ -487,14 +522,53 @@ export function StudioScreen({
    * result at once, and one Undo takes it back. A refusal is shown as a plain
    * sentence and nothing is sent.
    */
-  function runTimelineEdit(action: 'split' | 'remove' | 'hide' | 'show') {
+  function runTimelineEdit(
+    action:
+      | 'split'
+      | 'remove'
+      | 'remove-gap'
+      | 'hide'
+      | 'show'
+      | 'trim-start'
+      | 'trim-end'
+      | 'move-earlier'
+      | 'move-later'
+      | 'audio',
+  ) {
     if (timelineBusy) return
-    const result =
-      action === 'split'
-        ? buildSplitAtPlayhead(composition, playheadTicks, createOperationId, createClipId)
-        : action === 'remove'
-          ? buildRemoveAtPlayhead(composition, playheadTicks, createOperationId)
-          : buildSetEnabledAtPlayhead(composition, playheadTicks, action === 'show', createOperationId)
+    let result
+    if (action === 'split') {
+      result = buildSplitAtPlayhead(composition, playheadTicks, createOperationId, createClipId)
+    } else if (action === 'remove' || action === 'remove-gap') {
+      result = buildRemoveAtPlayhead(composition, playheadTicks, createOperationId, action === 'remove')
+    } else if (action === 'hide' || action === 'show') {
+      result = buildSetEnabledAtPlayhead(composition, playheadTicks, action === 'show', createOperationId)
+    } else if (action === 'trim-start' || action === 'trim-end') {
+      result = buildTrimAtPlayhead(
+        composition,
+        playheadTicks,
+        action === 'trim-start' ? 'start' : 'end',
+        trimSeconds * PROJECT_TIMESCALE,
+        true,
+        createOperationId,
+      )
+    } else if (action === 'move-earlier' || action === 'move-later') {
+      result = buildMoveAtPlayhead(
+        composition,
+        playheadTicks,
+        action === 'move-earlier' ? 'earlier' : 'later',
+        createOperationId,
+      )
+    } else {
+      result = buildSetAudioAtPlayhead(
+        composition,
+        playheadTicks,
+        clipGainDb,
+        fadeInSeconds * PROJECT_TIMESCALE,
+        fadeOutSeconds * PROJECT_TIMESCALE,
+        createOperationId,
+      )
+    }
 
     if (!result.ok) {
       setTimelineNotice(result.refusal.reason)
@@ -671,6 +745,7 @@ export function StudioScreen({
 
   return (
     <main className="studio-screen" onKeyDown={handlePointModeKeyDown}>
+      <a className="skip-link" href="#studio-primary">Skip to video editor</a>
       <header className="studio-screen__topbar">
         <button className="studio-screen__back" type="button" onClick={onBack}>
           <span aria-hidden="true">←</span>
@@ -695,7 +770,7 @@ export function StudioScreen({
       </header>
 
       <div className="studio-screen__workspace">
-        <section className="studio-screen__canvas" aria-label="Video canvas">
+        <section id="studio-primary" className="studio-screen__canvas" aria-label="Video canvas" tabIndex={-1}>
           <div className="studio-screen__canvas-heading">
             <div>
               <span className="studio-screen__section-index">01</span>
@@ -713,6 +788,7 @@ export function StudioScreen({
                 preload="metadata"
                 src={project.mediaUrl}
                 aria-label={`Preview of ${project.name}`}
+                style={{ opacity: transitionOpacity }}
                 onError={() => setHasPreviewError(true)}
               >
                 Your browser does not support video playback.
@@ -744,6 +820,7 @@ export function StudioScreen({
                       compositionWidth={composition.width}
                       compositionHeight={composition.height}
                       scale={previewScale}
+                      visualStyle={motionStyle(node)}
                     />
                   ))}
                   {previewCallouts.map((node) => (
@@ -753,6 +830,7 @@ export function StudioScreen({
                       compositionWidth={composition.width}
                       compositionHeight={composition.height}
                       scale={previewScale}
+                      visualStyle={motionStyle(node)}
                     />
                   ))}
                   {previewTitles.map((node) => (
@@ -762,6 +840,7 @@ export function StudioScreen({
                       compositionWidth={composition.width}
                       compositionHeight={composition.height}
                       scale={previewScale}
+                      visualStyle={motionStyle(node)}
                     />
                   ))}
                   {previewNodes.map((node) => (
@@ -771,6 +850,7 @@ export function StudioScreen({
                       compositionWidth={composition.width}
                       compositionHeight={composition.height}
                       scale={previewScale}
+                      visualStyle={motionStyle(node)}
                     />
                   ))}
                   {previewCaptions.map((node) => (
@@ -780,6 +860,7 @@ export function StudioScreen({
                       compositionWidth={composition.width}
                       compositionHeight={composition.height}
                       scale={previewScale}
+                      visualStyle={motionStyle(node)}
                     />
                   ))}
                 </div>
@@ -1057,6 +1138,76 @@ export function StudioScreen({
             Bring it back
           </button>
         </div>
+        <details className="studio-screen__section-adjustments">
+          <summary>Adjust this section</summary>
+          <div className="studio-screen__section-adjustment-grid">
+            <label>
+              Seconds to remove
+              <input
+                aria-label="Seconds to remove"
+                type="number"
+                min="0.1"
+                step="0.1"
+                value={trimSeconds}
+                onChange={(event) => setTrimSeconds(Number(event.currentTarget.value))}
+              />
+            </label>
+            <div className="studio-screen__track-actions">
+              <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('trim-start')}>
+                Shorten the start
+              </button>
+              <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('trim-end')}>
+                Shorten the end
+              </button>
+              <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('remove-gap')}>
+                Remove and leave empty space
+              </button>
+            </div>
+            <div className="studio-screen__track-actions">
+              <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('move-earlier')}>
+                Move earlier
+              </button>
+              <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('move-later')}>
+                Move later
+              </button>
+            </div>
+            <label>
+              Loudness change (dB)
+              <input
+                aria-label="Loudness change"
+                type="number"
+                min="-60"
+                max="24"
+                step="1"
+                value={clipGainDb}
+                onChange={(event) => setClipGainDb(Number(event.currentTarget.value))}
+              />
+            </label>
+            <label>
+              Fade in (seconds)
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={fadeInSeconds}
+                onChange={(event) => setFadeInSeconds(Number(event.currentTarget.value))}
+              />
+            </label>
+            <label>
+              Fade out (seconds)
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={fadeOutSeconds}
+                onChange={(event) => setFadeOutSeconds(Number(event.currentTarget.value))}
+              />
+            </label>
+            <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('audio')}>
+              Apply sound
+            </button>
+          </div>
+        </details>
         {timelineNotice ? (
           <p className="studio-screen__track-notice" role="status">
             {timelineNotice}
@@ -1076,6 +1227,29 @@ export function StudioScreen({
             onCreate={onCreateOverlay}
             onUploadAsset={onUploadAsset}
           />
+          {acceptedOverlays.length > 0 ? (
+            <div className="studio-screen__overlay-repairs" aria-label="Things added to the video">
+              <h4>Things you added</h4>
+              {acceptedOverlays.map((item) => (
+                <OverlayRepairPanel
+                  key={
+                    item.kind === 'add-title'
+                      ? item.titleId
+                      : item.kind === 'add-callout'
+                        ? item.calloutId
+                        : item.kind === 'add-media-overlay'
+                          ? item.overlayId
+                          : item.musicId
+                  }
+                  editProject={editProject}
+                  item={item}
+                  playheadMs={playheadMs}
+                  busy={timelineBusy || captionsBusy}
+                  onRepair={onCreateOverlay}
+                />
+              ))}
+            </div>
+          ) : null}
           <label className="studio-screen__captions-picker">
             <span>Add captions from a transcript file</span>
             <input

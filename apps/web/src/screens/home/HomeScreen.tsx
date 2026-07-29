@@ -77,6 +77,7 @@ export function HomeScreen({
 
   return (
     <main className="home-screen">
+      <a className="skip-link" href="#home-primary">Skip to main content</a>
       <header className="home-screen__topbar" aria-label="Sanverse home">
         <span className="home-screen__wordmark">Sanverse</span>
         <span className="home-screen__status">
@@ -85,7 +86,7 @@ export function HomeScreen({
         </span>
       </header>
 
-      <section className="home-screen__intro" aria-labelledby="home-title">
+      <section id="home-primary" className="home-screen__intro" aria-labelledby="home-title" tabIndex={-1}>
         <p className="home-screen__eyebrow">Start a new project</p>
         <h1 id="home-title">What do you want to edit today?</h1>
         <p className="home-screen__lead">
@@ -133,7 +134,7 @@ export function HomeScreen({
           </div>
 
           {isStarting ? (
-            <p className="home-screen__progress" role="status">
+            <p className="home-screen__progress" role="status" aria-live="polite">
               Importing video securely…
             </p>
           ) : null}

@@ -499,6 +499,26 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
       return { sourcePath, outputPath: join(exportsDir, `${exportId}.mp4`), trustedWorkDir: projectDir }
     },
 
+    async listExports(projectId: string) {
+      const { exportsDir } = await exportRoot(projectId)
+      const entries = await readdir(exportsDir, { withFileTypes: true })
+      const exports = await Promise.all(entries
+        .filter((entry) => entry.isFile() && /^export_[a-z0-9]{16,64}\.mp4$/.test(entry.name))
+        .map(async (entry) => {
+          const exportId = entry.name.slice(0, -4)
+          const published = await resolvePublishedExport(projectId, exportId)
+          const info = await stat(published.path)
+          return { exportId, size: published.size, modifiedAt: info.mtime.toISOString() }
+        }))
+      return exports.sort((left, right) => right.modifiedAt.localeCompare(left.modifiedAt))
+    },
+
+    async deleteExport(projectId: string, exportId: string) {
+      const published = await resolvePublishedExport(projectId, exportId)
+      await rm(published.path)
+      await syncDirectory(dirname(published.path))
+    },
+
     async inspectExport(projectId: string, exportId: string) {
       const output = await resolvePublishedExport(projectId, exportId)
       return { size: output.size }

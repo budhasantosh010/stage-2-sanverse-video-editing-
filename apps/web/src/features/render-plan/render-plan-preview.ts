@@ -1,4 +1,10 @@
-import { PROJECT_TIMESCALE, type AddNameplateOperation, type EditProject } from '@sanverse/edit-domain'
+import {
+  PROJECT_TIMESCALE,
+  evaluateVisualProperties,
+  type AddNameplateOperation,
+  type ChangeSet,
+  type EditProject,
+} from '@sanverse/edit-domain'
 import { compileProjectToRenderPlan } from '@sanverse/render-contract/compile-project'
 import type {
   CalloutOverlayNode,
@@ -6,8 +12,10 @@ import type {
   MediaOverlayNode,
   RenderNode,
   RenderPlan,
+  SourceSegmentNode,
   TextOverlayNode,
   TitleOverlayNode,
+  VisualPropertiesNode,
 } from '@sanverse/render-contract'
 import {
   NAMEPLATE_STYLE_V1,
@@ -45,27 +53,32 @@ export const compilePreviewPlan = (project: EditProject): RenderPlan | null => {
  * only to compile a preview. Saved state is not touched, and this value is
  * never persisted, sent, or accepted — accepting goes through the server.
  */
-export const withPendingProposal = (
+export const withPendingChangeSet = (
   project: EditProject,
-  proposal: AddNameplateOperation,
+  changeSet: ChangeSet,
 ): EditProject => Object.freeze({
   ...project,
   changeSets: Object.freeze([
     ...project.changeSets,
     Object.freeze({
-      changeSet: Object.freeze({
-        schemaVersion: 'sanverse.change-set/v1' as const,
-        changeSetId: 'changeset_pendingpreview',
-        baseRevision: project.revision,
-        operations: Object.freeze([proposal]),
-        provenance: Object.freeze({ source: 'direct' as const, requestId: null }),
-        extensions: Object.freeze({}),
-      }),
+      changeSet,
       active: true,
       blockedReason: null,
     }),
   ]),
 })
+
+export const withPendingProposal = (
+  project: EditProject,
+  proposal: AddNameplateOperation,
+): EditProject => withPendingChangeSet(project, Object.freeze({
+  schemaVersion: 'sanverse.change-set/v1' as const,
+  changeSetId: 'changeset_pendingpreview',
+  baseRevision: project.revision,
+  operations: Object.freeze([proposal]),
+  provenance: Object.freeze({ source: 'direct' as const, requestId: null }),
+  extensions: Object.freeze({}),
+}))
 
 export const millisecondsToTicks = (milliseconds: number): number =>
   Math.round((milliseconds / 1000) * PROJECT_TIMESCALE)
@@ -110,6 +123,84 @@ export const visibleMediaOverlays = (plan: RenderPlan, ticks: number): readonly 
   plan.overlays.filter(
     (node): node is MediaOverlayNode => node.kind === 'media-overlay' && isNodeVisible(node, ticks),
   )
+
+/** Picture opacity for one explicit dip-to-black transition at an exact tick. */
+export const segmentVideoOpacityAt = (
+  segment: SourceSegmentNode,
+  compositionTicks: number,
+  reducedMotion: boolean,
+): number => {
+  if (reducedMotion) return 1
+  const relative = compositionTicks - segment.interval.start.ticks
+  if (relative < 0 || relative >= segment.interval.duration.ticks) return 1
+  let opacity = 1
+  if (segment.videoFadeInTicks > 0 && relative < segment.videoFadeInTicks) {
+    opacity = Math.min(opacity, relative / segment.videoFadeInTicks)
+  }
+  const fadeOutStart = segment.interval.duration.ticks - segment.videoFadeOutTicks
+  if (segment.videoFadeOutTicks > 0 && relative > fadeOutStart) {
+    opacity = Math.min(opacity, (segment.interval.duration.ticks - relative) / segment.videoFadeOutTicks)
+  }
+  return Math.min(1, Math.max(0, opacity))
+}
+
+export const visualPropertiesForNode = (
+  plan: RenderPlan,
+  nodeId: string,
+): VisualPropertiesNode | null =>
+  plan.visuals.find((visual) => visual.nodeIds.includes(nodeId)) ?? null
+
+export type VisualCssStyle = Readonly<{
+  transform: string
+  transformOrigin: string
+  opacity: number
+  clipPath?: string
+  filter?: string
+  zIndex: number
+}>
+
+/** Translate the shared motion contract into browser CSS at one exact tick. */
+export const visualCssStyleAt = (
+  plan: RenderPlan,
+  node: RenderNode,
+  ticks: number,
+  compositionWidth: number,
+  compositionHeight: number,
+  reducedMotion: boolean,
+): VisualCssStyle | undefined => {
+  const visual = visualPropertiesForNode(plan, node.nodeId)
+  if (!visual) return undefined
+  const evaluated = evaluateVisualProperties(
+    visual,
+    ticks - node.interval.start.ticks,
+    node.interval.duration.ticks,
+    reducedMotion,
+  )
+  const { transform, crop, mask, effects } = evaluated
+  const filter = effects.map((effect) => {
+    if (effect.kind === 'blur') return `blur(${effect.amount * Math.min(compositionWidth, compositionHeight)}px)`
+    if (effect.kind === 'brightness') return `brightness(${1 + effect.amount})`
+    if (effect.kind === 'contrast') return `contrast(${effect.amount})`
+    if (effect.kind === 'saturation') return `saturate(${effect.amount})`
+    return `grayscale(${effect.amount})`
+  }).join(' ')
+  const hasCrop = crop.top > 0 || crop.right > 0 || crop.bottom > 0 || crop.left > 0
+  const clipPath = hasCrop
+    ? `inset(${crop.top * 100}% ${crop.right * 100}% ${crop.bottom * 100}% ${crop.left * 100}%)`
+    : mask.shape === 'ellipse'
+      ? 'ellipse(50% 50% at 50% 50%)'
+      : undefined
+  return Object.freeze({
+    transform:
+      `translate(${transform.translateX * compositionWidth}px, ${transform.translateY * compositionHeight}px) ` +
+      `scale(${transform.scale}) rotate(${transform.rotationDegrees}deg)`,
+    transformOrigin: 'center center',
+    opacity: transform.opacity,
+    ...(clipPath ? { clipPath } : {}),
+    ...(filter ? { filter } : {}),
+    zIndex: evaluated.layer,
+  })
+}
 
 export type TitleCssVariables = Readonly<Record<string, string>>
 

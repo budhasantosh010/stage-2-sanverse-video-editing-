@@ -179,6 +179,41 @@ describe('callouts', () => {
 })
 
 describe('B-roll and pictures', () => {
+  it('translates the shared visual contract into native FFmpeg motion and effects', () => {
+    const graph = buildFilterGraph({
+      ...base,
+      plan: plan({
+        sources: VIDEO_SOURCES,
+        overlays: [brollNode()],
+        visuals: [{
+          visualId: 'broll_0001',
+          nodeIds: ['broll_0001'],
+          transform: { translateX: 0.1, translateY: -0.05, scale: 1.1, rotationDegrees: 8, opacity: 0.8 },
+          crop: { top: 0.05, right: 0, bottom: 0, left: 0.05 },
+          layer: 0,
+          mask: { shape: 'ellipse', feather: 0 },
+          tracks: [{
+            property: 'translate-x',
+            keyframes: [
+              { at: ms(0), value: 0, easing: { kind: 'bounce', intensity: 0.5 } },
+              { at: ms(1_000), value: 0.1, easing: { kind: 'linear' } },
+            ],
+          }],
+          transition: {
+            enter: { kind: 'fade', duration: ms(250), easing: { kind: 'linear' } },
+            exit: { kind: 'none', duration: ms(0), easing: { kind: 'linear' } },
+          },
+          effects: [{ kind: 'saturation', amount: 0.8 }],
+        }],
+      }) as never,
+    })
+
+    expect(graph).toContain('rotate=')
+    expect(graph).toContain('saturation=0.8')
+    expect(graph).toContain('fade=t=in')
+    expect(graph).toContain('overlay=x=')
+  })
+
   it('scales the clip to fit its box without stretching, and centres it', () => {
     // Box: 0.4 * 1280 = 512 wide, 0.4 * 720 = 288 high, at 64,36.
     const graph = buildFilterGraph({

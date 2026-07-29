@@ -881,4 +881,50 @@ describe('StudioScreen time strip', () => {
 
     expect(screen.getByRole('button', { name: /^cut here$/i })).toBeDisabled()
   })
+
+  it('offers the advanced section controls only after the user asks for them', async () => {
+    const user = userEvent.setup()
+    renderStudio()
+
+    expect(screen.queryByRole('button', { name: /shorten the start/i })).not.toBeInTheDocument()
+    await user.click(screen.getByText(/adjust this section/i))
+
+    expect(screen.getByRole('button', { name: /shorten the start/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /shorten the end/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /leave empty space/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /move earlier/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /move later/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /apply sound/i })).toBeInTheDocument()
+  })
+
+  it('turns the plain trim and sound controls into bounded operations', async () => {
+    const user = userEvent.setup()
+    const onTimelineEdit = vi.fn()
+    const { container } = renderStudio({ onTimelineEdit })
+    const video = container.querySelector('video') as HTMLVideoElement
+    prepareVideoForPointing(video, 5)
+    fireEvent.timeUpdate(video)
+
+    await user.click(screen.getByText(/adjust this section/i))
+    const trimAmount = screen.getByRole('spinbutton', { name: /seconds to remove/i })
+    await user.clear(trimAmount)
+    await user.type(trimAmount, '2')
+    await user.click(screen.getByRole('button', { name: /shorten the start/i }))
+
+    expect(onTimelineEdit).toHaveBeenLastCalledWith(expect.objectContaining({
+      kind: 'trim-clip',
+      trimStart: ms(2_000),
+      ripple: true,
+    }))
+
+    const loudness = screen.getByRole('spinbutton', { name: /loudness change/i })
+    await user.clear(loudness)
+    await user.type(loudness, '-6')
+    await user.click(screen.getByRole('button', { name: /apply sound/i }))
+
+    expect(onTimelineEdit).toHaveBeenLastCalledWith(expect.objectContaining({
+      kind: 'set-clip-audio',
+      gainDb: -6,
+    }))
+  })
 })

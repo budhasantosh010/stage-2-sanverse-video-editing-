@@ -1,6 +1,8 @@
 import {
   activeCaptionSets,
+  activeOverlayOperations,
   activeOperations,
+  activeVisualProperties,
   compositionDuration,
   effectiveComposition,
   findAsset,
@@ -20,6 +22,7 @@ import {
   type RenderPlanError,
   type RenderSource,
   type SourceSegmentNode,
+  type VisualPropertiesNode,
 } from './render-plan.ts'
 
 export type CompileResult =
@@ -43,6 +46,16 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
   const duration = compositionDuration(composition)
   if (duration.ticks <= 0) {
     return { ok: false, error: { code: 'COMPILE_FAILED', reason: 'The composition is empty.' } }
+  }
+  const operations = activeOperations(project)
+  const transitionIn = new Map<string, { video: number; audio: number }>()
+  const transitionOut = new Map<string, { video: number; audio: number }>()
+  for (const operation of operations) {
+    if (operation.kind !== 'set-clip-transition') continue
+    const video = operation.style === 'dip-to-black' ? operation.duration.ticks : 0
+    const audio = operation.audio === 'fade-through-silence' ? operation.duration.ticks : 0
+    transitionOut.set(operation.clipId, { video, audio })
+    transitionIn.set(operation.nextClipId, { video, audio })
   }
 
   // Every file the renderer must open, in the order they are first needed.
@@ -79,6 +92,10 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
         gainDb: clip.gainDb,
         fadeInTicks: clip.fadeIn.ticks,
         fadeOutTicks: clip.fadeOut.ticks,
+        videoFadeInTicks: transitionIn.get(clip.clipId)?.video ?? 0,
+        videoFadeOutTicks: transitionOut.get(clip.clipId)?.video ?? 0,
+        transitionAudioFadeInTicks: transitionIn.get(clip.clipId)?.audio ?? 0,
+        transitionAudioFadeOutTicks: transitionOut.get(clip.clipId)?.audio ?? 0,
       }))
     }
   }
@@ -113,7 +130,7 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     }
   }
 
-  for (const operation of activeOperations(project)) {
+  for (const operation of operations) {
     if (isNameplateOperation(operation)) {
       placeAnchored(operation.assetId, operation.sourceInterval, (suffix, interval) => Object.freeze({
         nodeId: `${operation.operationId}${suffix}`,
@@ -124,9 +141,10 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
         secondaryText: operation.secondaryText,
         styleId: NAMEPLATE_STYLE_ID,
       }))
-      continue
     }
+  }
 
+  for (const operation of activeOverlayOperations(project)) {
     if (operation.kind === 'add-title') {
       placeAnchored(operation.assetId, operation.sourceInterval, (suffix, interval) => Object.freeze({
         nodeId: `${operation.titleId}${suffix}`,
@@ -240,6 +258,30 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     left.interval.start.ticks - right.interval.start.ticks || drawRank(left) - drawRank(right),
   )
 
+  const visuals: VisualPropertiesNode[] = []
+  for (const operation of activeVisualProperties(project)) {
+    const nodeIds = overlays
+      .filter((node) => node.nodeId === operation.visualId || node.nodeId.startsWith(`${operation.visualId}.`))
+      .map((node) => node.nodeId)
+    if (nodeIds.length === 0) {
+      return {
+        ok: false,
+        error: { code: 'COMPILE_FAILED', reason: 'A visual adjustment names something that is not on screen.' },
+      }
+    }
+    visuals.push(Object.freeze({
+      visualId: operation.visualId,
+      nodeIds: Object.freeze(nodeIds),
+      transform: operation.transform,
+      crop: operation.crop,
+      layer: operation.layer,
+      mask: operation.mask,
+      tracks: operation.tracks,
+      transition: operation.transition,
+      effects: operation.effects,
+    }))
+  }
+
   const plan = {
     schemaVersion: RENDER_PLAN_SCHEMA_VERSION,
     projectId: project.projectId,
@@ -251,6 +293,7 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     sources: Object.freeze(sources),
     segments: Object.freeze(segments),
     overlays: Object.freeze(overlays),
+    visuals: Object.freeze(visuals),
     music: Object.freeze(music),
   }
 

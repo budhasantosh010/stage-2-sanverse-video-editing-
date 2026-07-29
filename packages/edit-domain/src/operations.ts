@@ -26,6 +26,11 @@ import {
   validateOverlayOperation,
   type OverlayOperation,
 } from './overlay-operations.ts'
+import {
+  VISUAL_PROPERTIES_OPERATION_KIND,
+  validateVisualPropertiesOperation,
+  type SetVisualPropertiesOperation,
+} from './visual-properties.ts'
 import { findAsset, type MediaAsset } from './assets.ts'
 import {
   validateTimeRange,
@@ -86,6 +91,7 @@ export type EditOperation =
   | TimelineOperation
   | CaptionOperation
   | OverlayOperation
+  | SetVisualPropertiesOperation
 
 /** Every operation kind this build can execute. Unknown kinds are rejected. */
 export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze([
@@ -93,6 +99,7 @@ export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze([
   ...TIMELINE_OPERATION_KINDS,
   ...CAPTION_OPERATION_KINDS,
   ...OVERLAY_OPERATION_KINDS,
+  VISUAL_PROPERTIES_OPERATION_KIND,
 ])
 
 /** True for the operations that change which footage the finished video is made of. */
@@ -106,6 +113,10 @@ export const isNameplateOperation = (operation: EditOperation): operation is Add
 /** True for titles, callouts, B-roll, and music. */
 export const isOverlayFamilyOperation = (operation: EditOperation): operation is OverlayOperation =>
   isOverlayOperationKind(operation.kind)
+
+export const isVisualPropertiesOperation = (
+  operation: EditOperation,
+): operation is SetVisualPropertiesOperation => operation.kind === VISUAL_PROPERTIES_OPERATION_KIND
 
 /**
  * True when this operation is pinned to a moment of original footage.
@@ -152,6 +163,7 @@ export type OperationIssueCode =
   | 'OVERLAY_ASSET_WRONG_KIND'
   /** The stretch of B-roll asked for runs past the end of the B-roll clip. */
   | 'OVERLAY_SPAN_OUTSIDE_ASSET'
+  | 'VISUAL_TARGET_UNKNOWN'
 
 export type OperationError = {
   readonly code: 'OPERATION_INVALID'
@@ -283,6 +295,20 @@ export const validateOperation = (input: unknown, path = '$'): Result<EditOperat
     return ok(overlay.value)
   }
 
+  if (input.kind === VISUAL_PROPERTIES_OPERATION_KIND) {
+    const visual = validateVisualPropertiesOperation(input, path)
+    if (!visual.ok) {
+      return err({
+        code: 'OPERATION_INVALID',
+        issues: visual.error.issues.map((issue) => ({
+          path: issue.path,
+          code: issue.code as OperationIssueCode,
+        })),
+      })
+    }
+    return ok(visual.value)
+  }
+
   if (isTimelineOperationKind(input.kind)) {
     const timeline = validateTimelineOperation(input, path)
     if (!timeline.ok) {
@@ -320,7 +346,11 @@ export const validateOperationAgainstComposition = (
   const fail = (field: string, code: OperationIssueCode): Result<EditOperation, OperationError> =>
     err({ code: 'OPERATION_INVALID', issues: [{ path: `${path}.${field}`, code }] })
 
-  if (operation.kind === 'add-music') {
+  // Whether the named visual exists is history-dependent and is checked in the
+  // project replay, where earlier accepted operations are available.
+  if (isVisualPropertiesOperation(operation)) return ok(operation)
+
+  if (operation.kind === 'add-music' || operation.kind === 'set-music') {
     // Music is judged only on whether the music itself is still here. It is not
     // pinned to any moment of footage, so no amount of cutting can invalidate
     // it — the bed simply plays over whatever finished video now exists.
@@ -330,7 +360,7 @@ export const validateOperationAgainstComposition = (
     return ok(operation)
   }
 
-  if (operation.kind === 'add-media-overlay') {
+  if (operation.kind === 'add-media-overlay' || operation.kind === 'set-media-overlay') {
     const overlayAsset = findAsset(assets, operation.overlayAssetId)
     if (!overlayAsset) return fail('overlayAssetId', 'OVERLAY_ASSET_UNKNOWN')
     if (overlayAsset.mediaKind === 'audio') return fail('overlayAssetId', 'OVERLAY_ASSET_WRONG_KIND')

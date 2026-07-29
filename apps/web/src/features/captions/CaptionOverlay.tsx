@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { CaptionOverlayNode } from '@sanverse/render-contract'
 
 import { captionLineTopPx } from '../render-plan/render-plan-preview'
@@ -9,6 +10,7 @@ export type CaptionOverlayProps = {
   compositionHeight: number
   /** Display pixels per composition pixel. */
   scale: number
+  visualStyle?: CSSProperties
 }
 
 /**
@@ -21,11 +23,11 @@ export type CaptionOverlayProps = {
  * are enough — and because neither renderer measures anything, neither can
  * measure it differently.
  */
-export function CaptionOverlay({ node, compositionWidth, compositionHeight, scale }: CaptionOverlayProps) {
+export function CaptionOverlay({ node, compositionWidth, compositionHeight, scale, visualStyle }: CaptionOverlayProps) {
   if (scale <= 0) return null
 
   return (
-    <div className="caption-overlay" data-testid="caption-overlay" data-node-id={node.nodeId}>
+    <div className="caption-overlay" data-testid="caption-overlay" data-node-id={node.nodeId} style={visualStyle}>
       {node.lines.map((line, lineIndex) => (
         <div
           key={`${node.nodeId}:${lineIndex}`}

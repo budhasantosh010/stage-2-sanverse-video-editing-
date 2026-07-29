@@ -153,6 +153,14 @@ export function createProjectStateService(options: {
   return {
     load,
 
+    async restorePortable(projectId: string, project: unknown): Promise<EditProject> {
+      const validated = validateProject(project)
+      if (!validated.ok || validated.value.projectId !== projectId) {
+        throw new ProjectStateError('PROJECT_STATE_INVALID', 'Portable project state is invalid.', validated.ok ? undefined : validated.error)
+      }
+      return persist(projectId, validated.value)
+    },
+
     /**
      * The server, not the browser, decides whether an edit is allowed and what
      * the resulting revision is. A client cannot claim a revision it does not

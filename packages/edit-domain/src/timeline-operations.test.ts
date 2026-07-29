@@ -12,6 +12,7 @@ import {
   testSetAudio,
   testSetEnabled,
   testSplit,
+  testTransition,
   testTrim,
 } from './test-fixtures'
 
@@ -81,6 +82,27 @@ describe('splitting a piece of footage', () => {
     expect(clips[0].fadeOut).toEqual(ms(0))
     expect(clips[1].fadeIn).toEqual(ms(0))
     expect(clips[1].fadeOut).toEqual(ms(4_000))
+  })
+})
+
+describe('a bounded transition between adjacent clips', () => {
+  it('accepts an explicit video dip and audio fade without changing duration', () => {
+    const split = mustApply(base, testSplit({ atClipTime: ms(10_000) }))
+    const transitioned = mustApply(split, testTransition())
+    expect(transitioned).toEqual(split)
+    expect(compositionDuration(transitioned)).toEqual(compositionDuration(base))
+  })
+
+  it('refuses a non-adjacent target and a transition longer than either clip', () => {
+    const split = mustApply(base, testSplit({ atClipTime: ms(1_000) }))
+    expect(apply(split, testTransition({ nextClipId: 'clip_missing00' }))).toMatchObject({
+      ok: false,
+      error: { reason: 'TRANSITION_TARGET_INVALID' },
+    })
+    expect(apply(split, testTransition({ duration: ms(2_000) }))).toMatchObject({
+      ok: false,
+      error: { reason: 'TRANSITION_LONGER_THAN_CLIP' },
+    })
   })
 })
 

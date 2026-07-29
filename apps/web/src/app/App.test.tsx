@@ -85,10 +85,16 @@ function projectResponse(name = 'cleaned.mp4', mediaUrl = '/api/projects/project
 
 function exportResponse() {
   return new Response(JSON.stringify({
-    id: 'export_1234567890abcdef',
-    mediaUrl: '/api/projects/project_1234567890abcdef/exports/export_1234567890abcdef/media',
-    sha256: 'b'.repeat(64), width: 1920, height: 1080, durationMs: 60_000, hasAudio: true,
-  }), { status: 201, headers: { 'content-type': 'application/json' } })
+    jobId: 'job_1234567890abcdef',
+    projectId: 'project_1234567890abcdef',
+    status: 'succeeded',
+    progress: 1,
+    result: {
+      id: 'export_1234567890abcdef',
+      mediaUrl: '/api/projects/project_1234567890abcdef/exports/export_1234567890abcdef/media',
+      sha256: 'b'.repeat(64), width: 1920, height: 1080, durationMs: 60_000, hasAudio: true,
+    },
+  }), { status: 202, headers: { 'content-type': 'application/json' } })
 }
 
 const PROJECTS_URL = '/api/projects'
