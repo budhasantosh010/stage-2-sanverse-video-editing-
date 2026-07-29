@@ -20,6 +20,7 @@ Record failures that can teach the project, including rejected architectural ass
 | FAIL-014 | 2026-07-26 | Error observability | The first idempotent `close()` implementation swallowed `FileHandle.close()` rejection, making a failed release appear successful | Resolved during independent review | Memoize and return the original close promise without converting rejection into success |
 | FAIL-015 | 2026-07-29 | Git environment | The managed Codex session can edit the project but cannot create `.git/index.lock`, so the completed G5C-07 batch cannot be staged or committed here | Open environment limitation; files are complete and uncommitted | Commit the existing working tree from normal PowerShell outside the managed sandbox |
 | FAIL-016 | 2026-07-29 | Job durability | Windows rejected directory `fsync` with `EPERM` after an export-job file was atomically renamed, causing job creation to report failure even though the file write itself was valid | Resolved in G8-03 | Preserve file flush/atomic rename; tolerate only Windows directory-sync `EPERM`, then prove restart recovery |
+| FAIL-019 | 2026-07-29 | Upstream audit network | Shell Git was forced through unreachable `127.0.0.1:9`, so six read-only `git ls-remote` probes failed | Managed; audit completed through GitHub connector | Use connector or approved unrestricted Git; do not retry dead proxy |
 
 ## 2026-07-26 cleanup incident details
 
@@ -153,6 +154,24 @@ Record failures that can teach the project, including rejected architectural ass
 - **What was tried:** One reload proved current code was served over HTTP; no HMR configuration debugging was attempted.
 - **Status:** Open nonblocking development-only problem.
 - **One-line solution:** Configure Vite HMR to use the same public hostname as the page, or use `127.0.0.1:2000` consistently, then verify the WebSocket connects.
+
+### FAIL-019 — Shell Git could not reach upstream repositories
+
+- **What failed:** Six read-only `git ls-remote` requests could not reach
+  GitHub.
+- **Where:** P0-R probes for OpenCut, OpenCut Classic, OpenTimelineIO, MLT,
+  Kdenlive, and Natron.
+- **When:** During P0-R upstream pinning on 2026-07-29.
+- **Who was affected:** This audit path only; Sanverse runtime was unaffected.
+- **Why/how:** The shell Git HTTPS path attempted unreachable
+  `127.0.0.1:9`; every probe returned the same connection failure.
+- **What was tried:** One bounded six-repository probe; no retries or proxy
+  debugging. GitHub connector then returned exact commits, files, and licenses.
+- **Evidence:** `DOCS/decisions/P0-R_OPENCUT_TIMELINE_REUSE_DECISION.md`.
+- **Blocking:** No.
+- **Status:** Managed; connector completed the audit.
+- **One-line solution:** Use the GitHub connector or approved unrestricted Git
+  instead of retrying the dead shell proxy.
 
 ## Entry rules
 

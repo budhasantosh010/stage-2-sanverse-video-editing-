@@ -4,14 +4,22 @@ Last updated: 2026-07-29
 
 ## Active goal
 
+**P0-R is complete on 2026-07-29.** The decision is **C: study OpenCut
+behavior and build a focused Sanverse timeline**. A non-routed spike proved
+that selected MIT zoom/pixel math can sit behind a one-way Sanverse adapter and
+emit the existing `split-clip` operation without replacing the project, typed
+operations, revisions, change sets, proposals, Undo/Redo, preview, or export.
+Production Timeline V1 has not started. Decision:
+`DOCS/decisions/P0-R_OPENCUT_TIMELINE_REUSE_DECISION.md`. Next is P0-D, then
+P0-E, then P1-A.
+
 **P0-B and P0-C are technically complete on 2026-07-29.** The web app now has
 a small reusable UI kernel and one persistent `EditorShell` with switchable
 **Assist** and **Studio** workspaces. The same mounted editor, project, revision,
 playhead/video element, pending proposal, history, Undo/Redo, save state, and
 export state survive the switch. Assist exposes the current canvas,
 conversation, pointing, proposal/history, and a compact change strip; Studio
-retains the current engineering controls. Timeline V1 has not started and must
-wait for the owner's shell/workspace walkthrough.
+retains the current engineering controls.
 
 **The executable G6/G8 technical batch is complete: G6-11 and
 G8-02 through G8-10 are complete. Remaining G8 work is owner approval,

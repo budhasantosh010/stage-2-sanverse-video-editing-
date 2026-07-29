@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "sanverse.third-party-manifest/v1",
+  "entries": [
+    {
+      "name": "OpenCut Classic timeline math",
+      "repository": "https://github.com/OpenCut-app/opencut-classic",
+      "upstreamCommit": "cf5e79e919144200294fb9fed22a222592a0aeea",
+      "license": "MIT",
+      "upstreamFiles": [
+        "apps/web/src/timeline/scale.ts",
+        "apps/web/src/timeline/pixel-utils.ts",
+        "apps/web/src/timeline/zoom-utils.ts"
+      ],
+      "localFiles": [
+        "apps/web/src/spikes/opencut-timeline-reuse/opencut-derived-math.ts"
+      ],
+      "modifications": [
+        "Replaced OpenCut WASM tick constants with an explicit Sanverse timescale parameter.",
+        "Removed browser-global and device-pixel helpers not needed by the bounded spike.",
+        "Capped the spike zoom range and retained only scale, tick-to-pixel, fit, and exponential slider behavior."
+      ],
+      "reason": "Measure whether pure OpenCut timeline math can sit behind a one-way Sanverse adapter without importing OpenCut authority.",
+      "owner": "Sanverse editor team",
+      "upgradePolicy": "No automatic upgrades. Re-audit the exact upstream commit before any production port.",
+      "reviewPolicy": "Review license, provenance, adaptation diff, and Sanverse authority before production use."
+    }
+  ]
+}
