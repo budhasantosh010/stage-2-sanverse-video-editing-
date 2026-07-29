@@ -118,6 +118,18 @@ Record failures that can teach the project, including rejected architectural ass
 - **Status:** Open environment limitation. G5C-07 is complete but uncommitted.
 - **One-line solution:** From normal PowerShell, stage the listed G5C-07 files and run `git commit -m "[wip] feat(web): repair titles callouts media and music"`.
 
+### FAIL-016 — Current-state document contradicts implemented G6 status
+
+- **What failed:** The `Not built` section says transforms, crop, scale, rotation, keyframes, easing, spring/bounce, transitions, and general effects are absent, while later sections in the same document say the shared G6 visual-property model and bounded effects are implemented.
+- **Where:** `DOCS/CURRENT_STATE.md`, primarily the `Not built`, `G5-C so far`, and `Known limitations` sections.
+- **When:** Detected during the 2026-07-29 competitor-gap and dual-workspace planning inspection.
+- **Who was affected:** The owner and future agents using the document to decide what remains.
+- **Why:** Completion updates were added later without removing or narrowing the older `Not built` claim.
+- **How reproduced:** A targeted read returns both claims in the same file.
+- **What was tried:** Confirmed the contradiction against `packages/edit-domain/src/visual-properties.ts` and `packages/edit-domain/src/capabilities.ts`; no cleanup was attempted because the owner requested planning and high-impact work only.
+- **Status:** Open documentation defect; it does not establish a runtime defect.
+- **One-line solution:** Replace the obsolete bullet with a precise statement that the domain/render foundation exists while professional controls and broader effect coverage remain incomplete.
+
 ## Entry rules
 
 Do not delete a failure because it is fixed. Mark it resolved, link evidence, and preserve what prevented recurrence.
