@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { Button, IconButton, SegmentedControl } from './ui'
+import { Button, DisabledAction, IconButton, SegmentedControl } from './ui'
 import './EditorShell.css'
 
 export type EditorWorkspace = 'assist' | 'studio'
@@ -9,9 +9,9 @@ export type EditorShellProps = {
   workspace: EditorWorkspace
   projectName: string
   saveState: 'idle' | 'saving' | 'saved' | 'error'
-  canUndo: boolean
-  canRedo: boolean
-  canExport: boolean
+  undoDisabledReason: string | null
+  redoDisabledReason: string | null
+  exportDisabledReason: string | null
   isExporting: boolean
   onWorkspaceChange(workspace: EditorWorkspace): void
   onBack(): void
@@ -49,9 +49,9 @@ export function EditorShell({
   workspace,
   projectName,
   saveState,
-  canUndo,
-  canRedo,
-  canExport,
+  undoDisabledReason,
+  redoDisabledReason,
+  exportDisabledReason,
   isExporting,
   onWorkspaceChange,
   onBack,
@@ -60,6 +60,10 @@ export function EditorShell({
   onExport,
   children,
 }: EditorShellProps) {
+  const undoDisabled = undoDisabledReason !== null
+  const redoDisabled = redoDisabledReason !== null
+  const exportDisabled = exportDisabledReason !== null
+
   return (
     <div className="editor-shell" data-workspace={workspace}>
       <header className="editor-shell__topbar">
@@ -89,17 +93,23 @@ export function EditorShell({
           >
             {saveMessage(saveState)}
           </span>
-          <IconButton label="Undo edit" icon="↶" disabled={!canUndo} onClick={onUndo} />
-          <IconButton label="Redo edit" icon="↷" disabled={!canRedo} onClick={onRedo} />
-          <Button
-            variant="primary"
-            aria-label={isExporting ? 'Exporting video' : canExport ? 'Export video' : 'Export unavailable'}
-            disabled={!canExport}
-            loading={isExporting}
-            onClick={onExport}
-          >
-            {isExporting ? 'Exporting' : 'Export'}
-          </Button>
+          <DisabledAction disabled={undoDisabled} label="Undo edit" reason={undoDisabledReason}>
+            <IconButton label="Undo edit" icon="↶" disabled={undoDisabled} onClick={onUndo} />
+          </DisabledAction>
+          <DisabledAction disabled={redoDisabled} label="Redo edit" reason={redoDisabledReason}>
+            <IconButton label="Redo edit" icon="↷" disabled={redoDisabled} onClick={onRedo} />
+          </DisabledAction>
+          <DisabledAction disabled={exportDisabled} label="Export" reason={exportDisabledReason}>
+            <Button
+              variant="primary"
+              aria-label={isExporting ? 'Exporting video' : exportDisabled ? 'Export unavailable' : 'Export video'}
+              disabled={exportDisabled}
+              loading={isExporting}
+              onClick={onExport}
+            >
+              {isExporting ? 'Exporting' : 'Export'}
+            </Button>
+          </DisabledAction>
         </div>
       </header>
 

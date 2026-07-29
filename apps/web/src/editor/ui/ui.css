@@ -47,7 +47,7 @@
 
 .sv-button:active:not(:disabled) {
   box-shadow: none;
-  transform: scale(0.96);
+  transform: scale(0.98);
 }
 
 .sv-button:disabled {
@@ -107,7 +107,55 @@
 }
 
 .sv-segmented__option:active {
-  transform: scale(0.96);
+  transform: scale(0.98);
+}
+
+.sv-disabled-action {
+  position: relative;
+  display: inline-flex;
+}
+
+.sv-disabled-action--disabled {
+  border-radius: var(--radius-control);
+}
+
+.sv-disabled-action--disabled:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.sv-disabled-action__reason {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  top: calc(100% + 8px);
+  width: max-content;
+  max-width: 260px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-small);
+  background: var(--color-ink);
+  color: var(--color-surface);
+  box-shadow: var(--shadow-control);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  visibility: hidden;
+  transition:
+    opacity var(--motion-duration-control) var(--motion-ease-standard),
+    transform var(--motion-duration-control) var(--motion-ease-standard),
+    visibility var(--motion-duration-control) var(--motion-ease-standard);
+}
+
+.sv-disabled-action--disabled:hover .sv-disabled-action__reason,
+.sv-disabled-action--disabled:focus .sv-disabled-action__reason,
+.sv-disabled-action--disabled:focus-within .sv-disabled-action__reason {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
 }
 
 .sv-panel {
@@ -163,7 +211,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sv-button,
-  .sv-segmented__option {
+  .sv-segmented__option,
+  .sv-disabled-action__reason {
     transform: none !important;
   }
 }

@@ -20,9 +20,17 @@ function StatefulEditor() {
 function ShellHarness({
   onUndo = vi.fn(),
   onExport = vi.fn(),
+  undoDisabledReason = null,
+  redoDisabledReason = 'Nothing to redo yet.',
+  exportDisabledReason = null,
+  isExporting = false,
 }: {
   onUndo?: () => void
   onExport?: () => void
+  undoDisabledReason?: string | null
+  redoDisabledReason?: string | null
+  exportDisabledReason?: string | null
+  isExporting?: boolean
 }) {
   const [workspace, setWorkspace] = useState<EditorWorkspace>('assist')
 
@@ -31,10 +39,10 @@ function ShellHarness({
       workspace={workspace}
       projectName="cleaned-interview.mp4"
       saveState="saved"
-      canUndo
-      canRedo={false}
-      canExport
-      isExporting={false}
+      undoDisabledReason={undoDisabledReason}
+      redoDisabledReason={redoDisabledReason}
+      exportDisabledReason={exportDisabledReason}
+      isExporting={isExporting}
       onWorkspaceChange={setWorkspace}
       onBack={vi.fn()}
       onUndo={onUndo}
@@ -86,5 +94,47 @@ describe('EditorShell', () => {
 
     expect(onUndo).toHaveBeenCalledOnce()
     expect(onExport).toHaveBeenCalledOnce()
+  })
+
+  it('exposes the exact disabled reasons without enabling the real actions', async () => {
+    const user = userEvent.setup()
+    const onUndo = vi.fn()
+    const onExport = vi.fn()
+    render(
+      <ShellHarness
+        onUndo={onUndo}
+        onExport={onExport}
+        undoDisabledReason="Accept or reject the pending proposal before undoing accepted edits."
+        redoDisabledReason="Nothing to redo yet."
+        exportDisabledReason="Accept or reject the pending proposal before exporting."
+      />,
+    )
+
+    const undoGroup = screen.getByRole('group', { name: /undo edit unavailable/i })
+    const redoGroup = screen.getByRole('group', { name: /redo edit unavailable/i })
+    const exportGroup = screen.getByRole('group', { name: /export unavailable/i })
+    expect(undoGroup).toHaveAccessibleDescription(/pending proposal before undoing/i)
+    expect(redoGroup).toHaveAccessibleDescription(/nothing to redo yet/i)
+    expect(exportGroup).toHaveAccessibleDescription(/pending proposal before exporting/i)
+    expect(screen.getByRole('button', { name: /undo edit/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /export unavailable/i })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: /undo edit/i }))
+    await user.click(screen.getByRole('button', { name: /export unavailable/i }))
+    expect(onUndo).not.toHaveBeenCalled()
+    expect(onExport).not.toHaveBeenCalled()
+  })
+
+  it('explains when an export is already running', () => {
+    render(
+      <ShellHarness
+        isExporting
+        exportDisabledReason="Export is already in progress."
+      />,
+    )
+
+    expect(screen.getByRole('group', { name: /export unavailable/i }))
+      .toHaveAccessibleDescription(/export is already in progress/i)
+    expect(screen.getByRole('button', { name: /exporting video/i })).toBeDisabled()
   })
 })

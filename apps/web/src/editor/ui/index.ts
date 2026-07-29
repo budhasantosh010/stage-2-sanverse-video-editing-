@@ -1,4 +1,5 @@
 export { Button, type ButtonProps } from './Button'
+export { DisabledAction, type DisabledActionProps } from './DisabledAction'
 export { IconButton, type IconButtonProps } from './IconButton'
 export { Panel, type PanelProps } from './Panel'
 export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } from './SegmentedControl'

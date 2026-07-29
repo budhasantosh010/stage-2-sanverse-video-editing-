@@ -82,6 +82,9 @@ describe('AssistChangeStrip', () => {
     expect(onSeek).toHaveBeenCalledWith(14_400_000)
     expect(screen.getByText('Pending')).toBeInTheDocument()
     expect(screen.getByText('Needs attention')).toBeInTheDocument()
+    expect(screen.getByText('✓')).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByText('○')).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByText('!')).toHaveAttribute('aria-hidden', 'true')
     expect(screen.queryByRole('button', { name: /add name/i })).not.toBeInTheDocument()
   })
 

@@ -103,7 +103,7 @@ export function HomeScreen({
             value={draftRequest}
             onChange={(event) => onDraftRequestChange(event.target.value)}
             placeholder="For example: Make the opening tighter and add my name when I first appear."
-            rows={5}
+            rows={3}
           />
 
           <div

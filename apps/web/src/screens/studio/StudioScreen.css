@@ -15,8 +15,9 @@
 }
 
 .studio-screen--assist .studio-screen__workspace {
-  grid-template-columns: minmax(0, 1.55fr) minmax(330px, 0.7fr);
-  max-width: 1400px;
+  grid-template-columns: minmax(0, 1.9fr) minmax(340px, 420px);
+  gap: 20px;
+  max-width: 1560px;
 }
 
 .studio-screen--assist .studio-screen__canvas,
@@ -126,7 +127,7 @@
 }
 
 .studio-screen__back:hover {
-  transform: translateX(-3px) scale(1.025);
+  transform: translateX(-2px);
 }
 
 .studio-screen__project {
@@ -168,12 +169,12 @@
 }
 
 .studio-screen button:active:not(:disabled) {
-  transform: scale(0.94);
+  transform: scale(0.98);
   transition-timing-function: var(--motion-ease-spring);
 }
 
 .studio-screen button.studio-screen__back:active:not(:disabled) {
-  transform: translateX(0) scale(0.94);
+  transform: translateX(0) scale(0.98);
 }
 
 .studio-screen button:focus-visible,

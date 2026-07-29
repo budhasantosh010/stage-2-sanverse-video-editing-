@@ -50,10 +50,13 @@ export function AssistChangeStrip({
                 : item.status === 'blocked'
                   ? 'Needs attention'
                   : 'Accepted'
+            const marker =
+              item.status === 'pending' ? '○' : item.status === 'blocked' ? '!' : '✓'
             return (
               <li key={item.id}>
                 {item.seekTicks === null ? (
                   <span className={`assist-change-strip__item assist-change-strip__item--${item.status}`}>
+                    <span className="assist-change-strip__marker" aria-hidden="true">{marker}</span>
                     <strong>{item.label}</strong>
                     <small>{status}</small>
                   </span>
@@ -68,6 +71,7 @@ export function AssistChangeStrip({
                       onSeek(item.seekTicks as number)
                     }}
                   >
+                    <span className="assist-change-strip__marker" aria-hidden="true">{marker}</span>
                     <strong>{item.label}</strong>
                     <small>{status}</small>
                   </button>

@@ -43,9 +43,9 @@
 }
 
 .home-screen__intro {
-  width: min(100%, 880px);
+  width: min(100%, 740px);
   margin: 0 auto;
-  padding: clamp(72px, 10vh, 116px) 0 88px;
+  padding: clamp(48px, 7vh, 76px) 0 64px;
   text-align: center;
 }
 
@@ -78,7 +78,7 @@
 
 .home-screen__composer {
   text-align: left;
-  padding: 30px;
+  padding: 24px;
   border: var(--border-strong);
   border-radius: var(--radius-panel);
   background: var(--color-surface);
@@ -91,8 +91,8 @@
 
 .home-screen__composer:focus-within {
   border-color: var(--color-ink);
-  transform: translateY(-3px) scale(1.005);
-  box-shadow: 0 24px 58px rgba(17, 17, 17, 0.12);
+  transform: translateY(-1px) scale(1.002);
+  box-shadow: 0 20px 50px rgba(17, 17, 17, 0.1);
 }
 
 .home-screen__prompt-label {
@@ -108,8 +108,10 @@
 .home-screen__prompt {
   display: block;
   width: 100%;
-  min-height: 136px;
-  padding: 0 0 28px;
+  min-height: 88px;
+  max-height: 180px;
+  padding: 0 0 20px;
+  overflow-y: auto;
   resize: vertical;
   border: 0;
   border-bottom: 1px solid var(--color-border-muted);
@@ -137,9 +139,9 @@
   gap: 28px;
   align-items: center;
   justify-content: space-between;
-  min-height: 104px;
-  margin-top: 22px;
-  padding: 20px;
+  min-height: 64px;
+  margin-top: 16px;
+  padding: 12px 14px;
   border: 1px dashed var(--color-border-dashed);
   background: var(--color-surface-raised);
   border-radius: 12px;
@@ -197,12 +199,12 @@
 .home-screen__choose-button:hover {
   color: var(--color-ink);
   background: var(--color-surface);
-  transform: translateY(-2px) scale(1.025);
-  box-shadow: 0 8px 20px rgba(17, 17, 17, 0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(17, 17, 17, 0.09);
 }
 
 .home-screen__choose-button:active {
-  transform: translateY(1px) scale(0.94);
+  transform: scale(0.98);
   box-shadow: none;
 }
 
@@ -314,7 +316,7 @@
 }
 
 .home-screen__recent-list button:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.98);
 }
 
 @media (max-width: 720px) {
@@ -332,7 +334,7 @@
   }
 
   .home-screen__intro {
-    padding: 68px 0 72px;
+    padding: 52px 0 56px;
   }
 
   .home-screen h1 {

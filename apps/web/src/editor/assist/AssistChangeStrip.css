@@ -1,5 +1,5 @@
 .assist-change-strip {
-  max-width: 1320px;
+  max-width: 1560px;
   margin: 16px auto 0;
   padding: 18px 20px;
   border: var(--border-subtle);
@@ -59,6 +59,7 @@
 .assist-change-strip__earlier,
 .assist-change-strip__item {
   display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   min-width: 150px;
   min-height: 58px;
   gap: 4px;
@@ -88,21 +89,36 @@ button.assist-change-strip__item:hover {
 }
 
 .assist-change-strip__item strong {
+  grid-column: 2;
   font-size: 0.8rem;
   font-weight: 680;
 }
 
 .assist-change-strip__item small {
+  grid-column: 2;
   color: var(--color-text-muted);
   font-size: 0.72rem;
 }
 
 .assist-change-strip__item--pending {
   border-style: dashed;
+  background: var(--color-surface-raised);
 }
 
 .assist-change-strip__item--blocked {
   border-style: double;
+  border-width: 3px;
+}
+
+.assist-change-strip__marker {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: 20px;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
 }
 
 .assist-change-strip__earlier {

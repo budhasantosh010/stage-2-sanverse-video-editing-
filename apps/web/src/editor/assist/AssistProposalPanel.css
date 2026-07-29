@@ -21,7 +21,7 @@
 
 .assist-proposal__heading > span {
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
@@ -34,7 +34,7 @@
 
 .assist-proposal__empty {
   color: var(--color-text-secondary);
-  font-size: 0.84rem;
+  font-size: 0.88rem;
   line-height: 1.45;
 }
 
@@ -47,7 +47,7 @@
 .assist-proposal__summary p {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 0.76rem;
+  font-size: 0.8rem;
   line-height: 1.45;
 }
 

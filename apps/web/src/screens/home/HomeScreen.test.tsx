@@ -41,6 +41,7 @@ describe('HomeScreen', () => {
 
     const prompt = screen.getByRole('textbox', { name: /describe what you want to change/i })
     expect(prompt).toHaveValue('Make the opening clearer')
+    expect(prompt).toHaveAttribute('rows', '3')
 
     await user.type(prompt, '!')
 

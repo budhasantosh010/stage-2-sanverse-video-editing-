@@ -939,12 +939,14 @@ export function StudioScreen({
                   : 'Pause anywhere, then choose Point to mark an exact place.'}
             </p>
           </div>
-          <NameplateComposer
-            target={pointTarget}
-            composition={composition}
-            createOperationId={createOperationId}
-            onProposal={onProposal}
-          />
+          {pointTarget ? (
+            <NameplateComposer
+              target={pointTarget}
+              composition={composition}
+              createOperationId={createOperationId}
+              onProposal={onProposal}
+            />
+          ) : null}
           {pointError ? <p role="alert" className="studio-screen__point-error">{pointError}</p> : null}
           {hasPreviewError ? (
             <p role="alert">

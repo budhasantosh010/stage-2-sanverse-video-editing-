@@ -35,6 +35,8 @@ describe('AssistProposalPanel', () => {
     )
 
     expect(screen.getByText(/nothing changes until you accept/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /accept proposal/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /reject proposal/i })).not.toBeInTheDocument()
     rerender(
       <AssistProposalPanel
         proposal={null}

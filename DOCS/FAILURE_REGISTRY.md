@@ -1,6 +1,31 @@
-# Failure Registry
+# Sanverse Internal Issue and Failure Registry
 
 Record failures that can teach the project, including rejected architectural assumptions and misleading verification.
+
+Use this file for defects, risks, UX problems, performance observations,
+environment failures, documentation conflicts, and technical debt. Milestone
+tasks stay in `PLAN_CHECKLIST.md`; architecture decisions stay in
+`DOCS/decisions/`; proof stays in `DOCS/evidence/`.
+
+Allowed status values are `OPEN`, `INVESTIGATING`, `PLANNED`, `IN_PROGRESS`,
+`BLOCKED`, `MONITORING`, `RESOLVED`, `WONT_FIX`, and `DUPLICATE`. Status text is
+authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
+
+## Active issues
+
+| Done | ID | Severity | Type | One-line issue | Status | Target |
+|---|---|---:|---|---|---|---|
+| [x] | UX-001 | P1 | UX | Home composer occupies too much vertical space | RESOLVED | P0-D.1 |
+| [x] | UX-002 | P1 | UX/A11Y | Disabled Undo, Redo, and Export lack explanations | RESOLVED | P0-D.1 |
+| [x] | UX-003 | P1 | UX | Empty proposal state exposes an unusable Accept action | RESOLVED | P0-D.1 |
+| [x] | UX-004 | P2 | UX | Add-text control appears before a valid point exists | RESOLVED | P0-D.1 |
+| [ ] | UX-005 | P1 | UX | Assist side-panel text and hierarchy need owner visual approval | IN_PROGRESS | Owner review |
+| [x] | UX-006 | P2 | UX/A11Y | Pending and accepted changes need stronger visual distinction | RESOLVED | P0-D.1 |
+| [ ] | FAIL-021 | P2 | Performance | 30-second export crossed the 60-second walkthrough budget | MONITORING | E5 benchmark |
+| [ ] | FEATURE-001 | P3 | Deferred UX | Optional desktop composer resize preference | PLANNED | Post-P1 |
+| [x] | INFRA-001 | P3 | Verification infrastructure | In-app viewport screenshots tiled the page texture | RESOLVED | P0-D.1 |
+
+## Legacy risk and failure summary
 
 | ID | Date | Area | Failure or risk | Status | Next evidence |
 |---|---|---|---|---|---|
@@ -228,6 +253,583 @@ Record failures that can teach the project, including rejected architectural ass
 - **Blocking:** It was milestone-invalidating for accessible core feedback and was fixed before commit.
 - **One-line solution:** Give each error domain one announcement owner: conversation errors in `ChatComposer`, proposal/edit errors in `AssistProposalPanel`.
 - **Status:** Resolved.
+
+## UX-001 — Home composer occupies too much vertical space
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P1
+- **Type:** UX
+- **Found:** 2026-07-29
+- **Target milestone:** P0-D.1
+- **Owner:** Codex
+- **One-line issue:** The new-project composer pushed useful context below the fold and felt disproportionate to its job.
+
+### What?
+
+The initial prompt, card, upload row, and intro spacing occupied too much height.
+
+### Where?
+
+`HomeScreen.tsx` and `HomeScreen.css` at 1440×900, 1280×800, and 1024×768.
+
+### When?
+
+Immediately after opening Home before selecting a video.
+
+### Who is affected?
+
+Every user starting or reopening a project, especially on laptop displays.
+
+### Why does it matter?
+
+The first screen should explain one action without visually overwhelming a non-editor.
+
+### How is it reproduced?
+
+Open Home at the starting commit and compare the five-row composer with the final three-row layout.
+
+### Root cause
+
+`rows={5}`, 136px prompt height, 30px card padding, 104px upload row, and oversized intro spacing accumulated.
+
+### What was tried?
+
+The values were reduced as one coherent layout correction; the focused Home tests and three responsive browser sizes passed.
+
+### Proposed solution
+
+Use a three-row prompt, 88px initial height, 24px card padding, 64px upload row, and reduced intro spacing.
+
+### One-line solution
+
+Make the Home composer compact enough to explain one action without dominating the page.
+
+### Acceptance tests
+
+Three-row controlled prompt; exact responsive screenshots; no horizontal overflow.
+
+### Evidence
+
+- Test: `HomeScreen.test.tsx`; focused P0-D.1 suite 78/78.
+- Screenshot: `DOCS/evidence/2026-07-29-p0d1-visual-corrections/home-before-1440x900.png` and `home-after-*.png`.
+- Walkthrough: `browser-walkthrough.md`.
+- Commit: focused P0-D.1 commit.
+- Decision: `P0-D1_IMPLEMENTATION_REPORT.md`.
+
+### Resolution
+
+Resolved with the bounded Home layout correction.
+
+### Current status
+
+RESOLVED; owner comparison remains available in the evidence folder.
+
+## UX-002 — Disabled global actions lacked explanations
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P1
+- **Type:** UX/A11Y
+- **Found:** 2026-07-29
+- **Target milestone:** P0-D.1
+- **Owner:** Codex
+- **One-line issue:** Disabled Undo, Redo, and Export controls did not explain what prerequisite was missing.
+
+### What?
+
+Native disabled controls communicated unavailability but not the reason or recovery action.
+
+### Where?
+
+`App.tsx`, `EditorShell.tsx`, and the new `DisabledAction.tsx`.
+
+### When?
+
+With no accepted edit, with a pending proposal, or while export is rendering.
+
+### Who is affected?
+
+Keyboard, screen-reader, and sighted users deciding what to do next.
+
+### Why does it matter?
+
+An unexplained disabled primary action looks broken and creates avoidable guessing.
+
+### How is it reproduced?
+
+Open a clean project and inspect Undo, Redo, and Export before any proposal or accepted edit.
+
+### Root cause
+
+The shell received booleans only, so domain-specific disabled reasons were discarded.
+
+### What was tried?
+
+Reason derivation was centralized in `App`; a small focusable wrapper exposes exact descriptions while the real button remains disabled.
+
+### Proposed solution
+
+Pass nullable reason strings as the single authority for action availability.
+
+### One-line solution
+
+Keep real actions disabled while making the exact prerequisite keyboard and screen-reader accessible.
+
+### Acceptance tests
+
+Exact reason copy; wrapper keyboard focus; disabled callback cannot fire; enabled action remains normal.
+
+### Evidence
+
+- Test: `DisabledAction.test.tsx`, `EditorShell.test.tsx`, and `App.test.tsx`.
+- Screenshot: final Assist screenshots.
+- Walkthrough: empty, pending, accepted, Undo, and Redo states in `browser-walkthrough.md`.
+- Commit: focused P0-D.1 commit.
+- Decision: `P0-D1_IMPLEMENTATION_REPORT.md`.
+
+### Resolution
+
+Resolved with one reusable accessible disabled-action pattern.
+
+### Current status
+
+RESOLVED; no tooltip framework or second action-state authority was introduced.
+
+## UX-003 — Empty proposal state exposed an unusable Accept action
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P1
+- **Type:** UX
+- **Found:** 2026-07-29
+- **Target milestone:** P0-D.1
+- **Owner:** Codex
+- **One-line issue:** Assist showed a disabled Accept action when no proposal existed.
+
+### What?
+
+The empty proposal area displayed a dead action instead of calm next-step guidance.
+
+### Where?
+
+`AssistProposalPanel.tsx`.
+
+### When?
+
+On a newly opened project and after a proposal is accepted or rejected.
+
+### Who is affected?
+
+Normal users who may interpret the disabled control as a broken workflow.
+
+### Why does it matter?
+
+Actions should appear only when they can act on a real object.
+
+### How is it reproduced?
+
+Open Assist with `proposal=null` and inspect the Proposal region.
+
+### Root cause
+
+The empty state reused pending-action presentation instead of modeling its own state.
+
+### What was tried?
+
+The dead button was removed and the three-line instruction hierarchy was retained.
+
+### Proposed solution
+
+Render Accept and Reject only for a real pending proposal.
+
+### One-line solution
+
+Do not show proposal actions until a proposal exists.
+
+### Acceptance tests
+
+No Accept/Reject in empty state; both actions present and functional in pending state.
+
+### Evidence
+
+- Test: `AssistProposalPanel.test.tsx`, `StudioScreen.test.tsx`.
+- Screenshot: final empty Assist screenshots.
+- Walkthrough: empty and pending proposal snapshots in `browser-walkthrough.md`.
+- Commit: focused P0-D.1 commit.
+- Decision: `P0-D1_IMPLEMENTATION_REPORT.md`.
+
+### Resolution
+
+Resolved by making proposal actions contextual.
+
+### Current status
+
+RESOLVED.
+
+## UX-004 — Add text appeared before a valid point existed
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P2
+- **Type:** UX
+- **Found:** 2026-07-29
+- **Target milestone:** P0-D.1
+- **Owner:** Codex
+- **One-line issue:** A disabled Add text control appeared before Point had produced a usable target.
+
+### What?
+
+The canvas exposed the next-step control too early.
+
+### Where?
+
+`StudioScreen.tsx` around `NameplateComposer`.
+
+### When?
+
+Before entering Point mode or choosing a location.
+
+### Who is affected?
+
+Users learning the Point → Add text sequence.
+
+### Why does it matter?
+
+Premature controls add noise and hide the actual next action.
+
+### How is it reproduced?
+
+Open Assist with no captured point and inspect the canvas actions.
+
+### Root cause
+
+`NameplateComposer` was always mounted and defended itself with a disabled trigger.
+
+### What was tried?
+
+The composer now mounts only when `pointTarget` exists; its internal defensive check remains.
+
+### Proposed solution
+
+Make Add text visible only after a valid Point target is captured.
+
+### One-line solution
+
+Reveal Add text after Point, not before it.
+
+### Acceptance tests
+
+No Add text before Point; enabled Add text after mouse or keyboard capture; proposal remains bounded.
+
+### Evidence
+
+- Test: `StudioScreen.test.tsx`.
+- Screenshot: final Assist screenshots.
+- Walkthrough: keyboard Point capture and contextual Add text in `browser-walkthrough.md`.
+- Commit: focused P0-D.1 commit.
+- Decision: `P0-D1_IMPLEMENTATION_REPORT.md`.
+
+### Resolution
+
+Resolved with conditional composition, without changing point or nameplate operations.
+
+### Current status
+
+RESOLVED.
+
+## UX-005 — Assist hierarchy needed more readable proportions
+
+- **Done:** [ ]
+- **Status:** IN_PROGRESS
+- **Severity:** P1
+- **Type:** UX
+- **Found:** 2026-07-29
+- **Target milestone:** Owner review after P0-D.1
+- **Owner:** Codex
+- **One-line issue:** The side panel was too compressed and visually competed with the video.
+
+### What?
+
+Assist needed a wider video region, bounded side panel, and less compressed secondary typography.
+
+### Where?
+
+`StudioScreen.css` and `AssistProposalPanel.css` across the three required laptop widths.
+
+### When?
+
+While reviewing an empty, pending, or accepted Assist state.
+
+### Who is affected?
+
+Non-editors who need a clear video-first reading order.
+
+### Why does it matter?
+
+Assist fails its purpose if it feels like a dense admin panel.
+
+### How is it reproduced?
+
+Compare the P0-D 1440×900 screenshot with the P0-D.1 final responsive set.
+
+### Root cause
+
+The earlier grid ratio, 1400px cap, and sub-12px secondary text compressed the conversation hierarchy.
+
+### What was tried?
+
+The video column ratio, layout cap, gap, and proposal type sizes were adjusted without changing workspace structure.
+
+### Proposed solution
+
+Keep the video dominant, bound the conversation column to 340–420px, and await owner visual approval.
+
+### One-line solution
+
+Use readable Assist proportions, then close this issue only after owner visual approval.
+
+### Acceptance tests
+
+No overflow at required widths; one-column video-first layout near 1024px; owner approves readability and hierarchy.
+
+### Evidence
+
+- Test: focused P0-D.1 suite 78/78.
+- Screenshot: `assist-before-1440x900.png` and `assist-after-*.png`.
+- Walkthrough: `browser-walkthrough.md`.
+- Commit: focused P0-D.1 commit.
+- Decision: owner approval pending.
+
+### Resolution
+
+Implementation evidence is complete; subjective product approval is intentionally not self-certified.
+
+### Current status
+
+IN_PROGRESS; the only remaining action is owner visual review.
+
+## UX-006 — Pending and accepted changes lacked a strong non-color distinction
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P2
+- **Type:** UX/A11Y
+- **Found:** 2026-07-29
+- **Target milestone:** P0-D.1
+- **Owner:** Codex
+- **One-line issue:** Pending, accepted, and blocked change cards relied too heavily on subtle border differences.
+
+### What?
+
+Change states were not quickly distinguishable without close reading.
+
+### Where?
+
+`AssistChangeStrip.tsx` and `AssistChangeStrip.css`.
+
+### When?
+
+After creating a proposal or accepting an edit.
+
+### Who is affected?
+
+All users, including those who cannot rely on color or subtle contrast.
+
+### Why does it matter?
+
+Pending versus accepted is a safety boundary, not decorative status.
+
+### How is it reproduced?
+
+Render one accepted, pending, and blocked item and compare their non-text visual cues.
+
+### Root cause
+
+Status labels and border styles were the only cues.
+
+### What was tried?
+
+Accepted now uses `✓`, pending `○`, and blocked `!`, all decorative beside explicit status text; border treatments remain secondary.
+
+### Proposed solution
+
+Keep redundant marker, text, and border cues.
+
+### One-line solution
+
+Represent each change state with explicit text plus a unique non-color marker.
+
+### Acceptance tests
+
+All three markers render with `aria-hidden`; text labels remain available; timed items still seek safely.
+
+### Evidence
+
+- Test: `AssistChangeStrip.test.tsx`.
+- Screenshot: pending and accepted states covered by the browser walkthrough.
+- Walkthrough: `browser-walkthrough.md`.
+- Commit: focused P0-D.1 commit.
+- Decision: `P0-D1_IMPLEMENTATION_REPORT.md`.
+
+### Resolution
+
+Resolved without changing the derived change model.
+
+### Current status
+
+RESOLVED.
+
+## FEATURE-001 — Optional desktop composer resize preference
+
+- **Done:** [ ]
+- **Status:** PLANNED
+- **Severity:** P3
+- **Type:** Deferred UX
+- **Found:** 2026-07-29
+- **Target milestone:** Post-P1
+- **Owner:** Product
+- **One-line issue:** A remembered horizontal desktop composer size was requested as an optional enhancement, not a current core need.
+
+### What?
+
+Potential preference for manually widening the Home composer and persisting that preference.
+
+### Where?
+
+Future Home settings/persistence only; no current implementation file is assigned.
+
+### When?
+
+Only if owner evidence shows the bounded responsive width is insufficient after P1.
+
+### Who is affected?
+
+Desktop users who prefer a wider drafting surface.
+
+### Why does it matter?
+
+Building resize state now would add complexity without proving a core workflow benefit.
+
+### How is it reproduced?
+
+Not a defect; evaluate through future owner/user feedback.
+
+### Root cause
+
+Deferred enhancement request.
+
+### What was tried?
+
+P0-D.1 kept vertical textarea resizing and a responsive 740px composer; no preference system was added.
+
+### Proposed solution
+
+Reassess after P1 and implement only if repeated evidence justifies it.
+
+### One-line solution
+
+Defer remembered desktop composer sizing until core editor evidence proves it useful.
+
+### Acceptance tests
+
+Future contract must define resizing limits, persistence scope, reset behavior, keyboard accessibility, and responsive fallback.
+
+### Evidence
+
+- Test: none required while deferred.
+- Screenshot: current responsive Home set.
+- Walkthrough: current composer is usable at all required widths.
+- Commit: not implemented.
+- Decision: explicitly deferred by P0-D.1 scope.
+
+### Resolution
+
+Not resolved because it is intentionally deferred.
+
+### Current status
+
+PLANNED for post-P1 reassessment; not a P0-D.1 blocker.
+
+## INFRA-001 — In-app viewport screenshots tiled the page texture
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P3
+- **Type:** Verification infrastructure
+- **Found:** 2026-07-29
+- **Target milestone:** P0-D.1
+- **Owner:** Codex
+- **One-line issue:** The in-app browser returned repeated texture tiles instead of one valid responsive screenshot.
+
+### What?
+
+Every viewport-override PNG repeated partial page surfaces across the image.
+
+### Where?
+
+P0-D.1 screenshot capture only; application DOM, layout, and runtime were not
+implicated.
+
+### When?
+
+After the functional browser walkthrough when the files were opened for visual
+inspection.
+
+### Who is affected?
+
+Milestone reviewers relying on screenshot evidence.
+
+### Why does it matter?
+
+Correct dimensions do not make a tiled screenshot truthful visual evidence.
+
+### How is it reproduced?
+
+Set an explicit in-app-browser viewport, capture the tab, and open the resulting
+PNG; multiple partial copies are visible.
+
+### Root cause
+
+The in-app screenshot surface and explicit viewport override used incompatible
+device/backing scaling in this desktop session.
+
+### What was tried?
+
+Calibrated viewport values and verified DOM dimensions; visual inspection still
+showed tiling. The invalid files were deleted and recaptured through the proven
+disposable local Edge/CDP fallback.
+
+### Proposed solution
+
+Reject tiled files and use exact-size local CDP capture until the in-app
+viewport screenshot backend is corrected.
+
+### One-line solution
+
+Visually inspect every evidence PNG and replace tiled backend output with a
+truthful exact-size capture.
+
+### Acceptance tests
+
+Every PNG opens as one page, matches its filename dimensions, and its browser
+inner size equals the requested viewport.
+
+### Evidence
+
+- Test: disk dimensions and visual inspection.
+- Screenshot: every final `home-*.png` and `assist-*.png` in the P0-D.1 evidence folder.
+- Walkthrough: `browser-walkthrough.md`.
+- Commit: focused P0-D.1 commit.
+- Decision: use the established P0-D local CDP fallback only for evidence.
+
+### Resolution
+
+All invalid files were replaced; disposable processes and profiles were removed.
+
+### Current status
+
+RESOLVED; this was an evidence-tool defect, not a Sanverse product defect.
 
 ## Entry rules
 

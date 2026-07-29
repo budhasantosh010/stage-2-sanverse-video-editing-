@@ -188,10 +188,9 @@ describe('StudioScreen', () => {
 
     const exportButton = screen.getByRole('button', { name: /export unavailable/i })
     const chat = screen.getByRole('textbox', { name: /ask for an edit/i })
-    const accept = screen.getByRole('button', { name: /accept proposal unavailable/i })
 
     expect(exportButton).toBeDisabled()
-    expect(accept).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /accept proposal/i })).not.toBeInTheDocument()
     expect(chat).toBeEnabled()
     expect(exportButton).toHaveAccessibleDescription(/accept at least one edit/i)
   })
@@ -359,6 +358,7 @@ describe('StudioScreen', () => {
     expect(screen.getByRole('button', { name: /enter point mode/i })).toBeEnabled()
     expect(container.querySelector('video')).toHaveAttribute('controls')
     expect(screen.queryByRole('button', { name: /choose a point on the visible video/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add text here/i })).not.toBeInTheDocument()
   })
 
   it('pauses playback and exposes a temporary accessible pointer layer in Point mode', async () => {
@@ -510,8 +510,7 @@ describe('StudioScreen', () => {
     vi.spyOn(video, 'pause').mockImplementation(() => undefined)
     prepareVideoForPointing(video, 12.4)
 
-    const addText = screen.getByRole('button', { name: /add text here/i })
-    expect(addText).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /add text here/i })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /enter point mode/i }))
     fireEvent.click(screen.getByRole('button', { name: /choose a point on the visible video/i }), {
@@ -519,6 +518,7 @@ describe('StudioScreen', () => {
       clientY: 250,
     })
 
+    const addText = screen.getByRole('button', { name: /add text here/i })
     expect(addText).toBeEnabled()
     await user.click(addText)
     await user.type(screen.getByRole('textbox', { name: /^main text$/i }), 'Santosh')
@@ -538,7 +538,7 @@ describe('StudioScreen', () => {
         },
       }),
     )
-    expect(screen.getByText(/no pending proposal/i)).toBeInTheDocument()
+    expect(screen.getByText(/tell sanverse what you want to change/i)).toBeInTheDocument()
     expect(screen.getByText(/no accepted edits/i)).toBeInTheDocument()
   })
 

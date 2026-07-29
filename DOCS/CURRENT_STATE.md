@@ -4,6 +4,15 @@ Last updated: 2026-07-29
 
 ## Active goal
 
+**P0-D.1 is technically complete on 2026-07-29.** Home is compact; Assist
+uses a more readable video-first hierarchy; empty proposal and pre-Point dead
+actions are gone; pending/accepted/blocked changes have redundant non-color
+markers; and Undo, Redo, and Export expose exact accessible disabled reasons.
+The focused result is 78/78 passing tests plus a clean production build.
+Responsive before/after evidence and the browser continuity walkthrough are in
+`DOCS/evidence/2026-07-29-p0d1-visual-corrections/`. `UX-005` remains open only
+for owner visual approval. P0-E has not started.
+
 **P0-D is technically complete on 2026-07-29.** Assist is now the video-first
 default workspace, while the same mounted editor session, project, revision,
 video/playhead, proposal, repair state, history, Undo/Redo, preview, and export

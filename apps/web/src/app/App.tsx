@@ -283,18 +283,33 @@ export function App() {
     )
   }
 
-  const canExport = !appState.proposal
-    && appState.editProject.changeSets.length > 0
-    && exportState.status !== 'rendering'
+  const hasPendingProposal = appState.proposal !== null
+  const undoDisabledReason = hasPendingProposal
+    ? 'Accept or reject the pending proposal before undoing accepted edits.'
+    : canUndoProject(appState)
+      ? null
+      : 'Nothing to undo yet.'
+  const redoDisabledReason = hasPendingProposal
+    ? 'Accept or reject the pending proposal before redoing accepted edits.'
+    : canRedoProject(appState)
+      ? null
+      : 'Nothing to redo yet.'
+  const exportDisabledReason = exportState.status === 'rendering'
+    ? 'Export is already in progress.'
+    : hasPendingProposal
+      ? 'Accept or reject the pending proposal before exporting.'
+      : appState.editProject.changeSets.length === 0
+        ? 'Accept at least one edit before exporting.'
+        : null
 
   return (
     <EditorShell
       workspace={workspace}
       projectName={appState.project.name}
       saveState={saveState}
-      canUndo={canUndoProject(appState)}
-      canRedo={canRedoProject(appState)}
-      canExport={canExport}
+      undoDisabledReason={undoDisabledReason}
+      redoDisabledReason={redoDisabledReason}
+      exportDisabledReason={exportDisabledReason}
       isExporting={exportState.status === 'rendering'}
       onWorkspaceChange={setWorkspace}
       onBack={() => {

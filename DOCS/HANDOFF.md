@@ -1,10 +1,18 @@
 # HANDOFF — everything a new agent needs to continue Sanverse Stage 2
 
-Updated 2026-07-29. P0-D is technically complete on
+Updated 2026-07-29. P0-D.1 is technically complete on
+`agent/g6-g8-local-alpha`: the Home composer and Assist hierarchy are corrected,
+dead empty-state actions are contextual, action-disabled reasons are accessible,
+change states have non-color markers, focused tests pass 78/78, and the
+production build passes. Evidence and the owner-only `UX-005` review gate are in
+`DOCS/evidence/2026-07-29-p0d1-visual-corrections/P0-D1_IMPLEMENTATION_REPORT.md`.
+P0-E, P1-A, and production Timeline V1 have not started.
+
+P0-D is technically complete on
 `agent/g6-g8-local-alpha`: Assist is the video-first default over one persistent
 editor session, focused tests pass 67/67, the production build passes, and the
 real `test-30s.mp4` proposal → repair → Accept → Undo → Redo → export →
-download loop passed. Evidence and the owner-review gate are in
+download loop passed. Its evidence and original owner-review gate are in
 `DOCS/evidence/2026-07-29-p0d-assist/P0-D_IMPLEMENTATION_REPORT.md`. P0-E,
 P1-A, and production Timeline V1 have not started.
 

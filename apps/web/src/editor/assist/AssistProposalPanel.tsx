@@ -60,14 +60,10 @@ export function AssistProposalPanel({
       {!proposal && !busy ? (
         <>
           <div className="assist-proposal__empty">
-            <span>No pending proposal.</span>
             <strong>Tell Sanverse what you want to change.</strong>
             <span>Pause and point when location matters.</span>
-            <span>Nothing changes until you accept a proposal.</span>
+            <span>Nothing changes until you accept.</span>
           </div>
-          <button type="button" disabled aria-label="Accept proposal unavailable">
-            Accept proposal
-          </button>
         </>
       ) : null}
 

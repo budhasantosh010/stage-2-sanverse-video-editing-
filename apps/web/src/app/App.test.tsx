@@ -380,7 +380,7 @@ describe('App', () => {
     await screen.findByText('second.mp4')
 
     // A different project starts clean; the first project's edits do not leak.
-    expect(screen.getByText(/no pending proposal/i)).toBeInTheDocument()
+    expect(screen.getByText(/tell sanverse what you want to change/i)).toBeInTheDocument()
     expect(screen.getByText(/no accepted edits/i)).toBeInTheDocument()
   })
 
@@ -517,6 +517,8 @@ describe('App', () => {
 
     await user.click(await screen.findByRole('button', { name: /open cleaned.mp4/i }))
     const chat = await screen.findByRole('textbox', { name: /ask for an edit/i })
+    expect(screen.getByRole('group', { name: /export unavailable/i }))
+      .toHaveAccessibleDescription(/accept at least one edit before exporting/i)
     await user.type(chat, 'keep this unsent')
 
     const video = container.querySelector('video')
@@ -540,6 +542,8 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /^send$/i }))
 
     expect(await screen.findByText(/suggested by the assistant/i)).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: /export unavailable/i }))
+      .toHaveAccessibleDescription(/pending proposal before exporting/i)
     // Asking changed nothing on the server.
     expect(api.current().revision).toBe(base.revision)
 
@@ -561,6 +565,8 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: /^accept proposal$/i }))
     await waitFor(() => expect(api.current().revision).toBe(base.revision + 1))
+    expect(screen.queryByRole('group', { name: /export unavailable/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /export video/i })).toBeEnabled()
     expect(api.current().changeSets.at(-1)?.changeSet.provenance).toEqual({
       source: 'ai',
       requestId: 'request_aaaaaaaa',
