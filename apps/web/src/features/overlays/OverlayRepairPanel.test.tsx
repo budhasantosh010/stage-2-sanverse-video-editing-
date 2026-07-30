@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -71,8 +71,9 @@ describe('OverlayRepairPanel', () => {
     )
 
     await user.click(screen.getByRole('button', { name: 'Adjust music' }))
-    await user.clear(screen.getByLabelText('Music level in dB'))
-    await user.type(screen.getByLabelText('Music level in dB'), '-24')
+    const gainInput = screen.getByLabelText('Music level in dB')
+    fireEvent.change(gainInput, { target: { value: '-24' } })
+    expect(gainInput).toHaveValue(-24)
     await user.click(screen.getByRole('button', { name: 'Save music changes' }))
 
     expect(onRepair).toHaveBeenCalledWith(expect.objectContaining({

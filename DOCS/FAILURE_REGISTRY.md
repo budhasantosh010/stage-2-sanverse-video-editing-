@@ -23,9 +23,9 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | UX-006 | P2 | UX/A11Y | Pending and accepted changes need stronger visual distinction | RESOLVED | P0-D.1 |
 | [x] | UX-007 | P1 | UX | P0-E Studio layout required owner approval before P1-A | RESOLVED | P0-E |
 | [ ] | FAIL-021 | P2 | Performance | 30-second export crossed the 60-second walkthrough budget | MONITORING | E5 benchmark |
-| [ ] | FAIL-024 | P2 | Verification debt | Contract files named `.test.ts` contain no Vitest suites, so broad domain/API commands exit 1 after their real assertions pass | OPEN | Test-contract maintenance |
-| [ ] | FAIL-025 | P2 | API test drift | Two server tests expect old synchronous export statuses while the current API correctly returns asynchronous 202 | OPEN | Export API contract maintenance |
-| [ ] | FAIL-026 | P2 | Web test drift | Overlay music-gain test enters `-24` through jsdom/user-event but submits `+24` | OPEN | Overlay test maintenance |
+| [x] | FAIL-024 | P2 | Verification debt | Contract files named `.test.ts` contain no Vitest suites, so broad domain/API commands exit 1 after their real assertions pass | RESOLVED | P1-B.1 |
+| [x] | FAIL-025 | P2 | API test drift | Two server tests expect old synchronous export statuses while the current API correctly returns asynchronous 202 | RESOLVED | P1-B.1 |
+| [x] | FAIL-026 | P2 | Web test drift | Overlay music-gain test enters `-24` through jsdom/user-event but submits `+24` | RESOLVED | P1-B.1 |
 | [ ] | FEATURE-001 | P3 | Deferred UX | Optional desktop composer resize preference | PLANNED | Post-P1 |
 | [x] | INFRA-001 | P3 | Verification infrastructure | In-app viewport screenshots tiled the page texture | RESOLVED | P0-D.1 |
 | [x] | INFRA-004 | P3 | Dev-process cleanup | Stopping the Harness dev parent left Sanverse Vite/API children listening on ports 2000/2001 | RESOLVED | P1-B |
@@ -268,8 +268,11 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 - **Why:** Vitest collects the filenames as test modules and treats “No test suite found” as failure.
 - **How reproduced:** Full edit-domain produced 263 passing assertions then exited 1; full API produced 228 passing assertions plus the two empty-suite collection failures.
 - **What was tried:** Focused affected suites were run explicitly and passed. The files were not changed because that is unrelated test-contract maintenance.
-- **Status:** OPEN; nonblocking for P1-B's focused/affected acceptance gate.
-- **One-line solution:** Rename non-executable contracts away from `*.test.ts` or wrap each in an intentional Vitest suite.
+- **Previous status:** OPEN; nonblocking for P1-B's focused/affected acceptance gate.
+- **Resolution:** The three files were genuine executable contracts, so their existing Node assertions were preserved and their runner import was changed from `node:test` to Vitest. No fake empty tests and no runtime code were added.
+- **Evidence:** Full edit-domain passes 23 files/265 tests; full API passes 20 files/233 tests; the three converted contract files pass directly. See `DOCS/evidence/2026-07-30-p1b1-test-truth/` and the focused P1-B.1 completion commit.
+- **Status:** RESOLVED in P1-B.1.
+- **One-line solution:** Collect real executable contracts with the repository's actual test runner instead of hiding or weakening them.
 
 ### FAIL-025 — Export API tests expect obsolete synchronous statuses
 
@@ -280,8 +283,11 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 - **Why:** The tests were not advanced when export moved to the asynchronous job contract.
 - **How reproduced:** Full API run returned 202 in both assertions. Stopping the real dev server and rerunning produced the same result, ruling out browser-run interference.
 - **What was tried:** No API change was made because P1-B touches no API behavior. Real Edge export plus downloaded MP4 probe supplied product evidence.
-- **Status:** OPEN; unrelated to P1-B.
-- **One-line solution:** Rewrite the two assertions around 202 acceptance and the durable job polling/result contract.
+- **Previous status:** OPEN; unrelated to P1-B.
+- **Resolution:** The tests now assert `202 Accepted`, the safe queued public-job body, deterministic job polling through `GET /export-jobs/:jobId`, successful result/download metadata, and the terminal failed state with the safe `RENDER_PROCESS_BLOCKED` error. The production route and job implementation were not changed.
+- **Evidence:** Full API passes 20 files/233 tests, including both asynchronous lifecycle cases; the all-workspace build and P1-B bundle remain unchanged. See `DOCS/evidence/2026-07-30-p1b1-test-truth/` and the focused P1-B.1 completion commit.
+- **Status:** RESOLVED in P1-B.1.
+- **One-line solution:** Test the complete 202 → poll → terminal job contract instead of asserting the removed synchronous response.
 
 ### FAIL-026 — Signed music-gain test submits the wrong sign in jsdom
 
@@ -292,8 +298,11 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 - **Why:** The current jsdom/user-event signed-number input sequence loses the minus sign, the same class of issue previously recorded in FAIL-020.
 - **How reproduced:** Full web reported 324 passing and one failure; rerunning only this file reproduced 1 pass/1 failure with `+24` received.
 - **What was tried:** The failure was isolated and recorded. No overlay behavior or test was changed inside P1-B.
-- **Status:** OPEN; unrelated to P1-B.
-- **One-line solution:** Set the signed number value atomically in the test, then separately test user interaction semantics in a real browser.
+- **Previous status:** OPEN; unrelated to P1-B.
+- **Resolution:** The test now sends the complete `-24` value in one change event, verifies the controlled input displays `-24`, submits, and proves the callback receives `gainDb: -24`. Product code was not changed.
+- **Evidence:** The focused overlay suite passes 2/2 and the full web suite passes 34 files/332 tests. See `DOCS/evidence/2026-07-30-p1b1-test-truth/` and the focused P1-B.1 completion commit.
+- **Status:** RESOLVED in P1-B.1.
+- **One-line solution:** Set signed numeric values atomically in jsdom, verify the displayed value, then assert the submitted domain value.
 
 ### INFRA-004 — Dev parent stopped but Vite/API children kept ports open
 

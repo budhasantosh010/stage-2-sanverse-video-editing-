@@ -1,5 +1,22 @@
 # Project Log
 
+## 2026-07-30 — P1-B.1 repository-wide test truth restored
+
+- Resolved `FAIL-024` by registering three genuine contract suites with Vitest
+  while preserving every existing assertion.
+- Resolved `FAIL-025` by testing the current durable export lifecycle: 202 queued
+  acceptance, bounded job polling, terminal success/result or safe failure/error,
+  and successful ranged media access.
+- Resolved `FAIL-026` by atomically changing the signed number input, verifying
+  the displayed `-24`, and proving the repair callback receives `gainDb: -24`.
+- Changed only tests and authority/evidence documents; no product source,
+  dependency, schema, route, renderer, timeline, proposal, or history behavior.
+- Full suites pass: web 332/332, edit-domain 265/265, API 233/233,
+  render-contract 51/51, intent-domain 27/27, Timeline/Studio 79/79; the complete
+  build produces the identical P1-B bundle.
+- `FAIL-021` remains monitoring, `FEATURE-001` remains planned, and P1-C was not
+  started.
+
 ## 2026-07-30 — P1-B Production Timeline V1 complete
 
 - Replaced the old one-row proportional strip with a five-lane Studio timeline

@@ -20,6 +20,13 @@ errors, and failed HTTP responses are all zero. The 30.033-second export was
 probed and five frames were inspected. Start with
 `DOCS/evidence/2026-07-30-p1b-production-timeline-v1/P1-B_IMPLEMENTATION_REPORT.md`.
 
+**P1-B.1 verification maintenance is complete.** `FAIL-024`, `FAIL-025`, and
+`FAIL-026` are resolved without production changes. Full suites now pass: web
+332/332, edit-domain 265/265, API 233/233, render-contract 51/51, intent-domain
+27/27, plus focused Timeline/Studio 79/79. The all-workspace build produces the
+same P1-B bundle. Evidence:
+`DOCS/evidence/2026-07-30-p1b1-test-truth/P1-B1_IMPLEMENTATION_REPORT.md`.
+
 P1-A remains the pure authoritative presentation/gesture foundation. P0-E
 remains the owner-approved five-region Studio frame. The exact next task is
 **P1-C — Inspector V1**; it has not started.

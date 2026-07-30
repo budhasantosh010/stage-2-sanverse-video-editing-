@@ -20,6 +20,16 @@ Studio tests pass 79/79, affected edit-domain tests pass 77/77, and the complete
 production build passes. Evidence:
 `DOCS/evidence/2026-07-30-p1b-production-timeline-v1/`. P1-C has not started.
 
+**P1-B.1 repository-wide test truth is complete on 2026-07-30.** The three
+previously recorded verification failures are resolved without product changes:
+real contract tests now register with Vitest; export server tests assert the
+current `202 Accepted → poll job → terminal result/error` lifecycle; and the
+signed music-gain test atomically verifies `-24`. Full results are web 332/332,
+edit-domain 265/265, API 233/233, render-contract 51/51, intent-domain 27/27,
+and focused Timeline/Studio 79/79. The all-workspace build passes with the same
+P1-B production bundle. Evidence:
+`DOCS/evidence/2026-07-30-p1b1-test-truth/`.
+
 **P1-A remains the authoritative pure timeline foundation.** It owns the
 `EditProject → TimelineViewModel` projection, semantic lanes, derived gaps,
 detached proposal items, diagnostics, viewport math, and the gesture adapter.

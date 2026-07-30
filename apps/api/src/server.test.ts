@@ -1,18 +1,29 @@
 import { once } from 'node:events'
 import { request } from 'node:http'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { EditProject } from '@sanverse/edit-domain'
 
 import { stubMediaProbe } from './test-fixtures.ts'
 import { createSanverseServer } from './server.ts'
+import type { PublicExportJob } from './jobs/local-export-job-store.ts'
 import type { ProjectRepository } from './projects/project-repository.ts'
 
 const servers: Array<ReturnType<typeof createSanverseServer>> = []
-afterEach(async () => { await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve) => server.close(() => resolve())))) })
+const temporaryRoots: string[] = []
+afterEach(async () => {
+  await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve) => server.close(() => resolve()))))
+  await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+})
+
+async function temporaryRoot(prefix: string): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), prefix))
+  temporaryRoots.push(root)
+  return root
+}
 
 function mp4(): Uint8Array {
   return new Uint8Array([0,0,0,24,102,116,121,112,105,115,111,109,0,0,0,0,105,115,111,109,109,112,52,50])
@@ -146,6 +157,29 @@ async function sendJson(port: number, method: string, path: string, payload: unk
     headers: { 'content-type': 'application/json', 'content-length': String(body.length) },
     body,
   })
+}
+
+type ExportJobBody = PublicExportJob
+
+function jsonBody<T>(response: Awaited<ReturnType<typeof call>>): T {
+  return JSON.parse(new TextDecoder().decode(response.body)) as T
+}
+
+async function waitForExportJob(
+  port: number,
+  projectId: string,
+  jobId: string,
+  terminalStatus: 'succeeded' | 'failed',
+): Promise<ExportJobBody> {
+  let last: ExportJobBody | null = null
+  await vi.waitFor(async () => {
+    const response = await call(port, { path: `/api/projects/${projectId}/export-jobs/${jobId}` })
+    expect(response.status).toBe(200)
+    last = jsonBody<ExportJobBody>(response)
+    expect(last.status).toBe(terminalStatus)
+  }, { timeout: 10_000, interval: 20 })
+  if (!last) throw new Error('Export job response was missing.')
+  return last
 }
 
 describe('local API boundary', () => {
@@ -290,25 +324,54 @@ describe('local API boundary', () => {
       },
     }
     const exportId = 'export_1234567890abcdef'
+    const jobId = 'job_1234567890abcdef'
     const state = savedProjectState()
     const port = await listen(createSanverseServer({
-      dataRoot: 'unused',
+      dataRoot: await temporaryRoot('sanverse-api-export-'),
       maxUploadBytes: 100,
       repository: { ...spy.repository, ...state.repository },
       mediaProbe: stubMediaProbe(),
       renderService,
       exportIdGenerator: () => exportId,
+      exportJobIdGenerator: () => jobId,
     }))
 
     // No edit list is sent. The server compiles what it has stored, so a
     // tampered or stale client cannot cause an export that differs from the
     // project the user approved.
-    const created = await call(port, { method: 'POST', path: `/api/projects/${PROJECT_ID}/exports` })
-    expect(created.status).toBe(201)
-    expect(JSON.parse(new TextDecoder().decode(created.body))).toMatchObject({
-      id: exportId,
-      mediaUrl: `/api/projects/${PROJECT_ID}/exports/${exportId}/media`,
-      sha256: 'b'.repeat(64),
+    const accepted = await call(port, { method: 'POST', path: `/api/projects/${PROJECT_ID}/exports` })
+    expect(accepted.status).toBe(202)
+    const acceptedJob = jsonBody<ExportJobBody>(accepted)
+    expect(acceptedJob).toMatchObject({
+      schemaVersion: 'sanverse.local-export-job/v1',
+      jobId,
+      projectId: PROJECT_ID,
+      projectRevision: 0,
+      exportId,
+      status: 'queued',
+      progress: 0,
+      attempts: 0,
+    })
+    expect(acceptedJob).not.toHaveProperty('result')
+    expect(acceptedJob).not.toHaveProperty('error')
+    expect(acceptedJob).not.toHaveProperty('projectSnapshot')
+    expect(acceptedJob).not.toHaveProperty('idempotencyKey')
+
+    const completedJob = await waitForExportJob(port, PROJECT_ID, jobId, 'succeeded')
+    expect(completedJob).toMatchObject({
+      status: 'succeeded',
+      progress: 1,
+      attempts: 1,
+      result: {
+        id: exportId,
+        mediaUrl: `/api/projects/${PROJECT_ID}/exports/${exportId}/media`,
+        sha256: 'b'.repeat(64),
+        width: 1280,
+        height: 720,
+        durationMs: 8_000,
+        hasAudio: true,
+        projectRevision: 0,
+      },
     })
     expect(exportCalls).toHaveLength(1)
     expect(exportCalls[0].outputPath).toBe(EXPORT_OUTPUT_PATH(exportId))
@@ -316,7 +379,7 @@ describe('local API boundary', () => {
     const media = await call(port, { path: `/api/projects/${PROJECT_ID}/exports/${exportId}/media`, headers: { range: 'bytes=0-7' } })
     expect(media.status).toBe(206)
     expect(new TextDecoder().decode(media.body)).toBe('rendered')
-  })
+  }, 15_000)
 
   it('returns a safe actionable code when the operating system blocks the renderer process', async () => {
     const spy = readRepository(new TextEncoder().encode('unused'))
@@ -325,25 +388,43 @@ describe('local API boundary', () => {
         throw Object.assign(new Error('raw operating system detail must stay local'), { code: 'RENDER_PROCESS_BLOCKED' })
       },
     }
+    const exportId = 'export_1234567890abcdef'
+    const jobId = 'job_1234567890abcdef'
     const state = savedProjectState()
     const port = await listen(createSanverseServer({
-      dataRoot: 'unused',
+      dataRoot: await temporaryRoot('sanverse-api-export-failure-'),
       maxUploadBytes: 100,
       repository: { ...spy.repository, ...state.repository },
       mediaProbe: stubMediaProbe(),
       renderService,
-      exportIdGenerator: () => 'export_1234567890abcdef',
+      exportIdGenerator: () => exportId,
+      exportJobIdGenerator: () => jobId,
     }))
 
-    const response = await call(port, { method: 'POST', path: `/api/projects/${PROJECT_ID}/exports` })
-
-    expect(response.status).toBe(503)
-    expect(JSON.parse(new TextDecoder().decode(response.body))).toEqual({
-      error: 'The local renderer process was blocked from starting.',
-      code: 'RENDER_PROCESS_BLOCKED',
+    const accepted = await call(port, { method: 'POST', path: `/api/projects/${PROJECT_ID}/exports` })
+    expect(accepted.status).toBe(202)
+    expect(jsonBody<ExportJobBody>(accepted)).toMatchObject({
+      jobId,
+      projectId: PROJECT_ID,
+      exportId,
+      status: 'queued',
+      progress: 0,
+      attempts: 0,
     })
-    expect(new TextDecoder().decode(response.body)).not.toContain('raw operating system detail')
-  })
+
+    const failedJob = await waitForExportJob(port, PROJECT_ID, jobId, 'failed')
+    expect(failedJob).toMatchObject({
+      status: 'failed',
+      progress: 1,
+      attempts: 1,
+      error: {
+        code: 'RENDER_PROCESS_BLOCKED',
+        message: 'The local renderer process was blocked from starting.',
+      },
+    })
+    expect(failedJob).not.toHaveProperty('result')
+    expect(JSON.stringify(failedJob)).not.toContain('raw operating system detail')
+  }, 15_000)
 
   it('creates, edits, undoes, and reopens a project with the server owning the revision', async () => {
     const spy = readRepository(mp4())
