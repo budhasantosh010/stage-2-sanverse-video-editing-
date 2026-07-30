@@ -1,36 +1,28 @@
 # HANDOFF — everything a new agent needs to continue Sanverse Stage 2
 
-Updated 2026-07-30. **P1-A is complete and pushed as one focused timeline
-foundation change.** It adds a pure immutable timeline contract, deterministic
-`EditProject → TimelineViewModel` projection, semantic lanes, derived gaps,
-detached pending proposals, blocked/unsupported diagnostics, viewport math,
-and a pure gesture adapter that emits only existing Sanverse operations. It
-does not add React timeline UI, persistence, a second history, schema changes,
-or renderer changes. Focused evidence is 71/71 web timeline tests, 77/77
-affected edit-domain tests, an unchanged production bundle, and a passing
-all-workspace build. Start with
-`DOCS/evidence/2026-07-30-p1a-timeline-foundation/P1-A_IMPLEMENTATION_REPORT.md`.
-The exact next task is P1-B — Production Timeline V1; it has not started.
+Updated 2026-07-30. **P1-B — Production Timeline V1 is technically complete.**
+Studio now consumes P1-A's one-way `EditProject → TimelineViewModel` projection
+as a real five-lane editor: V2 overlays, V1 video, C1 captions, A1 dialogue, and
+A2 music. It has one shared composition playhead, ruler, click/drag seek,
+zoom/Fit/scroll, visible-range overscan, stable selection, exact trim preview,
+deterministic snapping, proposal ghosts, keyboard-safe removal, and real
+right-click/Shift+F10 actions. Every edit still crosses P1-A's typed gesture
+adapter and the existing server-authoritative change-set route. No second
+project, history, proposal, playhead, video element, schema, persistence format,
+or renderer exists.
 
-P0-E is complete and owner-approved from commit
-`d48aabf34fdadbd6899807fa0c6de0c854a5dc5f`. `UX-007` records that resolved
-layout gate. The visible Studio remains unchanged by P1-A.
+The focused result is 79/79 timeline/Studio web tests, 77/77 affected
+domain tests, and a passing all-workspace production build. A real Edge run on
+a fresh `test-30s.mp4` completed split → Undo → Redo → context menu → snap →
+trim → Undo → proposal ghost/reject → export/download. Final desktop, tablet,
+and mobile geometry has no document-width overflow; page errors, console
+errors, and failed HTTP responses are all zero. The 30.033-second export was
+probed and five frames were inspected. Start with
+`DOCS/evidence/2026-07-30-p1b-production-timeline-v1/P1-B_IMPLEMENTATION_REPORT.md`.
 
-P0-D.1 is technically complete and owner-approved on
-`agent/g6-g8-local-alpha`: the Home composer and Assist hierarchy are corrected,
-dead empty-state actions are contextual, action-disabled reasons are accessible,
-change states have non-color markers, focused tests pass 78/78, and the
-production build passes. Evidence and the resolved `UX-005` review gate are in
-`DOCS/evidence/2026-07-29-p0d1-visual-corrections/P0-D1_IMPLEMENTATION_REPORT.md`.
-P1-A and production Timeline V1 have not started.
-
-P0-D is technically complete on
-`agent/g6-g8-local-alpha`: Assist is the video-first default over one persistent
-editor session, focused tests pass 67/67, the production build passes, and the
-real `test-30s.mp4` proposal → repair → Accept → Undo → Redo → export →
-download loop passed. Its evidence and original owner-review gate are in
-`DOCS/evidence/2026-07-29-p0d-assist/P0-D_IMPLEMENTATION_REPORT.md`. P0-E,
-P1-A, and production Timeline V1 have not started.
+P1-A remains the pure authoritative presentation/gesture foundation. P0-E
+remains the owner-approved five-region Studio frame. The exact next task is
+**P1-C — Inspector V1**; it has not started.
 
 **Read this file, then `DOCS/CURRENT_STATE.md`, then the ADRs it names.**
 Nothing else is required to start work.

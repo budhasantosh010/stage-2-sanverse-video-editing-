@@ -23,8 +23,12 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | UX-006 | P2 | UX/A11Y | Pending and accepted changes need stronger visual distinction | RESOLVED | P0-D.1 |
 | [x] | UX-007 | P1 | UX | P0-E Studio layout required owner approval before P1-A | RESOLVED | P0-E |
 | [ ] | FAIL-021 | P2 | Performance | 30-second export crossed the 60-second walkthrough budget | MONITORING | E5 benchmark |
+| [ ] | FAIL-024 | P2 | Verification debt | Contract files named `.test.ts` contain no Vitest suites, so broad domain/API commands exit 1 after their real assertions pass | OPEN | Test-contract maintenance |
+| [ ] | FAIL-025 | P2 | API test drift | Two server tests expect old synchronous export statuses while the current API correctly returns asynchronous 202 | OPEN | Export API contract maintenance |
+| [ ] | FAIL-026 | P2 | Web test drift | Overlay music-gain test enters `-24` through jsdom/user-event but submits `+24` | OPEN | Overlay test maintenance |
 | [ ] | FEATURE-001 | P3 | Deferred UX | Optional desktop composer resize preference | PLANNED | Post-P1 |
 | [x] | INFRA-001 | P3 | Verification infrastructure | In-app viewport screenshots tiled the page texture | RESOLVED | P0-D.1 |
+| [x] | INFRA-004 | P3 | Dev-process cleanup | Stopping the Harness dev parent left Sanverse Vite/API children listening on ports 2000/2001 | RESOLVED | P1-B |
 
 ## Legacy risk and failure summary
 
@@ -254,6 +258,54 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 - **Blocking:** It was milestone-invalidating for accessible core feedback and was fixed before commit.
 - **One-line solution:** Give each error domain one announcement owner: conversation errors in `ChatComposer`, proposal/edit errors in `AssistProposalPanel`.
 - **Status:** Resolved.
+
+### FAIL-024 — Empty contract files make broad Vitest commands exit 1
+
+- **What failed:** Full edit-domain and API test commands exit 1 even after their executable assertions pass because three files named `*.test.ts` contain contracts but no Vitest suite.
+- **Where:** `motion-fidelity.contract.test.ts`, `local-export-job-store.contract.test.ts`, and `portable-project.contract.test.ts`.
+- **When:** P1-B final broad verification on 2026-07-30.
+- **Who was affected:** Developers and CI interpretation; no runtime user path failed.
+- **Why:** Vitest collects the filenames as test modules and treats “No test suite found” as failure.
+- **How reproduced:** Full edit-domain produced 263 passing assertions then exited 1; full API produced 228 passing assertions plus the two empty-suite collection failures.
+- **What was tried:** Focused affected suites were run explicitly and passed. The files were not changed because that is unrelated test-contract maintenance.
+- **Status:** OPEN; nonblocking for P1-B's focused/affected acceptance gate.
+- **One-line solution:** Rename non-executable contracts away from `*.test.ts` or wrap each in an intentional Vitest suite.
+
+### FAIL-025 — Export API tests expect obsolete synchronous statuses
+
+- **What failed:** Two API server tests expect 201 and 503, while the current durable export-job route correctly accepts work asynchronously with 202.
+- **Where:** Two export assertions in `apps/api/src/server.test.ts`.
+- **When:** P1-B final broad verification on 2026-07-30.
+- **Who was affected:** Test-suite truthfulness; the real browser export completed, verified, and downloaded normally.
+- **Why:** The tests were not advanced when export moved to the asynchronous job contract.
+- **How reproduced:** Full API run returned 202 in both assertions. Stopping the real dev server and rerunning produced the same result, ruling out browser-run interference.
+- **What was tried:** No API change was made because P1-B touches no API behavior. Real Edge export plus downloaded MP4 probe supplied product evidence.
+- **Status:** OPEN; unrelated to P1-B.
+- **One-line solution:** Rewrite the two assertions around 202 acceptance and the durable job polling/result contract.
+
+### FAIL-026 — Signed music-gain test submits the wrong sign in jsdom
+
+- **What failed:** The overlay-repair test expects `gainDb: -24`, but its user-event number-input sequence submits `gainDb: 24`.
+- **Where:** `apps/web/src/features/overlays/OverlayRepairPanel.test.tsx`.
+- **When:** P1-B full web verification on 2026-07-30.
+- **Who was affected:** One unrelated web test; Timeline V1 does not modify the component.
+- **Why:** The current jsdom/user-event signed-number input sequence loses the minus sign, the same class of issue previously recorded in FAIL-020.
+- **How reproduced:** Full web reported 324 passing and one failure; rerunning only this file reproduced 1 pass/1 failure with `+24` received.
+- **What was tried:** The failure was isolated and recorded. No overlay behavior or test was changed inside P1-B.
+- **Status:** OPEN; unrelated to P1-B.
+- **One-line solution:** Set the signed number value atomically in the test, then separately test user interaction semantics in a real browser.
+
+### INFRA-004 — Dev parent stopped but Vite/API children kept ports open
+
+- **What failed:** A later `npm run dev` launch returned `EADDRINUSE` for ports 2000 and 2001 after the Harness parent process had been stopped.
+- **Where:** P1-B visual-QA process cleanup on Windows.
+- **When:** 2026-07-30.
+- **Who was affected:** Local verification only.
+- **Why:** The orchestrator parent exited while its two Node children remained listening.
+- **How reproduced:** `Get-NetTCPConnection` found PIDs 18640/22336; command-line inspection proved they were this workspace's Vite and API processes.
+- **What was tried:** Only those two proven Sanverse child PIDs were stopped, then the app relaunched normally.
+- **Status:** RESOLVED.
+- **One-line solution:** Inspect port owners and stop only verified workspace child processes when the parent does not propagate termination.
 
 ## UX-001 — Home composer occupies too much vertical space
 

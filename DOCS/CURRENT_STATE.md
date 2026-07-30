@@ -4,18 +4,27 @@ Last updated: 2026-07-30
 
 ## Active goal
 
-**P1-A is complete on 2026-07-30.** Sanverse now has a pure immutable timeline
-presentation contract, a deterministic `EditProject → TimelineViewModel`
-projection, semantic overlay/video/caption/dialogue/music lanes, derived gaps,
-detached pending-proposal items, blocked/unsupported diagnostics, bounded
-viewport math, and a pure gesture adapter that returns one existing validated
-operation or a typed refusal. The builder evaluates accepted project history
-once and reuses authoritative effective composition, folded captions/overlays,
-and source placement. It adds no second project model, no persistence, no React,
-and no production UI change. Evidence: 71/71 focused web timeline tests, 77/77
-affected edit-domain tests, unchanged P0-E bundle sizes, and a passing
-all-workspace build in
-`DOCS/evidence/2026-07-30-p1a-timeline-foundation/`. P1-B has not started.
+**P1-B — Production Timeline V1 is technically complete on 2026-07-30.**
+Studio now renders P1-A's immutable `TimelineViewModel` as five semantic lanes
+(V2/V1/C1/A1/A2), one shared composition playhead, ruler, click/drag seek,
+zoom, Fit, horizontal scroll, visible-range overscan, stable selection, gaps,
+hidden/blocked items, detached proposal ghosts, trim preview, deterministic
+boundary snapping, a real right-click/Shift+F10 menu, and keyboard-safe removal.
+Every supported editorial gesture still crosses P1-A's typed adapter and the
+existing server-authoritative change-set path; no second project, history,
+proposal, playhead, video element, schema, renderer, or persistence format was
+introduced. A real Edge run on fresh `test-30s.mp4` completed split → Undo →
+Redo → snap → trim → Undo → proposal ghost/reject → export/download, with zero
+page/console/HTTP errors and clean 1440/1024/390 geometry. Focused timeline and
+Studio tests pass 79/79, affected edit-domain tests pass 77/77, and the complete
+production build passes. Evidence:
+`DOCS/evidence/2026-07-30-p1b-production-timeline-v1/`. P1-C has not started.
+
+**P1-A remains the authoritative pure timeline foundation.** It owns the
+`EditProject → TimelineViewModel` projection, semantic lanes, derived gaps,
+detached proposal items, diagnostics, viewport math, and the gesture adapter.
+P1-B consumes that one-way presentation boundary; it does not persist a second
+timeline document.
 
 **P0-E is complete and owner-approved.** The owner explicitly approved the
 layout and started P1-A from commit
@@ -43,8 +52,9 @@ proposal, repair, Accept, Undo, Redo, export, and download. Exact-size
 remains open.
 
 **P0-R is complete on 2026-07-29.** The decision is **C: study OpenCut
-behavior and build a focused Sanverse timeline**. Production Timeline V1 has
-not started. Decision:
+behavior and build a focused Sanverse timeline**. P1-A and P1-B now implement
+that decision with Sanverse-owned contracts, components, operations, history,
+preview, and export authority. Decision:
 `DOCS/decisions/P0-R_OPENCUT_TIMELINE_REUSE_DECISION.md`.
 
 **P0-B and P0-C are technically complete on 2026-07-29.** The web app now has

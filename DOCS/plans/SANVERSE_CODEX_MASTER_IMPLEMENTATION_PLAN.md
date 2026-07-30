@@ -1151,6 +1151,10 @@ Do not persist the view model as a second project format.
 
 ## P1-B — Timeline V1
 
+Status: **complete on 2026-07-30**. Evidence:
+`DOCS/evidence/2026-07-30-p1b-production-timeline-v1/`. P1-C was not started by
+this change.
+
 Initial rows:
 
 ```text

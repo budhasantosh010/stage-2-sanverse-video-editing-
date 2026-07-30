@@ -8,8 +8,10 @@ import {
   type MediaAsset,
   PROJECT_TIMESCALE,
   TICKS_PER_MILLISECOND as TICKS_PER_MS,
+  clipAtCompositionTime,
   compositionDuration,
   effectiveComposition,
+  isTimelineOperation,
   toMilliseconds,
 } from '@sanverse/edit-domain'
 import { proposalPlacement } from '../../app/app-state'
@@ -19,17 +21,15 @@ import type { IntentContextInput } from '../../features/conversation/conversatio
 import { NameplateRepair } from '../../features/proposal-repair/NameplateRepair'
 import { describeOperation } from '../../features/history/describe-operation'
 import {
-  buildMoveAtPlayhead,
-  buildRemoveAtPlayhead,
-  buildSetAudioAtPlayhead,
-  buildSetEnabledAtPlayhead,
-  buildSplitAtPlayhead,
-  buildTrimAtPlayhead,
-  timelineBlocks,
-} from '../../features/timeline/timeline-edits'
+  adaptTimelineGesture,
+  buildTimelineViewModel,
+  type TimelineGesture,
+  type TimelineViewportState,
+} from '../../features/timeline'
 import {
   advancePlayback,
   isUncutPassthrough,
+  nextVisibleTick,
   playbackSegments,
   sourceTimeFor,
   type PlaybackSegment,
@@ -61,6 +61,7 @@ import {
   AssistProposalPanel,
   buildAssistChangeItems,
 } from '../../editor/assist'
+import { Timeline, reconcileTimelineSelection } from '../../editor/timeline'
 import {
   capturePointTarget,
   formatPointTargetTime,
@@ -215,11 +216,22 @@ export function StudioScreen({
   const segmentIndexRef = useRef(0)
   const totalTicksRef = useRef(0)
   const inHoleRef = useRef(false)
+  const playheadTicksRef = useRef(0)
+  const holePlaybackRef = useRef<Readonly<{
+    enter(fromTicks: number, untilTicks: number): void
+    leave(): void
+  }> | null>(null)
   const [proposalResult, setProposalResult] = useState<string | null>(null)
   const [selectedAssistChangeId, setSelectedAssistChangeId] = useState<string | null>(null)
   const [isAiPanelCollapsed, setIsAiPanelCollapsed] = useState(false)
   const [compactSidePanel, setCompactSidePanel] = useState<'media' | 'inspector' | null>(null)
-  /** A plain sentence explaining why a cut was not made. */
+  const [selectedTimelineItemId, setSelectedTimelineItemId] = useState<string | null>(null)
+  const [timelineViewport, setTimelineViewport] = useState<TimelineViewportState>(() => Object.freeze({
+    pixelsPerSecond: 100,
+    scrollLeftPx: 0,
+    viewportWidthPx: 0,
+  }))
+  /** A plain sentence explaining why a timeline edit was not made. */
   const [timelineNotice, setTimelineNotice] = useState<string | null>(null)
   const [trimSeconds, setTrimSeconds] = useState(1)
   const [clipGainDb, setClipGainDb] = useState(0)
@@ -270,13 +282,19 @@ export function StudioScreen({
     if (exportState.status === 'idle') return
     const target = exportResultRef.current
     if (!target) return
-    target.scrollIntoView?.({ block: 'nearest' })
+    target.scrollIntoView?.({ block: 'start' })
+    const panel = target.closest<HTMLElement>('.studio-screen__ai-panel-content')
+    if (panel) panel.scrollTop = Math.max(0, target.offsetTop - 8)
     if (exportState.status === 'ready' || exportState.status === 'error') target.focus?.()
   }, [exportState.status])
 
   useEffect(() => {
     if (editError) pendingProposalResolutionRef.current = null
   }, [editError])
+
+  useEffect(() => {
+    playheadTicksRef.current = Math.max(0, millisecondsToTicks(playheadMs))
+  }, [playheadMs])
 
   useEffect(() => {
     const video = videoRef.current
@@ -379,6 +397,16 @@ export function StudioScreen({
     const hasVideoFrameCallback = typeof video.requestVideoFrameCallback === 'function'
     let videoFrameCallbackId: number | null = null
     let stopped = false
+    holePlaybackRef.current = Object.freeze({ enter: enterHole, leave: leaveHole })
+    const resumeTimelineHole = () => {
+      if (!inHoleRef.current) return
+      video.pause()
+      const fromTicks = playheadTicksRef.current
+      const untilTicks = nextVisibleTick(segmentsRef.current, fromTicks)
+      if (untilTicks === null || untilTicks <= fromTicks) return
+      inHoleRef.current = false
+      enterHole(fromTicks, untilTicks)
+    }
     const requestNextVideoFrame = () => {
       if (typeof video.requestVideoFrameCallback !== 'function') return
       videoFrameCallbackId = video.requestVideoFrameCallback((_now, metadata) => {
@@ -403,11 +431,13 @@ export function StudioScreen({
     video.addEventListener('loadedmetadata', refreshPlayhead)
     video.addEventListener('timeupdate', refreshPlayhead)
     video.addEventListener('seeked', refreshPlayhead)
+    video.addEventListener('play', resumeTimelineHole)
     if (hasVideoFrameCallback) requestNextVideoFrame()
 
     return () => {
       stopped = true
       leaveHole()
+      holePlaybackRef.current = null
       if (
         videoFrameCallbackId !== null &&
         typeof video.cancelVideoFrameCallback === 'function'
@@ -420,6 +450,7 @@ export function StudioScreen({
       video.removeEventListener('loadedmetadata', refreshPlayhead)
       video.removeEventListener('timeupdate', refreshPlayhead)
       video.removeEventListener('seeked', refreshPlayhead)
+      video.removeEventListener('play', resumeTimelineHole)
     }
   }, [])
 
@@ -522,28 +553,107 @@ export function StudioScreen({
     if (segmentIndexRef.current >= previewSegments.length) segmentIndexRef.current = 0
   }, [previewSegments, compositionDurationTicks])
 
-  // Where the pending proposal actually lands on screen. After a cut this is
-  // not a number stored on the proposal; it has to be worked out from the
-  // footage that survived, and every place that shows a time uses this one
-  // value so the panel and the summary can never disagree.
-  const timelineSections = timelineBlocks(composition, compositionDurationTicks)
-  const playheadTicks = Math.max(0, millisecondsToTicks(playheadMs))
-  const playheadPercent =
-    compositionDurationTicks > 0
-      ? Math.min(100, (playheadTicks / compositionDurationTicks) * 100)
-      : 0
-  // A cut while a proposal is pending would move the footage the proposal is
-  // anchored to, so the two are kept apart rather than racing.
+  const playheadTicks = Math.min(
+    compositionDurationTicks,
+    Math.max(0, millisecondsToTicks(playheadMs)),
+  )
+  // A direct project edit while a proposal is pending would move the footage
+  // the proposal is anchored to, so both surfaces share one fail-closed policy.
   const timelineBusy = Boolean(proposal) || isRendering
+  const pendingTimelineInput = useMemo(
+    () => proposal
+      ? Object.freeze({
+          proposalId: proposal.operation.operationId,
+          baseRevision: editProject.revision,
+          operations: Object.freeze([proposal.operation]),
+        })
+      : null,
+    [editProject.revision, proposal],
+  )
+  const timelineModel = useMemo(
+    () => buildTimelineViewModel({
+      project: editProject,
+      selectedItemId: selectedTimelineItemId,
+      pending: pendingTimelineInput,
+    }),
+    [editProject, pendingTimelineInput, selectedTimelineItemId],
+  )
 
-  /**
-   * Make one cut, at the playhead, and let the server decide the result.
-   *
-   * A cut is applied immediately rather than proposed for approval: unlike a
-   * nameplate there is nothing to word or position, the preview shows the
-   * result at once, and one Undo takes it back. A refusal is shown as a plain
-   * sentence and nothing is sent.
-   */
+  useEffect(() => {
+    const reconciled = reconcileTimelineSelection(timelineModel, selectedTimelineItemId)
+    if (reconciled !== selectedTimelineItemId) setSelectedTimelineItemId(reconciled)
+  }, [selectedTimelineItemId, timelineModel])
+
+  function seekCompositionTicks(requestedTicks: number) {
+    const nextTicks = Math.min(
+      compositionDurationTicks,
+      Math.max(0, Number.isFinite(requestedTicks) ? Math.round(requestedTicks) : 0),
+    )
+    setPlayheadMs(nextTicks / TICKS_PER_MS)
+    playheadTicksRef.current = nextTicks
+
+    const videoElement = videoRef.current
+    if (!videoElement) return
+    holePlaybackRef.current?.leave()
+
+    if (nextTicks >= compositionDurationTicks) {
+      videoElement.pause()
+      return
+    }
+
+    const target = sourceTimeFor(previewSegments, nextTicks)
+    if (!target) {
+      videoElement.pause()
+      inHoleRef.current = true
+      setIsShowingHole(true)
+      return
+    }
+
+    inHoleRef.current = false
+    setIsShowingHole(false)
+    segmentIndexRef.current = target.segmentIndex
+    videoElement.currentTime = target.sourceTicks / PROJECT_TIMESCALE
+  }
+
+  function timelineRefusalMessage(code: string, fallback: string): string {
+    switch (code) {
+      case 'PROPOSAL_PENDING':
+        return 'Accept or reject the pending proposal before changing the timeline.'
+      case 'EXPORT_IN_PROGRESS':
+        return 'Export is running. Wait for it to finish before changing the project.'
+      case 'CLIP_UNKNOWN':
+        return 'That section no longer exists. The timeline has been refreshed.'
+      case 'GESTURE_OUT_OF_RANGE':
+        return fallback || 'That edit would fall outside the current section.'
+      case 'NO_TARGET':
+        return fallback || 'There is no editable section at that moment.'
+      default:
+        return fallback || 'That timeline edit could not be applied. Nothing changed.'
+    }
+  }
+
+  function handleTimelineGesture(gesture: TimelineGesture) {
+    const result = adaptTimelineGesture({
+      project: editProject,
+      gesture,
+      createOperationId,
+      createClipId,
+      pendingProposalExists: Boolean(proposal),
+      exportInProgress: isRendering,
+    })
+    if (!result.ok) {
+      setTimelineNotice(timelineRefusalMessage(result.error.code, result.error.message))
+      return
+    }
+    if (!isTimelineOperation(result.value)) {
+      setTimelineNotice('That timeline action produced an unsupported edit. Nothing changed.')
+      return
+    }
+    setTimelineNotice(null)
+    onTimelineEdit(result.value)
+  }
+
+  /** Keep the proven controls as a temporary fallback, but route them through P1-A. */
   function runTimelineEdit(
     action:
       | 'split'
@@ -557,47 +667,48 @@ export function StudioScreen({
       | 'move-later'
       | 'audio',
   ) {
-    if (timelineBusy) return
-    let result
+    const clip = clipAtCompositionTime(composition, {
+      ticks: playheadTicks,
+      timescale: PROJECT_TIMESCALE,
+    })
     if (action === 'split') {
-      result = buildSplitAtPlayhead(composition, playheadTicks, createOperationId, createClipId)
-    } else if (action === 'remove' || action === 'remove-gap') {
-      result = buildRemoveAtPlayhead(composition, playheadTicks, createOperationId, action === 'remove')
-    } else if (action === 'hide' || action === 'show') {
-      result = buildSetEnabledAtPlayhead(composition, playheadTicks, action === 'show', createOperationId)
-    } else if (action === 'trim-start' || action === 'trim-end') {
-      result = buildTrimAtPlayhead(
-        composition,
-        playheadTicks,
-        action === 'trim-start' ? 'start' : 'end',
-        trimSeconds * PROJECT_TIMESCALE,
-        true,
-        createOperationId,
-      )
-    } else if (action === 'move-earlier' || action === 'move-later') {
-      result = buildMoveAtPlayhead(
-        composition,
-        playheadTicks,
-        action === 'move-earlier' ? 'earlier' : 'later',
-        createOperationId,
-      )
-    } else {
-      result = buildSetAudioAtPlayhead(
-        composition,
-        playheadTicks,
-        clipGainDb,
-        fadeInSeconds * PROJECT_TIMESCALE,
-        fadeOutSeconds * PROJECT_TIMESCALE,
-        createOperationId,
-      )
-    }
-
-    if (!result.ok) {
-      setTimelineNotice(result.refusal.reason)
+      handleTimelineGesture({ type: 'split', atTicks: playheadTicks })
       return
     }
-    setTimelineNotice(null)
-    onTimelineEdit(result.operation)
+    if (action === 'remove' || action === 'remove-gap') {
+      handleTimelineGesture({
+        type: action === 'remove' ? 'remove-ripple' : 'remove-gap',
+        atTicks: playheadTicks,
+      })
+      return
+    }
+    if (!clip) {
+      setTimelineNotice('There is no editable section at this moment.')
+      return
+    }
+    if (action === 'hide' || action === 'show') {
+      handleTimelineGesture({ type: 'set-enabled', clipId: clip.clipId, enabled: action === 'show' })
+      return
+    }
+    if (action === 'trim-start' || action === 'trim-end') {
+      handleTimelineGesture({
+        type: action,
+        clipId: clip.clipId,
+        deltaTicks: Math.max(1, Math.round(trimSeconds * PROJECT_TIMESCALE)),
+      })
+      return
+    }
+    if (action === 'move-earlier' || action === 'move-later') {
+      handleTimelineGesture({ type: action, clipId: clip.clipId })
+      return
+    }
+    handleTimelineGesture({
+      type: 'set-audio',
+      clipId: clip.clipId,
+      gainDb: clipGainDb,
+      fadeInTicks: Math.max(0, Math.round(fadeInSeconds * PROJECT_TIMESCALE)),
+      fadeOutTicks: Math.max(0, Math.round(fadeOutSeconds * PROJECT_TIMESCALE)),
+    })
   }
 
   /**
@@ -628,9 +739,7 @@ export function StudioScreen({
   const proposalDurationMs = proposalPlaced ? proposalPlaced.durationTicks / TICKS_PER_MS : 0
 
   function seekAssistChange(ticks: number) {
-    const nextMs = Math.max(0, ticks / TICKS_PER_MS)
-    setPlayheadMs(nextMs)
-    if (videoRef.current) videoRef.current.currentTime = nextMs / 1_000
+    seekCompositionTicks(ticks)
   }
 
   /**
@@ -770,6 +879,154 @@ export function StudioScreen({
       })
     }
   }
+
+  const advancedTimelineControls = (
+    <div className="studio-screen__legacy-timeline-controls">
+      <div className="studio-screen__track-actions">
+        <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('split')}>
+          Cut here
+        </button>
+        <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('remove')}>
+          Remove this section
+        </button>
+        <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('hide')}>
+          Hide this section
+        </button>
+        <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('show')}>
+          Bring it back
+        </button>
+      </div>
+      <details className="studio-screen__section-adjustments">
+        <summary>Adjust section at playhead</summary>
+        <div className="studio-screen__section-adjustment-grid">
+          <label>
+            Seconds to remove
+            <input
+              aria-label="Seconds to remove"
+              type="number"
+              min="0.1"
+              step="0.1"
+              value={trimSeconds}
+              onChange={(event) => setTrimSeconds(Number(event.currentTarget.value))}
+            />
+          </label>
+          <div className="studio-screen__track-actions">
+            <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('trim-start')}>
+              Shorten the start
+            </button>
+            <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('trim-end')}>
+              Shorten the end
+            </button>
+            <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('remove-gap')}>
+              Remove and leave empty space
+            </button>
+          </div>
+          <div className="studio-screen__track-actions">
+            <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('move-earlier')}>
+              Move earlier
+            </button>
+            <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('move-later')}>
+              Move later
+            </button>
+          </div>
+          <label>
+            Loudness change (dB)
+            <input
+              aria-label="Loudness change"
+              type="number"
+              min="-60"
+              max="24"
+              step="1"
+              value={clipGainDb}
+              onChange={(event) => setClipGainDb(Number(event.currentTarget.value))}
+            />
+          </label>
+          <label>
+            Fade in (seconds)
+            <input
+              aria-label="Fade in seconds"
+              type="number"
+              min="0"
+              step="0.1"
+              value={fadeInSeconds}
+              onChange={(event) => setFadeInSeconds(Number(event.currentTarget.value))}
+            />
+          </label>
+          <label>
+            Fade out (seconds)
+            <input
+              aria-label="Fade out seconds"
+              type="number"
+              min="0"
+              step="0.1"
+              value={fadeOutSeconds}
+              onChange={(event) => setFadeOutSeconds(Number(event.currentTarget.value))}
+            />
+          </label>
+          <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('audio')}>
+            Apply sound
+          </button>
+        </div>
+      </details>
+
+      <div className="studio-screen__captions">
+        <h3>Captions and overlays</h3>
+        <p>
+          Add captions, titles, callouts, B-roll, images or music. These proven controls remain
+          available while Timeline V1 becomes the primary editing surface.
+        </p>
+        <AddOverlayPanel
+          editProject={editProject}
+          playheadMs={playheadMs}
+          busy={timelineBusy || captionsBusy}
+          onCreate={onCreateOverlay}
+          onUploadAsset={onUploadAsset}
+        />
+        {acceptedOverlays.length > 0 ? (
+          <div className="studio-screen__overlay-repairs" aria-label="Things added to the video">
+            <h4>Things you added</h4>
+            {acceptedOverlays.map((item) => (
+              <OverlayRepairPanel
+                key={
+                  item.kind === 'add-title'
+                    ? item.titleId
+                    : item.kind === 'add-callout'
+                      ? item.calloutId
+                      : item.kind === 'add-media-overlay'
+                        ? item.overlayId
+                        : item.musicId
+                }
+                editProject={editProject}
+                item={item}
+                playheadMs={playheadMs}
+                busy={timelineBusy || captionsBusy}
+                onRepair={onCreateOverlay}
+              />
+            ))}
+          </div>
+        ) : null}
+        <label className="studio-screen__captions-picker">
+          <span>Add captions from a transcript file</span>
+          <input
+            type="file"
+            accept="application/json,.json"
+            disabled={timelineBusy || captionsBusy}
+            data-testid="caption-file-input"
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0]
+              event.currentTarget.value = ''
+              if (file) void onAddCaptions(file)
+            }}
+          />
+        </label>
+        {captionsNotice ? (
+          <p className="studio-screen__track-notice" role="status">
+            {captionsNotice}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  )
 
   return (
     <main className={`studio-screen studio-screen--${workspace}`} onKeyDown={handlePointModeKeyDown}>
@@ -1281,185 +1538,35 @@ export function StudioScreen({
         <div className="studio-screen__time-strip-heading">
           <div>
             <span className="studio-screen__section-index">05</span>
-            <h2>Timeline</h2>
+            <h2>Production timeline</h2>
           </div>
-          <p>
-            Direct controls over the current project
-          </p>
+          <p>One project · one playhead · server-authoritative edits</p>
         </div>
-        <div className="studio-screen__track" data-testid="timeline-track">
-          {timelineSections.map((block) => (
-            <div
-              key={block.clipId}
-              className={
-                block.enabled
-                  ? 'studio-screen__track-block'
-                  : 'studio-screen__track-block studio-screen__track-block--hidden'
-              }
-              style={{ left: `${block.leftPercent}%`, width: `${block.widthPercent}%` }}
-              data-testid="timeline-section"
-              data-clip-id={block.clipId}
-            >
-              <span>{block.enabled ? 'Section' : 'Hidden'}</span>
-            </div>
-          ))}
-          <div
-            className="studio-screen__track-playhead"
-            data-testid="timeline-playhead"
-            style={{ left: `${playheadPercent}%` }}
-            aria-hidden="true"
-          />
-        </div>
-
-        <div className="studio-screen__track-actions">
-          <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('split')}>
-            Cut here
-          </button>
-          <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('remove')}>
-            Remove this section
-          </button>
-          <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('hide')}>
-            Hide this section
-          </button>
-          <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('show')}>
-            Bring it back
-          </button>
-        </div>
-        <details className="studio-screen__section-adjustments">
-          <summary>Adjust this section</summary>
-          <div className="studio-screen__section-adjustment-grid">
-            <label>
-              Seconds to remove
-              <input
-                aria-label="Seconds to remove"
-                type="number"
-                min="0.1"
-                step="0.1"
-                value={trimSeconds}
-                onChange={(event) => setTrimSeconds(Number(event.currentTarget.value))}
-              />
-            </label>
-            <div className="studio-screen__track-actions">
-              <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('trim-start')}>
-                Shorten the start
-              </button>
-              <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('trim-end')}>
-                Shorten the end
-              </button>
-              <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('remove-gap')}>
-                Remove and leave empty space
-              </button>
-            </div>
-            <div className="studio-screen__track-actions">
-              <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('move-earlier')}>
-                Move earlier
-              </button>
-              <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('move-later')}>
-                Move later
-              </button>
-            </div>
-            <label>
-              Loudness change (dB)
-              <input
-                aria-label="Loudness change"
-                type="number"
-                min="-60"
-                max="24"
-                step="1"
-                value={clipGainDb}
-                onChange={(event) => setClipGainDb(Number(event.currentTarget.value))}
-              />
-            </label>
-            <label>
-              Fade in (seconds)
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={fadeInSeconds}
-                onChange={(event) => setFadeInSeconds(Number(event.currentTarget.value))}
-              />
-            </label>
-            <label>
-              Fade out (seconds)
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={fadeOutSeconds}
-                onChange={(event) => setFadeOutSeconds(Number(event.currentTarget.value))}
-              />
-            </label>
-            <button type="button" disabled={timelineBusy} onClick={() => runTimelineEdit('audio')}>
-              Apply sound
-            </button>
-          </div>
-        </details>
+        <Timeline
+          model={timelineModel}
+          playheadTicks={playheadTicks}
+          viewport={timelineViewport}
+          selectedItemId={selectedTimelineItemId}
+          busy={timelineBusy}
+          trimAmountTicks={Math.max(1, Math.round(trimSeconds * PROJECT_TIMESCALE))}
+          gainDb={clipGainDb}
+          fadeInTicks={Math.max(0, Math.round(fadeInSeconds * PROJECT_TIMESCALE))}
+          fadeOutTicks={Math.max(0, Math.round(fadeOutSeconds * PROJECT_TIMESCALE))}
+          advancedControls={advancedTimelineControls}
+          onViewportChange={setTimelineViewport}
+          onSeek={seekCompositionTicks}
+          onSelect={setSelectedTimelineItemId}
+          onGesture={handleTimelineGesture}
+          onOpenProposal={() => {
+            setIsAiPanelCollapsed(false)
+            requestAnimationFrame(() => proposalSummaryRef.current?.focus())
+          }}
+        />
         {timelineNotice ? (
           <p className="studio-screen__track-notice" role="status">
             {timelineNotice}
           </p>
         ) : null}
-
-        <div className="studio-screen__captions">
-          <h3>Captions</h3>
-          <p>
-            Choose the transcript file for this video. Nothing is sent anywhere — the
-            words are read on this machine and turned into readable lines for you.
-          </p>
-          <AddOverlayPanel
-            editProject={editProject}
-            playheadMs={playheadMs}
-            busy={timelineBusy || captionsBusy}
-            onCreate={onCreateOverlay}
-            onUploadAsset={onUploadAsset}
-          />
-          {acceptedOverlays.length > 0 ? (
-            <div className="studio-screen__overlay-repairs" aria-label="Things added to the video">
-              <h4>Things you added</h4>
-              {acceptedOverlays.map((item) => (
-                <OverlayRepairPanel
-                  key={
-                    item.kind === 'add-title'
-                      ? item.titleId
-                      : item.kind === 'add-callout'
-                        ? item.calloutId
-                        : item.kind === 'add-media-overlay'
-                          ? item.overlayId
-                          : item.musicId
-                  }
-                  editProject={editProject}
-                  item={item}
-                  playheadMs={playheadMs}
-                  busy={timelineBusy || captionsBusy}
-                  onRepair={onCreateOverlay}
-                />
-              ))}
-            </div>
-          ) : null}
-          <label className="studio-screen__captions-picker">
-            <span>Add captions from a transcript file</span>
-            <input
-              type="file"
-              accept="application/json,.json"
-              disabled={timelineBusy || captionsBusy}
-              data-testid="caption-file-input"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0]
-                // The picker is cleared straight away so choosing the same file
-                // twice still fires, which is what a user expects after a
-                // failure they have just fixed.
-                event.currentTarget.value = ''
-                if (file) void onAddCaptions(file)
-              }}
-            />
-          </label>
-          {captionsNotice ? (
-            <p className="studio-screen__track-notice" role="status">
-              {captionsNotice}
-            </p>
-          ) : null}
-        </div>
       </section>}
     </main>
   )

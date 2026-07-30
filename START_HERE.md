@@ -8,17 +8,16 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 ## Current gate
 
-- Completed technical stages: **G0 — Foundation**, **G2 — Canonical project foundation**, and **G3 — First closed manual vertical slice**.
-- Open owner-evidence stage: **G1 — final motion, native drag-and-drop, and overall Studio UX acceptance**.
-- Proposed next implementation stage: **G4-A — Scale-ready Project v2 chassis**. It is planned but not approved or started.
-- Product code: a runnable local web application exists at strict http://localhost:2000. It imports an MP4 through a loopback-only API into an immutable project-owned copy, supports point capture, a bounded nameplate proposal, typed preview, exactly-once acceptance, persisted undo/redo history, recent-project reopening, and production FFmpeg export to a downloadable MP4.
-- **2026-07-25 — the manual loop is now verified end to end in a real browser.** A full walkthrough on a 30-second 1080p clip completed: upload, reopen from Recent projects, point, nameplate, preview, accept, undo, redo, export, download, and correct exported output (probe plus frames). Read `DOCS/changes/2026-07-25-claude-e2e-test-and-identity-fix.md` before doing anything else.
-- That walkthrough found and fixed a defect that was blocking **every new upload**: the media identity guard rejected Windows 64-bit NTFS file IDs, so each newly created project returned 404 for its own video. See FAIL-006. Both guards now read bigint stats.
-- Present persistence boundary: local project media, its integrity manifest, **and accepted edit history** persist under ignored `.sanverse-data/`. History survives reload and reopen; Home lists recent projects.
-- Immediate planning gate: owner review of `DOCS/MASTER_PLAN.md`, `DOCS/plans/PLAN_CHECKLIST.md`, and `DOCS/plans/G4A_ATOMIC_IMPLEMENTATION_PLAN.md`.
-- If approved, immediate implementation gate: **G4-A**, which establishes explicit media time, assets, composition/clip identity, target/anchor semantics, atomic change sets, capability discovery, migration, and one canonical render plan. **G4-B**, the first AI-operated proposal, follows this chassis.
-- Absent capabilities: no AI/chat interpretation, no cut/trim/split, no timeline, no motion or effects, no captions, no additional component types, no accounts, and no SaaS operations. Chat in Studio is a visible disabled placeholder.
-- Goal-status boundary: G1 remains open only for owner judgment that automation cannot supply. G2/G3 are technically complete. G4-A and every later goal remain unimplemented. Accounts and SaaS operations stay conditional until their own evidence gates are entered.
+- **P1-B — Production Timeline V1 is technically complete.** Evidence: `DOCS/evidence/2026-07-30-p1b-production-timeline-v1/`.
+- Studio has one authoritative five-lane timeline over the existing `EditProject`: V2 overlays, V1 video, C1 captions, A1 dialogue, and A2 music.
+- It includes one shared playhead, ruler, click/drag seek, zoom/Fit/scroll, visible-range overscan, selection, trim preview, snapping, gaps, hidden/blocked states, proposal ghosts, keyboard-safe removal, and right-click/Shift+F10 actions.
+- Split, trim, ripple/non-ripple removal, reorder, enable/disable, and audio edits still travel through existing typed operations, revision-fenced change sets, persisted history, shared preview, and FFmpeg export. There is no second timeline document or browser-owned edit state.
+- A fresh real Edge walkthrough on `test-30s.mp4` completed split → Undo → Redo → context menu → snap → trim → Undo → proposal ghost/reject → export/download. Desktop, tablet, and mobile geometry is clean; page/console/HTTP errors were zero; the 1080p export was probed and inspected.
+- Focused timeline/Studio tests pass 79/79, affected edit-domain tests pass 77/77, and the all-workspace production build passes. Known unrelated broad-suite contract drift is recorded in `DOCS/FAILURE_REGISTRY.md` and the P1-B test report.
+- P1-A remains the pure `EditProject → TimelineViewModel` and gesture-adapter foundation. P0-E remains the owner-approved five-region Studio frame.
+- Exact next implementation stage: **P1-C — Inspector V1**. It has not started.
+- Open human evidence remains human-only: native drag-and-drop feel, final motion/overall UX judgment, repeated owner workflows, and agreed performance budgets.
+- Real-provider connection still requires the owner's data-leaving-machine decision and keys. Accounts and SaaS operations remain conditional, not implied by P1-B.
 
 ## Read in this order
 

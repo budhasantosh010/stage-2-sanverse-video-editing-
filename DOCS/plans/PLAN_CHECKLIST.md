@@ -228,7 +228,11 @@ no button offers it yet — the owner cannot get to it from the screen.
       deterministic effective-project projection, semantic lanes, derived gaps,
       detached proposals, diagnostics, viewport math, gesture adapter, focused
       tests, large fixture, evidence, and unchanged production UI
-- [ ] P1-B Build Production Timeline V1 using the P1-A foundation
+- [x] P1-B Build Production Timeline V1 using the P1-A foundation — five semantic
+      lanes, one shared playhead, ruler/seek/zoom/scroll, overscan, stable
+      selection, typed edit gestures, trim preview, deterministic snapping,
+      proposal ghosts, keyboard safety, context menu, responsive browser proof,
+      verified export, and focused evidence
 
 ## Continuous tracks applied at every visible goal
 

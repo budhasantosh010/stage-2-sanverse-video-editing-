@@ -107,6 +107,21 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@media (min-width: 1101px) {
+  .studio-screen--studio .studio-screen__canvas {
+    position: relative;
+  }
+
+  .studio-screen--studio .nameplate-composer__sheet {
+    position: absolute;
+    z-index: 20;
+    inset: 14px;
+    margin: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 @media (max-width: 620px) {
   .nameplate-composer__heading,
   .nameplate-composer__timing,

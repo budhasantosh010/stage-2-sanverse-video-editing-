@@ -44,6 +44,7 @@ Last updated: 2026-07-30
 | P0C-01 | Dual workspace | Persistent EditorShell with Assist/Studio switching and state continuity | Complete — owner walkthrough open | 10 focused App tests; pending AI proposal, project revision, video element/playback time, history and acceptance survive switching; real browser retained one project, 9 history entries and one video element |
 | P0E-01 | Studio structure | Five-region professional Studio frame over the existing editor authority | Complete — owner approved | 64/64 focused regressions; all-workspace build; one-video continuity, AI collapse, direct edit/Undo/Redo/export, proposal repair, three exact-size screenshots; owner approved from `d48aabf…` |
 | P1A-01 | Timeline foundation | Immutable deterministic timeline presentation model, viewport math, and typed gesture adapter | Complete | 71/71 focused web timeline tests; 77/77 affected edit-domain tests; representative 50/100/20/1 fixture; unchanged production bundle; all-workspace build |
+| P1B-01 | Production Timeline V1 | Five semantic lanes, shared playhead, ruler, seek/drag, zoom/Fit/scroll, overscan, selection, supported typed edit gestures, trim preview, snapping, proposal ghosts, keyboard safety, and context menu | Complete | 79/79 focused timeline/Studio tests; 77/77 affected domain tests; real Edge split/Undo/Redo/snap/trim/proposal/export loop; clean 1440/1024/390 geometry; probed 1080p MP4; all-workspace build |
 
 ## Status rules
 

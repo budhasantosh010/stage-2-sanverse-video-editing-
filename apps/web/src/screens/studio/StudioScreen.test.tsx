@@ -396,16 +396,18 @@ describe('StudioScreen', () => {
       .toHaveTextContent(/1 pending/i)
   })
 
-  it('keeps every existing direct edit control inside the Studio timeline region', () => {
+  it('keeps every existing direct edit control inside the Studio timeline region', async () => {
+    const user = userEvent.setup()
     renderStudio()
 
     const timeline = screen.getByRole('region', { name: 'Timeline workspace' })
+    await user.click(within(timeline).getByText(/advanced direct controls/i))
     expect(within(timeline).getByRole('button', { name: /^cut here$/i })).toBeInTheDocument()
     expect(within(timeline).getByRole('button', { name: /remove this section/i })).toBeInTheDocument()
     expect(within(timeline).getByRole('button', { name: /hide this section/i })).toBeInTheDocument()
     expect(within(timeline).getByRole('button', { name: /bring it back/i })).toBeInTheDocument()
-    expect(within(timeline).getByText(/adjust this section/i)).toBeInTheDocument()
-    expect(within(timeline).getByText(/^captions$/i)).toBeInTheDocument()
+    expect(within(timeline).getByText(/adjust section at playhead/i)).toBeInTheDocument()
+    expect(within(timeline).getByText(/captions and overlays/i)).toBeInTheDocument()
   })
 
   it('never reports that a draft or edit was executed successfully', () => {
@@ -883,18 +885,21 @@ describe('StudioScreen', () => {
 })
 
 /**
- * The time strip is the only place a non-editor can cut. These check the whole
- * path from "the playhead is here" to "this is the operation the server gets",
- * because a strip that draws correctly but sends the wrong cut is worse than
- * one that does not draw at all.
+ * Timeline V1 is the primary surface. These retain coverage for the temporary
+ * proven direct-control fallback and the exact operation path it uses.
  */
-describe('StudioScreen time strip', () => {
-  it('shows the whole video as one section before anything is cut', () => {
+describe('StudioScreen production timeline', () => {
+  async function openAdvancedControls(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByText(/advanced direct controls/i))
+  }
+
+  it('shows the whole video as one V1 clip before anything is cut', () => {
     renderStudio()
 
-    const sections = screen.getAllByTestId('timeline-section')
-    expect(sections).toHaveLength(1)
-    expect(sections[0]).toHaveStyle({ left: '0%', width: '100%' })
+    const videoLane = screen.getByRole('group', { name: /V1 video lane/i })
+    const videoItem = within(videoLane).getByRole('button', { name: /^clip, Video,/i })
+    expect(videoItem).toHaveAttribute('aria-selected', 'false')
+    expect(videoItem.closest('[data-testid="timeline-item-shell"]')).toHaveAttribute('data-canonical-left', '0')
   })
 
   it('sends a cut measured from the start of the section the playhead is in', async () => {
@@ -908,14 +913,13 @@ describe('StudioScreen time strip', () => {
       video.dispatchEvent(new Event('timeupdate'))
     })
 
+    await openAdvancedControls(user)
     await user.click(screen.getByRole('button', { name: /^cut here$/i }))
 
     expect(onTimelineEdit).toHaveBeenCalledTimes(1)
     const operation = onTimelineEdit.mock.calls[0][0]
     expect(operation.kind).toBe('split-clip')
     expect(operation.atClipTime.ticks).toBe(12 * 1_440_000)
-    // It carries a capability that is actually allowed to produce this kind of
-    // edit, so the server's registry check passes rather than silently failing.
     expect(operation.capabilityId).toBe('sanverse.timeline.split.primitive/v1')
   })
 
@@ -924,10 +928,11 @@ describe('StudioScreen time strip', () => {
     const onTimelineEdit = vi.fn()
     renderStudio({ onTimelineEdit })
 
+    await openAdvancedControls(user)
     await user.click(screen.getByRole('button', { name: /^cut here$/i }))
 
     expect(onTimelineEdit).not.toHaveBeenCalled()
-    expect(screen.getByText(/edge of a section/i)).toBeInTheDocument()
+    expect(screen.getByText(/inside a section|edge/i)).toBeInTheDocument()
   })
 
   it('refuses to remove the only section, and sends nothing', async () => {
@@ -941,15 +946,15 @@ describe('StudioScreen time strip', () => {
       video.dispatchEvent(new Event('timeupdate'))
     })
 
+    await openAdvancedControls(user)
     await user.click(screen.getByRole('button', { name: /remove this section/i }))
 
     expect(onTimelineEdit).not.toHaveBeenCalled()
     expect(screen.getByText(/only section/i)).toBeInTheDocument()
   })
 
-  it('locks cutting while a proposal is waiting to be approved', () => {
-    // A cut would move the footage the pending nameplate is anchored to, so the
-    // two are kept apart rather than allowed to race.
+  it('locks cutting while a proposal is waiting to be approved', async () => {
+    const user = userEvent.setup()
     renderStudio({
       proposal: {
         operation: testOperation(),
@@ -957,15 +962,17 @@ describe('StudioScreen time strip', () => {
       },
     })
 
+    await openAdvancedControls(user)
     expect(screen.getByRole('button', { name: /^cut here$/i })).toBeDisabled()
   })
 
-  it('offers the advanced section controls only after the user asks for them', async () => {
+  it('offers the detailed direct controls only after the user asks for them', async () => {
     const user = userEvent.setup()
     renderStudio()
 
+    await openAdvancedControls(user)
     expect(screen.getByRole('button', { name: /shorten the start/i, hidden: true })).not.toBeVisible()
-    await user.click(screen.getByText(/adjust this section/i))
+    await user.click(screen.getByText(/adjust section at playhead/i))
 
     expect(screen.getByRole('button', { name: /shorten the start/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /shorten the end/i })).toBeInTheDocument()
@@ -983,7 +990,8 @@ describe('StudioScreen time strip', () => {
     prepareVideoForPointing(video, 5)
     fireEvent.timeUpdate(video)
 
-    await user.click(screen.getByText(/adjust this section/i))
+    await openAdvancedControls(user)
+    await user.click(screen.getByText(/adjust section at playhead/i))
     const trimAmount = screen.getByRole('spinbutton', { name: /seconds to remove/i })
     await user.clear(trimAmount)
     await user.type(trimAmount, '2')

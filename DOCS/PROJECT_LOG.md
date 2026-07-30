@@ -1,5 +1,28 @@
 # Project Log
 
+## 2026-07-30 — P1-B Production Timeline V1 complete
+
+- Replaced the old one-row proportional strip with a five-lane Studio timeline
+  driven only by P1-A's immutable `TimelineViewModel`.
+- Added one shared playhead, ruler, click/drag seek, zoom, Fit, horizontal scroll,
+  visible-range overscan, stable selection, gaps, hidden/blocked states, and
+  detached proposal ghosts.
+- Connected split, trim, ripple/non-ripple removal, reorder, enable/disable, and
+  audio gestures through the existing P1-A adapter and server-authoritative
+  change-set path.
+- Added deterministic boundary snapping with a visible guide, exact trim preview,
+  a right-click/Shift+F10 menu, Delete focus safety, and keyboard playhead steps.
+- Real Edge visual QA found and fixed desktop lane clipping, proposal-sheet
+  interception, clipped trim feedback, hidden export readiness, compact-label
+  problems, action/context-menu overflow, and favicon console noise.
+- Fresh real-media walkthrough completed split, Undo, Redo, context menu, snap,
+  trim, Undo, proposal ghost/reject, export, and MP4 download with zero page,
+  console, or HTTP errors and clean 1440/1024/390 geometry.
+- Focused timeline/Studio tests pass 79/79; affected domain tests pass 77/77;
+  the all-workspace production build passes. Broad unrelated test-contract drift
+  is recorded in the evidence and failure registry rather than hidden.
+- P1-C was not started.
+
 ## 2026-07-30 — P1-A timeline presentation foundation complete
 
 - Owner approved P0-E from commit `d48aabf34fdadbd6899807fa0c6de0c854a5dc5f`; resolved `UX-007`.

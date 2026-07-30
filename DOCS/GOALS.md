@@ -47,14 +47,14 @@ Legend: `[x]` complete, `[~]` partly complete or awaiting owner evidence, `[ ]` 
 | G1 | Owner-tested Home-to-Studio workflow and renderer evidence | [~] Owner motion, native drag-and-drop, and final Studio UX evidence remain open |
 | G2 | Minimal typed project/action/history/render foundation | [x] |
 | G3 | Upload through persisted accepted edit and downloadable MP4 | [x] |
-| G4-A | Project v2 semantics, capability registry, change sets, render plan, and migration seam | [ ] Proposed next implementation goal; not approved or started |
-| G4-B | Natural language becomes a safe pending edit proposal | [ ] |
-| G5-A | Correct, reviewable captions | [ ] |
-| G5-B | Cut, trim, split, ripple, reorder, audio level, and fades | [ ] |
-| G5-C | A genuinely useful talking-head workflow combining AI, captions, and timeline work | [ ] |
-| G6 | Transform, keyframes, easing, bounce, transitions, and basic effects | [ ] |
-| G7 | Versioned reusable components and compound AI plans | [ ] |
-| G8 | Recoverable, measurable local alpha used on real videos | [ ] |
+| G4-A | Project v2 semantics, capability registry, change sets, render plan, and migration seam | [x] Complete |
+| G4-B | Natural language becomes a safe pending edit proposal | [~] Fake-provider closed loop complete; first real provider call awaits owner keys/data decision |
+| G5-A | Correct, reviewable captions | [x] Complete for transcript-sidecar workflow |
+| G5-B | Cut, trim, split, ripple, reorder, audio level, and fades | [x] Complete in domain, preview, export, direct controls, and Timeline V1 |
+| G5-C | A genuinely useful talking-head workflow combining AI, captions, and timeline work | [~] Technical workflow exists; repeated owner/non-editor evidence remains open |
+| G6 | Transform, keyframes, easing, bounce, transitions, and basic effects | [~] Executable technical batch complete; owner workflow/performance evidence remains open |
+| G7 | Versioned reusable components and compound AI plans | [~] Significant technical slices exist; full goal exit remains open |
+| G8 | Recoverable, measurable local alpha used on real videos | [~] Technical controls complete; owner workflows, representative users, and agreed budgets remain open |
 | G9 | Stable external API/MCP over the same engine | [?] Build only when an external-client use case is proven |
 | G10 | Identity, tenancy, cloud jobs/storage/rendering, billing, security, and operations | [?] Enter when local-alpha evidence and distribution intent justify SaaS |
 | G11 | Tracking, segmentation, occlusion, and advanced spatial editing | [?] Evidence-driven |
@@ -62,11 +62,12 @@ Legend: `[x]` complete, `[~]` partly complete or awaiting owner evidence, `[ ]` 
 
 ## Current position
 
-- The deterministic manual nameplate loop is complete and verified with real media.
-- G1 has an owner-only evidence gap; automation cannot truthfully close it.
-- The complete roadmap is **proposed and awaiting owner approval**.
-- If approved, G4-A is the next implementation goal. It comes before provider integration because current v1 semantics are too narrow to support the later timeline, caption, motion, component, and AI layers safely.
-- No G4-A or later product implementation has started merely because these plans now exist.
+- G4-A's exact-time project/change-set/render chassis is complete and remains authoritative.
+- The fake-provider AI proposal loop, transcript captions, cutting/audio primitives, motion/effect slices, recovery controls, and production Timeline V1 exist in executable code.
+- P1-B is technically complete with real-browser/media/export evidence. The exact next interface milestone is P1-C — Inspector V1.
+- G1 and the later workflow/local-alpha exits retain owner-only evidence gaps; automation cannot truthfully close native feel, final UX judgment, repeated non-editor workflows, or agreed performance budgets.
+- The first real AI-provider call remains blocked on the owner's keys and explicit decision about data leaving the machine.
+- Conditional cloud/SaaS/API goals remain conditional; technical progress does not silently authorize them.
 
 ## Anti-drift measurement
 
