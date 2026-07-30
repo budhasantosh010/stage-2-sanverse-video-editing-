@@ -21,6 +21,7 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | UX-004 | P2 | UX | Add-text control appears before a valid point exists | RESOLVED | P0-D.1 |
 | [x] | UX-005 | P1 | UX | Assist side-panel text and hierarchy need owner visual approval | RESOLVED | P0-D.1 |
 | [x] | UX-006 | P2 | UX/A11Y | Pending and accepted changes need stronger visual distinction | RESOLVED | P0-D.1 |
+| [x] | UX-007 | P1 | UX | P0-E Studio layout required owner approval before P1-A | RESOLVED | P0-E |
 | [ ] | FAIL-021 | P2 | Performance | 30-second export crossed the 60-second walkthrough budget | MONITORING | E5 benchmark |
 | [ ] | FEATURE-001 | P3 | Deferred UX | Optional desktop composer resize preference | PLANNED | Post-P1 |
 | [x] | INFRA-001 | P3 | Verification infrastructure | In-app viewport screenshots tiled the page texture | RESOLVED | P0-D.1 |
@@ -833,6 +834,38 @@ All invalid files were replaced; disposable processes and profiles were removed.
 ### Current status
 
 RESOLVED; this was an evidence-tool defect, not a Sanverse product defect.
+
+## UX-007 — P0-E Studio layout required owner approval before P1-A
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P1
+- **Type:** UX approval gate
+- **Found:** 2026-07-30
+- **Target milestone:** P0-E
+- **Owner:** Owner
+
+### What / where / when / how / why?
+
+P0-E delivered the five-region Studio frame, but its final hierarchy and density
+could not be accepted by automated tests. P1-A was intentionally blocked until
+the owner judged the real 1440×900, 1280×800, and 1024×768 layouts.
+
+### What was tried?
+
+The implementation supplied 64/64 focused tests, an all-workspace build, a real
+browser continuity/edit/export walkthrough, and exact-size responsive evidence.
+No code change was attempted to replace the owner's visual judgment.
+
+### One-line solution
+
+Record the owner's explicit approval of the P0-E layout and then begin P1-A from
+the approved completion commit.
+
+### Evidence and status
+
+The owner approved P0-E in the 2026-07-30 instruction to implement P1-A from
+commit `d48aabf34fdadbd6899807fa0c6de0c854a5dc5f`. RESOLVED.
 
 ## FAIL-022 — Studio video overflow covered Point controls
 

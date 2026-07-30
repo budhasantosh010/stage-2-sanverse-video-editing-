@@ -1,5 +1,15 @@
 # Project Log
 
+## 2026-07-30 — P1-A timeline presentation foundation complete
+
+- Owner approved P0-E from commit `d48aabf34fdadbd6899807fa0c6de0c854a5dc5f`; resolved `UX-007`.
+- Added a pure immutable timeline contract and deterministic projection from one authoritative `EditProject`.
+- Added semantic overlay, per-domain-video, caption, dialogue, and music lanes; derived gaps; detached proposed items; and blocked/unsupported diagnostics.
+- Reused one domain evaluation, folded caption/overlay helpers, and authoritative source-span placement; no second editor or replay engine was created.
+- Added bounded pure viewport zoom/scroll math and a gesture adapter that returns existing validated operations without applying them.
+- Proved 71/71 focused web tests, 77/77 affected domain tests, a representative 50-video/100-caption/20-overlay/1-music fixture, unchanged P0-E bundle sizes, and a passing all-workspace build.
+- No production React/CSS/UI, schema, persistence, renderer, or P1-B work was started.
+
 ## 2026-07-29 — G6/G8 executable technical batch complete
 
 - Completed G6-11 deterministic seek-boundary, easing, reduced-motion, and

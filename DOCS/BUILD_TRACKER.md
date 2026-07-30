@@ -42,7 +42,8 @@ Last updated: 2026-07-30
 | G4B-10 | G4-B | Connect one real provider | Pending | Needs the owner's decision about data leaving the machine, then a probe of schema adherence, latency, error shape, timeout, cancellation, and quota behaviour |
 | P0B-01 | Dual workspace | Minimal shared UI kernel: Button, IconButton, SegmentedControl, Panel, and Tabs | Complete | 2 focused EditorShell tests; shared tokens; required web production build passes |
 | P0C-01 | Dual workspace | Persistent EditorShell with Assist/Studio switching and state continuity | Complete — owner walkthrough open | 10 focused App tests; pending AI proposal, project revision, video element/playback time, history and acceptance survive switching; real browser retained one project, 9 history entries and one video element |
-| P0E-01 | Studio structure | Five-region professional Studio frame over the existing editor authority | Complete — owner layout review open | 64/64 focused regressions; all-workspace build; one-video continuity, AI collapse, direct edit/Undo/Redo/export, proposal repair, and three exact-size screenshots |
+| P0E-01 | Studio structure | Five-region professional Studio frame over the existing editor authority | Complete — owner approved | 64/64 focused regressions; all-workspace build; one-video continuity, AI collapse, direct edit/Undo/Redo/export, proposal repair, three exact-size screenshots; owner approved from `d48aabf…` |
+| P1A-01 | Timeline foundation | Immutable deterministic timeline presentation model, viewport math, and typed gesture adapter | Complete | 71/71 focused web timeline tests; 77/77 affected edit-domain tests; representative 50/100/20/1 fixture; unchanged production bundle; all-workspace build |
 
 ## Status rules
 

@@ -222,6 +222,14 @@ no button offers it yet — the owner cannot get to it from the screen.
 - [ ] G8-12 Run bounded representative non-editor smoke tests
 - [ ] G8-13 Reach agreed E5 reliability, time, quality, and recovery budgets
 
+## P1 — Production timeline
+
+- [x] P1-A Build the pure timeline presentation foundation — immutable contract,
+      deterministic effective-project projection, semantic lanes, derived gaps,
+      detached proposals, diagnostics, viewport math, gesture adapter, focused
+      tests, large fixture, evidence, and unchanged production UI
+- [ ] P1-B Build Production Timeline V1 using the P1-A foundation
+
 ## Continuous tracks applied at every visible goal
 
 - [ ] H1 Select only the highest-impact task blocking the active evidence gate

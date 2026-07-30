@@ -4,17 +4,23 @@ Last updated: 2026-07-30
 
 ## Active goal
 
-**P0-E is technically complete on 2026-07-30 and awaits owner layout review.**
-Studio is now a stable professional workspace frame with Project media, one
-central Program canvas, a read-only Inspector, a collapsible AI panel, and a
-meaningful bottom Timeline workspace containing the existing direct controls.
-It still uses one mounted EditorShell/editor session, one video/playhead, one
-project/revision, one proposal/repair state, one conversation draft, one
-history, and the existing preview/export paths. Focused regression evidence is
-64/64 passing tests, a clean all-workspace production build, a real browser
-continuity/edit/export walkthrough, and exact-size 1440x900, 1280x800, and
-1024x768 screenshots in
-`DOCS/evidence/2026-07-30-p0e-studio-structure/`. P1-A has not started.
+**P1-A is complete on 2026-07-30.** Sanverse now has a pure immutable timeline
+presentation contract, a deterministic `EditProject → TimelineViewModel`
+projection, semantic overlay/video/caption/dialogue/music lanes, derived gaps,
+detached pending-proposal items, blocked/unsupported diagnostics, bounded
+viewport math, and a pure gesture adapter that returns one existing validated
+operation or a typed refusal. The builder evaluates accepted project history
+once and reuses authoritative effective composition, folded captions/overlays,
+and source placement. It adds no second project model, no persistence, no React,
+and no production UI change. Evidence: 71/71 focused web timeline tests, 77/77
+affected edit-domain tests, unchanged P0-E bundle sizes, and a passing
+all-workspace build in
+`DOCS/evidence/2026-07-30-p1a-timeline-foundation/`. P1-B has not started.
+
+**P0-E is complete and owner-approved.** The owner explicitly approved the
+layout and started P1-A from commit
+`d48aabf34fdadbd6899807fa0c6de0c854a5dc5f`; `UX-007` records the resolved
+visual gate. Studio remains the same five-region frame and production UI.
 
 **P0-D.1 is technically complete on 2026-07-29.** Home is compact; Assist
 uses a more readable video-first hierarchy; empty proposal and pre-Point dead

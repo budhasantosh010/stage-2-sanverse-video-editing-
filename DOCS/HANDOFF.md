@@ -1,14 +1,20 @@
 # HANDOFF — everything a new agent needs to continue Sanverse Stage 2
 
-Updated 2026-07-30. **P0-E is technically complete and awaits owner layout
-review.** Studio now has a stable five-region professional frame without
-creating a second editor session: Project media, Program canvas, read-only
-Inspector, collapsible AI edits, and the existing direct controls inside a
-meaningful Timeline workspace. Focused tests pass 64/64, all workspace builds
-pass, and the browser continuity/edit/export evidence plus exact-size responsive
-screenshots are in
-`DOCS/evidence/2026-07-30-p0e-studio-structure/P0-E_IMPLEMENTATION_REPORT.md`.
-P1-A and Timeline V1 have not started.
+Updated 2026-07-30. **P1-A is complete and pushed as one focused timeline
+foundation change.** It adds a pure immutable timeline contract, deterministic
+`EditProject → TimelineViewModel` projection, semantic lanes, derived gaps,
+detached pending proposals, blocked/unsupported diagnostics, viewport math,
+and a pure gesture adapter that emits only existing Sanverse operations. It
+does not add React timeline UI, persistence, a second history, schema changes,
+or renderer changes. Focused evidence is 71/71 web timeline tests, 77/77
+affected edit-domain tests, an unchanged production bundle, and a passing
+all-workspace build. Start with
+`DOCS/evidence/2026-07-30-p1a-timeline-foundation/P1-A_IMPLEMENTATION_REPORT.md`.
+The exact next task is P1-B — Production Timeline V1; it has not started.
+
+P0-E is complete and owner-approved from commit
+`d48aabf34fdadbd6899807fa0c6de0c854a5dc5f`. `UX-007` records that resolved
+layout gate. The visible Studio remains unchanged by P1-A.
 
 P0-D.1 is technically complete and owner-approved on
 `agent/g6-g8-local-alpha`: the Home composer and Assist hierarchy are corrected,
