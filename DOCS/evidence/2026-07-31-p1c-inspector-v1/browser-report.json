@@ -1,0 +1,124 @@
+{
+  "browser": "Microsoft Edge / Chromium",
+  "media": "resources\\test video\\test-30s.mp4",
+  "page_errors": [],
+  "console_errors": [],
+  "failed_responses": [],
+  "revisions": {
+    "initial": 0,
+    "clip_audio": 1,
+    "undo_audio": 2,
+    "redo_audio": 3,
+    "add_title": 4,
+    "repair_title": 5,
+    "visual_properties": 6,
+    "undo_visual": 7,
+    "redo_visual": 8,
+    "proposal_rejected": 8
+  },
+  "screenshots": [
+    "desktop-default.png",
+    "desktop-clip-inspector.png",
+    "desktop-title-visual-inspector.png",
+    "desktop-proposal-inspector.png",
+    "desktop-export-ready.png",
+    "tablet-1024x768.png",
+    "mobile-390x844.png"
+  ],
+  "geometry": {
+    "desktop": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "bodyScrollWidth": 1440,
+      "documentScrollWidth": 1440,
+      "videoCount": 1,
+      "laneCount": 5,
+      "lanesInsideViewport": false,
+      "inspector": {
+        "box": {
+          "x": 1104,
+          "y": 76,
+          "width": 320,
+          "height": 220,
+          "right": 1424,
+          "bottom": 296
+        },
+        "clientHeight": 218,
+        "scrollHeight": 218,
+        "scrollable": false
+      },
+      "timeline": null
+    },
+    "tablet": {
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "bodyScrollWidth": 1024,
+      "documentScrollWidth": 1024,
+      "videoCount": 1,
+      "laneCount": 5,
+      "lanesInsideViewport": false,
+      "inspector": {
+        "box": {
+          "x": 14,
+          "y": 427.125,
+          "width": 996,
+          "height": 212.09375,
+          "right": 1010,
+          "bottom": 639.21875
+        },
+        "clientHeight": 210,
+        "scrollHeight": 210,
+        "scrollable": false
+      },
+      "timeline": null
+    },
+    "mobile": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "videoCount": 1,
+      "laneCount": 5,
+      "lanesInsideViewport": false,
+      "inspector": {
+        "box": {
+          "x": 14,
+          "y": 254,
+          "width": 362,
+          "height": 212.09375,
+          "right": 376,
+          "bottom": 466.09375
+        },
+        "clientHeight": 210,
+        "scrollHeight": 210,
+        "scrollable": false
+      },
+      "timeline": null
+    }
+  },
+  "project_id": "project_8f32f9b54111d0c3c3eda92d44df7cf7",
+  "visual_operation": {
+    "visualId": "title_cd5744318f90f15e",
+    "scale": 1.25,
+    "cropLeft": 0.05,
+    "enter": "fade",
+    "keyframes": 3
+  },
+  "export": {
+    "path": "tmp\\p1c-inspector-export.mp4",
+    "bytes": 15054265
+  },
+  "final_revision": 8,
+  "active_operation_kinds": [
+    "set-clip-audio",
+    "add-title",
+    "set-title",
+    "set-visual-properties"
+  ]
+}

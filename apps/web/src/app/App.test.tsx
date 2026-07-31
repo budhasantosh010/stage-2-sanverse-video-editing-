@@ -1,5 +1,5 @@
 import { StrictMode } from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -207,6 +207,44 @@ describe('App', () => {
     ))
     // The browser adopts the server's answer rather than deciding for itself.
     await waitFor(() => expect(screen.queryByText('Saved nameplate')).not.toBeInTheDocument())
+  })
+
+  it('sends one Inspector edit through the server-authoritative change-set path and undoes it', async () => {
+    const user = userEvent.setup()
+    const api = fakeApi()
+    fetchMock.mockImplementation((url: string, options?: RequestInit) =>
+      api.handle(url, options) ?? new Response('{}', { status: 404 }))
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /open cleaned\.mp4/i }))
+    await user.click(screen.getByRole('button', { name: /studio workspace/i }))
+    const timelineItem = await screen.findByRole('button', { name: /^clip, cleaned\.mp4,/i })
+    await user.click(timelineItem)
+
+    const soundToggle = screen.getByRole('button', { name: 'Sound' })
+    const soundSection = soundToggle.closest('section')
+    if (!soundSection) throw new Error('Sound section missing')
+    fireEvent.change(within(soundSection).getByLabelText('Gain (dB)'), { target: { value: '-5' } })
+    await user.click(within(soundSection).getByRole('button', { name: 'Apply' }))
+
+    await waitFor(() => expect(api.current().revision).toBe(1))
+    expect(api.current().changeSets).toHaveLength(1)
+    expect(api.current().changeSets[0].changeSet.operations).toEqual([
+      expect.objectContaining({
+        kind: 'set-clip-audio',
+        clipId: 'clip_aaaaaaaa',
+        gainDb: -5,
+      }),
+    ])
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/projects/${api.manifest.id}/change-sets`,
+      expect.objectContaining({ method: 'POST' }),
+    )
+
+    await user.click(screen.getByRole('button', { name: /^undo edit$/i }))
+    await waitFor(() => expect(api.current().revision).toBe(2))
+    expect(api.current().changeSets).toHaveLength(0)
+    expect(api.current().redoStack).toHaveLength(1)
   })
 
   it('runs one Home-to-Studio-to-Home loop and releases its local video', async () => {

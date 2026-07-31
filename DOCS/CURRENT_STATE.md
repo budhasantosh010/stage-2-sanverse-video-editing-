@@ -1,26 +1,16 @@
 # Current State
 
-Last updated: 2026-07-30
+Last updated: 2026-07-31
 
 ## Active goal
 
-**P1-B — Production Timeline V1 is technically complete on 2026-07-30.**
-Studio now renders P1-A's immutable `TimelineViewModel` as five semantic lanes
-(V2/V1/C1/A1/A2), one shared composition playhead, ruler, click/drag seek,
-zoom, Fit, horizontal scroll, visible-range overscan, stable selection, gaps,
-hidden/blocked items, detached proposal ghosts, trim preview, deterministic
-boundary snapping, a real right-click/Shift+F10 menu, and keyboard-safe removal.
-Every supported editorial gesture still crosses P1-A's typed adapter and the
-existing server-authoritative change-set path; no second project, history,
-proposal, playhead, video element, schema, renderer, or persistence format was
-introduced. A real Edge run on fresh `test-30s.mp4` completed split → Undo →
-Redo → snap → trim → Undo → proposal ghost/reject → export/download, with zero
-page/console/HTTP errors and clean 1440/1024/390 geometry. Focused timeline and
-Studio tests pass 79/79, affected edit-domain tests pass 77/77, and the complete
-production build passes. Evidence:
-`DOCS/evidence/2026-07-30-p1b-production-timeline-v1/`. P1-C has not started.
+**P1-C — Inspector V1 is technically complete on 2026-07-31; owner visual and interaction approval remains open.** Studio now derives one contextual Inspector from the selected P1-B Timeline item and the current server-authoritative `EditProject`. Nothing-selected, gap, blocked, proposal, clip, dialogue, caption, nameplate, title, callout, media-overlay, and music states are explicit. Supported sections keep unapplied values local, validate one existing operation on Apply, and send it through the existing App/server revision-fenced change-set route, so one Apply is one Undo and the browser never owns a second project or history. The surface covers clip sound/visibility/transition, caption repair/style, title/callout/media-overlay/music repair, transform, crop, layer, mask, effects, entrance/exit, easing, and Keyframes V1. Nameplate text and other absent capabilities remain truthfully read-only rather than being faked.
 
-**P1-B.1 repository-wide test truth is complete on 2026-07-30.** The three
+A fresh real Edge run on `test-30s.mp4` completed clip Apply → Undo → Redo → title repair → transform/crop/fade/keyframes → Undo → Redo → pending proposal reject → export/download. The saved revision chain was `0→1→2→3→4→5→6→7→8`; proposal rejection stayed detached at revision 8. Page, console, and HTTP errors were zero. The corrected H.264 1920×1080/30 fps AAC export was probed and inspected at five frames. Final suites pass web 380/380, edit-domain 265/265, API 234/234, render-contract 51/51, and intent-domain 27/27; the all-workspace build passes. Evidence: `DOCS/evidence/2026-07-31-p1c-inspector-v1/`.
+
+**P1-B remains the authoritative Production Timeline V1.** Its five semantic lanes, one shared playhead, ruler, seek/zoom/scroll, stable selection, gaps, proposal ghosts, trim preview, snapping, context menu, and typed edit gestures remain unchanged in authority. P1-A remains the pure `EditProject → TimelineViewModel` and gesture-adapter foundation. P1-D has not started and is the next interface milestone only after explicit owner instruction.
+
+**P1-B.1 repository-wide test truth is complete and owner-approved on 2026-07-30.** The three
 previously recorded verification failures are resolved without product changes:
 real contract tests now register with Vitest; export server tests assert the
 current `202 Accepted → poll job → terminal result/error` lifecycle; and the

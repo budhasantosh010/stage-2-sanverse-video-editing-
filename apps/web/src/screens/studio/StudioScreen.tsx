@@ -61,6 +61,11 @@ import {
   AssistProposalPanel,
   buildAssistChangeItems,
 } from '../../editor/assist'
+import {
+  Inspector,
+  requestInspectorSelectionChange,
+  resolveInspectorSelection,
+} from '../../editor/inspector'
 import { Timeline, reconcileTimelineSelection } from '../../editor/timeline'
 import {
   capturePointTarget,
@@ -226,6 +231,8 @@ export function StudioScreen({
   const [isAiPanelCollapsed, setIsAiPanelCollapsed] = useState(false)
   const [compactSidePanel, setCompactSidePanel] = useState<'media' | 'inspector' | null>(null)
   const [selectedTimelineItemId, setSelectedTimelineItemId] = useState<string | null>(null)
+  const [inspectorDirty, setInspectorDirty] = useState(false)
+  const [pendingTimelineSelection, setPendingTimelineSelection] = useState<Readonly<{ itemId: string | null }> | null>(null)
   const [timelineViewport, setTimelineViewport] = useState<TimelineViewportState>(() => Object.freeze({
     pixelsPerSecond: 100,
     scrollLeftPx: 0,
@@ -539,9 +546,6 @@ export function StudioScreen({
     () => buildAssistChangeItems({ project: editProject, proposal }),
     [editProject, proposal],
   )
-  const selectedInspectorChange = assistChanges.find(
-    (item) => item.id === selectedAssistChangeId,
-  ) ?? null
 
   const compositionDurationTicks = compositionDuration(composition).ticks
 
@@ -560,6 +564,24 @@ export function StudioScreen({
   // A direct project edit while a proposal is pending would move the footage
   // the proposal is anchored to, so both surfaces share one fail-closed policy.
   const timelineBusy = Boolean(proposal) || isRendering
+  const assetLabels = useMemo(() => {
+    const counts = { video: 0, image: 0, audio: 0 }
+    const labels: Record<string, string> = {}
+    editProject.assets.forEach((asset, index) => {
+      counts[asset.mediaKind] += 1
+      if (index === 0) {
+        labels[asset.assetId] = project.name
+        return
+      }
+      const family = asset.mediaKind === 'video'
+        ? 'Video'
+        : asset.mediaKind === 'image'
+          ? 'Image'
+          : 'Audio'
+      labels[asset.assetId] = `${family} ${counts[asset.mediaKind]}`
+    })
+    return Object.freeze(labels)
+  }, [editProject.assets, project.name])
   const pendingTimelineInput = useMemo(
     () => proposal
       ? Object.freeze({
@@ -575,13 +597,49 @@ export function StudioScreen({
       project: editProject,
       selectedItemId: selectedTimelineItemId,
       pending: pendingTimelineInput,
+      assetLabels,
     }),
-    [editProject, pendingTimelineInput, selectedTimelineItemId],
+    [assetLabels, editProject, pendingTimelineInput, selectedTimelineItemId],
   )
+  const inspectorSelection = useMemo(
+    () => resolveInspectorSelection({
+      project: editProject,
+      timeline: timelineModel,
+      selectedTimelineItemId,
+      pending: pendingTimelineInput,
+      assetLabels,
+    }),
+    [assetLabels, editProject, pendingTimelineInput, selectedTimelineItemId, timelineModel],
+  )
+
+  const requestTimelineSelection = (nextItemId: string | null) => {
+    const decision = requestInspectorSelectionChange(
+      selectedTimelineItemId,
+      nextItemId,
+      inspectorDirty,
+    )
+    if (decision.kind === 'confirm') {
+      setPendingTimelineSelection(Object.freeze({ itemId: decision.nextItemId }))
+      return
+    }
+    setPendingTimelineSelection(null)
+    setSelectedTimelineItemId(decision.nextItemId)
+  }
+
+  const discardInspectorDraftAndContinue = () => {
+    const nextItemId = pendingTimelineSelection?.itemId ?? null
+    setInspectorDirty(false)
+    setPendingTimelineSelection(null)
+    setSelectedTimelineItemId(nextItemId)
+  }
 
   useEffect(() => {
     const reconciled = reconcileTimelineSelection(timelineModel, selectedTimelineItemId)
-    if (reconciled !== selectedTimelineItemId) setSelectedTimelineItemId(reconciled)
+    if (reconciled !== selectedTimelineItemId) {
+      setInspectorDirty(false)
+      setPendingTimelineSelection(null)
+      setSelectedTimelineItemId(reconciled)
+    }
   }, [selectedTimelineItemId, timelineModel])
 
   function seekCompositionTicks(requestedTicks: number) {
@@ -1303,54 +1361,30 @@ export function StudioScreen({
             aria-label="Inspector"
             hidden={workspace !== 'studio'}
           >
-            <div className="studio-screen__region-heading">
-              <div>
-                <span className="studio-screen__section-index">03</span>
-                <h2>Inspector</h2>
-              </div>
-              <span>Read only</span>
-            </div>
-            {selectedInspectorChange ? (
-              <dl className="studio-screen__inspector-facts">
-                <div>
-                  <dt>Type</dt>
-                  <dd>{selectedInspectorChange.operationKind}</dd>
-                </div>
-                <div>
-                  <dt>Timing</dt>
-                  <dd>
-                    {selectedInspectorChange.startTicks === null
-                      ? 'Not timed'
-                      : formatPointTargetTime(
-                          Math.round(selectedInspectorChange.startTicks / (PROJECT_TIMESCALE / 1_000)),
-                        )}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Enabled</dt>
-                  <dd>{selectedInspectorChange.status === 'blocked' ? 'Needs attention' : 'Yes'}</dd>
-                </div>
-                <div>
-                  <dt>Summary</dt>
-                  <dd>{selectedInspectorChange.label}</dd>
-                </div>
-              </dl>
-            ) : pointTarget ? (
-              <dl className="studio-screen__inspector-facts">
-                <div><dt>Type</dt><dd>Point target</dd></div>
-                <div><dt>Timing</dt><dd>{formatPointTargetTime(pointTarget.timeMs)}</dd></div>
-                <div><dt>Enabled</dt><dd>Yes</dd></div>
-                <div>
-                  <dt>Summary</dt>
-                  <dd>{`${Math.round(pointTarget.x * 100)}% across, ${Math.round(pointTarget.y * 100)}% down`}</dd>
-                </div>
-              </dl>
-            ) : (
-              <div className="studio-screen__inspector-empty">
-                <strong>Nothing selected</strong>
-                <p>Select a change in Assist or choose Point on the video to inspect its current context.</p>
-              </div>
-            )}
+            <Inspector
+              selection={inspectorSelection}
+              assets={editProject.assets}
+              busy={timelineBusy}
+              proposalActionsBusy={isRendering}
+              playheadTicks={playheadTicks}
+              pendingSelectionChange={pendingTimelineSelection
+                ? {
+                    nextLabel: pendingTimelineSelection.itemId
+                      ? timelineModel.lanes
+                          .flatMap((lane) => lane.items)
+                          .find((item) => item.id === pendingTimelineSelection.itemId)?.label ?? 'the selected item'
+                      : 'nothing selected',
+                  }
+                : null}
+              onDirtyChange={setInspectorDirty}
+              onStaySelection={() => setPendingTimelineSelection(null)}
+              onDiscardSelection={discardInspectorDraftAndContinue}
+              onAcceptProposal={onAcceptProposal}
+              onRejectProposal={onDiscardProposal}
+              onOpenProposal={() => onWorkspaceChange?.('assist')}
+              onSeek={seekCompositionTicks}
+              onApply={onCreateOverlay}
+            />
           </section>
 
         <aside
@@ -1555,7 +1589,7 @@ export function StudioScreen({
           advancedControls={advancedTimelineControls}
           onViewportChange={setTimelineViewport}
           onSeek={seekCompositionTicks}
-          onSelect={setSelectedTimelineItemId}
+          onSelect={requestTimelineSelection}
           onGesture={handleTimelineGesture}
           onOpenProposal={() => {
             setIsAiPanelCollapsed(false)

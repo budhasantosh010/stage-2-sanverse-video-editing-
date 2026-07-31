@@ -1,0 +1,151 @@
+{
+  "schemaVersion": "sanverse.render-plan/v5",
+  "projectId": "project_69a66d79428c452575da5e0fe880694e",
+  "projectRevision": 8,
+  "compositionId": "composition_69a66d79428c",
+  "width": 1920,
+  "height": 1080,
+  "durationTicks": 43248000,
+  "sources": [
+    {
+      "assetId": "asset_69a66d79428c",
+      "mediaKind": "video"
+    }
+  ],
+  "segments": [
+    {
+      "nodeId": "clip_69a66d79428c",
+      "kind": "source-segment",
+      "interval": {
+        "start": {
+          "ticks": 0,
+          "timescale": 1440000
+        },
+        "duration": {
+          "ticks": 43248000,
+          "timescale": 1440000
+        }
+      },
+      "assetId": "asset_69a66d79428c",
+      "sourceStartTicks": 0,
+      "gainDb": -6,
+      "fadeInTicks": 0,
+      "fadeOutTicks": 0,
+      "videoFadeInTicks": 0,
+      "videoFadeOutTicks": 0,
+      "transitionAudioFadeInTicks": 0,
+      "transitionAudioFadeOutTicks": 0
+    }
+  ],
+  "overlays": [
+    {
+      "nodeId": "title_18c25f1bdaf345d3",
+      "kind": "title-overlay",
+      "interval": {
+        "start": {
+          "ticks": 5760000,
+          "timescale": 1440000
+        },
+        "duration": {
+          "ticks": 7200000,
+          "timescale": 1440000
+        }
+      },
+      "headline": "P1-C Revised Title",
+      "subhead": "Inspector proof",
+      "placement": "center",
+      "styleId": "sanverse.title.boxed/v1"
+    }
+  ],
+  "visuals": [
+    {
+      "visualId": "title_18c25f1bdaf345d3",
+      "nodeIds": [
+        "title_18c25f1bdaf345d3"
+      ],
+      "transform": {
+        "translateX": 0.08,
+        "translateY": 0,
+        "scale": 1.25,
+        "rotationDegrees": 0,
+        "opacity": 1
+      },
+      "crop": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0.05
+      },
+      "layer": 0,
+      "mask": {
+        "shape": "none",
+        "feather": 0
+      },
+      "tracks": [
+        {
+          "property": "scale",
+          "keyframes": [
+            {
+              "at": {
+                "ticks": 0,
+                "timescale": 1440000
+              },
+              "value": 1.25,
+              "easing": {
+                "kind": "linear"
+              }
+            },
+            {
+              "at": {
+                "ticks": 2880000,
+                "timescale": 1440000
+              },
+              "value": 1.25,
+              "easing": {
+                "kind": "linear"
+              }
+            },
+            {
+              "at": {
+                "ticks": 7200000,
+                "timescale": 1440000
+              },
+              "value": 1.25,
+              "easing": {
+                "kind": "linear"
+              }
+            }
+          ]
+        }
+      ],
+      "transition": {
+        "enter": {
+          "kind": "fade",
+          "duration": {
+            "ticks": 720000,
+            "timescale": 1440000
+          },
+          "easing": {
+            "kind": "cubic-bezier",
+            "x1": 0.25,
+            "y1": 0.1,
+            "x2": 0.25,
+            "y2": 1
+          }
+        },
+        "exit": {
+          "kind": "none",
+          "duration": {
+            "ticks": 0,
+            "timescale": 1440000
+          },
+          "easing": {
+            "kind": "linear"
+          }
+        }
+      },
+      "effects": []
+    }
+  ],
+  "music": []
+}

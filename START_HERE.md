@@ -8,16 +8,18 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 ## Current gate
 
-- **P1-B — Production Timeline V1 is technically complete.** Evidence: `DOCS/evidence/2026-07-30-p1b-production-timeline-v1/`.
-- Studio has one authoritative five-lane timeline over the existing `EditProject`: V2 overlays, V1 video, C1 captions, A1 dialogue, and A2 music.
-- It includes one shared playhead, ruler, click/drag seek, zoom/Fit/scroll, visible-range overscan, selection, trim preview, snapping, gaps, hidden/blocked states, proposal ghosts, keyboard-safe removal, and right-click/Shift+F10 actions.
-- Split, trim, ripple/non-ripple removal, reorder, enable/disable, and audio edits still travel through existing typed operations, revision-fenced change sets, persisted history, shared preview, and FFmpeg export. There is no second timeline document or browser-owned edit state.
-- A fresh real Edge walkthrough on `test-30s.mp4` completed split → Undo → Redo → context menu → snap → trim → Undo → proposal ghost/reject → export/download. Desktop, tablet, and mobile geometry is clean; page/console/HTTP errors were zero; the 1080p export was probed and inspected.
-- P1-B.1 restored repository-wide test truth without product changes: web 332/332, edit-domain 265/265, API 233/233, render-contract 51/51, intent-domain 27/27, focused Timeline/Studio 79/79, and the all-workspace build pass. The production bundle is identical to P1-B. Evidence: `DOCS/evidence/2026-07-30-p1b1-test-truth/`.
-- P1-A remains the pure `EditProject → TimelineViewModel` and gesture-adapter foundation. P0-E remains the owner-approved five-region Studio frame.
-- Exact next implementation stage: **P1-C — Inspector V1**. It has not started.
-- Open human evidence remains human-only: native drag-and-drop feel, final motion/overall UX judgment, repeated owner workflows, and agreed performance budgets.
-- Real-provider connection still requires the owner's data-leaving-machine decision and keys. Accounts and SaaS operations remain conditional, not implied by P1-B.
+- **P1-C — Inspector V1 is technically complete.** Owner visual and interaction approval remains open. Evidence: `DOCS/evidence/2026-07-31-p1c-inspector-v1/`.
+- Selecting a Production Timeline item now opens one contextual Inspector derived from the current authoritative `EditProject`.
+- Supported section Apply actions build one existing validated operation and travel through the existing revision-fenced App/server change-set path. One Apply remains one Undo.
+- The Inspector covers clip sound/visibility/transition, caption repair/style, title/callout/media-overlay/music repair, transform, crop, layer, mask, effects, entrance/exit, easing, and Keyframes V1.
+- Local drafts never mutate the project. Reset is local, and changing selection while dirty requires `Stay` or `Discard and continue`.
+- Nothing-selected, gap, blocked, pending proposal, and unsupported capability states are explicit. Nameplate text remains truthfully read-only because no `set-nameplate` operation exists.
+- A fresh real Edge walkthrough completed clip Apply → Undo → Redo → title repair → transform/crop/fade/keyframes → Undo → Redo → proposal reject → export/download. Page, console, and HTTP errors were zero; tablet/mobile layouts had no page-level horizontal overflow; the corrected 1080p export was probed and inspected.
+- Final suites pass: web 380/380, edit-domain 265/265, API 234/234, render-contract 51/51, intent-domain 27/27, plus the all-workspace build.
+- P1-B remains the authoritative five-lane Production Timeline and P1-A remains its pure projection/gesture foundation. No second project, history, proposal store, playhead, video, schema, or persistence format was added.
+- Exact next implementation stage, only after explicit owner instruction: **P1-D — Canvas direct manipulation**. It has not started.
+- Open human evidence remains human-only: final P1-C visual/interaction approval, native drag-and-drop feel, repeated owner workflows, representative non-editor workflows, and agreed performance budgets.
+- Real-provider connection still requires the owner's data-leaving-machine decision and keys. Accounts and SaaS operations remain conditional.
 
 ## Read in this order
 

@@ -1,6 +1,6 @@
 # Build Tracker
 
-Last updated: 2026-07-30
+Last updated: 2026-07-31
 
 | ID | Goal | Deliverable | Status | Evidence |
 |---|---|---|---|---|
@@ -44,8 +44,9 @@ Last updated: 2026-07-30
 | P0C-01 | Dual workspace | Persistent EditorShell with Assist/Studio switching and state continuity | Complete — owner walkthrough open | 10 focused App tests; pending AI proposal, project revision, video element/playback time, history and acceptance survive switching; real browser retained one project, 9 history entries and one video element |
 | P0E-01 | Studio structure | Five-region professional Studio frame over the existing editor authority | Complete — owner approved | 64/64 focused regressions; all-workspace build; one-video continuity, AI collapse, direct edit/Undo/Redo/export, proposal repair, three exact-size screenshots; owner approved from `d48aabf…` |
 | P1A-01 | Timeline foundation | Immutable deterministic timeline presentation model, viewport math, and typed gesture adapter | Complete | 71/71 focused web timeline tests; 77/77 affected edit-domain tests; representative 50/100/20/1 fixture; unchanged production bundle; all-workspace build |
-| P1B-01 | Production Timeline V1 | Five semantic lanes, shared playhead, ruler, seek/drag, zoom/Fit/scroll, overscan, selection, supported typed edit gestures, trim preview, snapping, proposal ghosts, keyboard safety, and context menu | Complete | 79/79 focused timeline/Studio tests; 77/77 affected domain tests; real Edge split/Undo/Redo/snap/trim/proposal/export loop; clean 1440/1024/390 geometry; probed 1080p MP4; all-workspace build |
-| P1B1-01 | Repository-wide test truth | Align executable contracts, export lifecycle assertions, and signed-number simulation with current product behavior | Complete | Web 332/332; edit-domain 265/265; API 233/233; render 51/51; intent 27/27; Timeline/Studio 79/79; identical P1-B bundle; no production source change |
+| P1B-01 | Production Timeline V1 | Five semantic lanes, shared playhead, ruler, seek/drag, zoom/Fit/scroll, overscan, selection, supported typed edit gestures, trim preview, snapping, proposal ghosts, keyboard safety, and context menu | Complete — owner approved | 79/79 focused timeline/Studio tests; 77/77 affected domain tests; real Edge split/Undo/Redo/snap/trim/proposal/export loop; clean 1440/1024/390 geometry; probed 1080p MP4; all-workspace build |
+| P1B1-01 | Repository-wide test truth | Align executable contracts, export lifecycle assertions, and signed-number simulation with current product behavior | Complete — owner approved | Web 332/332; edit-domain 265/265; API 233/233; render 51/51; intent 27/27; Timeline/Studio 79/79; identical P1-B bundle; no production source change |
+| P1C-01 | Inspector V1 | Contextual authoritative selection, local drafts, section Apply/Reset, dirty-selection guard, existing-operation editorial controls, visual properties, effects, transitions, and Keyframes V1 | Complete — owner visual approval open | Real Edge clip/title/visual/proposal/export workflow with revision chain 0→8 and zero page/console/HTTP errors; corrected 1080p export inspected; web 380/380, edit-domain 265/265, API 234/234, render 51/51, intent 27/27; all-workspace build |
 
 ## Status rules
 

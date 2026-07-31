@@ -233,6 +233,12 @@ no button offers it yet — the owner cannot get to it from the screen.
       selection, typed edit gestures, trim preview, deterministic snapping,
       proposal ghosts, keyboard safety, context menu, responsive browser proof,
       verified export, and focused evidence
+- [x] P1-C Build Inspector V1 — authoritative Timeline selection resolver,
+      human-readable labels, contextual states, local drafts, section Apply/Reset,
+      dirty-selection guard, existing-operation editorial controls, transform,
+      crop, layer, mask, effects, entrance/exit, easing, Keyframes V1, responsive
+      browser proof, corrected preview/export parity, and focused evidence
+- [ ] P1-D Build Canvas direct manipulation only after explicit owner instruction
 
 ## Continuous tracks applied at every visible goal
 

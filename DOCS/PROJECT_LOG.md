@@ -424,3 +424,14 @@
 - Browser continuity, Point/proposal repair, Cut/Undo/Redo/export, three exact
   responsive screenshots, 64/64 focused tests, and all builds passed.
 - Found and fixed the video-over-Point overlap defect. P1-A was not started.
+
+## 2026-07-31 — P1-C Inspector V1
+
+- Added one immutable Timeline-selection resolver and one contextual Inspector over the current evaluated `EditProject`; no second project, history, proposal store, playhead, video, schema, or persistence format was introduced.
+- Added local section drafts, Apply/Reset, validation notices, and dirty-selection protection. Every successful Apply builds one existing typed operation and uses the existing App/server revision-fenced change-set route, so it remains one Undo.
+- Connected clip visibility/sound/transition, caption repair/style, title/callout/media-overlay/music repair, transform, crop, layer, mask, effects, entrance/exit, easing, and Keyframes V1. Missing capabilities remain explicit: accepted nameplate text is read-only, source clips have no visual target, caption placement controls do not exist, and music end is derived.
+- Real Edge found and drove three repairs that component tests had not proved: a sticky visual Apply footer intercepted another section's Apply; pending proposal resolution actions inherited the wrong busy flag; and FFmpeg wrote permanent alpha zero before an entrance fade, making the accepted title absent from export.
+- The fresh post-repair walkthrough used `test-30s.mp4` and completed clip Apply, Undo, Redo, title repair, transform/crop/fade/keyframes, Undo, Redo, proposal reject, export/download, and tablet/mobile layout checks. Revision advanced exactly from 0 to 8; rejecting the detached proposal did not consume a revision; page, console, and HTTP errors were zero.
+- The final export is H.264 1920×1080 at 30 fps with AAC 48 kHz stereo and 30.033-second duration. Five extracted frames prove the repaired title is absent before/after its interval, visible during fade-in, and fully visible inside the interval.
+- Final gates: web 380/380, edit-domain 265/265, API 234/234, render-contract 51/51, intent-domain 27/27, and all-workspace build. One API mocked-export assertion failed once under the first parallel full run, then passed alone and on the complete rerun without a code change; this transient observation is preserved in the evidence.
+- Evidence: `DOCS/evidence/2026-07-31-p1c-inspector-v1/`. P1-D was not started.

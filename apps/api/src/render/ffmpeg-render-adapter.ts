@@ -3,7 +3,7 @@ import { constants, createReadStream } from 'node:fs'
 import { chmod, copyFile, link, lstat, mkdir, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 
-import { evaluateVisualProperties } from '@sanverse/edit-domain'
+import { DEFAULT_VISUAL_PROPERTIES, evaluateVisualProperties } from '@sanverse/edit-domain'
 import { PROJECT_TIMESCALE } from '@sanverse/edit-domain/time'
 import {
   validateRenderPlan,
@@ -145,8 +145,11 @@ const visualForNode = (plan: RenderPlan, nodeId: string): VisualPropertiesNode |
  * Translate the renderer-neutral visual state into native FFmpeg filters.
  *
  * This deliberately uses the shared evaluator at t=0 rather than copying
- * defaults into the renderer. Time-varying translation is handled by the
- * overlay expression below; enter/exit opacity uses FFmpeg's frame-timed fade.
+ * defaults into the renderer. Enter/exit transitions are neutralized for that
+ * base evaluation because FFmpeg applies them as separate frame-timed filters
+ * below. Applying the transition twice would turn an authored opacity of 1 into
+ * permanent alpha 0 before the FFmpeg fade ever had pixels to reveal.
+ * Time-varying translation is handled by the overlay expression below.
  */
 const mediaVisualFilters = (
   visual: VisualPropertiesNode | undefined,
@@ -162,7 +165,11 @@ const mediaVisualFilters = (
       : Object.freeze([])
   }
 
-  const evaluated = evaluateVisualProperties(visual, 0, durationTicks)
+  const evaluated = evaluateVisualProperties(
+    Object.freeze({ ...visual, transition: DEFAULT_VISUAL_PROPERTIES.transition }),
+    0,
+    durationTicks,
+  )
   const filters: string[] = []
   const crop = evaluated.crop
   if (crop.top > 0 || crop.right > 0 || crop.bottom > 0 || crop.left > 0) {

@@ -22,11 +22,18 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | UX-005 | P1 | UX | Assist side-panel text and hierarchy need owner visual approval | RESOLVED | P0-D.1 |
 | [x] | UX-006 | P2 | UX/A11Y | Pending and accepted changes need stronger visual distinction | RESOLVED | P0-D.1 |
 | [x] | UX-007 | P1 | UX | P0-E Studio layout required owner approval before P1-A | RESOLVED | P0-E |
+| [x] | UX-008 | P1 | UX | Timeline items display technical clip suffixes instead of human-readable media labels | RESOLVED | P1-C |
+| [ ] | UX-009 | P2 | UX | Dialogue lane uses a temporary visual pattern until waveform rendering exists | PLANNED | Audio waveform milestone |
 | [ ] | FAIL-021 | P2 | Performance | 30-second export crossed the 60-second walkthrough budget | MONITORING | E5 benchmark |
+| [x] | FAIL-027 | P1 | UX | Sticky visual Apply footer intercepted another Inspector section's Apply button | RESOLVED | P1-C |
+| [x] | FAIL-028 | P1 | Product interaction | Pending proposal resolution actions inherited the unrelated timeline-busy state | RESOLVED | P1-C |
+| [x] | FAIL-029 | P0 | Preview/export fidelity | FFmpeg applied permanent alpha zero before an entrance fade, hiding written overlays in export | RESOLVED | P1-C |
+| [ ] | INFRA-005 | P3 | Verification infrastructure | One full API run transiently failed its mocked export-job assertion, then passed alone and on full rerun | MONITORING | Test stability |
 | [x] | FAIL-024 | P2 | Verification debt | Contract files named `.test.ts` contain no Vitest suites, so broad domain/API commands exit 1 after their real assertions pass | RESOLVED | P1-B.1 |
 | [x] | FAIL-025 | P2 | API test drift | Two server tests expect old synchronous export statuses while the current API correctly returns asynchronous 202 | RESOLVED | P1-B.1 |
 | [x] | FAIL-026 | P2 | Web test drift | Overlay music-gain test enters `-24` through jsdom/user-event but submits `+24` | RESOLVED | P1-B.1 |
 | [ ] | FEATURE-001 | P3 | Deferred UX | Optional desktop composer resize preference | PLANNED | Post-P1 |
+| [ ] | FEATURE-002 | P2 | Capability gap | Accepted nameplate text cannot be repaired because no set-nameplate operation exists | PLANNED | Capability-gap review after P1-G |
 | [x] | INFRA-001 | P3 | Verification infrastructure | In-app viewport screenshots tiled the page texture | RESOLVED | P0-D.1 |
 | [x] | INFRA-004 | P3 | Dev-process cleanup | Stopping the Harness dev parent left Sanverse Vite/API children listening on ports 2000/2001 | RESOLVED | P1-B |
 
@@ -303,6 +310,89 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 - **Evidence:** The focused overlay suite passes 2/2 and the full web suite passes 34 files/332 tests. See `DOCS/evidence/2026-07-30-p1b1-test-truth/` and the focused P1-B.1 completion commit.
 - **Status:** RESOLVED in P1-B.1.
 - **One-line solution:** Set signed numeric values atomically in jsdom, verify the displayed value, then assert the submitted domain value.
+
+### UX-008 — Timeline labels expose technical clip suffixes
+
+- **What:** Split video and dialogue items use labels such as `Clip ec623c` and `Dialogue ec623c`, which expose internal identity instead of recognizable media names.
+- **Where:** Timeline V1 item-label derivation and the contextual Inspector header.
+- **When:** Confirmed at the P1-C baseline on 2026-07-30.
+- **Who is affected:** Non-editors trying to understand what the selected item represents.
+- **Why:** P1-B used stable clip-ID suffixes as a temporary disambiguator before a contextual Inspector existed.
+- **How reproduced:** Split one source clip and inspect V1/A1 labels.
+- **Attempted fix:** P1-C accepts a derived asset-display-label map, keeps stable item IDs internal, and falls back to `Video 1`, `Dialogue · Video 1`, and media-kind names when no filename is available.
+- **Status:** RESOLVED. Focused tests and real Edge screenshots prove the final Timeline and Inspector labels without exposing clip suffixes.
+- **One-line solution:** Keep identity in stable IDs while presenting the source filename or a plain media-family label.
+- **Severity:** P1.
+- **Owner:** Web editor.
+- **Target:** P1-C.
+
+### UX-009 — Dialogue lane has no waveform yet
+
+- **What:** A1 dialogue currently mirrors clip timing with a temporary visual pattern rather than a rendered waveform.
+- **Where:** Production Timeline V1 dialogue lane.
+- **When:** Carried into P1-C on 2026-07-30.
+- **Who is affected:** Users judging speech intensity visually.
+- **Why:** Waveform generation, caching, and rendering are a separate media-analysis milestone and were explicitly excluded from P1-B and P1-C.
+- **How reproduced:** Open Studio and inspect the A1 lane.
+- **Attempted fix:** None inside P1-C; the Inspector exposes the linked clip's truthful gain and fades without pretending waveform data exists.
+- **Status:** PLANNED.
+- **One-line solution:** Add derived waveform assets in the dedicated audio-waveform milestone.
+- **Severity:** P2.
+- **Owner:** Media/render pipeline.
+- **Target:** Audio waveform milestone.
+
+### FEATURE-002 — Accepted nameplate text has no repair operation
+
+- **What:** An accepted nameplate has editable visual properties but its primary and secondary text cannot be changed through an existing typed repair operation.
+- **Where:** `add-nameplate` capability and P1-C Nameplate Inspector.
+- **When:** Confirmed during the P1-C domain-contract review on 2026-07-30.
+- **Who is affected:** Users who notice a name or role typo after accepting the nameplate.
+- **Why:** The executable operation set contains `add-nameplate` and `set-visual-properties`, but deliberately has no `set-nameplate` operation.
+- **How reproduced:** Accept a nameplate and inspect the available operation kinds.
+- **Attempted fix:** P1-C keeps accepted text read-only and explains the limitation; it does not mutate the original add operation or invent a browser-only value.
+- **Status:** PLANNED.
+- **One-line solution:** Design and approve a dedicated full-state nameplate repair operation during the post-P1-G capability-gap review.
+- **Severity:** P2.
+- **Owner:** Edit domain/capability review.
+- **Target:** Capability-gap review after P1-G.
+
+### FAIL-027 — Visual Apply footer intercepted another section's Apply
+
+- **What:** The sticky visual-properties footer covered the Title section Apply button inside the 220-pixel desktop Inspector.
+- **Where:** `apps/web/src/editor/inspector/Inspector.css`.
+- **When:** Real Edge P1-C walkthrough on 2026-07-31.
+- **Why:** The footer used sticky positioning, z-index, and a negative edge offset inside the same short scroll surface as other section actions.
+- **Resolution:** The visual Apply footer now participates in normal document flow. A visual-contract test forbids sticky/fixed positioning, z-index, and negative margin on that footer.
+- **Status:** RESOLVED.
+- **One-line solution:** Never overlay one Inspector section's action controls on another section.
+
+### FAIL-028 — Proposal resolution actions inherited unrelated timeline busy state
+
+- **What:** Selecting a pending proposal opened the correct Inspector state, but Accept and Reject were disabled.
+- **Where:** Studio-to-Inspector busy-state wiring.
+- **When:** Real Edge P1-C walkthrough on 2026-07-31.
+- **Why:** `timelineBusy` included the existence of a proposal, which is correct for unrelated direct edits but incorrect for the actions required to resolve that proposal.
+- **Resolution:** Proposal-action busy state is separate and is true only while rendering. A Studio regression proves Reject remains enabled while unrelated timeline edits are paused.
+- **Status:** RESOLVED.
+- **One-line solution:** Pause conflicting edits without disabling the only controls that can resolve the pending proposal.
+
+### FAIL-029 — Entrance fade produced permanent alpha zero in export
+
+- **What:** Preview showed the repaired title, but the first exported frames contained no title during its entire interval.
+- **Where:** `apps/api/src/render/ffmpeg-render-adapter.ts` written-overlay visual filters.
+- **When:** Export-frame inspection during P1-C on 2026-07-31.
+- **Why:** The shared evaluator was called at relative time zero with the entrance fade active, producing opacity zero. FFmpeg then wrote permanent alpha zero before applying its own frame-timed fade, so no pixels remained to reveal.
+- **Resolution:** Base visual evaluation neutralizes enter/exit transitions; FFmpeg applies the transition once as a frame-timed filter. A red/green filter-graph test and fresh real export prove the title fades in and remains visible.
+- **Status:** RESOLVED.
+- **One-line solution:** Evaluate authored base appearance without transitions when the renderer applies those transitions separately.
+
+### INFRA-005 — One transient full API export assertion
+
+- **What:** The first final full API run reported one failed mocked export-job assertion after 233 passes.
+- **When:** P1-C final verification on 2026-07-31.
+- **What was tried:** The exact test passed alone in 92 ms; the complete API suite then passed 234/234 without a code change.
+- **Status:** MONITORING. This single non-reproduced observation is preserved rather than hidden or promoted to a product defect.
+- **One-line solution:** Reproduce before changing code; investigate shared parallel-test state only if it recurs.
 
 ### INFRA-004 — Dev parent stopped but Vite/API children kept ports open
 

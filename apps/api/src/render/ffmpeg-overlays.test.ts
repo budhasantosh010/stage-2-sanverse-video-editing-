@@ -137,6 +137,33 @@ describe('titles', () => {
     expect(topOf(lower)).toBeGreaterThan(topOf(centred))
   })
 
+  it('keeps authored opacity intact so an entrance fade can reveal the title', () => {
+    const graph = buildFilterGraph({
+      ...base,
+      plan: plan({
+        overlays: [titleNode()],
+        visuals: [{
+          visualId: 'title_0001',
+          nodeIds: ['title_0001'],
+          transform: { translateX: 0.08, translateY: 0, scale: 1.25, rotationDegrees: 0, opacity: 1 },
+          crop: { top: 0, right: 0, bottom: 0, left: 0.05 },
+          layer: 0,
+          mask: { shape: 'none', feather: 0 },
+          tracks: [],
+          transition: {
+            enter: { kind: 'fade', duration: ms(500), easing: { kind: 'linear' } },
+            exit: { kind: 'none', duration: ms(0), easing: { kind: 'linear' } },
+          },
+          effects: [],
+        }],
+      }) as never,
+    })
+    const styled = /\[wtdrawn0\]([^;]+)\[wtstyled0\]/.exec(graph)?.[1] ?? ''
+
+    expect(styled).toContain('fade=t=in')
+    expect(styled).not.toContain('colorchannelmixer=aa=0')
+  })
+
   it('never puts title words on the command line', () => {
     const command = buildFfmpegArguments({
       ...base,

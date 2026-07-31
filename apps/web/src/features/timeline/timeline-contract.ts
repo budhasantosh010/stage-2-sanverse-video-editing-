@@ -50,6 +50,11 @@ export type TimelineItemView = Readonly<{
   operationId: string | null
   changeSetId: string | null
 
+  /** Explicit canonical identities used by Inspector; never parsed from labels. */
+  captionSetId: string | null
+  cueId: string | null
+  visualId: string | null
+
   /** Original-media time when this item refers to source footage. */
   sourceStartTicks: number | null
   sourceDurationTicks: number | null
@@ -116,4 +121,6 @@ export type BuildTimelineViewModelInput = Readonly<{
   project: EditProject
   selectedItemId: string | null
   pending: PendingTimelineInput | null
+  /** Derived display names only. They are never persisted into EditProject. */
+  assetLabels?: Readonly<Record<string, string>>
 }>

@@ -68,8 +68,18 @@ const previewText = (value: string, fallback: string): string => {
   return normalized.length <= 48 ? normalized : `${normalized.slice(0, 47)}…`
 }
 
-const makeItem = (input: Omit<TimelineItemView, 'selected'>, selectedItemId: string | null): TimelineItemView =>
-  Object.freeze({ ...input, selected: input.id === selectedItemId })
+type TimelineItemInput =
+  Omit<TimelineItemView, 'selected' | 'captionSetId' | 'cueId' | 'visualId'> &
+  Partial<Pick<TimelineItemView, 'captionSetId' | 'cueId' | 'visualId'>>
+
+const makeItem = (input: TimelineItemInput, selectedItemId: string | null): TimelineItemView =>
+  Object.freeze({
+    captionSetId: null,
+    cueId: null,
+    visualId: null,
+    ...input,
+    selected: input.id === selectedItemId,
+  })
 
 const operationTraceMap = (
   records: readonly ChangeSetRecord[],
@@ -214,6 +224,10 @@ export const buildTimelineViewModel = (
   input: BuildTimelineViewModelInput,
 ): TimelineViewModel => {
   const { project, pending, selectedItemId } = input
+  const displayAsset = (assetId: string, fallback: string): string => {
+    const supplied = input.assetLabels?.[assetId]?.trim()
+    return supplied || fallback
+  }
   // The domain replay is intentionally performed once. Everything below reads
   // the same evaluated composition and records, so a future timeline render
   // cannot spend several full history replays or observe two derived answers.
@@ -334,9 +348,12 @@ export const buildTimelineViewModel = (
         left.clipId.localeCompare(right.clipId),
       )
 
-    orderedClips.forEach((clip) => {
+    orderedClips.forEach((clip, clipIndex) => {
       const videoId = `clip:${clip.clipId}`
-      const label = orderedClips.length === 1 ? 'Video' : `Clip ${clip.clipId.slice(-6)}`
+      const label = displayAsset(
+        clip.assetId,
+        orderedClips.length === 1 ? 'Video' : `Video ${clipIndex + 1}`,
+      )
       addItem(videoLane, makeItem({
         id: videoId,
         laneId: videoLane.id,
@@ -367,7 +384,10 @@ export const buildTimelineViewModel = (
         laneId: dialogueLane.id,
         kind: 'clip',
         state: 'committed',
-        label: orderedClips.length === 1 ? 'Dialogue' : `Dialogue ${clip.clipId.slice(-6)}`,
+        label: `Dialogue · ${displayAsset(
+          clip.assetId,
+          orderedClips.length === 1 ? 'Video' : `Video ${clipIndex + 1}`,
+        )}`,
         detail: null,
         startTicks: clip.compositionStart.ticks,
         durationTicks: clip.sourceRange.duration.ticks,
@@ -470,6 +490,7 @@ export const buildTimelineViewModel = (
         assetId: operation.assetId,
         operationId: operation.operationId,
         changeSetId: trace?.changeSetId ?? null,
+        visualId: operation.operationId,
         sourceStartTicks: placement.sourceRange.start.ticks,
         sourceDurationTicks: placement.sourceRange.duration.ticks,
         gainDb: null,
@@ -513,6 +534,9 @@ export const buildTimelineViewModel = (
           assetId: set.assetId,
           operationId,
           changeSetId: cueTrace?.changeSetId ?? null,
+          captionSetId: set.captionSetId,
+          cueId: cue.cueId,
+          visualId: set.captionSetId,
           sourceStartTicks: placement.sourceRange.start.ticks,
           sourceDurationTicks: placement.sourceRange.duration.ticks,
           gainDb: null,
@@ -545,7 +569,7 @@ export const buildTimelineViewModel = (
         laneId: musicLane.id,
         kind: 'music',
         state: 'committed',
-        label: 'Music',
+        label: displayAsset(operation.assetId, 'Music'),
         detail: null,
         startTicks: operation.compositionStart.ticks,
         durationTicks: playable,
@@ -597,6 +621,7 @@ export const buildTimelineViewModel = (
           assetId: operation.assetId,
           operationId: operation.operationId,
           changeSetId: trace?.changeSetId ?? null,
+          visualId: operation.titleId,
           sourceStartTicks: placement.sourceRange.start.ticks,
           sourceDurationTicks: placement.sourceRange.duration.ticks,
           gainDb: null,
@@ -622,6 +647,7 @@ export const buildTimelineViewModel = (
           assetId: operation.assetId,
           operationId: operation.operationId,
           changeSetId: trace?.changeSetId ?? null,
+          visualId: operation.calloutId,
           sourceStartTicks: placement.sourceRange.start.ticks,
           sourceDurationTicks: placement.sourceRange.duration.ticks,
           gainDb: null,
@@ -637,7 +663,10 @@ export const buildTimelineViewModel = (
           laneId: overlayLane.id,
           kind: 'media-overlay',
           state: 'committed',
-          label: overlayAsset?.mediaKind === 'image' ? 'Image' : 'B-roll',
+          label: displayAsset(
+            operation.overlayAssetId,
+            overlayAsset?.mediaKind === 'image' ? 'Image' : 'B-roll',
+          ),
           detail: null,
           startTicks: placement.compositionRange.start.ticks,
           durationTicks: placement.compositionRange.duration.ticks,
@@ -648,6 +677,7 @@ export const buildTimelineViewModel = (
           assetId: operation.overlayAssetId,
           operationId: operation.operationId,
           changeSetId: trace?.changeSetId ?? null,
+          visualId: operation.overlayId,
           sourceStartTicks: operation.overlaySourceStart.ticks + sourceOffset,
           sourceDurationTicks: placement.compositionRange.duration.ticks,
           gainDb: null,
@@ -695,6 +725,7 @@ export const buildTimelineViewModel = (
     detail: string | null,
     itemAssetId: string,
     sourceStartFor: (placement: SourceSpanPlacement) => number,
+    visualId: string,
   ): void => {
     const placements = enabledPlacements(operation.assetId, operation.sourceInterval)
     if (placements.length === 0) {
@@ -723,6 +754,7 @@ export const buildTimelineViewModel = (
         assetId: itemAssetId,
         operationId: operation.operationId,
         changeSetId: null,
+        visualId,
         sourceStartTicks: sourceStartFor(placement),
         sourceDurationTicks: placement.compositionRange.duration.ticks,
         gainDb: null,
@@ -766,6 +798,7 @@ export const buildTimelineViewModel = (
           operation.secondaryText || null,
           operation.assetId,
           (placement) => placement.sourceRange.start.ticks,
+          operation.operationId,
         )
         return
       }
@@ -778,6 +811,7 @@ export const buildTimelineViewModel = (
           operation.subhead || null,
           operation.assetId,
           (placement) => placement.sourceRange.start.ticks,
+          operation.titleId,
         )
         return
       }
@@ -790,6 +824,7 @@ export const buildTimelineViewModel = (
           operation.label || null,
           operation.assetId,
           (placement) => placement.sourceRange.start.ticks,
+          operation.calloutId,
         )
         return
       }
@@ -798,11 +833,15 @@ export const buildTimelineViewModel = (
           proposal,
           operation,
           'media-overlay',
-          findAsset(project.assets, operation.overlayAssetId)?.mediaKind === 'image' ? 'Image' : 'B-roll',
+          displayAsset(
+            operation.overlayAssetId,
+            findAsset(project.assets, operation.overlayAssetId)?.mediaKind === 'image' ? 'Image' : 'B-roll',
+          ),
           null,
           operation.overlayAssetId,
           (placement) => operation.overlaySourceStart.ticks +
             (placement.sourceRange.start.ticks - operation.sourceInterval.start.ticks),
+          operation.overlayId,
         )
         return
       }
@@ -830,7 +869,7 @@ export const buildTimelineViewModel = (
           laneId: musicLane.id,
           kind: 'music',
           state: 'proposed',
-          label: 'Music',
+          label: displayAsset(operation.assetId, 'Music'),
           detail: null,
           startTicks: operation.compositionStart.ticks,
           durationTicks: playable,
@@ -881,6 +920,9 @@ export const buildTimelineViewModel = (
               assetId: operation.assetId,
               operationId: operation.operationId,
               changeSetId: null,
+              captionSetId: operation.captionSetId,
+              cueId: cue.cueId,
+              visualId: operation.captionSetId,
               sourceStartTicks: placement.sourceRange.start.ticks,
               sourceDurationTicks: placement.sourceRange.duration.ticks,
               gainDb: null,

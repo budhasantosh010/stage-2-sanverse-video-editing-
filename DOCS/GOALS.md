@@ -63,8 +63,8 @@ Legend: `[x]` complete, `[~]` partly complete or awaiting owner evidence, `[ ]` 
 ## Current position
 
 - G4-A's exact-time project/change-set/render chassis is complete and remains authoritative.
-- The fake-provider AI proposal loop, transcript captions, cutting/audio primitives, motion/effect slices, recovery controls, and production Timeline V1 exist in executable code.
-- P1-B is technically complete with real-browser/media/export evidence. The exact next interface milestone is P1-C — Inspector V1.
+- The fake-provider AI proposal loop, transcript captions, cutting/audio primitives, motion/effect slices, recovery controls, Production Timeline V1, and Inspector V1 exist in executable code.
+- P1-C is technically complete with real-browser/media/export evidence; owner visual and interaction approval remains open. The exact next interface milestone, only after explicit owner instruction, is P1-D — Canvas direct manipulation.
 - G1 and the later workflow/local-alpha exits retain owner-only evidence gaps; automation cannot truthfully close native feel, final UX judgment, repeated non-editor workflows, or agreed performance budgets.
 - The first real AI-provider call remains blocked on the owner's keys and explicit decision about data leaving the machine.
 - Conditional cloud/SaaS/API goals remain conditional; technical progress does not silently authorize them.

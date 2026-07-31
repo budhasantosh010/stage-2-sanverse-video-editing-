@@ -1213,6 +1213,8 @@ Every currently supported editorial operation can be manually performed and visu
 
 ## P1-C — Inspector V1
 
+**Status on 2026-07-31:** technically complete; owner visual and interaction approval remains open. The implementation exposes every existing targetable engine property through one contextual Inspector and records absent capabilities honestly instead of inventing browser-only state. Source clips have no current visual target; accepted nameplate text has no repair operation; caption placement/safe-margin/grouping controls and an independent music end do not exist yet. Evidence: `DOCS/evidence/2026-07-31-p1c-inspector-v1/`.
+
 ### Clip inspector
 
 - source summary;

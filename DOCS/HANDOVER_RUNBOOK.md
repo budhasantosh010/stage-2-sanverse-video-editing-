@@ -2,6 +2,10 @@
 
 Use this runbook when a new session, agent, or context window resumes the project.
 
+## Current handoff
+
+P1-C Inspector V1 is technically complete with evidence at `DOCS/evidence/2026-07-31-p1c-inspector-v1/`. Owner visual and interaction approval remains open. P1-D Canvas direct manipulation has not started and must not begin without explicit owner instruction.
+
 ## Fast resume
 
 1. Read `START_HERE.md`.

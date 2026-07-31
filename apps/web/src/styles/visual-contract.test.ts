@@ -46,7 +46,8 @@ describe('shared visual and accessibility contract', () => {
   const main = readSource('main.tsx')
   const homeStyles = readSource('screens/home/HomeScreen.css')
   const studioStyles = readSource('screens/studio/StudioScreen.css')
-  const allStyles = [tokens, globalStyles, homeStyles, studioStyles].join('\n')
+  const inspectorStyles = readSource('editor/inspector/Inspector.css')
+  const allStyles = [tokens, globalStyles, homeStyles, studioStyles, inspectorStyles].join('\n')
 
   test('defines the shared monochrome foundation as versionable tokens', () => {
     expect(tokens).toMatch(/:root\s*{/)
@@ -89,6 +90,15 @@ describe('shared visual and accessibility contract', () => {
     expect(studioStyles).toContain('var(--color-workspace)')
     expect(studioStyles).toContain('var(--border-subtle)')
     expect(allStyles).not.toMatch(/(?:linear|radial|conic|repeating-linear|repeating-radial)-gradient\s*\(/i)
+  })
+
+  test('keeps Inspector section actions unobstructed by the visual Apply footer', () => {
+    const visualApplyRule = inspectorStyles.match(/\.inspector__visual-apply\s*{[^}]*}/s)?.[0] ?? ''
+
+    expect(visualApplyRule).not.toContain('position: sticky')
+    expect(visualApplyRule).not.toContain('position: fixed')
+    expect(visualApplyRule).not.toContain('z-index:')
+    expect(visualApplyRule).not.toMatch(/margin:\s*[^;]*-/)
   })
 
   test('keeps placeholder and normal muted text at WCAG AA contrast', () => {

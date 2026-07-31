@@ -1,8 +1,8 @@
 import type { ComponentProps } from 'react'
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { acceptChangeSet, undoChangeSet, type EditProject } from '@sanverse/edit-domain'
+import { acceptChangeSet, undoChangeSet, type EditOperation, type EditProject } from '@sanverse/edit-domain'
 
 import { StudioScreen } from './StudioScreen'
 import { TEST_CLIP_ID, ms, testChangeSet, testOperation, testProject } from '../../test-fixtures'
@@ -138,7 +138,7 @@ describe('StudioScreen', () => {
   it('shows the selected filename and a real controlled video preview', () => {
     const { container } = renderStudio()
 
-    expect(screen.getAllByText('cleaned-interview.mp4')).toHaveLength(2)
+    expect(screen.getAllByText('cleaned-interview.mp4')).toHaveLength(3)
     const video = container.querySelector('video')
     expect(video).toHaveAttribute('src', 'blob:cleaned-interview')
     expect(video).toHaveAttribute('controls')
@@ -897,9 +897,87 @@ describe('StudioScreen production timeline', () => {
     renderStudio()
 
     const videoLane = screen.getByRole('group', { name: /V1 video lane/i })
-    const videoItem = within(videoLane).getByRole('button', { name: /^clip, Video,/i })
+    const videoItem = within(videoLane).getByRole('button', { name: /^clip, cleaned-interview\.mp4,/i })
     expect(videoItem).toHaveAttribute('aria-selected', 'false')
     expect(videoItem.closest('[data-testid="timeline-item-shell"]')).toHaveAttribute('data-canonical-left', '0')
+  })
+
+  it('opens the authoritative Inspector from Timeline selection and applies one existing audio operation', async () => {
+    const user = userEvent.setup()
+    const onCreateOverlay = vi.fn(async (_operation: EditOperation): Promise<string | null> => null)
+    renderStudio({ onCreateOverlay })
+
+    const videoLane = screen.getByRole('group', { name: /V1 video lane/i })
+    await user.click(within(videoLane).getByRole('button', { name: /^clip, cleaned-interview\.mp4,/i }))
+
+    const inspector = screen.getByRole('region', { name: 'Inspector' })
+    expect(within(inspector).getByRole('heading', { name: 'cleaned-interview.mp4' })).toBeInTheDocument()
+    const soundToggle = within(inspector).getByRole('button', { name: 'Sound' })
+    expect(soundToggle).toHaveAttribute('aria-expanded', 'true')
+    const soundSection = soundToggle.closest('section')
+    if (!soundSection) throw new Error('Sound section missing')
+    fireEvent.change(within(soundSection).getByLabelText('Gain (dB)'), { target: { value: '-7' } })
+    await user.click(within(soundSection).getByRole('button', { name: 'Apply' }))
+
+    await waitFor(() => expect(onCreateOverlay).toHaveBeenCalledTimes(1))
+    expect(onCreateOverlay.mock.calls[0][0]).toMatchObject({
+      kind: 'set-clip-audio',
+      clipId: TEST_CLIP_ID,
+      gainDb: -7,
+    })
+  })
+
+  it('keeps Inspector proposal resolution actions available while unrelated timeline edits are paused', async () => {
+    const user = userEvent.setup()
+    const onDiscardProposal = vi.fn()
+    renderStudio({
+      proposal: directProposal(testOperation({
+        operationId: 'operation_propsel1',
+        sourceInterval: { start: ms(0), duration: ms(5_000) },
+      })),
+      onDiscardProposal,
+    })
+
+    const overlayLane = screen.getByRole('group', { name: /V2 overlay lane/i })
+    const proposalItem = within(overlayLane).getByRole('button', {
+      name: /^nameplate, Santosh, Founder,.*Proposed$/i,
+    })
+    await user.click(proposalItem)
+
+    const inspector = screen.getByRole('region', { name: 'Inspector' })
+    expect(within(inspector).getByText('Pending — preview only')).toBeInTheDocument()
+    const reject = within(inspector).getByRole('button', { name: 'Reject proposal' })
+    expect(reject).toBeEnabled()
+    await user.click(reject)
+    expect(onDiscardProposal).toHaveBeenCalledOnce()
+  })
+
+  it('guards a dirty Inspector draft before Timeline selection changes', async () => {
+    const user = userEvent.setup()
+    renderStudio()
+
+    const videoLane = screen.getByRole('group', { name: /V1 video lane/i })
+    await user.click(within(videoLane).getByRole('button', { name: /^clip, cleaned-interview\.mp4,/i }))
+    const inspector = screen.getByRole('region', { name: 'Inspector' })
+    const soundSection = within(inspector).getByRole('button', { name: 'Sound' }).closest('section')
+    if (!soundSection) throw new Error('Sound section missing')
+    fireEvent.change(within(soundSection).getByLabelText('Gain (dB)'), { target: { value: '-9' } })
+
+    const dialogueLane = screen.getByRole('group', { name: /A1 dialogue lane/i })
+    const videoItem = within(videoLane).getByRole('button', { name: /^clip, cleaned-interview\.mp4,/i })
+    const dialogueItem = within(dialogueLane).getByRole('button', { name: /^clip, Dialogue · cleaned-interview\.mp4,/i })
+    await user.click(dialogueItem)
+    expect(within(inspector).getByRole('alertdialog', { name: 'Discard unapplied changes?' })).toBeInTheDocument()
+    expect(videoItem).toHaveAttribute('aria-selected', 'true')
+
+    await user.click(within(inspector).getByRole('button', { name: 'Stay' }))
+    expect(within(inspector).queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(videoItem).toHaveAttribute('aria-selected', 'true')
+
+    await user.click(dialogueItem)
+    await user.click(within(inspector).getByRole('button', { name: 'Discard and continue' }))
+    await waitFor(() => expect(dialogueItem).toHaveAttribute('aria-selected', 'true'))
+    expect(within(inspector).getByText('Dialogue linked to video')).toBeInTheDocument()
   })
 
   it('sends a cut measured from the start of the section the playhead is in', async () => {
