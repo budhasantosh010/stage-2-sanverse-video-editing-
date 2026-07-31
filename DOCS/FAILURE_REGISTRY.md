@@ -25,7 +25,11 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | UX-008 | P1 | UX | Timeline items display technical clip suffixes instead of human-readable media labels | RESOLVED | P1-C |
 | [ ] | UX-009 | P2 | UX | Dialogue lane uses a temporary visual pattern until waveform rendering exists | PLANNED | Audio waveform milestone |
 | [x] | UX-010 | P1 | UX | Studio video preview collapsed below a usable Canvas height | RESOLVED | P1-D |
-| [ ] | UX-011 | P2 | UX | Media, Timeline, Canvas, and Inspector use different display names for the same imported asset | PLANNED | P1-E |
+| [x] | UX-011 | P2 | UX | Media, Timeline, Canvas, and Inspector use different display names for the same imported asset | RESOLVED | P1-E |
+| [x] | FAIL-032 | P1 | React lifecycle | Unstable optional media-name defaults retriggered source probing and caused an infinite Studio render loop | RESOLVED | P1-E |
+| [x] | FAIL-033 | P3 | Verification typing | Deferred source-probe test resolver narrowed to `never` during production TypeScript build | RESOLVED | P1-E |
+| [x] | UX-012 | P1 | UX gate | P1-D Canvas direct manipulation required owner visual and interaction approval | RESOLVED | P1-D |
+| [ ] | FEATURE-003 | P2 | Capability gap | No server-authoritative remove-unused-asset action exists | PLANNED | Post-P1-E asset service |
 | [x] | FAIL-030 | P1 | Revision authority | Immediate B-roll placement used the stale pre-upload project revision | RESOLVED | P1-D |
 | [x] | FAIL-031 | P0 | Preview/export fidelity | FFmpeg crop dimensions were calculated from the target box instead of the actual scaled image | RESOLVED | P1-D |
 | [ ] | FAIL-021 | P2 | Performance | 30-second export crossed the 60-second walkthrough budget | MONITORING | E5 benchmark |
@@ -364,21 +368,75 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 - **Owner:** Web editor.
 - **Target:** P1-D.
 
+### UX-012 — P1-D Canvas owner visual and interaction approval
+
+- **What:** P1-D remained technically complete but its final visual and interaction gate required the owner's decision.
+- **Where:** P1-D Canvas Direct Manipulation V1 evidence and project authority documents.
+- **When:** The owner approved P1-D by supplying the P1-E implementation contract and instructing implementation to begin on 2026-07-31.
+- **Who was affected:** The owner and future agents deciding whether P1-E was authorized.
+- **Why:** Browser evidence can prove behavior, but the product owner must decide whether the direct-manipulation experience is acceptable.
+- **How verified:** P1-D completion commit `b79d6fd21b4aff9d162a4e5f29a569a1298cf870` was clean, pushed, and named as the required P1-E start point by the owner.
+- **What was tried:** No additional product change was needed; the explicit owner decision closed the human gate.
+- **Status:** RESOLVED.
+- **One-line solution:** Record the owner's explicit P1-D approval and use its verified commit as the P1-E baseline.
+- **Severity:** P1.
+- **Owner:** Product owner.
+- **Target:** P1-D.
+- **Evidence:** `DOCS/evidence/2026-07-31-p1e-media-bin-v1/P1-D_OWNER_APPROVAL.md`.
+
 ### UX-011 — Media panel and Timeline label the same image differently
 
-- **What:** After importing one image behind the main video, the Media panel calls it `Image 2` while Timeline, Canvas, and Inspector call it `Image 1`.
-- **Where:** Media-card ordinal derivation versus the shared editor asset-label map.
-- **When:** Final P1-D Edge walkthrough on 2026-07-31.
-- **Who is affected:** Users matching an imported asset across Media, Timeline, Canvas, and Inspector.
-- **Why:** The Media panel counts all project assets, while editor labels count only assets of that media family.
-- **Reproduction:** Open one video, import one image, then compare its Media card with its Timeline/Inspector label.
-- **Attempted fix:** None inside P1-D because the mismatch is non-blocking and does not affect identity, selection, persistence, or export.
-- **Final solution:** Planned.
-- **One-line solution:** Feed Media, Timeline, Canvas, and Inspector from the same derived asset-display-label map.
+- **What:** After importing one image behind the main video, Media and editor surfaces could show different ordinal names for the same asset identity.
+- **Where:** Media-card label derivation versus Timeline/Canvas/Inspector asset-label derivation.
+- **When:** Found during the final P1-D Edge walkthrough and closed in P1-E on 2026-07-31.
+- **Who was affected:** Users matching an imported asset across Media, Timeline, Canvas, and Inspector.
+- **Why:** Each surface counted or formatted assets independently instead of consuming one label authority.
+- **Reproduction:** Open one video, import one image, then compare its Media card, V2 Timeline item, Canvas move control, and Inspector heading.
+- **What was tried:** P1-D documented the mismatch without patching separate components. P1-E extracted one pure `deriveAssetDisplayLabels` map and passed it to every surface.
+- **Final solution:** Media, Timeline, Canvas, and Inspector now consume the same deterministic label map, including safe filenames, family fallbacks, and duplicate disambiguation.
+- **Acceptance tests:** `media-display-labels.test.ts`; `StudioMediaBinIntegration.test.tsx`; full web 473/473.
+- **Browser proof:** `browser-report.json` records `hero-frame.png` on all four surfaces; `screenshots/image-added-to-timeline-1440x900.png` visibly shows the shared name.
+- **Evidence:** `DOCS/evidence/2026-07-31-p1e-media-bin-v1/media-label-authority.md`.
+- **Commit:** P1-E completion commit.
+- **One-line solution:** Feed every visible asset name from one pure display-label authority.
 - **Severity:** P2.
 - **Owner:** Web editor.
 - **Target:** P1-E.
-- **Status:** PLANNED.
+- **Status:** RESOLVED.
+
+### FAIL-032 — Unstable optional media-name default caused an infinite Studio render loop
+
+- **What:** The final web suite stopped after most files because `StudioCanvasIntegration.test.tsx` consumed CPU indefinitely instead of finishing.
+- **Where:** `apps/web/src/screens/studio/StudioScreen.tsx`, optional `assetOriginalNames` default and media-source probe effect.
+- **When:** P1-E closure verification on 2026-07-31.
+- **Who was affected:** Tests and any caller omitting the optional upload-name map while Studio remained mounted.
+- **Why:** The parameter default created a fresh `{}` on every render. That changed `mediaSourceEntries`, retriggered the source-probe effect, and scheduled another `mediaSourceStatuses` state update. The loop repeated even when no probe adapter existed.
+- **How reproduced:** Run `StudioCanvasIntegration.test.tsx` alone or the full web suite after P1-E source probing; the worker remains CPU-bound and writes no terminal result.
+- **What was tried:** Duplicate Vitest roots were removed and the suite was serialized, which isolated the hang to one file but did not solve it.
+- **Final solution:** Use one frozen module-level empty original-name map and make the no-probe effect return without scheduling state.
+- **Acceptance tests:** Formerly hanging Canvas integration 4/4; affected Canvas/Media integration 9/9; normal full web suite 55 files and 473/473 tests.
+- **One-line solution:** Stable optional collection defaults must not create new effect dependencies on every render.
+- **Severity:** P1.
+- **Owner:** Web Studio lifecycle.
+- **Target:** P1-E.
+- **Status:** RESOLVED.
+
+### FAIL-033 — Deferred source-probe test resolver narrowed to never during build
+
+- **What:** All runtime tests passed, but the all-workspace TypeScript build failed because a test-local deferred resolver was inferred as non-callable.
+- **Where:** `apps/web/src/screens/studio/StudioMediaBinIntegration.test.tsx`.
+- **When:** First P1-E final production build on 2026-07-31.
+- **Who was affected:** Repository build verification only; production code did not fail.
+- **Why:** TypeScript control-flow narrowing could not prove that the promise constructor had assigned the nullable resolver before the later call.
+- **How reproduced:** Run `npm run build`; TypeScript reports `TS2349` at the resolver call.
+- **What was tried:** The focused runtime test already passed, confirming behavior. The fixture was then changed to an explicit typed deferred helper.
+- **Final solution:** Use an explicitly typed deferred promise object whose resolver exists by construction.
+- **Acceptance tests:** Affected integration tests 9/9 and the complete all-workspace build pass; all six gates were rerun afterward.
+- **One-line solution:** Represent deferred test promises with an explicit typed helper instead of nullable closure assignment.
+- **Severity:** P3.
+- **Owner:** Web verification.
+- **Target:** P1-E.
+- **Status:** RESOLVED.
 
 ### FAIL-030 — Immediate B-roll placement used a stale project revision
 
@@ -417,6 +475,21 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 - **Owner:** Render adapter.
 - **Target:** P1-D.
 - **Status:** RESOLVED.
+
+### FEATURE-003 — No server-authoritative remove-unused-asset action
+
+- **What:** P1-E can identify unused assets, but the current domain/API has no safe operation or route that removes one project asset.
+- **Where:** Edit-domain asset operations, App project adapters, and API project-asset routes.
+- **When:** Confirmed during the P1-E AQ-1 preflight on 2026-07-31.
+- **Who is affected:** Users who import media they later decide not to use.
+- **Why:** Asset upload exists, but removal was deliberately not modeled; deleting only frontend state would create a second false project authority and deleting the user's source file would be unsafe.
+- **How reproduced:** Search current capabilities, operations, App adapters, and API routes for a remove-unused-asset contract; none exists.
+- **What was tried:** P1-E computes usage once, disables Remove for used assets, and also disables it for unused assets with a plain explanation that the source remains safe.
+- **Status:** PLANNED. It does not block Media Bin search, selection, import, placement, Undo/Redo, preview, or export.
+- **One-line solution:** Add a server-authoritative remove-unused-asset service that refuses any asset with accepted project references and never deletes the user's original source file.
+- **Severity:** P2.
+- **Owner:** Edit domain and project asset service.
+- **Target:** Post-P1-E asset service.
 
 ### FEATURE-002 — Accepted nameplate text has no repair operation
 

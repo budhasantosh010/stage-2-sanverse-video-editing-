@@ -64,7 +64,7 @@ Legend: `[x]` complete, `[~]` partly complete or awaiting owner evidence, `[ ]` 
 
 - G4-A's exact-time project/change-set/render chassis is complete and remains authoritative.
 - The fake-provider AI proposal loop, transcript captions, cutting/audio primitives, motion/effect slices, recovery controls, Production Timeline V1, Inspector V1, and Canvas Direct Manipulation V1 exist in executable code.
-- P1-D is technically complete with real-browser/media/export evidence; owner visual and interaction approval remains open. The exact next interface milestone, only after explicit owner instruction, is P1-E — Media Bin V1. UX-011 is assigned there and remains open.
+- P1-E Media Bin V1 is technically complete with real-browser/media/export evidence. One accepted project now feeds one Media view model, one display-label authority, one usage index, and App-owned source probing; `UX-011` is resolved. The next interface milestone is P1-F only after explicit owner instruction.
 - G1 and the later workflow/local-alpha exits retain owner-only evidence gaps; automation cannot truthfully close native feel, final UX judgment, repeated non-editor workflows, or agreed performance budgets.
 - The first real AI-provider call remains blocked on the owner's keys and explicit decision about data leaving the machine.
 - Conditional cloud/SaaS/API goals remain conditional; technical progress does not silently authorize them.

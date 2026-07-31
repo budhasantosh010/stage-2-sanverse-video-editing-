@@ -1,5 +1,16 @@
 # Project Log
 
+## 2026-07-31 — P1-E Media Bin V1 complete
+
+- Added one immutable Media Bin view model over the accepted project with import, search, All/Video/Images/Audio/Missing filters, usage, source status, keyboard navigation, right-click/Shift+F10 actions, and responsive layouts.
+- Centralized asset display names in one pure helper shared by Media, Timeline, Canvas, and Inspector, resolving `UX-011` without component-specific patches.
+- Kept project/revision in App/server, accepted history in project change sets, editor selection in Studio, media selection presentation-only, and source probing App-owned with four-request concurrency.
+- Reused existing `add-media-overlay`, `add-music`, and `set-music` operations; import remains outside Undo history and placement Undo/Redo retains imported assets.
+- Real Edge used a talking-head MP4, image, secondary MP4, and WAV; completed Canvas image manipulation, B-roll, music repair, Undo/Redo, filters, keyboard/context menus, missing-source failure/restoration, export/download, frame/audio inspection, and cleanup with zero unexpected browser/HTTP errors.
+- Final suites pass: web 473/473, edit-domain 265/265, API 235/235, render-contract 51/51, intent-domain 27/27; all-workspace build passes.
+- Unused asset deletion remains deferred as `FEATURE-003`; `FAIL-021` and `INFRA-005` remain monitoring.
+- P1-F was not started.
+
 ## 2026-07-31 — P1-D Canvas Direct Manipulation V1 complete
 
 - Added one Canvas interaction layer driven by the existing Timeline selection and the Inspector's shared detached visual draft.

@@ -1,0 +1,101 @@
+﻿[
+    {
+        "name":  "media-bin-default-1440x900.png",
+        "bytes":  59393,
+        "width":  1440,
+        "height":  900,
+        "sha256":  "be4914b34001efaaed96cef2a527c6dc54f0c3a74de6c5b0f9b84e3bea5dd980",
+        "visuallyReviewed":  true,
+        "valid":  true
+    },
+    {
+        "name":  "media-search-1440x900.png",
+        "bytes":  218174,
+        "width":  1440,
+        "height":  900,
+        "sha256":  "bbe5efdeb0cabf39d62e07fa3b074dcfe0a987ef79f8071bf83f3c97baf89905",
+        "visuallyReviewed":  true,
+        "valid":  true
+    },
+    {
+        "name":  "media-filter-images-1440x900.png",
+        "bytes":  222006,
+        "width":  1440,
+        "height":  900,
+        "sha256":  "60ddd4224f0414c4cc519c001bc14e390dec0b589ebd8dc8bd7ba305711e3645",
+        "visuallyReviewed":  true,
+        "valid":  true
+    },
+    {
+        "name":  "imported-image-1440x900.png",
+        "bytes":  219917,
+        "width":  1440,
+        "height":  900,
+        "sha256":  "a925b37eca6d55c99bef2f709c43e5d94dd589f7da6dfb580a8ee5ff0f084da5",
+        "visuallyReviewed":  true,
+        "valid":  true
+    },
+    {
+        "name":  "image-added-to-timeline-1440x900.png",
+        "bytes":  246477,
+        "width":  1440,
+        "height":  900,
+        "sha256":  "c374bc6560b2fd0626b02b046d30a7e74f3f1e8c0c8dd53721aa0576018e3a15",
+        "visuallyReviewed":  true,
+        "valid":  true
+    },
+    {
+        "name":  "media-crop-mode.png",
+        "bytes":  213276,
+        "width":  1440,
+        "height":  900,
+        "sha256":  "638aa696308f1da309daf4c3fcb6bbd911a1b221985be23e508b57af414e4347",
+        "visuallyReviewed":  true,
+        "valid":  true
+    },
+    {
+        "name":  "music-added-1440x900.png",
+        "bytes":  217364,
+        "width":  1440,
+        "height":  900,
+        "sha256":  "f37588473196e9380664d8c36ede966ea5b6ec8193b6c9c358d5e825a75ebc22",
+        "visuallyReviewed":  true,
+        "valid":  true
+    },
+    {
+        "name":  "missing-media-1440x900.png",
+        "bytes":  222024,
+        "width":  1440,
+        "height":  900,
+        "sha256":  "a5f6a809e63f25e3a92fe73c0c2d5339e903b0539dc72e739d8ffd16e76ce13f",
+        "visuallyReviewed":  true,
+        "valid":  true
+    },
+    {
+        "name":  "media-bin-1280x800.png",
+        "bytes":  170835,
+        "width":  1280,
+        "height":  800,
+        "sha256":  "f102c2fc30cad5b4e8a2b9e6dcecceecdef1a1bd951103afa28d2f0fab7b9803",
+        "visuallyReviewed":  true,
+        "valid":  true
+    },
+    {
+        "name":  "media-bin-1024x768.png",
+        "bytes":  136012,
+        "width":  1024,
+        "height":  768,
+        "sha256":  "2dc9df15b9c8d2c861e52e254ffba6a5995516d676a6357db4479eacb0fd8004",
+        "visuallyReviewed":  true,
+        "valid":  true
+    },
+    {
+        "name":  "media-drawer-390x844.png",
+        "bytes":  88432,
+        "width":  390,
+        "height":  844,
+        "sha256":  "697b5431fa0280614d88a97ba874589c0c48941afe9cffcb4c3935a707e79535",
+        "visuallyReviewed":  true,
+        "valid":  true
+    }
+]

@@ -1,0 +1,834 @@
+{
+  "browser": "Microsoft Edge / Chromium",
+  "main_media": "resources\\test video\\test-30s.mp4",
+  "page_errors": [],
+  "console_errors": [],
+  "expected_missing_console_errors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "failed_responses": [],
+  "expected_missing_responses": [
+    {
+      "status": 404,
+      "url": "http://localhost:2000/api/projects/project_0dd4b22144d9374a3a1023eee3469d82/assets/asset_f57d7f5e27b9dcec983b6ad94bd3a893/media"
+    },
+    {
+      "status": 404,
+      "url": "http://localhost:2000/api/projects/project_0dd4b22144d9374a3a1023eee3469d82/assets/asset_f57d7f5e27b9dcec983b6ad94bd3a893/media"
+    },
+    {
+      "status": 404,
+      "url": "http://localhost:2000/api/projects/project_0dd4b22144d9374a3a1023eee3469d82/assets/asset_c8762f3ea226c3e6e965d32d5a5cbd2f/media"
+    },
+    {
+      "status": 404,
+      "url": "http://localhost:2000/api/projects/project_0dd4b22144d9374a3a1023eee3469d82/assets/asset_c8762f3ea226c3e6e965d32d5a5cbd2f/media"
+    }
+  ],
+  "revisions": {
+    "initial": 0,
+    "image_import": 1,
+    "image_add": 2,
+    "image_move": 3,
+    "image_resize": 4,
+    "image_crop": 5,
+    "image_crop_undo": 6,
+    "image_crop_redo": 7,
+    "video_import": 8,
+    "video_add": 9,
+    "audio_import": 10,
+    "music_add": 11,
+    "music_adjust": 12,
+    "music_undo": 13,
+    "music_redo": 14,
+    "post_restore_undo": 16,
+    "post_restore_redo": 17
+  },
+  "labels": {
+    "image": {
+      "media": "hero-frame.png\nImage \u00b7 Still image\n1920\u00d71080\nUsed 1 time",
+      "timeline": "media overlay, hero-frame.png, starts 00:02.000, duration 00:03.000, Committed",
+      "inspector": "hero-frame.png",
+      "canvas": "Move hero-frame.png. Position 0 percent across and 0 percent down."
+    },
+    "video": {
+      "media": "VIDEO\nsecondary-broll.mp4\nVideo \u00b7 5.0 sec\n1920\u00d71080\nUsed 1 time",
+      "timeline": "media overlay, secondary-broll.mp4, starts 00:09.000, duration 00:03.000, Committed",
+      "inspector": "secondary-broll.mp4",
+      "canvas": "Move secondary-broll.mp4. Position 0 percent across and 0 percent down."
+    }
+  },
+  "geometry": {
+    "1440x900": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "bodyScrollWidth": 1440,
+      "documentScrollWidth": 1440,
+      "mainVideoCount": 1,
+      "totalVideoCount": 1,
+      "laneCount": 5,
+      "mediaRegion": {
+        "x": 16,
+        "y": 76,
+        "width": 220,
+        "height": 490,
+        "right": 236,
+        "bottom": 566
+      },
+      "mediaList": {
+        "x": 31,
+        "y": 322.109375,
+        "width": 190,
+        "height": 275,
+        "right": 221,
+        "bottom": 597.109375
+      },
+      "videoStage": {
+        "x": 263,
+        "y": 155,
+        "width": 814,
+        "height": 342,
+        "right": 1077,
+        "bottom": 497
+      },
+      "timeline": null,
+      "blobSources": []
+    },
+    "1280x800": {
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "bodyScrollWidth": 1280,
+      "documentScrollWidth": 1280,
+      "mainVideoCount": 1,
+      "totalVideoCount": 1,
+      "laneCount": 5,
+      "mediaRegion": {
+        "x": 16,
+        "y": 76,
+        "width": 220,
+        "height": 424,
+        "right": 236,
+        "bottom": 500
+      },
+      "mediaList": {
+        "x": 31,
+        "y": 322.109375,
+        "width": 190,
+        "height": 209,
+        "right": 221,
+        "bottom": 531.109375
+      },
+      "videoStage": {
+        "x": 263,
+        "y": 155,
+        "width": 654,
+        "height": 280,
+        "right": 917,
+        "bottom": 435
+      },
+      "timeline": null,
+      "blobSources": []
+    },
+    "1024x768": {
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "bodyScrollWidth": 1024,
+      "documentScrollWidth": 1024,
+      "mainVideoCount": 1,
+      "totalVideoCount": 1,
+      "laneCount": 5,
+      "mediaRegion": {
+        "x": 14,
+        "y": 577.828125,
+        "width": 996,
+        "height": 645.734375,
+        "right": 1010,
+        "bottom": 1223.5625
+      },
+      "mediaList": {
+        "x": 29,
+        "y": 823.9375,
+        "width": 966,
+        "height": 368.625,
+        "right": 995,
+        "bottom": 1192.5625
+      },
+      "videoStage": {
+        "x": 29,
+        "y": 155,
+        "width": 966,
+        "height": 291.828125,
+        "right": 995,
+        "bottom": 446.828125
+      },
+      "timeline": null,
+      "blobSources": []
+    },
+    "390x844": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "mainVideoCount": 1,
+      "totalVideoCount": 1,
+      "laneCount": 5,
+      "mediaRegion": {
+        "x": 14,
+        "y": 669,
+        "width": 362,
+        "height": 682.90625,
+        "right": 376,
+        "bottom": 1351.90625
+      },
+      "mediaList": {
+        "x": 29,
+        "y": 915.109375,
+        "width": 332,
+        "height": 405.109375,
+        "right": 361,
+        "bottom": 1320.21875
+      },
+      "videoStage": {
+        "x": 29,
+        "y": 258,
+        "width": 332,
+        "height": 280,
+        "right": 361,
+        "bottom": 538
+      },
+      "timeline": null,
+      "blobSources": []
+    },
+    "final-desktop": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "bodyScrollWidth": 1440,
+      "documentScrollWidth": 1440,
+      "mainVideoCount": 1,
+      "totalVideoCount": 1,
+      "laneCount": 5,
+      "mediaRegion": {
+        "x": 16,
+        "y": 76,
+        "width": 220,
+        "height": 490,
+        "right": 236,
+        "bottom": 566
+      },
+      "mediaList": {
+        "x": 31,
+        "y": 322.109375,
+        "width": 190,
+        "height": 275,
+        "right": 221,
+        "bottom": 597.109375
+      },
+      "videoStage": {
+        "x": 263,
+        "y": 155,
+        "width": 814,
+        "height": 342,
+        "right": 1077,
+        "bottom": 497
+      },
+      "timeline": null,
+      "blobSources": []
+    }
+  },
+  "state_preservation": {
+    "before": {
+      "playhead": "4320000",
+      "zoom": "125 px/s",
+      "scrollLeft": 140,
+      "timelineSelection": "clip, test-30s.mp4, starts 00:00.000, duration 00:30.033, Committed",
+      "canvasSelection": null,
+      "inspectorHeading": "test-30s.mp4",
+      "mediaSelection": "test-30s.mp4, Video, Used 1 time"
+    },
+    "after": {
+      "playhead": "4320000",
+      "zoom": "125 px/s",
+      "scrollLeft": 140,
+      "timelineSelection": "clip, test-30s.mp4, starts 00:00.000, duration 00:30.033, Committed",
+      "canvasSelection": null,
+      "inspectorHeading": "test-30s.mp4",
+      "mediaSelection": "test-30s.mp4, Video, Used 1 time"
+    }
+  },
+  "missing_fixture": {
+    "asset_ids": [
+      "asset_f57d7f5e27b9dcec983b6ad94bd3a893",
+      "asset_c8762f3ea226c3e6e965d32d5a5cbd2f"
+    ],
+    "method": "Temporarily rename the isolated stored asset beside itself; preserve the project asset and restore the file after verification.",
+    "renamed_files": [
+      "asset_f57d7f5e27b9dcec983b6ad94bd3a893.missing",
+      "asset_c8762f3ea226c3e6e965d32d5a5cbd2f.missing"
+    ],
+    "used_image_export_error": "The accepted edit cannot be rendered as requested. Adjust it, then retry. Your accepted edits are still safe. Code: RENDER_INPUT_INVALID.\n\nRetry export"
+  },
+  "object_url_observation": "Media Bin uses same-origin project asset URLs and created no blob: URLs.",
+  "project_id": "project_0dd4b22144d9374a3a1023eee3469d82",
+  "usage": {
+    "primary": "test-30s.mp4, Video, Used 1 time",
+    "image": "hero-frame.png, Image, Used 1 time",
+    "video": "secondary-broll.mp4, Video, Used 1 time",
+    "music": "music-bed.wav, Audio, Used 1 time"
+  },
+  "export_path": "tmp\\p1e-browser\\p1e-media-bin-export.mp4",
+  "final_project": {
+    "schemaVersion": "sanverse.project/v4",
+    "projectId": "project_0dd4b22144d9374a3a1023eee3469d82",
+    "revision": 17,
+    "timescale": 1440000,
+    "assets": [
+      {
+        "schemaVersion": "sanverse.asset/media/v1",
+        "assetId": "asset_0dd4b22144d9",
+        "storageRef": "project:project_0dd4b22144d9374a3a1023eee3469d82/source",
+        "sha256": "f77489118ffa7a3d00699a32e44e8611835132a866659fb7f7f1606e31237839",
+        "byteLength": 8981037,
+        "durationResidualSeconds": -3.3333333604446125e-07,
+        "mediaKind": "video",
+        "duration": {
+          "ticks": 43248000,
+          "timescale": 1440000
+        },
+        "width": 1920,
+        "height": 1080,
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "hasAudio": true
+      },
+      {
+        "schemaVersion": "sanverse.asset/media/v1",
+        "assetId": "asset_f57d7f5e27b9dcec983b6ad94bd3a893",
+        "storageRef": "project/project_0dd4b22144d9374a3a1023eee3469d82/assets/asset_f57d7f5e27b9dcec983b6ad94bd3a893",
+        "sha256": "c1e83c7211c0acd39d18014455049d27c436ebf1cec2ce3d8e960c1c67cf23ee",
+        "byteLength": 659083,
+        "durationResidualSeconds": 0,
+        "mediaKind": "image",
+        "duration": null,
+        "width": 1920,
+        "height": 1080,
+        "frameRate": null,
+        "hasAudio": false
+      },
+      {
+        "schemaVersion": "sanverse.asset/media/v1",
+        "assetId": "asset_4889eb9549880325044d58f59a2ac4c7",
+        "storageRef": "project/project_0dd4b22144d9374a3a1023eee3469d82/assets/asset_4889eb9549880325044d58f59a2ac4c7",
+        "sha256": "929ceaff5b5828fac026a3480f99f5cc6b4a29fb0344a7a5c2b8c25c21f29377",
+        "byteLength": 3576876,
+        "durationResidualSeconds": 0,
+        "mediaKind": "video",
+        "duration": {
+          "ticks": 7200000,
+          "timescale": 1440000
+        },
+        "width": 1920,
+        "height": 1080,
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "hasAudio": true
+      },
+      {
+        "schemaVersion": "sanverse.asset/media/v1",
+        "assetId": "asset_c8762f3ea226c3e6e965d32d5a5cbd2f",
+        "storageRef": "project/project_0dd4b22144d9374a3a1023eee3469d82/assets/asset_c8762f3ea226c3e6e965d32d5a5cbd2f",
+        "sha256": "bc3f7cfa526e9e4f50a110433f08437b2299298bd7917b9e525d4c3de9bb366b",
+        "byteLength": 2304078,
+        "durationResidualSeconds": 0,
+        "mediaKind": "audio",
+        "duration": {
+          "ticks": 17280000,
+          "timescale": 1440000
+        },
+        "width": null,
+        "height": null,
+        "frameRate": null,
+        "hasAudio": true
+      },
+      {
+        "schemaVersion": "sanverse.asset/media/v1",
+        "assetId": "asset_93c163a61584a4c096e2403492eddbb5",
+        "storageRef": "project/project_0dd4b22144d9374a3a1023eee3469d82/assets/asset_93c163a61584a4c096e2403492eddbb5",
+        "sha256": "c1e83c7211c0acd39d18014455049d27c436ebf1cec2ce3d8e960c1c67cf23ee",
+        "byteLength": 659083,
+        "durationResidualSeconds": 0,
+        "mediaKind": "image",
+        "duration": null,
+        "width": 1920,
+        "height": 1080,
+        "frameRate": null,
+        "hasAudio": false
+      }
+    ],
+    "composition": {
+      "compositionId": "composition_0dd4b22144d9",
+      "width": 1920,
+      "height": 1080,
+      "tracks": [
+        {
+          "trackId": "track_0dd4b22144d9",
+          "kind": "video",
+          "order": 0,
+          "clips": [
+            {
+              "clipId": "clip_0dd4b22144d9",
+              "assetId": "asset_0dd4b22144d9",
+              "sourceRange": {
+                "start": {
+                  "ticks": 0,
+                  "timescale": 1440000
+                },
+                "duration": {
+                  "ticks": 43248000,
+                  "timescale": 1440000
+                }
+              },
+              "compositionStart": {
+                "ticks": 0,
+                "timescale": 1440000
+              },
+              "enabled": true,
+              "gainDb": 0,
+              "fadeIn": {
+                "ticks": 0,
+                "timescale": 1440000
+              },
+              "fadeOut": {
+                "ticks": 0,
+                "timescale": 1440000
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "changeSets": [
+      {
+        "changeSet": {
+          "schemaVersion": "sanverse.change-set/v1",
+          "changeSetId": "changeset_56dd237f6edfdef5",
+          "baseRevision": 1,
+          "operations": [
+            {
+              "schemaVersion": "sanverse.operation/v3",
+              "operationId": "operation_56dd237f6edfdef5",
+              "kind": "add-media-overlay",
+              "capabilityId": "sanverse.broll.component/v1",
+              "overlayId": "broll_dc28fb61a0178c90",
+              "overlayAssetId": "asset_f57d7f5e27b9dcec983b6ad94bd3a893",
+              "assetId": "asset_0dd4b22144d9",
+              "sourceInterval": {
+                "start": {
+                  "ticks": 2880000,
+                  "timescale": 1440000
+                },
+                "duration": {
+                  "ticks": 4320000,
+                  "timescale": 1440000
+                }
+              },
+              "overlaySourceStart": {
+                "ticks": 0,
+                "timescale": 1440000
+              },
+              "region": {
+                "coordinateSpace": "composition-normalized",
+                "x": 0.04,
+                "y": 0.06,
+                "width": 0.42,
+                "height": 0.42
+              },
+              "opacity": 1,
+              "useOverlayAudio": false,
+              "extensions": {}
+            }
+          ],
+          "provenance": {
+            "source": "direct",
+            "requestId": null
+          },
+          "extensions": {}
+        },
+        "active": true,
+        "blockedReason": null
+      },
+      {
+        "changeSet": {
+          "schemaVersion": "sanverse.change-set/v1",
+          "changeSetId": "changeset_89319167249a102404b91e84",
+          "baseRevision": 2,
+          "operations": [
+            {
+              "schemaVersion": "sanverse.operation/v3",
+              "operationId": "operation_89319167249a102404b91e84",
+              "kind": "set-visual-properties",
+              "capabilityId": "sanverse.visual.properties.primitive/v1",
+              "visualId": "broll_dc28fb61a0178c90",
+              "transform": {
+                "translateX": 0.059872159090909094,
+                "translateY": 0.03982919254658386,
+                "scale": 1,
+                "rotationDegrees": 0,
+                "opacity": 1
+              },
+              "crop": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              },
+              "layer": 0,
+              "mask": {
+                "shape": "none",
+                "feather": 0
+              },
+              "tracks": [],
+              "transition": {
+                "enter": {
+                  "kind": "none",
+                  "duration": {
+                    "ticks": 0,
+                    "timescale": 1440000
+                  },
+                  "easing": {
+                    "kind": "linear"
+                  }
+                },
+                "exit": {
+                  "kind": "none",
+                  "duration": {
+                    "ticks": 0,
+                    "timescale": 1440000
+                  },
+                  "easing": {
+                    "kind": "linear"
+                  }
+                }
+              },
+              "effects": [],
+              "extensions": {}
+            }
+          ],
+          "provenance": {
+            "source": "direct",
+            "requestId": null
+          },
+          "extensions": {}
+        },
+        "active": true,
+        "blockedReason": null
+      },
+      {
+        "changeSet": {
+          "schemaVersion": "sanverse.change-set/v1",
+          "changeSetId": "changeset_8c1a6e5b617261177f5f76e7",
+          "baseRevision": 3,
+          "operations": [
+            {
+              "schemaVersion": "sanverse.operation/v3",
+              "operationId": "operation_8c1a6e5b617261177f5f76e7",
+              "kind": "set-visual-properties",
+              "capabilityId": "sanverse.visual.properties.primitive/v1",
+              "visualId": "broll_dc28fb61a0178c90",
+              "transform": {
+                "translateX": 0.08593832348417303,
+                "translateY": 0.06590917948072827,
+                "scale": 1.1240952137471365,
+                "rotationDegrees": 0,
+                "opacity": 1
+              },
+              "crop": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              },
+              "layer": 0,
+              "mask": {
+                "shape": "none",
+                "feather": 0
+              },
+              "tracks": [],
+              "transition": {
+                "enter": {
+                  "kind": "none",
+                  "duration": {
+                    "ticks": 0,
+                    "timescale": 1440000
+                  },
+                  "easing": {
+                    "kind": "linear"
+                  }
+                },
+                "exit": {
+                  "kind": "none",
+                  "duration": {
+                    "ticks": 0,
+                    "timescale": 1440000
+                  },
+                  "easing": {
+                    "kind": "linear"
+                  }
+                }
+              },
+              "effects": [],
+              "extensions": {}
+            }
+          ],
+          "provenance": {
+            "source": "direct",
+            "requestId": null
+          },
+          "extensions": {}
+        },
+        "active": true,
+        "blockedReason": null
+      },
+      {
+        "changeSet": {
+          "schemaVersion": "sanverse.change-set/v1",
+          "changeSetId": "changeset_9c5e96012d2c69e5ffed1da1",
+          "baseRevision": 4,
+          "operations": [
+            {
+              "schemaVersion": "sanverse.operation/v3",
+              "operationId": "operation_9c5e96012d2c69e5ffed1da1",
+              "kind": "set-visual-properties",
+              "capabilityId": "sanverse.visual.properties.primitive/v1",
+              "visualId": "broll_dc28fb61a0178c90",
+              "transform": {
+                "translateX": 0.08593832348417303,
+                "translateY": 0.06590917948072827,
+                "scale": 1.1240952137471365,
+                "rotationDegrees": 0,
+                "opacity": 1
+              },
+              "crop": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0.08144631563249194
+              },
+              "layer": 0,
+              "mask": {
+                "shape": "none",
+                "feather": 0
+              },
+              "tracks": [],
+              "transition": {
+                "enter": {
+                  "kind": "none",
+                  "duration": {
+                    "ticks": 0,
+                    "timescale": 1440000
+                  },
+                  "easing": {
+                    "kind": "linear"
+                  }
+                },
+                "exit": {
+                  "kind": "none",
+                  "duration": {
+                    "ticks": 0,
+                    "timescale": 1440000
+                  },
+                  "easing": {
+                    "kind": "linear"
+                  }
+                }
+              },
+              "effects": [],
+              "extensions": {}
+            }
+          ],
+          "provenance": {
+            "source": "direct",
+            "requestId": null
+          },
+          "extensions": {}
+        },
+        "active": true,
+        "blockedReason": null
+      },
+      {
+        "changeSet": {
+          "schemaVersion": "sanverse.change-set/v1",
+          "changeSetId": "changeset_c2a6d0d1d1525658",
+          "baseRevision": 8,
+          "operations": [
+            {
+              "schemaVersion": "sanverse.operation/v3",
+              "operationId": "operation_c2a6d0d1d1525658",
+              "kind": "add-media-overlay",
+              "capabilityId": "sanverse.broll.component/v1",
+              "overlayId": "broll_07c507ff387dfec7",
+              "overlayAssetId": "asset_4889eb9549880325044d58f59a2ac4c7",
+              "assetId": "asset_0dd4b22144d9",
+              "sourceInterval": {
+                "start": {
+                  "ticks": 12960000,
+                  "timescale": 1440000
+                },
+                "duration": {
+                  "ticks": 4320000,
+                  "timescale": 1440000
+                }
+              },
+              "overlaySourceStart": {
+                "ticks": 0,
+                "timescale": 1440000
+              },
+              "region": {
+                "coordinateSpace": "composition-normalized",
+                "x": 0.04,
+                "y": 0.06,
+                "width": 0.42,
+                "height": 0.42
+              },
+              "opacity": 1,
+              "useOverlayAudio": false,
+              "extensions": {}
+            }
+          ],
+          "provenance": {
+            "source": "direct",
+            "requestId": null
+          },
+          "extensions": {}
+        },
+        "active": true,
+        "blockedReason": null
+      },
+      {
+        "changeSet": {
+          "schemaVersion": "sanverse.change-set/v1",
+          "changeSetId": "changeset_c822da72ff44c8e3",
+          "baseRevision": 10,
+          "operations": [
+            {
+              "schemaVersion": "sanverse.operation/v3",
+              "operationId": "operation_c822da72ff44c8e3",
+              "kind": "add-music",
+              "capabilityId": "sanverse.music.component/v1",
+              "musicId": "music_5fcd0c140773618a",
+              "assetId": "asset_c8762f3ea226c3e6e965d32d5a5cbd2f",
+              "compositionStart": {
+                "ticks": 17280000,
+                "timescale": 1440000
+              },
+              "sourceStart": {
+                "ticks": 0,
+                "timescale": 1440000
+              },
+              "gainDb": -18,
+              "fadeIn": {
+                "ticks": 1440000,
+                "timescale": 1440000
+              },
+              "fadeOut": {
+                "ticks": 2880000,
+                "timescale": 1440000
+              },
+              "extensions": {}
+            }
+          ],
+          "provenance": {
+            "source": "direct",
+            "requestId": null
+          },
+          "extensions": {}
+        },
+        "active": true,
+        "blockedReason": null
+      },
+      {
+        "changeSet": {
+          "schemaVersion": "sanverse.change-set/v1",
+          "changeSetId": "changeset_6c10943626444ea2af8db62f",
+          "baseRevision": 11,
+          "operations": [
+            {
+              "schemaVersion": "sanverse.operation/v3",
+              "operationId": "operation_6c10943626444ea2af8db62f",
+              "kind": "set-music",
+              "capabilityId": "sanverse.music.primitive/v1",
+              "musicId": "music_5fcd0c140773618a",
+              "assetId": "asset_c8762f3ea226c3e6e965d32d5a5cbd2f",
+              "compositionStart": {
+                "ticks": 17280000,
+                "timescale": 1440000
+              },
+              "sourceStart": {
+                "ticks": 0,
+                "timescale": 1440000
+              },
+              "gainDb": -18,
+              "fadeIn": {
+                "ticks": 2160000,
+                "timescale": 1440000
+              },
+              "fadeOut": {
+                "ticks": 3600000,
+                "timescale": 1440000
+              },
+              "extensions": {}
+            }
+          ],
+          "provenance": {
+            "source": "direct",
+            "requestId": null
+          },
+          "extensions": {}
+        },
+        "active": true,
+        "blockedReason": null
+      }
+    ],
+    "redoStack": [],
+    "issuedChangeSetIds": [
+      "changeset_56dd237f6edfdef5",
+      "changeset_89319167249a102404b91e84",
+      "changeset_8c1a6e5b617261177f5f76e7",
+      "changeset_9c5e96012d2c69e5ffed1da1",
+      "changeset_c2a6d0d1d1525658",
+      "changeset_c822da72ff44c8e3",
+      "changeset_6c10943626444ea2af8db62f"
+    ],
+    "extensions": {}
+  },
+  "resource_cleanup": {
+    "before_unmount": {
+      "blobSources": [],
+      "mainVideos": 1,
+      "allVideos": 1,
+      "hiddenMedia": 0
+    },
+    "after_unmount": {
+      "blobSources": [],
+      "mainVideos": 0,
+      "allVideos": 0,
+      "hiddenMedia": 0
+    }
+  }
+}

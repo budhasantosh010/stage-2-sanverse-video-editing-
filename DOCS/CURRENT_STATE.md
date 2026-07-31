@@ -4,11 +4,13 @@ Last updated: 2026-07-31
 
 ## Active goal
 
-**P1-D — Canvas Direct Manipulation V1 is technically complete on 2026-07-31; owner visual and interaction approval remains open.** Timeline, Canvas, and Inspector now share one authoritative selection and one detached visual draft. Move, Shift axis constraint, keyboard nudge, uniform and centre resize, rotation, crop, frame/safe-area snapping, proposal repair, dirty-draft refusal, Point precedence, reduced-motion handling, and truthful unsupported states all use existing domain operations and server authority. Pointer movement creates no revision; gesture completion creates at most one `set-visual-properties` operation and one Undo.
+**P1-E — Media Bin V1 is technically complete on 2026-07-31.** Studio now derives one immutable Media Bin view model from the accepted `EditProject`, with search, All/Video/Images/Audio/Missing filters, import, local presentation selection, usage, source status, keyboard navigation, right-click/Shift+F10 actions, and responsive desktop/tablet/mobile layouts. Import remains asset intake rather than an edit. Image/video placement reuses `add-media-overlay`; audio placement reuses `add-music`; music repair reuses `set-music`; Undo/Redo changes placement while imported assets remain.
 
-Studio's collapsed preview was repaired with a bounded responsive stage and one exact contained-footage rectangle shared by browser overlays, Point, Canvas, crop, and guides. A fresh Edge run at 1440×900, 1280×800, 1024×768, and 390×844 completed title/callout/image manipulation, crop Undo/Redo, proposal repair/reject/accept, Point mode, export, download, probe, and frame inspection. Page, console, and HTTP errors were zero; exactly one main video remained; native controls were reachable; no page-width overflow occurred. Final suites pass web 442/442, edit-domain 265/265, API 235/235, render-contract 51/51, and intent-domain 27/27; the all-workspace build passes. Evidence: `DOCS/evidence/2026-07-31-p1d-canvas-manipulation-v1/`.
+One pure display-label authority feeds Media, Timeline, Canvas, and Inspector, resolving `UX-011`. App owns bounded source probing and presents `checking`, `available`, or `missing` without creating a second media library. Missing assets retain identity and accepted usage; preview/placement fail closed. Used removal is refused, and unused removal remains truthfully deferred because no server-authoritative deletion operation exists.
 
-**P1-B remains the authoritative Production Timeline and P1-C remains the contextual Inspector.** P1-D adds no second project, history, selection, visual draft, proposal store, playhead, schema, operation family, route, or persistence format. P1-E Media Bin has not started and requires explicit owner instruction. `UX-011` remains open and is assigned to P1-E so Media, Timeline, Canvas, and Inspector can share one asset display name.
+A fresh isolated Edge run at 1440×900, 1280×800, 1024×768, and 390×844 used a real talking-head MP4, image, secondary MP4, and WAV. It completed import, image placement/move/resize/crop, B-roll, music gain/fade repair, Undo/Redo, search/filters, keyboard/context menus, missing image/audio checks, durable missing-source export failure, restoration, successful export/download, MP4 probe, frame/audio inspection, and editor cleanup. Unexpected page, console, and HTTP errors were zero; exactly one main video and five Timeline lanes remained; no horizontal overflow or blob URL leak occurred. Final suites pass web 473/473, edit-domain 265/265, API 235/235, render-contract 51/51, and intent-domain 27/27; the all-workspace build passes. Evidence: `DOCS/evidence/2026-07-31-p1e-media-bin-v1/`.
+
+**P1-B remains the authoritative Production Timeline, P1-C the contextual Inspector, and P1-D the Canvas interaction layer.** P1-E adds no second project, history, media library, editor selection, visual draft, schema, operation family, API route, renderer architecture, or persistence format. P1-F has not started and requires explicit owner instruction.
 
 **P1-B.1 repository-wide test truth is complete and owner-approved on 2026-07-30.** The three
 previously recorded verification failures are resolved without product changes:
@@ -144,14 +146,16 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
 ## Test and build state
 
 ```
-  edit-domain      198
-  render-contract   35
+  edit-domain      265
+  render-contract   51
   intent-domain     27
-  api              198
-  web              200
+  api              235
+  web              473
   ------------------------
-  total            658 passing; all workspace builds clean
+  total           1051 passing; all workspace builds clean
 ```
+
+These are the final P1-E closure totals from sequential commands on 2026-07-31.
 
 Focused P0-B/P0-C evidence on 2026-07-29: 12/12 web continuity tests passed
 (`EditorShell.test.tsx` plus `App.test.tsx`) and the web production build passed.

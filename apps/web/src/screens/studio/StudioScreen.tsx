@@ -74,6 +74,18 @@ import {
   type CanvasHitTarget,
 } from '../../editor/canvas'
 import { Timeline, reconcileTimelineSelection } from '../../editor/timeline'
+import { MediaBin } from '../../editor/media'
+import {
+  buildAddAsBrollOperation,
+  buildAddAsMusicOperation,
+  buildMediaBinViewModel,
+  createMediaActionIds,
+  deriveAssetDisplayLabels,
+  probeMediaAssetStatuses,
+  type MediaAssetSource,
+  type MediaSourceProbe,
+  type MediaStatus,
+} from '../../features/media'
 import {
   capturePointTarget,
   formatPointTargetTime,
@@ -83,6 +95,8 @@ import {
 import './StudioScreen.css'
 import type { EditorWorkspace } from '../../editor/EditorShell'
 
+const EMPTY_ASSET_ORIGINAL_NAMES: Readonly<Record<string, string>> = Object.freeze({})
+
 export type StudioScreenProps = {
   embedded?: boolean
   workspace?: EditorWorkspace
@@ -91,6 +105,7 @@ export type StudioScreenProps = {
   conversation: ConversationState
   editProject: EditProject
   editError: string | null
+  assetOriginalNames?: Readonly<Record<string, string>>
   onProposal(proposal: AddNameplateOperation): void
   onDiscardProposal(): void
   onAcceptProposal(): void
@@ -111,6 +126,8 @@ export type StudioScreenProps = {
   onUploadAsset(file: File): Promise<MediaAsset | string>
   /** Where each extra file can be fetched from, for the preview. */
   assetUrl(assetId: string): string
+  /** App-owned availability check. Media UI never calls project APIs directly. */
+  probeAssetSource?: MediaSourceProbe
   onSendMessage(message: string, context: IntentContextInput): void
   onUndo(): void
   onRedo(): void
@@ -199,6 +216,7 @@ export function StudioScreen({
   conversation,
   editProject,
   editError,
+  assetOriginalNames = EMPTY_ASSET_ORIGINAL_NAMES,
   onProposal,
   onDiscardProposal,
   onAcceptProposal,
@@ -208,6 +226,7 @@ export function StudioScreen({
   onCreateOverlay,
   onUploadAsset,
   assetUrl,
+  probeAssetSource,
   onSendMessage,
   onUndo,
   onRedo,
@@ -246,6 +265,9 @@ export function StudioScreen({
   const [isAiPanelCollapsed, setIsAiPanelCollapsed] = useState(false)
   const [compactSidePanel, setCompactSidePanel] = useState<'media' | 'inspector' | null>(null)
   const [selectedTimelineItemId, setSelectedTimelineItemId] = useState<string | null>(null)
+  const [selectedMediaAssetId, setSelectedMediaAssetId] = useState<string | null>(null)
+  const [mediaSourceStatuses, setMediaSourceStatuses] = useState<Readonly<Record<string, MediaStatus>>>({})
+  const [pendingPlacedTimelineItemId, setPendingPlacedTimelineItemId] = useState<string | null>(null)
   const [inspectorDirty, setInspectorDirty] = useState(false)
   const [pendingTimelineSelection, setPendingTimelineSelection] = useState<Readonly<{ itemId: string | null }> | null>(null)
   const [canvasCropMode, setCanvasCropMode] = useState(false)
@@ -596,24 +618,41 @@ export function StudioScreen({
   // A direct project edit while a proposal is pending would move the footage
   // the proposal is anchored to, so both surfaces share one fail-closed policy.
   const timelineBusy = Boolean(proposal) || isRendering
-  const assetLabels = useMemo(() => {
-    const counts = { video: 0, image: 0, audio: 0 }
-    const labels: Record<string, string> = {}
-    editProject.assets.forEach((asset, index) => {
-      counts[asset.mediaKind] += 1
-      if (index === 0) {
-        labels[asset.assetId] = project.name
-        return
-      }
-      const family = asset.mediaKind === 'video'
-        ? 'Video'
-        : asset.mediaKind === 'image'
-          ? 'Image'
-          : 'Audio'
-      labels[asset.assetId] = `${family} ${counts[asset.mediaKind]}`
+  const assetLabels = useMemo(() => deriveAssetDisplayLabels({
+    project: editProject,
+    primaryDisplayName: project.name,
+    originalNames: assetOriginalNames,
+  }), [assetOriginalNames, editProject, project.name])
+  const primaryAssetId = editProject.composition.tracks
+    .find((track) => track.kind === 'video')?.clips[0]?.assetId ?? null
+  const mediaSourceEntries = useMemo(() => Object.freeze(editProject.assets.map((asset) => Object.freeze({
+    assetId: asset.assetId,
+    url: asset.assetId === primaryAssetId ? project.mediaUrl : assetUrl(asset.assetId),
+    originalName: assetOriginalNames[asset.assetId] ?? (asset.assetId === primaryAssetId ? project.name : null),
+  }))), [assetOriginalNames, assetUrl, editProject.assets, primaryAssetId, project.mediaUrl, project.name])
+  const mediaSourceProbeKey = mediaSourceEntries.map((source) => `${source.assetId}:${source.url}`).join('|')
+  useEffect(() => {
+    if (!probeAssetSource) return
+    let cancelled = false
+    void probeMediaAssetStatuses(mediaSourceEntries, probeAssetSource).then((statuses) => {
+      if (!cancelled) setMediaSourceStatuses(statuses)
     })
-    return Object.freeze(labels)
-  }, [editProject.assets, project.name])
+    return () => { cancelled = true }
+  }, [mediaSourceEntries, mediaSourceProbeKey, probeAssetSource])
+  const mediaAssetSources = useMemo(() => Object.freeze(Object.fromEntries(
+    mediaSourceEntries.map((source) => [source.assetId, Object.freeze({
+      url: source.url,
+      originalName: source.originalName,
+      status: probeAssetSource ? mediaSourceStatuses[source.assetId] ?? 'checking' : 'available',
+    } satisfies MediaAssetSource)]),
+  )), [mediaSourceEntries, mediaSourceStatuses, probeAssetSource])
+  const mediaModel = useMemo(() => buildMediaBinViewModel({
+    project: editProject,
+    primaryDisplayName: project.name,
+    originalNames: assetOriginalNames,
+    assetSources: mediaAssetSources,
+    selectedAssetId: selectedMediaAssetId,
+  }), [assetOriginalNames, editProject, mediaAssetSources, project.name, selectedMediaAssetId])
   const pendingTimelineInput = useMemo(
     () => proposal
       ? Object.freeze({
@@ -726,6 +765,61 @@ export function StudioScreen({
     setInspectorDirty(false)
     setPendingTimelineSelection(null)
     setSelectedTimelineItemId(nextItemId)
+  }
+
+  useEffect(() => {
+    if (selectedMediaAssetId && !editProject.assets.some((asset) => asset.assetId === selectedMediaAssetId)) {
+      setSelectedMediaAssetId(null)
+    }
+  }, [editProject.assets, selectedMediaAssetId])
+
+  useEffect(() => {
+    if (!pendingPlacedTimelineItemId) return
+    const exists = timelineModel.lanes.some((lane) => lane.items.some((item) => item.id === pendingPlacedTimelineItemId))
+    if (!exists) return
+    requestTimelineSelection(pendingPlacedTimelineItemId)
+    setPendingPlacedTimelineItemId(null)
+  }, [pendingPlacedTimelineItemId, timelineModel])
+
+  const importMediaFiles = async (files: readonly File[]): Promise<string | null> => {
+    for (const file of files) {
+      const uploaded = await onUploadAsset(file)
+      if (typeof uploaded === 'string') return uploaded
+      setSelectedMediaAssetId(uploaded.assetId)
+    }
+    return null
+  }
+
+  const addMediaAsBroll = async (assetId: string): Promise<string | null> => {
+    const asset = editProject.assets.find((candidate) => candidate.assetId === assetId)
+    if (!asset) return 'That media is no longer in this project.'
+    const built = buildAddAsBrollOperation({
+      project: editProject,
+      expectedRevision: editProject.revision,
+      asset,
+      playheadMs,
+      ids: createMediaActionIds(),
+    })
+    if (!built.ok) return built.message
+    const failure = await onCreateOverlay(built.operation)
+    if (!failure) setPendingPlacedTimelineItemId(built.timelineItemId)
+    return failure
+  }
+
+  const addMediaAsMusic = async (assetId: string): Promise<string | null> => {
+    const asset = editProject.assets.find((candidate) => candidate.assetId === assetId)
+    if (!asset) return 'That media is no longer in this project.'
+    const built = buildAddAsMusicOperation({
+      project: editProject,
+      expectedRevision: editProject.revision,
+      asset,
+      playheadMs,
+      ids: createMediaActionIds(),
+    })
+    if (!built.ok) return built.message
+    const failure = await onCreateOverlay(built.operation)
+    if (!failure) setPendingPlacedTimelineItemId(built.timelineItemId)
+    return failure
   }
 
   useEffect(() => {
@@ -1435,40 +1529,15 @@ export function StudioScreen({
             </div>
             <span>{editProject.assets.length}</span>
           </div>
-          {editProject.assets.length > 0 ? (
-            <ul className="studio-screen__asset-list" aria-label="Project assets">
-              {editProject.assets.map((asset, index) => (
-                <li key={asset.assetId}>
-                  <div className="studio-screen__asset-name">
-                    <span aria-hidden="true">
-                      {asset.mediaKind === 'video' ? 'V' : asset.mediaKind === 'image' ? 'I' : 'A'}
-                    </span>
-                    <strong title={index === 0 ? project.name : asset.assetId}>
-                      {index === 0
-                        ? project.name
-                        : `${asset.mediaKind === 'video' ? 'Video' : asset.mediaKind === 'image' ? 'Image' : 'Audio'} ${index + 1}`}
-                    </strong>
-                  </div>
-                  <dl>
-                    <div>
-                      <dt>Type</dt>
-                      <dd>{asset.mediaKind === 'video' ? 'Video' : asset.mediaKind === 'image' ? 'Image' : 'Audio'}</dd>
-                    </div>
-                    <div>
-                      <dt>Duration</dt>
-                      <dd>{asset.duration ? formatDuration(toMilliseconds(asset.duration)) : 'Still image'}</dd>
-                    </div>
-                    <div>
-                      <dt>Status</dt>
-                      <dd>Local</dd>
-                    </div>
-                  </dl>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="studio-screen__empty-copy">No project assets available.</p>
-          )}
+          <MediaBin
+            model={mediaModel}
+            selectedAssetId={selectedMediaAssetId}
+            busy={timelineBusy}
+            onSelect={setSelectedMediaAssetId}
+            onImport={importMediaFiles}
+            onAddAsBroll={addMediaAsBroll}
+            onAddAsMusic={addMediaAsMusic}
+          />
         </section>
 
         <div className="studio-screen__right-rail">

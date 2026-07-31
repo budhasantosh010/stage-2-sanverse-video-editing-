@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { EditProject } from '@sanverse/edit-domain'
 
@@ -40,12 +40,20 @@ import {
   type RecentProject,
 } from '../features/project-library/project-library'
 import { transitionView } from '../features/view-transition/view-transition'
+import { probeMediaSourceStatus } from '../features/media'
 import { HomeScreen } from '../screens/home/HomeScreen'
 import { StudioScreen } from '../screens/studio/StudioScreen'
 import { EditorShell, type EditorWorkspace } from '../editor/EditorShell'
 
+const probeProjectMediaSource = (url: string) => probeMediaSourceStatus(url, fetch)
+
 export function App() {
   const [appState, setAppState] = useState<AppState>(createInitialState)
+  const activeProjectId = appState.screen === 'studio' ? appState.project.id : null
+  const assetSourceUrl = useCallback(
+    (assetId: string) => activeProjectId ? projectAssetUrl(activeProjectId, assetId) : '',
+    [activeProjectId],
+  )
   const [isStarting, setIsStarting] = useState(false)
   const [startError, setStartError] = useState('')
   const [exportState, setExportState] = useState<ProjectExportState>({ status: 'idle' })
@@ -54,6 +62,7 @@ export function App() {
   const [isOpeningRecent, setIsOpeningRecent] = useState(false)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [workspace, setWorkspace] = useState<EditorWorkspace>('assist')
+  const [assetOriginalNames, setAssetOriginalNames] = useState<Readonly<Record<string, string>>>({})
   const intakeAbortRef = useRef<AbortController | null>(null)
   const intakeInFlightRef = useRef(false)
   const transitionSequenceRef = useRef(0)
@@ -364,6 +373,7 @@ export function App() {
       conversation={appState.conversation}
       editProject={appState.editProject}
       editError={appState.editError}
+      assetOriginalNames={assetOriginalNames}
       exportState={exportState}
       saveState={saveState}
       onSendMessage={sendConversationMessage}
@@ -454,6 +464,7 @@ export function App() {
         try {
           const { project, assetId } = await uploadProjectAsset(appState.project.id, file, fetch)
           latestEditProjectRef.current = project
+          setAssetOriginalNames((current) => Object.freeze({ ...current, [assetId]: file.name }))
           setAppState((current) =>
             current.screen === 'studio' ? { ...current, editProject: project, editError: null } : current,
           )
@@ -465,9 +476,8 @@ export function App() {
           return error instanceof Error && error.message ? error.message : 'That file could not be added.'
         }
       }}
-      assetUrl={(assetId) =>
-        appState.screen === 'studio' ? projectAssetUrl(appState.project.id, assetId) : ''
-      }
+      assetUrl={assetSourceUrl}
+      probeAssetSource={probeProjectMediaSource}
       onAcceptProposal={() => {
         if (appState.screen !== 'studio' || !appState.proposal) return
         const changeSet = buildChangeSet(appState.proposal, appState.editProject.revision)

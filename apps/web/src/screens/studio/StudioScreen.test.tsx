@@ -382,27 +382,28 @@ describe('StudioScreen', () => {
     expect(container.querySelectorAll('video')).toHaveLength(1)
   })
 
-  it('shows the current project assets without inventing media-bin behavior', () => {
+  it('shows the current project assets in the usable Media Bin', () => {
     renderStudio()
 
     const media = screen.getByRole('region', { name: 'Project media' })
     expect(within(media).getByText('cleaned-interview.mp4')).toBeInTheDocument()
-    expect(within(media).getByText('Video')).toBeInTheDocument()
-    expect(within(media).getByText('30 seconds')).toBeInTheDocument()
-    expect(within(media).getByText('Local')).toBeInTheDocument()
-    expect(within(media).queryByText(/drag|drop|import/i)).not.toBeInTheDocument()
+    expect(within(media).getByLabelText(/cleaned-interview\.mp4, Video, Used 1 time/i)).toBeInTheDocument()
+    expect(within(media).getByLabelText(/cleaned-interview\.mp4, Video, Used 1 time/i)).toHaveTextContent('Video · 30 sec')
+    expect(within(media).getByText('Used 1 time')).toBeInTheDocument()
+    expect(within(media).getByRole('button', { name: 'Import media' })).toBeEnabled()
   })
 
-  it('shows honest empty Media and Inspector states without a second selection model', () => {
+  it('shows honest empty Media and Inspector states without a second project model', () => {
     renderStudio({
       editProject: { ...testProject(), assets: [] },
     })
 
     expect(screen.getByRole('region', { name: 'Project media' }))
-      .toHaveTextContent(/no project assets available/i)
+      .toHaveTextContent(/no media yet/i)
     expect(screen.getByRole('region', { name: 'Inspector' }))
       .toHaveTextContent(/nothing selected/i)
   })
+
 
   it('keeps the same chat composer and unsent text while the AI panel collapses', async () => {
     const user = userEvent.setup()

@@ -8,16 +8,18 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 ## Current gate
 
-- **P1-D — Canvas Direct Manipulation V1 is technically complete.** Owner visual and interaction approval remains open. Evidence: `DOCS/evidence/2026-07-31-p1d-canvas-manipulation-v1/`.
-- Timeline, Canvas, and Inspector share one selection and one detached visual draft.
-- Move, Shift constraint, keyboard nudge, uniform/centre resize, rotation, crop, snapping, safe guides, proposal repair, Point precedence, and unsupported-target refusal are implemented.
-- Pointer movement never calls the server or creates history. A completed gesture emits at most one existing `set-visual-properties` operation and one Undo step; cancel creates none.
-- Studio uses one bounded responsive video stage and one contained-footage geometry authority. Native controls remain reachable and exactly one main video remains.
-- A fresh real Edge workflow completed title/callout/image manipulation, crop Undo/Redo, proposal repair/reject/accept, Point mode, reduced motion, export, download, probe, and frame inspection with zero page, console, or HTTP errors.
-- Final suites pass: web 442/442, edit-domain 265/265, API 235/235, render-contract 51/51, intent-domain 27/27, plus the all-workspace build.
-- No second project, history, proposal store, selection, visual draft, playhead, schema, operation family, API route, or runtime dependency was added.
-- **P1-E Media Bin has not started.** Begin it only after explicit owner instruction.
-- Open human evidence remains human-only: final P1-D feel/visual approval, repeated owner workflows, representative non-editor workflows, and agreed performance budgets.
+- **P1-E — Media Bin V1 is technically complete.** Evidence: `DOCS/evidence/2026-07-31-p1e-media-bin-v1/`.
+- Media is one immutable presentation model over the accepted project, with search, All/Video/Images/Audio/Missing filters, import, usage, source status, keyboard/context-menu actions, and responsive layouts.
+- Import adds an asset to the server-owned project shelf without placing it or creating Undo history. Image/video placement reuses `add-media-overlay`; audio placement reuses `add-music`; music repair reuses `set-music`.
+- Media selection is presentation-only. Timeline, Canvas, and Inspector retain one shared Studio selection and one shared visual draft.
+- One pure display-label authority now feeds Media, Timeline, Canvas, and Inspector; `UX-011` is resolved.
+- App owns bounded source probing. Checking and missing media fail closed without losing asset identity or accepted usage.
+- Used removal is refused. Unused removal remains deferred until a server-authoritative asset service exists.
+- A fresh real Edge workflow used a talking-head MP4, image, secondary MP4, and WAV; it completed placement, Canvas manipulation, music repair, Undo/Redo, filters, keyboard/context menus, missing-source failure/restoration, export/download, frame/audio inspection, and resource cleanup with zero unexpected browser/HTTP errors.
+- Final suites pass: web 473/473, edit-domain 265/265, API 235/235, render-contract 51/51, intent-domain 27/27, plus the all-workspace build.
+- No second project, history, media library, editor selection, visual draft, schema, operation family, API route, renderer architecture, or runtime dependency was added.
+- **P1-F has not started.** Begin it only after explicit owner instruction.
+- Open human evidence remains human-only: repeated owner workflows, representative non-editor workflows, and agreed performance budgets.
 - Real-provider connection still requires the owner's data-leaving-machine decision and keys. Accounts and SaaS operations remain conditional.
 
 ## Read in this order

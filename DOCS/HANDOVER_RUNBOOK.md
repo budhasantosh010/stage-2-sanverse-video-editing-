@@ -4,7 +4,7 @@ Use this runbook when a new session, agent, or context window resumes the projec
 
 ## Current handoff
 
-P1-D Canvas Direct Manipulation V1 is technically complete with evidence at `DOCS/evidence/2026-07-31-p1d-canvas-manipulation-v1/`. Owner visual and interaction approval remains open. P1-E Media Bin has not started and must not begin without explicit owner instruction.
+P1-E Media Bin V1 is technically complete with evidence at `DOCS/evidence/2026-07-31-p1e-media-bin-v1/`. One accepted project feeds one Media view model, one label authority, one usage index, and App-owned source probing. P1-F has not started and must not begin without explicit owner instruction. Unused asset deletion remains deferred until a server-authoritative service exists; `FAIL-021` and `INFRA-005` remain monitoring.
 
 ## Fast resume
 

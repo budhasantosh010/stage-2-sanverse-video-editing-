@@ -1,0 +1,3 @@
+﻿10-12 seconds, before music starts
+[Parsed_volumedetect_0 @ 00000246b5bd8f40] mean_volume: -17.0 dB
+[Parsed_volumedetect_0 @ 00000246b5bd8f40] max_volume: -1.5 dB
