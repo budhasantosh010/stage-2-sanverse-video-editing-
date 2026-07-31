@@ -46,6 +46,7 @@ import {
   visibleTitles,
   titleCssVariables,
   visualCssStyleAt,
+  visualCssStyleFromPropertiesAt,
   visibleNameplates,
   withPendingProposal,
 } from '../../features/render-plan/render-plan-preview'
@@ -66,6 +67,12 @@ import {
   requestInspectorSelectionChange,
   resolveInspectorSelection,
 } from '../../editor/inspector'
+import {
+  CanvasInteractionLayer,
+  resolveCanvasSelection,
+  useSharedVisualDraft,
+  type CanvasHitTarget,
+} from '../../editor/canvas'
 import { Timeline, reconcileTimelineSelection } from '../../editor/timeline'
 import {
   capturePointTarget,
@@ -147,9 +154,16 @@ function formatDuration(durationMs: number) {
   return `${value} ${seconds === 1 ? 'second' : 'seconds'}`
 }
 
+function videoLayoutDimensions(video: HTMLVideoElement) {
+  return video.videoWidth > 0 && video.videoHeight > 0
+    ? { width: video.videoWidth, height: video.videoHeight }
+    : { width: 16, height: 9 }
+}
+
 function projectPointOntoVideoElement(point: NormalizedPoint, video: HTMLVideoElement) {
   const elementBox = video.getBoundingClientRect()
-  const contentBox = getRenderedVideoContentBox(elementBox, video.videoWidth, video.videoHeight)
+  const dimensions = videoLayoutDimensions(video)
+  const contentBox = getRenderedVideoContentBox(elementBox, dimensions.width, dimensions.height)
   if (!contentBox) return null
 
   return {
@@ -165,7 +179,8 @@ function projectPointOntoVideoElement(point: NormalizedPoint, video: HTMLVideoEl
 
 function getVideoContentLayerStyle(video: HTMLVideoElement) {
   const elementBox = video.getBoundingClientRect()
-  const contentBox = getRenderedVideoContentBox(elementBox, video.videoWidth, video.videoHeight)
+  const dimensions = videoLayoutDimensions(video)
+  const contentBox = getRenderedVideoContentBox(elementBox, dimensions.width, dimensions.height)
   if (!contentBox) return null
 
   return {
@@ -233,6 +248,9 @@ export function StudioScreen({
   const [selectedTimelineItemId, setSelectedTimelineItemId] = useState<string | null>(null)
   const [inspectorDirty, setInspectorDirty] = useState(false)
   const [pendingTimelineSelection, setPendingTimelineSelection] = useState<Readonly<{ itemId: string | null }> | null>(null)
+  const [canvasCropMode, setCanvasCropMode] = useState(false)
+  const [proposalCanvasPoint, setProposalCanvasPoint] = useState<NormalizedPoint | null>(null)
+  const [canvasNarrow, setCanvasNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth < 600)
   const [timelineViewport, setTimelineViewport] = useState<TimelineViewportState>(() => Object.freeze({
     pixelsPerSecond: 100,
     scrollLeftPx: 0,
@@ -247,12 +265,26 @@ export function StudioScreen({
   const [captionsNotice, setCaptionsNotice] = useState<string | null>(null)
   const [captionsBusy, setCaptionsBusy] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const videoContentLayerRef = useRef<HTMLDivElement>(null)
+  const inspectorRegionRef = useRef<HTMLElement>(null)
   const pointModeButtonRef = useRef<HTMLButtonElement>(null)
   const pointLayerRef = useRef<HTMLButtonElement>(null)
   const proposalSummaryRef = useRef<HTMLDivElement>(null)
   const proposalResultRef = useRef<HTMLParagraphElement>(null)
   const exportResultRef = useRef<HTMLElement>(null)
   const pendingProposalResolutionRef = useRef<'accepted' | 'discarded' | null>(null)
+
+  useEffect(() => {
+    const update = () => setCanvasNarrow(window.innerWidth < 600)
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
+  useEffect(() => {
+    setProposalCanvasPoint(null)
+    if (!proposal) setCanvasCropMode(false)
+  }, [proposal])
 
   useEffect(() => {
     if (isPointMode) pointLayerRef.current?.focus()
@@ -481,8 +513,14 @@ export function StudioScreen({
     [footagePlan],
   )
 
+  const previewProposalOperation = proposal && proposalCanvasPoint
+    ? Object.freeze({
+        ...proposal.operation,
+        target: Object.freeze({ ...proposal.operation.target, point: proposalCanvasPoint }),
+      })
+    : proposal?.operation ?? null
   const previewPlan = compilePreviewPlan(
-    proposal ? withPendingProposal(editProject, proposal.operation) : editProject,
+    previewProposalOperation ? withPendingProposal(editProject, previewProposalOperation) : editProject,
   )
   const playheadPreviewTicks = millisecondsToTicks(playheadMs)
   const previewNodes = previewPlan ? visibleNameplates(previewPlan, playheadPreviewTicks) : []
@@ -491,7 +529,12 @@ export function StudioScreen({
   const previewCallouts = previewPlan ? visibleCallouts(previewPlan, playheadPreviewTicks) : []
   const previewMedia = previewPlan ? visibleMediaOverlays(previewPlan, playheadPreviewTicks) : []
   const assetKinds = new Map(editProject.assets.map((asset) => [asset.assetId, asset.mediaKind]))
-  const contentBox = video ? getRenderedVideoContentBox(video.getBoundingClientRect(), video.videoWidth, video.videoHeight) : null
+  const contentBox = video
+    ? (() => {
+        const dimensions = videoLayoutDimensions(video)
+        return getRenderedVideoContentBox(video.getBoundingClientRect(), dimensions.width, dimensions.height)
+      })()
+    : null
   const previewScale = contentBox && composition.width > 0 ? contentBox.width / composition.width : 0
   const reducedMotion =
     typeof window !== 'undefined' &&
@@ -505,17 +548,6 @@ export function StudioScreen({
   const transitionOpacity = transitionSegment
     ? segmentVideoOpacityAt(transitionSegment, playheadPreviewTicks, reducedMotion)
     : 1
-  const motionStyle = (node: Parameters<typeof visualCssStyleAt>[1]) =>
-    previewPlan
-      ? visualCssStyleAt(
-          previewPlan,
-          node,
-          playheadPreviewTicks,
-          composition.width,
-          composition.height,
-          reducedMotion,
-        )
-      : undefined
   const nameplateVariables = nameplateCssVariables(composition.width, composition.height, previewScale)
   // Only one caption is ever on screen, so one set of variables is enough. Two
   // caption sets with different looks would need one layer each; that arrives
@@ -611,6 +643,69 @@ export function StudioScreen({
     }),
     [assetLabels, editProject, pendingTimelineInput, selectedTimelineItemId, timelineModel],
   )
+  const canvasVisibleNodes = [
+    ...previewNodes,
+    ...previewCaptions,
+    ...previewTitles,
+    ...previewCallouts,
+    ...previewMedia,
+  ]
+  const visibleCanvasNodeIds = new Set(canvasVisibleNodes.map((node) => node.nodeId))
+  const canvasSelectionResult = resolveCanvasSelection(inspectorSelection, visibleCanvasNodeIds)
+  const visualDraftController = useSharedVisualDraft(canvasSelectionResult)
+  const canvasTargets: readonly CanvasHitTarget[] = canvasVisibleNodes.flatMap((node) => {
+    const item = timelineModel.lanes
+      .flatMap((lane) => lane.items)
+      .find((candidate) =>
+        candidate.state !== 'blocked' &&
+        candidate.visualId !== null &&
+        (candidate.visualId === node.nodeId || node.nodeId.startsWith(`${candidate.visualId}.`)),
+      )
+    if (!item || item.kind === 'clip' || item.kind === 'gap' || item.kind === 'music') return []
+    const visual = previewPlan?.visuals.find((candidate) => candidate.nodeIds.includes(node.nodeId))
+    return [Object.freeze({
+      timelineItemId: item.id,
+      nodeId: node.nodeId,
+      label: item.label,
+      layer: visual?.layer ?? 0,
+      state: item.state === 'proposed' ? 'proposed' as const : 'committed' as const,
+    })]
+  })
+  const canvasBusy = isRendering || Boolean(
+    proposal &&
+    canvasSelectionResult.kind === 'supported' &&
+    canvasSelectionResult.selection.state === 'committed',
+  )
+  const motionStyle = (node: Parameters<typeof visualCssStyleAt>[1]) => {
+    if (!previewPlan) return undefined
+    if (
+      canvasSelectionResult.kind === 'supported' &&
+      canvasSelectionResult.selection.state === 'committed' &&
+      canvasSelectionResult.selection.nodeId === node.nodeId &&
+      visualDraftController.draft
+    ) {
+      return visualCssStyleFromPropertiesAt(
+        Object.freeze({
+          visualId: canvasSelectionResult.selection.visualId,
+          nodeIds: Object.freeze([node.nodeId]),
+          ...visualDraftController.draft.value,
+        }),
+        node,
+        playheadPreviewTicks,
+        composition.width,
+        composition.height,
+        reducedMotion,
+      )
+    }
+    return visualCssStyleAt(
+      previewPlan,
+      node,
+      playheadPreviewTicks,
+      composition.width,
+      composition.height,
+      reducedMotion,
+    )
+  }
 
   const requestTimelineSelection = (nextItemId: string | null) => {
     const decision = requestInspectorSelectionChange(
@@ -1154,6 +1249,7 @@ export function StudioScreen({
 
               {videoContentLayerStyle ? (
                 <div
+                  ref={videoContentLayerRef}
                   className="studio-screen__video-content-layer"
                   data-testid="video-content-layer"
                   style={{ ...videoContentLayerStyle, ...nameplateVariables, ...captionVariables, ...titleVariables }}
@@ -1211,6 +1307,27 @@ export function StudioScreen({
                       visualStyle={motionStyle(node)}
                     />
                   ))}
+                  {workspace === 'studio' && !isPointMode ? (
+                    <CanvasInteractionLayer
+                      contentLayerRef={videoContentLayerRef}
+                      selectionResult={canvasSelectionResult}
+                      targets={canvasTargets}
+                      draftController={visualDraftController}
+                      busy={canvasBusy}
+                      narrow={canvasNarrow}
+                      cropMode={canvasCropMode}
+                      onCropModeChange={setCanvasCropMode}
+                      onSelectTimelineItem={requestTimelineSelection}
+                      onApply={onCreateOverlay}
+                      onProposalPreviewPoint={setProposalCanvasPoint}
+                      onProposalPointCommit={(point) => {
+                        setProposalCanvasPoint(null)
+                        if (proposal) onRepairProposal({ point })
+                      }}
+                      onPausePlayback={() => videoRef.current?.pause()}
+                      onFocusInspector={() => inspectorRegionRef.current?.focus()}
+                    />
+                  ) : null}
                 </div>
               ) : null}
 
@@ -1356,9 +1473,11 @@ export function StudioScreen({
 
         <div className="studio-screen__right-rail">
           <section
+            ref={inspectorRegionRef}
             id="studio-inspector-region"
             className={`studio-screen__inspector${compactSidePanel === 'inspector' ? ' studio-screen__side-region--compact-open' : ''}`}
             aria-label="Inspector"
+            tabIndex={-1}
             hidden={workspace !== 'studio'}
           >
             <Inspector
@@ -1384,6 +1503,8 @@ export function StudioScreen({
               onOpenProposal={() => onWorkspaceChange?.('assist')}
               onSeek={seekCompositionTicks}
               onApply={onCreateOverlay}
+              visualDraftController={visualDraftController}
+              onRequestCanvasCrop={() => setCanvasCropMode(true)}
             />
           </section>
 

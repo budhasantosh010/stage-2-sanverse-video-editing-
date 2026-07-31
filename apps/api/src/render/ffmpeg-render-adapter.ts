@@ -154,8 +154,6 @@ const visualForNode = (plan: RenderPlan, nodeId: string): VisualPropertiesNode |
 const mediaVisualFilters = (
   visual: VisualPropertiesNode | undefined,
   durationTicks: number,
-  boxWidth: number,
-  boxHeight: number,
   baseOpacity: number,
   fadeStartTicks = 0,
 ): readonly string[] => {
@@ -173,10 +171,13 @@ const mediaVisualFilters = (
   const filters: string[] = []
   const crop = evaluated.crop
   if (crop.top > 0 || crop.right > 0 || crop.bottom > 0 || crop.left > 0) {
-    const cropWidth = Math.max(2, Math.round(boxWidth * (1 - crop.left - crop.right)))
-    const cropHeight = Math.max(2, Math.round(boxHeight * (1 - crop.top - crop.bottom)))
+    const widthFraction = compactNumber(1 - crop.left - crop.right)
+    const heightFraction = compactNumber(1 - crop.top - crop.bottom)
     filters.push(
-      `crop=${cropWidth}:${cropHeight}:${Math.round(boxWidth * crop.left)}:${Math.round(boxHeight * crop.top)}`,
+      `crop=w='max(2,trunc(iw*${widthFraction}/2)*2)':` +
+        `h='max(2,trunc(ih*${heightFraction}/2)*2)':` +
+        `x='trunc(iw*${compactNumber(crop.left)})':` +
+        `y='trunc(ih*${compactNumber(crop.top)})'`,
     )
   }
 
@@ -644,7 +645,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
       // H.264 with 4:2:0 colour cannot encode an odd dimension.
       'scale=trunc(iw/2)*2:trunc(ih/2)*2',
       'setsar=1',
-      ...mediaVisualFilters(visual, node.interval.duration.ticks, boxWidth, boxHeight, node.opacity),
+      ...mediaVisualFilters(visual, node.interval.duration.ticks, node.opacity),
       `setpts=PTS-STARTPTS+${startSeconds}/TB`,
     ]
     graph.push(`${steps.join(',')}[b${index}]`)
@@ -731,8 +732,6 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
     const visualFilters = mediaVisualFilters(
       visual,
       node.interval.duration.ticks,
-      width,
-      height,
       1,
       node.interval.start.ticks,
     )

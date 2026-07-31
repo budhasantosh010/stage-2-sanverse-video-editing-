@@ -73,6 +73,42 @@ function prepareVideoForPointing(video: HTMLVideoElement, currentTime = 12.4) {
   })
 }
 
+const canvasDomRect = (x: number, y: number, width: number, height: number): DOMRect => ({
+  x,
+  y,
+  left: x,
+  top: y,
+  right: x + width,
+  bottom: y + height,
+  width,
+  height,
+  toJSON: () => ({}),
+} as DOMRect)
+
+function prepareCanvasGeometry(container: HTMLElement, currentTime = 12.4) {
+  vi.stubGlobal('PointerEvent', MouseEvent)
+  const video = container.querySelector('video') as HTMLVideoElement
+  prepareVideoForPointing(video, currentTime)
+  fireEvent.loadedMetadata(video)
+  fireEvent.timeUpdate(video)
+
+  const contentLayer = screen.getByTestId('video-content-layer')
+  Object.defineProperties(contentLayer, {
+    clientWidth: { configurable: true, value: 400 },
+    clientHeight: { configurable: true, value: 225 },
+  })
+  vi.spyOn(contentLayer, 'getBoundingClientRect').mockReturnValue(canvasDomRect(100, 137.5, 400, 225))
+
+  const root = contentLayer.querySelector<HTMLElement>('[data-node-id]')
+  if (!root) throw new Error('Expected a visible preview node')
+  vi.spyOn(root, 'getBoundingClientRect').mockReturnValue(canvasDomRect(180, 220, 120, 40))
+  root.querySelectorAll<HTMLElement>('*').forEach((child) => {
+    vi.spyOn(child, 'getBoundingClientRect').mockReturnValue(canvasDomRect(180, 220, 120, 40))
+  })
+  window.dispatchEvent(new Event('resize'))
+  return { video, contentLayer, root }
+}
+
 function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = {}) {
   const props: ComponentProps<typeof StudioScreen> = {
     project: {

@@ -1,0 +1,303 @@
+{
+  "browser": "Microsoft Edge / Chromium",
+  "media": "resources\\test video\\test-30s.mp4",
+  "project_id": "project_491de4b70a4764d8fd042722d1747115",
+  "page_errors": [],
+  "console_errors": [],
+  "failed_responses": [],
+  "revisions": {
+    "initial": 0,
+    "add_title": 1,
+    "title_move": 2,
+    "undo_title_move": 3,
+    "redo_title_move": 4,
+    "keyboard_nudge": 5,
+    "title_resize": 6,
+    "title_rotate": 7,
+    "add_callout": 8,
+    "callout_move_resize": 10,
+    "add_media": 10,
+    "media_crop": 15,
+    "redo_media_crop": 17,
+    "proposal_repair_reject": 17,
+    "proposal_accept": 18
+  },
+  "geometry": {
+    "1440x900": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "videoCount": 1,
+      "laneCount": 5,
+      "bodyScrollWidth": 1440,
+      "documentScrollWidth": 1440,
+      "stage": {
+        "x": 263,
+        "y": 155,
+        "width": 814,
+        "height": 342,
+        "right": 1077,
+        "bottom": 497
+      },
+      "video": {
+        "x": 273,
+        "y": 165,
+        "width": 794,
+        "height": 322,
+        "right": 1067,
+        "bottom": 487
+      },
+      "content": {
+        "x": 383.765625,
+        "y": 165,
+        "width": 572.4375,
+        "height": 322,
+        "right": 956.203125,
+        "bottom": 487
+      },
+      "timeline": {
+        "x": 16,
+        "y": 578,
+        "width": 1408,
+        "height": 306,
+        "right": 1424,
+        "bottom": 884
+      },
+      "contentMatchesCanvas": true,
+      "controlsPointTarget": {
+        "tag": "VIDEO",
+        "className": "studio-screen__video"
+      },
+      "objectFit": "contain",
+      "videoControls": true
+    },
+    "1280x800": {
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "videoCount": 1,
+      "laneCount": 5,
+      "bodyScrollWidth": 1280,
+      "documentScrollWidth": 1280,
+      "stage": {
+        "x": 263,
+        "y": 155,
+        "width": 654,
+        "height": 280,
+        "right": 917,
+        "bottom": 435
+      },
+      "video": {
+        "x": 273,
+        "y": 165,
+        "width": 634,
+        "height": 260,
+        "right": 907,
+        "bottom": 425
+      },
+      "content": {
+        "x": 358.875,
+        "y": 165,
+        "width": 462.21875,
+        "height": 260,
+        "right": 821.09375,
+        "bottom": 425
+      },
+      "timeline": {
+        "x": 16,
+        "y": 512,
+        "width": 1248,
+        "height": 272,
+        "right": 1264,
+        "bottom": 784
+      },
+      "contentMatchesCanvas": true,
+      "controlsPointTarget": {
+        "tag": "VIDEO",
+        "className": "studio-screen__video"
+      },
+      "objectFit": "contain",
+      "videoControls": true
+    },
+    "1024x768": {
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "videoCount": 1,
+      "laneCount": 5,
+      "bodyScrollWidth": 1024,
+      "documentScrollWidth": 1024,
+      "stage": {
+        "x": 29,
+        "y": 155,
+        "width": 966,
+        "height": 291.828125,
+        "right": 995,
+        "bottom": 446.828125
+      },
+      "video": {
+        "x": 39,
+        "y": 165,
+        "width": 946,
+        "height": 271.828125,
+        "right": 985,
+        "bottom": 436.828125
+      },
+      "content": {
+        "x": 270.375,
+        "y": 165,
+        "width": 483.25,
+        "height": 271.828125,
+        "right": 753.625,
+        "bottom": 436.828125
+      },
+      "timeline": {
+        "x": 14,
+        "y": 1203.828125,
+        "width": 996,
+        "height": 444.625,
+        "right": 1010,
+        "bottom": 1648.453125
+      },
+      "contentMatchesCanvas": true,
+      "controlsPointTarget": {
+        "tag": "VIDEO",
+        "className": "studio-screen__video"
+      },
+      "objectFit": "contain",
+      "videoControls": true
+    },
+    "390x844": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "videoCount": 1,
+      "laneCount": 5,
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "stage": {
+        "x": 29,
+        "y": 258,
+        "width": 332,
+        "height": 280,
+        "right": 361,
+        "bottom": 538
+      },
+      "video": {
+        "x": 37,
+        "y": 266,
+        "width": 316,
+        "height": 264,
+        "right": 353,
+        "bottom": 530
+      },
+      "content": {
+        "x": 37,
+        "y": 309.109375,
+        "width": 316,
+        "height": 177.75,
+        "right": 353,
+        "bottom": 486.859375
+      },
+      "timeline": {
+        "x": 14,
+        "y": 1295,
+        "width": 362,
+        "height": 491.15625,
+        "right": 376,
+        "bottom": 1786.15625
+      },
+      "contentMatchesCanvas": true,
+      "controlsPointTarget": {
+        "tag": "VIDEO",
+        "className": "studio-screen__video"
+      },
+      "objectFit": "contain",
+      "videoControls": true
+    },
+    "final_desktop": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "videoCount": 1,
+      "laneCount": 5,
+      "bodyScrollWidth": 1440,
+      "documentScrollWidth": 1440,
+      "stage": {
+        "x": 263,
+        "y": 155,
+        "width": 814,
+        "height": 288,
+        "right": 1077,
+        "bottom": 443
+      },
+      "video": {
+        "x": 273,
+        "y": 165,
+        "width": 794,
+        "height": 268,
+        "right": 1067,
+        "bottom": 433
+      },
+      "content": {
+        "x": 431.765625,
+        "y": 165,
+        "width": 476.4375,
+        "height": 268,
+        "right": 908.203125,
+        "bottom": 433
+      },
+      "timeline": {
+        "x": 16,
+        "y": 578,
+        "width": 1408,
+        "height": 306,
+        "right": 1424,
+        "bottom": 884
+      },
+      "contentMatchesCanvas": true,
+      "controlsPointTarget": {
+        "tag": "VIDEO",
+        "className": "studio-screen__video"
+      },
+      "objectFit": "contain",
+      "videoControls": true
+    }
+  },
+  "interactions": {
+    "title_move": {
+      "translateX": -0.00038243006993006994,
+      "translateY": 0.001358695652173913,
+      "scale": 1,
+      "rotationDegrees": 0,
+      "opacity": 1
+    },
+    "inspector_values": {
+      "x": "4.52",
+      "y": "2.09",
+      "scale": "132.75",
+      "rotation": "45"
+    },
+    "media_label": "Move Image 1. Position 0 percent across and 0 percent down.",
+    "timeline_unchanged": true,
+    "timeline_before": {
+      "scrollLeft": 0,
+      "zoom": ""
+    },
+    "timeline_after": {
+      "scrollLeft": 0,
+      "zoom": ""
+    },
+    "point_precedence": true,
+    "reduced_motion": true
+  },
+  "export": {
+    "path": "tmp\\p1d-canvas-export.mp4",
+    "bytes": 14832356
+  }
+}

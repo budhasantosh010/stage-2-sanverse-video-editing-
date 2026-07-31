@@ -239,6 +239,37 @@ describe('B-roll and pictures', () => {
     expect(graph).toContain('saturation=0.8')
     expect(graph).toContain('fade=t=in')
     expect(graph).toContain('overlay=x=')
+    expect(graph).toContain("crop=w='max(2,trunc(iw*0.95/2)*2)':h='max(2,trunc(ih*0.95/2)*2)'")
+    expect(graph).not.toContain('crop=486:274')
+  })
+
+  it('derives crop dimensions from the actual even-sized input after contain scaling', () => {
+    const graph = buildFilterGraph({
+      ...base,
+      plan: plan({
+        sources: VIDEO_SOURCES,
+        overlays: [brollNode()],
+        visuals: [{
+          visualId: 'broll_0001',
+          nodeIds: ['broll_0001'],
+          transform: { translateX: 0, translateY: 0, scale: 1, rotationDegrees: 0, opacity: 1 },
+          crop: { top: 0, right: 0, bottom: 0, left: 0.126089 },
+          layer: 0,
+          mask: { shape: 'none', feather: 0 },
+          tracks: [],
+          transition: {
+            enter: { kind: 'none', duration: ms(0), easing: { kind: 'linear' } },
+            exit: { kind: 'none', duration: ms(0), easing: { kind: 'linear' } },
+          },
+          effects: [],
+        }],
+      }) as never,
+    })
+
+    expect(graph).toContain("crop=w='max(2,trunc(iw*0.873911/2)*2)'")
+    expect(graph).toContain("h='max(2,trunc(ih*1/2)*2)'")
+    expect(graph).toContain("x='trunc(iw*0.126089)'")
+    expect(graph).not.toContain('crop=447:288')
   })
 
   it('scales the clip to fit its box without stretching, and centres it', () => {

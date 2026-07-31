@@ -1,0 +1,5 @@
+Branch: agent/g6-g8-local-alpha
+Start commit: 7994b4a230ab271727b118a0ddf08a0286f8cc31
+Working tree before task files: clean
+Owner approval: P1-C visually approved by instruction to start P1-D on 2026-07-31.
+P1-E: not started.

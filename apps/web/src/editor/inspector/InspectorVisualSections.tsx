@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import {
   PROJECT_TIMESCALE,
@@ -12,6 +12,7 @@ import {
   type VisualTransitionKind,
 } from '@sanverse/edit-domain'
 
+import type { SharedVisualDraftController } from '../canvas/canvas-contract'
 import type {
   InspectorCaptionSelection,
   InspectorCalloutSelection,
@@ -39,6 +40,8 @@ export type InspectorVisualSectionsProps = Readonly<{
   onSeek(ticks: number): void
   onApply(operation: EditOperation): Promise<string | null>
   onDirtyChange(sectionId: string, dirty: boolean): void
+  visualDraftController?: SharedVisualDraftController
+  onRequestCanvasCrop?(): void
 }>
 
 type EasingPreset = 'linear' | 'ease' | 'spring' | 'bounce'
@@ -150,6 +153,8 @@ const setTrack = (
   ].sort((left, right) => VISUAL_PROPERTIES.indexOf(left.property) - VISUAL_PROPERTIES.indexOf(right.property))),
 })
 
+const NOOP_DIRTY = () => {}
+
 export function InspectorVisualSections({
   selection,
   busy,
@@ -157,22 +162,32 @@ export function InspectorVisualSections({
   onSeek,
   onApply,
   onDirtyChange,
+  visualDraftController,
+  onRequestCanvasCrop,
 }: InspectorVisualSectionsProps) {
   const key = `${selection.timelineItemId}:${selection.projectRevision}`
-  const visual = useInspectorSectionDraft({
+  const localVisual = useInspectorSectionDraft({
     sectionId: 'visual-properties',
     selectionKey: key,
     projectRevision: selection.projectRevision,
     authoritative: selection.visualProperties,
-    onDirtyChange,
+    onDirtyChange: visualDraftController ? NOOP_DIRTY : onDirtyChange,
   })
+  const visual = visualDraftController ?? localVisual
+
+  useEffect(() => {
+    if (!visualDraftController) return
+    onDirtyChange('visual-properties', visualDraftController.draft?.dirty ?? false)
+    return () => onDirtyChange('visual-properties', false)
+  }, [onDirtyChange, visualDraftController, visualDraftController?.draft?.dirty])
   const [working, setWorking] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [keyframeProperty, setKeyframeProperty] = useState<VisualProperty>('scale')
 
   const update = (next: VisualProperties) => visual.update(Object.freeze(next))
   const apply = async () => {
-    const result = buildVisualPropertiesOperation(selection, visual.draft.value, createInspectorOperationId())
+    const value = visual.draft?.value ?? selection.visualProperties
+    const result = buildVisualPropertiesOperation(selection, value, createInspectorOperationId())
     if (!result.ok) {
       setNotice(result.message)
       return
@@ -189,7 +204,10 @@ export function InspectorVisualSections({
     setNotice('Applied. Undo takes back this visual change.')
   }
 
-  const properties = visual.draft.value
+  const properties = visual.draft?.value ?? selection.visualProperties
+  const visualDirty = visual.draft?.dirty ?? false
+  const interaction = visual.draft && 'interaction' in visual.draft ? visual.draft.interaction : null
+  const sharedNotice = visual.draft && 'notice' in visual.draft ? visual.draft.notice : null
   const relativePlayhead = Math.max(0, Math.min(selection.durationTicks, playheadTicks - selection.startTicks))
   const selectedTrack = properties.tracks.find((track) => track.property === keyframeProperty) ?? null
   const keyframeEnabled = selectedTrack !== null
@@ -266,10 +284,10 @@ export function InspectorVisualSections({
 
   const footer = (
     <InspectorSectionActions
-      dirty={visual.draft.dirty}
-      busy={busy}
+      dirty={visualDirty}
+      busy={busy || interaction !== null}
       working={working}
-      notice={notice}
+      notice={interaction ? 'Dragging…' : sharedNotice ?? notice}
       onReset={() => {
         visual.reset()
         setNotice(null)
@@ -291,6 +309,11 @@ export function InspectorVisualSections({
       </InspectorSection>
 
       <InspectorSection title="Crop">
+        {selection.kind === 'media-overlay' && onRequestCanvasCrop ? (
+          <button type="button" className="inspector__canvas-crop-action" disabled={busy || interaction !== null} onClick={onRequestCanvasCrop}>
+            Crop on canvas
+          </button>
+        ) : null}
         <div className="inspector-field-grid inspector-field-grid--four">
           <NumberField label="Crop top (%)" value={percent(properties.crop.top)} min={0} max={99} onChange={(value) => update({ ...properties, crop: { ...properties.crop, top: value / 100 } })} />
           <NumberField label="Crop right (%)" value={percent(properties.crop.right)} min={0} max={99} onChange={(value) => update({ ...properties, crop: { ...properties.crop, right: value / 100 } })} />

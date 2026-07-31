@@ -9,7 +9,7 @@ import type { EditProject } from '@sanverse/edit-domain'
 
 import { stubMediaProbe } from './test-fixtures.ts'
 import { createSanverseServer } from './server.ts'
-import type { PublicExportJob } from './jobs/local-export-job-store.ts'
+import type { LocalExportJob, LocalExportJobStore, PublicExportJob } from './jobs/local-export-job-store.ts'
 import type { ProjectRepository } from './projects/project-repository.ts'
 
 const servers: Array<ReturnType<typeof createSanverseServer>> = []
@@ -182,6 +182,51 @@ async function waitForExportJob(
   return last
 }
 
+function inMemoryExportJobStore(): LocalExportJobStore {
+  const jobs = new Map<string, LocalExportJob>()
+  const publicJob = (job: LocalExportJob): PublicExportJob => {
+    const { projectSnapshot: _snapshot, idempotencyKey: _key, ...safe } = job
+    return safe
+  }
+  return {
+    publicJob,
+    async create(input) {
+      const existing = [...jobs.values()].find((job) =>
+        job.projectId === input.project.projectId && job.idempotencyKey === input.idempotencyKey,
+      )
+      if (existing) return { job: existing, created: false }
+      const timestamp = new Date().toISOString()
+      const job: LocalExportJob = {
+        schemaVersion: 'sanverse.local-export-job/v1',
+        jobId: input.jobId,
+        projectId: input.project.projectId,
+        projectRevision: input.project.revision,
+        idempotencyKey: input.idempotencyKey,
+        exportId: input.exportId,
+        status: 'queued',
+        progress: 0,
+        attempts: 0,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        projectSnapshot: input.project,
+      }
+      jobs.set(job.jobId, job)
+      return { job, created: true }
+    },
+    async read(jobId) { return jobs.get(jobId) ?? null },
+    async list() { return [...jobs.values()] },
+    async update(jobId, change) {
+      const current = jobs.get(jobId)
+      if (!current) throw new Error('Export job was not found.')
+      const next = { ...current, ...change, updatedAt: new Date().toISOString() } as LocalExportJob
+      jobs.set(jobId, next)
+      return next
+    },
+    async recoverRunnable() { return [] },
+    async remove(jobId) { jobs.delete(jobId) },
+  }
+}
+
 describe('local API boundary', () => {
   it('binds loopback, rejects cross-origin requests, creates a project, and serves ranges', async () => {
     const dataRoot = await mkdtemp(join(tmpdir(), 'sanverse-api-'))
@@ -327,11 +372,12 @@ describe('local API boundary', () => {
     const jobId = 'job_1234567890abcdef'
     const state = savedProjectState()
     const port = await listen(createSanverseServer({
-      dataRoot: await temporaryRoot('sanverse-api-export-'),
+      dataRoot: 'unused',
       maxUploadBytes: 100,
       repository: { ...spy.repository, ...state.repository },
       mediaProbe: stubMediaProbe(),
       renderService,
+      exportJobStore: inMemoryExportJobStore(),
       exportIdGenerator: () => exportId,
       exportJobIdGenerator: () => jobId,
     }))
@@ -392,11 +438,12 @@ describe('local API boundary', () => {
     const jobId = 'job_1234567890abcdef'
     const state = savedProjectState()
     const port = await listen(createSanverseServer({
-      dataRoot: await temporaryRoot('sanverse-api-export-failure-'),
+      dataRoot: 'unused',
       maxUploadBytes: 100,
       repository: { ...spy.repository, ...state.repository },
       mediaProbe: stubMediaProbe(),
       renderService,
+      exportJobStore: inMemoryExportJobStore(),
       exportIdGenerator: () => exportId,
       exportJobIdGenerator: () => jobId,
     }))

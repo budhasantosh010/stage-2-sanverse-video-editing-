@@ -1,5 +1,15 @@
 # Project Log
 
+## 2026-07-31 — P1-D Canvas Direct Manipulation V1 complete
+
+- Added one Canvas interaction layer driven by the existing Timeline selection and the Inspector's shared detached visual draft.
+- Delivered move, Shift constraint, keyboard nudge, uniform/centre resize, rotation, crop, frame/safe snapping, proposal repair, Point precedence, and truthful unsupported states.
+- Repaired `UX-010` collapsed preview, `FAIL-030` stale post-upload revision, and `FAIL-031` FFmpeg crop/export parity.
+- Real Edge completed title/callout/image manipulation, Undo/Redo, proposal reject/accept, Point mode, export/download, responsive checks, and frame inspection with zero browser/HTTP errors and one video.
+- Final suites pass: web 442/442, edit-domain 265/265, API 235/235, render-contract 51/51, intent-domain 27/27; all-workspace build passes.
+- Recorded `UX-011` as open and assigned it to P1-E; no P1-E implementation was started.
+- P1-E was not started.
+
 ## 2026-07-30 — P1-B.1 repository-wide test truth restored
 
 - Resolved `FAIL-024` by registering three genuine contract suites with Vitest

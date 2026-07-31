@@ -238,7 +238,8 @@ no button offers it yet — the owner cannot get to it from the screen.
       dirty-selection guard, existing-operation editorial controls, transform,
       crop, layer, mask, effects, entrance/exit, easing, Keyframes V1, responsive
       browser proof, corrected preview/export parity, and focused evidence
-- [ ] P1-D Build Canvas direct manipulation only after explicit owner instruction
+- [x] P1-D Build Canvas direct manipulation — one shared Timeline/Canvas/Inspector selection and visual draft; move, nudge, uniform/centre resize, rotation, crop, snapping, proposal repair, Point precedence, responsive contained-video geometry, one-operation completion, real Edge/export proof
+- [ ] P1-E Build Media Bin V1 only after explicit owner instruction — UX-011 requires one shared asset display name across Media, Timeline, Canvas, and Inspector; no P1-E implementation has started
 
 ## Continuous tracks applied at every visible goal
 

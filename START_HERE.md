@@ -8,17 +8,16 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 ## Current gate
 
-- **P1-C — Inspector V1 is technically complete.** Owner visual and interaction approval remains open. Evidence: `DOCS/evidence/2026-07-31-p1c-inspector-v1/`.
-- Selecting a Production Timeline item now opens one contextual Inspector derived from the current authoritative `EditProject`.
-- Supported section Apply actions build one existing validated operation and travel through the existing revision-fenced App/server change-set path. One Apply remains one Undo.
-- The Inspector covers clip sound/visibility/transition, caption repair/style, title/callout/media-overlay/music repair, transform, crop, layer, mask, effects, entrance/exit, easing, and Keyframes V1.
-- Local drafts never mutate the project. Reset is local, and changing selection while dirty requires `Stay` or `Discard and continue`.
-- Nothing-selected, gap, blocked, pending proposal, and unsupported capability states are explicit. Nameplate text remains truthfully read-only because no `set-nameplate` operation exists.
-- A fresh real Edge walkthrough completed clip Apply → Undo → Redo → title repair → transform/crop/fade/keyframes → Undo → Redo → proposal reject → export/download. Page, console, and HTTP errors were zero; tablet/mobile layouts had no page-level horizontal overflow; the corrected 1080p export was probed and inspected.
-- Final suites pass: web 380/380, edit-domain 265/265, API 234/234, render-contract 51/51, intent-domain 27/27, plus the all-workspace build.
-- P1-B remains the authoritative five-lane Production Timeline and P1-A remains its pure projection/gesture foundation. No second project, history, proposal store, playhead, video, schema, or persistence format was added.
-- Exact next implementation stage, only after explicit owner instruction: **P1-D — Canvas direct manipulation**. It has not started.
-- Open human evidence remains human-only: final P1-C visual/interaction approval, native drag-and-drop feel, repeated owner workflows, representative non-editor workflows, and agreed performance budgets.
+- **P1-D — Canvas Direct Manipulation V1 is technically complete.** Owner visual and interaction approval remains open. Evidence: `DOCS/evidence/2026-07-31-p1d-canvas-manipulation-v1/`.
+- Timeline, Canvas, and Inspector share one selection and one detached visual draft.
+- Move, Shift constraint, keyboard nudge, uniform/centre resize, rotation, crop, snapping, safe guides, proposal repair, Point precedence, and unsupported-target refusal are implemented.
+- Pointer movement never calls the server or creates history. A completed gesture emits at most one existing `set-visual-properties` operation and one Undo step; cancel creates none.
+- Studio uses one bounded responsive video stage and one contained-footage geometry authority. Native controls remain reachable and exactly one main video remains.
+- A fresh real Edge workflow completed title/callout/image manipulation, crop Undo/Redo, proposal repair/reject/accept, Point mode, reduced motion, export, download, probe, and frame inspection with zero page, console, or HTTP errors.
+- Final suites pass: web 442/442, edit-domain 265/265, API 235/235, render-contract 51/51, intent-domain 27/27, plus the all-workspace build.
+- No second project, history, proposal store, selection, visual draft, playhead, schema, operation family, API route, or runtime dependency was added.
+- **P1-E Media Bin has not started.** Begin it only after explicit owner instruction.
+- Open human evidence remains human-only: final P1-D feel/visual approval, repeated owner workflows, representative non-editor workflows, and agreed performance budgets.
 - Real-provider connection still requires the owner's data-leaving-machine decision and keys. Accounts and SaaS operations remain conditional.
 
 ## Read in this order

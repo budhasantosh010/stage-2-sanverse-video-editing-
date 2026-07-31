@@ -47,7 +47,8 @@ describe('shared visual and accessibility contract', () => {
   const homeStyles = readSource('screens/home/HomeScreen.css')
   const studioStyles = readSource('screens/studio/StudioScreen.css')
   const inspectorStyles = readSource('editor/inspector/Inspector.css')
-  const allStyles = [tokens, globalStyles, homeStyles, studioStyles, inspectorStyles].join('\n')
+  const canvasStyles = readSource('editor/canvas/CanvasInteractionLayer.css')
+  const allStyles = [tokens, globalStyles, homeStyles, studioStyles, inspectorStyles, canvasStyles].join('\n')
 
   test('defines the shared monochrome foundation as versionable tokens', () => {
     expect(tokens).toMatch(/:root\s*{/)
@@ -99,6 +100,27 @@ describe('shared visual and accessibility contract', () => {
     expect(visualApplyRule).not.toContain('position: fixed')
     expect(visualApplyRule).not.toContain('z-index:')
     expect(visualApplyRule).not.toMatch(/margin:\s*[^;]*-/)
+  })
+
+  test('keeps Studio video manipulation inside a bounded contained stage', () => {
+    const stageRule = studioStyles.match(/\.studio-screen__video-frame\s*{[^}]*}/s)?.[0] ?? ''
+    const videoRule = studioStyles.match(/\.studio-screen__video\s*{[^}]*}/s)?.[0] ?? ''
+    const desktopGridRule = studioStyles.match(/\.editor-shell \.studio-screen--studio\s*{[^}]*}/s)?.[0] ?? ''
+
+    expect(stageRule).toContain('min-height: clamp(')
+    expect(stageRule).toContain('max-height:')
+    expect(videoRule).toContain('height: 100%')
+    expect(videoRule).toContain('object-fit: contain')
+    expect(desktopGridRule).not.toContain('grid-template-rows: minmax(0, 1fr)')
+  })
+
+  test('leaves native video controls reachable outside real Canvas targets', () => {
+    const layerRule = canvasStyles.match(/\.canvas-interaction-layer\s*{[^}]*}/s)?.[0] ?? ''
+    const hitRule = canvasStyles.match(/\.canvas-hit-target\s*{[^}]*}/s)?.[0] ?? ''
+
+    expect(layerRule).toContain('pointer-events: none')
+    expect(hitRule).toContain('pointer-events: auto')
+    expect(canvasStyles).not.toContain('.canvas-empty-selection-target')
   })
 
   test('keeps placeholder and normal muted text at WCAG AA contrast', () => {

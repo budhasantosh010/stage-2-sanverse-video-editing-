@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { EditOperation, MediaAsset } from '@sanverse/edit-domain'
 
+import type { SharedVisualDraftController } from '../canvas/canvas-contract'
 import type { InspectorSelection } from './inspector-contract'
 import {
   CalloutEditorialSections,
@@ -34,6 +35,8 @@ export type InspectorProps = Readonly<{
   onOpenProposal(): void
   onSeek(ticks: number): void
   onApply(operation: EditOperation): Promise<string | null>
+  visualDraftController?: SharedVisualDraftController
+  onRequestCanvasCrop?(): void
 }>
 
 const selectionKey = (selection: InspectorSelection): string =>
@@ -77,6 +80,8 @@ function InspectorCommittedContent({
   onSeek,
   onApply,
   onSectionDirty,
+  visualDraftController,
+  onRequestCanvasCrop,
 }: Readonly<{
   selection: Exclude<InspectorSelection, { kind: 'nothing' | 'gap' | 'blocked' | 'proposal' }>
   assets: readonly MediaAsset[]
@@ -85,6 +90,8 @@ function InspectorCommittedContent({
   onSeek(ticks: number): void
   onApply(operation: EditOperation): Promise<string | null>
   onSectionDirty(sectionId: string, dirty: boolean): void
+  visualDraftController?: SharedVisualDraftController
+  onRequestCanvasCrop?(): void
 }>) {
   const common = { busy, onApply, onDirtyChange: onSectionDirty }
   return (
@@ -96,31 +103,31 @@ function InspectorCommittedContent({
       {selection.kind === 'caption' ? (
         <>
           <CaptionEditorialSections {...common} selection={selection} />
-          <InspectorVisualSections {...common} selection={selection} playheadTicks={playheadTicks} onSeek={onSeek} />
+          <InspectorVisualSections {...common} selection={selection} playheadTicks={playheadTicks} onSeek={onSeek} visualDraftController={visualDraftController} onRequestCanvasCrop={onRequestCanvasCrop} />
         </>
       ) : null}
       {selection.kind === 'nameplate' ? (
         <>
           <NameplateEditorialSections selection={selection} />
-          <InspectorVisualSections {...common} selection={selection} playheadTicks={playheadTicks} onSeek={onSeek} />
+          <InspectorVisualSections {...common} selection={selection} playheadTicks={playheadTicks} onSeek={onSeek} visualDraftController={visualDraftController} onRequestCanvasCrop={onRequestCanvasCrop} />
         </>
       ) : null}
       {selection.kind === 'title' ? (
         <>
           <TitleEditorialSections {...common} selection={selection} />
-          <InspectorVisualSections {...common} selection={selection} playheadTicks={playheadTicks} onSeek={onSeek} />
+          <InspectorVisualSections {...common} selection={selection} playheadTicks={playheadTicks} onSeek={onSeek} visualDraftController={visualDraftController} onRequestCanvasCrop={onRequestCanvasCrop} />
         </>
       ) : null}
       {selection.kind === 'callout' ? (
         <>
           <CalloutEditorialSections {...common} selection={selection} />
-          <InspectorVisualSections {...common} selection={selection} playheadTicks={playheadTicks} onSeek={onSeek} />
+          <InspectorVisualSections {...common} selection={selection} playheadTicks={playheadTicks} onSeek={onSeek} visualDraftController={visualDraftController} onRequestCanvasCrop={onRequestCanvasCrop} />
         </>
       ) : null}
       {selection.kind === 'media-overlay' ? (
         <>
           <MediaOverlayEditorialSections {...common} selection={selection} assets={assets} />
-          <InspectorVisualSections {...common} selection={selection} playheadTicks={playheadTicks} onSeek={onSeek} />
+          <InspectorVisualSections {...common} selection={selection} playheadTicks={playheadTicks} onSeek={onSeek} visualDraftController={visualDraftController} onRequestCanvasCrop={onRequestCanvasCrop} />
         </>
       ) : null}
       {selection.kind === 'music' ? <MusicEditorialSections {...common} selection={selection} /> : null}
@@ -143,6 +150,8 @@ export function Inspector({
   onOpenProposal,
   onSeek,
   onApply,
+  visualDraftController,
+  onRequestCanvasCrop,
 }: InspectorProps) {
   const [dirtySections, setDirtySections] = useState<ReadonlySet<string>>(() => new Set())
   const key = selectionKey(selection)
@@ -189,9 +198,11 @@ export function Inspector({
         onSeek={onSeek}
         onApply={onApply}
         onSectionDirty={reportSectionDirty}
+        visualDraftController={visualDraftController}
+        onRequestCanvasCrop={onRequestCanvasCrop}
       />
     )
-  }, [assets, busy, onApply, onAcceptProposal, onOpenProposal, onRejectProposal, onSeek, playheadTicks, proposalActionsBusy, reportSectionDirty, selection])
+  }, [assets, busy, onApply, onAcceptProposal, onOpenProposal, onRejectProposal, onRequestCanvasCrop, onSeek, playheadTicks, proposalActionsBusy, reportSectionDirty, selection, visualDraftController])
 
   return (
     <div className="inspector" data-inspector-selection={key}>

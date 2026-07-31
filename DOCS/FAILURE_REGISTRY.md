@@ -24,11 +24,15 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | UX-007 | P1 | UX | P0-E Studio layout required owner approval before P1-A | RESOLVED | P0-E |
 | [x] | UX-008 | P1 | UX | Timeline items display technical clip suffixes instead of human-readable media labels | RESOLVED | P1-C |
 | [ ] | UX-009 | P2 | UX | Dialogue lane uses a temporary visual pattern until waveform rendering exists | PLANNED | Audio waveform milestone |
+| [x] | UX-010 | P1 | UX | Studio video preview collapsed below a usable Canvas height | RESOLVED | P1-D |
+| [ ] | UX-011 | P2 | UX | Media, Timeline, Canvas, and Inspector use different display names for the same imported asset | PLANNED | P1-E |
+| [x] | FAIL-030 | P1 | Revision authority | Immediate B-roll placement used the stale pre-upload project revision | RESOLVED | P1-D |
+| [x] | FAIL-031 | P0 | Preview/export fidelity | FFmpeg crop dimensions were calculated from the target box instead of the actual scaled image | RESOLVED | P1-D |
 | [ ] | FAIL-021 | P2 | Performance | 30-second export crossed the 60-second walkthrough budget | MONITORING | E5 benchmark |
 | [x] | FAIL-027 | P1 | UX | Sticky visual Apply footer intercepted another Inspector section's Apply button | RESOLVED | P1-C |
 | [x] | FAIL-028 | P1 | Product interaction | Pending proposal resolution actions inherited the unrelated timeline-busy state | RESOLVED | P1-C |
 | [x] | FAIL-029 | P0 | Preview/export fidelity | FFmpeg applied permanent alpha zero before an entrance fade, hiding written overlays in export | RESOLVED | P1-C |
-| [ ] | INFRA-005 | P3 | Verification infrastructure | One full API run transiently failed its mocked export-job assertion, then passed alone and on full rerun | MONITORING | Test stability |
+| [ ] | INFRA-005 | P3 | Verification infrastructure | Windows filesystem contention made broad export lifecycle tests unreliable until HTTP lifecycle and durability concerns were isolated | MONITORING | Windows test stability |
 | [x] | FAIL-024 | P2 | Verification debt | Contract files named `.test.ts` contain no Vitest suites, so broad domain/API commands exit 1 after their real assertions pass | RESOLVED | P1-B.1 |
 | [x] | FAIL-025 | P2 | API test drift | Two server tests expect old synchronous export statuses while the current API correctly returns asynchronous 202 | RESOLVED | P1-B.1 |
 | [x] | FAIL-026 | P2 | Web test drift | Overlay music-gain test enters `-24` through jsdom/user-event but submits `+24` | RESOLVED | P1-B.1 |
@@ -341,6 +345,79 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 - **Owner:** Media/render pipeline.
 - **Target:** Audio waveform milestone.
 
+### UX-010 — Studio video preview collapses below a usable Canvas height
+
+- **What:** The Studio preview becomes a shallow horizontal strip at common desktop sizes, leaving too little visible footage for Canvas move, resize, rotation, crop, or Point placement.
+- **Where:** `apps/web/src/screens/studio/StudioScreen.css`, the Studio two-row editor grid, video frame, video surface, and video element sizing contract.
+- **When:** Reproduced during P1-D continuation on 2026-07-31.
+- **Who is affected:** Anyone directly manipulating a visual object in Studio, especially at 1440×900 and 1280×800.
+- **Why:** The desktop grid reserved at least 390px for the Timeline while its first row used `minmax(0, 1fr)`. Inside that shrinking row, the video surface and video both used unresolved `height: 100%`. At 1280×800 the stage fell to 158px and the real 16:9 footage to 245×138; at 1024×768 the same percentage-height chain instead let intrinsic width produce an oversized 532px preview.
+- **Reproduction:** Open `test-30s.mp4`, switch to Studio, and inspect computed rectangles. Before repair: 1440×900 stage 814×243 with visible footage 396×223; 1280×800 stage 654×158 with visible footage 245×138.
+- **Attempted fix:** Replaced the circular percentage-height chain with a bounded stage, reduced the desktop Timeline reservation, retained `object-fit: contain`, and kept Studio's existing video `ResizeObserver` as the sole geometry observer.
+- **Final solution:** Studio now uses a responsive bounded stage and computes one exact contained-footage rectangle that serves browser overlays, Point mode, Canvas bounds, guides, hit targets, and crop controls.
+- **Acceptance tests:** Pure landscape/portrait/square/ultrawide geometry, strict unknown-metadata capture refusal, CSS contracts, real Edge at 1440×900, 1280×800, 1024×768, and 390×844, one-video assertion, Canvas/Point alignment, native-control hit testing, and no horizontal overflow.
+- **Evidence:** `DOCS/evidence/2026-07-31-p1d-canvas-manipulation-v1/`; real stage heights are 342px, 280px, about 292px, and 280px at the four required viewports.
+- **Commit:** P1-D completion commit.
+- **Status:** RESOLVED.
+- **One-line solution:** Give Studio one bounded responsive video stage and derive Canvas/Point geometry from the exact contained-footage rectangle.
+- **Severity:** P1.
+- **Owner:** Web editor.
+- **Target:** P1-D.
+
+### UX-011 — Media panel and Timeline label the same image differently
+
+- **What:** After importing one image behind the main video, the Media panel calls it `Image 2` while Timeline, Canvas, and Inspector call it `Image 1`.
+- **Where:** Media-card ordinal derivation versus the shared editor asset-label map.
+- **When:** Final P1-D Edge walkthrough on 2026-07-31.
+- **Who is affected:** Users matching an imported asset across Media, Timeline, Canvas, and Inspector.
+- **Why:** The Media panel counts all project assets, while editor labels count only assets of that media family.
+- **Reproduction:** Open one video, import one image, then compare its Media card with its Timeline/Inspector label.
+- **Attempted fix:** None inside P1-D because the mismatch is non-blocking and does not affect identity, selection, persistence, or export.
+- **Final solution:** Planned.
+- **One-line solution:** Feed Media, Timeline, Canvas, and Inspector from the same derived asset-display-label map.
+- **Severity:** P2.
+- **Owner:** Web editor.
+- **Target:** P1-E.
+- **Status:** PLANNED.
+
+### FAIL-030 — Immediate B-roll placement used a stale project revision
+
+- **What:** Uploading an additional asset succeeded, but the immediately following `add-media-overlay` change set was rejected, so no B-roll appeared on the Timeline.
+- **Where:** `apps/web/src/app/App.tsx`, between `uploadProjectAsset` and `onCreateOverlay`.
+- **When:** Real P1-D Edge workflow on 2026-07-31.
+- **Who is affected:** Users importing B-roll or an image and expecting it to appear immediately.
+- **Why:** Asset intake advanced the server project revision, but React's state update had not rendered before the overlay callback closed over the previous revision.
+- **Reproduction:** Import an extra media file through Add overlay and inspect the server project: the asset revision exists but the overlay operation is absent.
+- **Attempted fix:** Traced the upload response and rejected change set, then introduced one latest-authoritative-project ref updated synchronously from both upload and accepted change-set responses.
+- **Final solution:** Immediate placement now builds against the revision returned by asset intake; the server remains authoritative and stale revisions remain rejected.
+- **Acceptance tests:** App regression proves upload revision 1 becomes the overlay's base revision and final revision 2; the real Edge workflow imports, places, moves, resizes, crops, and exports the image.
+- **Evidence:** `DOCS/evidence/2026-07-31-p1d-canvas-manipulation-v1/`.
+- **Commit:** P1-D completion commit.
+- **One-line solution:** Build the immediate post-upload edit from the exact project revision returned by the upload response.
+- **Severity:** P1.
+- **Owner:** Web/App authority boundary.
+- **Target:** P1-D.
+- **Status:** RESOLVED.
+
+### FAIL-031 — FFmpeg crop used the planned box instead of the actual scaled image
+
+- **What:** Preview crop worked, but the final export failed with an invalid FFmpeg crop size.
+- **Where:** `apps/api/src/render/ffmpeg-render-adapter.ts`, media-overlay visual filters.
+- **When:** Final P1-D real export on 2026-07-31.
+- **Who is affected:** Users exporting a contained image or B-roll after Canvas crop.
+- **Why:** Contain scaling and yuv420p rounding produced an actual 806×452 image, while crop arithmetic still requested the planned 454px box height.
+- **Reproduction:** Crop the imported image about 12.6% from the left and export; FFmpeg reports crop height 454 exceeds input height 452.
+- **Attempted fix:** Reproduced the exact revision through a logging render adapter and inspected the generated filter graph and FFmpeg error.
+- **Final solution:** Crop width, height, and offsets are now expressions based on FFmpeg's actual current `iw` and `ih`, rounded to valid even dimensions.
+- **Acceptance tests:** Filter-graph regression 33/33, exact revision render, fresh Edge export/download, H.264/AAC probe, and extracted crop frame inspection.
+- **Evidence:** `DOCS/evidence/2026-07-31-p1d-canvas-manipulation-v1/preview-export-parity.md` and `export-frames/03-cropped-image.png`.
+- **Commit:** P1-D completion commit.
+- **One-line solution:** Derive crop pixels from FFmpeg's actual post-scale `iw`/`ih`, never from the pre-scale target box.
+- **Severity:** P0.
+- **Owner:** Render adapter.
+- **Target:** P1-D.
+- **Status:** RESOLVED.
+
 ### FEATURE-002 — Accepted nameplate text has no repair operation
 
 - **What:** An accepted nameplate has editable visual properties but its primary and secondary text cannot be changed through an existing typed repair operation.
@@ -386,13 +463,20 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 - **Status:** RESOLVED.
 - **One-line solution:** Evaluate authored base appearance without transitions when the renderer applies those transitions separately.
 
-### INFRA-005 — One transient full API export assertion
+### INFRA-005 — Filesystem export-job tests contend under full Windows load
 
-- **What:** The first final full API run reported one failed mocked export-job assertion after 233 passes.
-- **When:** P1-C final verification on 2026-07-31.
-- **What was tried:** The exact test passed alone in 92 ms; the complete API suite then passed 234/234 without a code change.
-- **Status:** MONITORING. This single non-reproduced observation is preserved rather than hidden or promoted to a product defect.
-- **One-line solution:** Reproduce before changing code; investigate shared parallel-test state only if it recurs.
+- **What:** Export lifecycle tests intermittently stayed `running`, failed before attempt 1 with `EPERM`, or observed the wrong terminal result under the full parallel API suite, while each lifecycle passed alone.
+- **Where:** `apps/api/src/server.test.ts` when API lifecycle tests used the real filesystem job store; durability itself remains covered by `local-export-job-store.contract.test.ts`.
+- **When:** First observed in P1-C and reproduced repeatedly during P1-D final verification on 2026-07-31.
+- **Who is affected:** Repository verification on Windows; the final real browser export completed successfully.
+- **Why:** Several parallel tests performed atomic job-file replacement and cleanup while Windows still held short-lived filesystem handles.
+- **Reproduction:** Run the full API suite repeatedly with filesystem-backed job storage in server lifecycle tests; run the same test alone and it passes.
+- **Attempted fix:** Stopped live dev listeners, reran focused and full suites, then separated concerns instead of increasing sleeps.
+- **Final solution:** Server lifecycle tests inject a deterministic in-memory job store; the dedicated filesystem contract still tests real durable storage. Production job storage is unchanged.
+- **Acceptance tests:** Focused server 14/14 and full API 235/235 pass; real Edge export/download also passes.
+- **Evidence:** P1-D `test-results.md` and browser report.
+- **Status:** MONITORING for Windows production-store contention; the broad test-isolation failure is resolved.
+- **One-line solution:** Test HTTP lifecycle with an in-memory store and test filesystem durability separately in its dedicated contract suite.
 
 ### INFRA-004 — Dev parent stopped but Vite/API children kept ports open
 

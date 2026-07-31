@@ -159,17 +159,15 @@ export type VisualCssStyle = Readonly<{
   zIndex: number
 }>
 
-/** Translate the shared motion contract into browser CSS at one exact tick. */
-export const visualCssStyleAt = (
-  plan: RenderPlan,
+/** Translate one accepted or detached visual-properties value into browser CSS at one exact tick. */
+export const visualCssStyleFromPropertiesAt = (
+  visual: VisualPropertiesNode,
   node: RenderNode,
   ticks: number,
   compositionWidth: number,
   compositionHeight: number,
   reducedMotion: boolean,
-): VisualCssStyle | undefined => {
-  const visual = visualPropertiesForNode(plan, node.nodeId)
-  if (!visual) return undefined
+): VisualCssStyle => {
   const evaluated = evaluateVisualProperties(
     visual,
     ticks - node.interval.start.ticks,
@@ -200,6 +198,27 @@ export const visualCssStyleAt = (
     ...(filter ? { filter } : {}),
     zIndex: evaluated.layer,
   })
+}
+
+/** Resolve an accepted plan visual into browser CSS. */
+export const visualCssStyleAt = (
+  plan: RenderPlan,
+  node: RenderNode,
+  ticks: number,
+  compositionWidth: number,
+  compositionHeight: number,
+  reducedMotion: boolean,
+): VisualCssStyle | undefined => {
+  const visual = visualPropertiesForNode(plan, node.nodeId)
+  if (!visual) return undefined
+  return visualCssStyleFromPropertiesAt(
+    visual,
+    node,
+    ticks,
+    compositionWidth,
+    compositionHeight,
+    reducedMotion,
+  )
 }
 
 export type TitleCssVariables = Readonly<Record<string, string>>

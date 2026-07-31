@@ -70,6 +70,9 @@ export function capturePointTarget(input: CapturePointTargetInput): CapturePoint
   if (!Number.isFinite(input.currentTimeSeconds) || input.currentTimeSeconds < 0) {
     return { ok: false, error: 'The current video time is unavailable.' }
   }
+  if (!isPositiveFinite(input.videoWidth) || !isPositiveFinite(input.videoHeight)) {
+    return { ok: false, error: 'The visible video bounds are unavailable.' }
+  }
 
   const timeMs = Math.round(input.currentTimeSeconds * 1000)
   if (!Number.isFinite(timeMs) || timeMs < 0) {

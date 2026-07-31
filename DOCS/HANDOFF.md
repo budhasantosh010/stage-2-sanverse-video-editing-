@@ -1,35 +1,12 @@
 # HANDOFF — everything a new agent needs to continue Sanverse Stage 2
 
-Updated 2026-07-30. **P1-B — Production Timeline V1 is technically complete.**
-Studio now consumes P1-A's one-way `EditProject → TimelineViewModel` projection
-as a real five-lane editor: V2 overlays, V1 video, C1 captions, A1 dialogue, and
-A2 music. It has one shared composition playhead, ruler, click/drag seek,
-zoom/Fit/scroll, visible-range overscan, stable selection, exact trim preview,
-deterministic snapping, proposal ghosts, keyboard-safe removal, and real
-right-click/Shift+F10 actions. Every edit still crosses P1-A's typed gesture
-adapter and the existing server-authoritative change-set route. No second
-project, history, proposal, playhead, video element, schema, persistence format,
-or renderer exists.
+Updated 2026-07-31. **P1-D — Canvas Direct Manipulation V1 is technically complete.** Timeline, Canvas, and Inspector share one authoritative selection and one detached visual draft. Move, Shift constraint, keyboard nudge, uniform/centre resize, rotation, crop, frame/safe snapping, proposal repair, dirty-draft refusal, Point precedence, and truthful unsupported states use existing domain operations and server authority. Pointer movement creates no revision; completion creates at most one operation and one Undo.
 
-The focused result is 79/79 timeline/Studio web tests, 77/77 affected
-domain tests, and a passing all-workspace production build. A real Edge run on
-a fresh `test-30s.mp4` completed split → Undo → Redo → context menu → snap →
-trim → Undo → proposal ghost/reject → export/download. Final desktop, tablet,
-and mobile geometry has no document-width overflow; page errors, console
-errors, and failed HTTP responses are all zero. The 30.033-second export was
-probed and five frames were inspected. Start with
-`DOCS/evidence/2026-07-30-p1b-production-timeline-v1/P1-B_IMPLEMENTATION_REPORT.md`.
+Studio now has a bounded responsive contained-video stage. Browser overlays, Point, Canvas bounds, crop, and guides use one displayed-footage rectangle and one existing ResizeObserver authority. Native controls remain reachable and exactly one main video remains.
 
-**P1-B.1 verification maintenance is complete.** `FAIL-024`, `FAIL-025`, and
-`FAIL-026` are resolved without production changes. Full suites now pass: web
-332/332, edit-domain 265/265, API 233/233, render-contract 51/51, intent-domain
-27/27, plus focused Timeline/Studio 79/79. The all-workspace build produces the
-same P1-B bundle. Evidence:
-`DOCS/evidence/2026-07-30-p1b1-test-truth/P1-B1_IMPLEMENTATION_REPORT.md`.
+A fresh Edge run completed title/callout/image manipulation, crop Undo/Redo, proposal repair/reject/accept, Point mode, reduced motion, export/download, probe, and frame inspection at 1440×900, 1280×800, 1024×768, and 390×844. Page, console, and HTTP errors were zero. Final suites pass web 442/442, edit-domain 265/265, API 235/235, render-contract 51/51, intent-domain 27/27, plus the all-workspace build. Start with `DOCS/evidence/2026-07-31-p1d-canvas-manipulation-v1/P1-D_IMPLEMENTATION_REPORT.md`.
 
-P1-A remains the pure authoritative presentation/gesture foundation. P0-E
-remains the owner-approved five-region Studio frame. The exact next task is
-**P1-C — Inspector V1**; it has not started.
+P1-B remains the authoritative Production Timeline; P1-C remains the contextual Inspector. No second project, history, selection, visual draft, proposal store, playhead, schema, operation family, route, or persistence format was added. **P1-E Media Bin has not started.** `UX-011` remains open and is assigned to P1-E.
 
 **Read this file, then `DOCS/CURRENT_STATE.md`, then the ADRs it names.**
 Nothing else is required to start work.

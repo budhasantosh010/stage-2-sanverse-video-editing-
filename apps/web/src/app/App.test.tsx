@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   acceptChangeSet as applyChangeSet,
+  addAsset,
   redoChangeSet,
   undoChangeSet,
   type EditProject,
@@ -245,6 +246,45 @@ describe('App', () => {
     await waitFor(() => expect(api.current().revision).toBe(2))
     expect(api.current().changeSets).toHaveLength(0)
     expect(api.current().redoStack).toHaveLength(1)
+  })
+
+  it('uses the authoritative post-upload revision when immediately placing B-roll', async () => {
+    const user = userEvent.setup()
+    const api = fakeApi()
+    const overlayAsset = { ...testAsset(), assetId: 'asset_bbbbbbbb' }
+    fetchMock.mockImplementation((url: string, options?: RequestInit) => {
+      if (url === `/api/projects/${api.manifest.id}/assets` && options?.method === 'POST') {
+        const added = addAsset(api.current(), overlayAsset)
+        if (!added.ok) return new Response(JSON.stringify({ error: added.error }), { status: 400 })
+        api.setProject(added.value)
+        return new Response(JSON.stringify({ project: added.value, asset: { assetId: overlayAsset.assetId } }), {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+      return api.handle(url, options) ?? new Response('{}', { status: 404 })
+    })
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /open cleaned\.mp4/i }))
+    await user.click(screen.getByRole('button', { name: /studio workspace/i }))
+    await user.click(screen.getByText('Advanced direct controls'))
+    await user.click(screen.getByTestId('add-overlay-open'))
+    await user.click(screen.getByTestId('add-overlay-choose-broll'))
+    await user.upload(
+      screen.getByTestId('broll-file'),
+      new File(['video'], 'broll.mp4', { type: 'video/mp4' }),
+    )
+
+    await waitFor(() => expect(
+      api.current().changeSets.flatMap((record) => record.changeSet.operations).some((operation) => operation.kind === 'add-media-overlay'),
+    ).toBe(true))
+    const changeSetCall = fetchMock.mock.calls.find(
+      ([url, options]) => url === `/api/projects/${api.manifest.id}/change-sets` && (options as RequestInit | undefined)?.method === 'POST',
+    )
+    const body = JSON.parse(String((changeSetCall?.[1] as RequestInit | undefined)?.body)) as { changeSet: { baseRevision: number } }
+    expect(body.changeSet.baseRevision).toBe(1)
+    expect(api.current().revision).toBe(2)
   })
 
   it('runs one Home-to-Studio-to-Home loop and releases its local video', async () => {

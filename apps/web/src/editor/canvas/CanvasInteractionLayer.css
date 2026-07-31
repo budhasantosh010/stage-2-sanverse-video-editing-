@@ -1,0 +1,242 @@
+.canvas-interaction-layer {
+  position: absolute;
+  z-index: 30;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.canvas-hit-target {
+  position: absolute;
+  border: 1px solid transparent;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.canvas-hit-target:hover,
+.canvas-hit-target:focus-visible {
+  border-color: rgb(255 255 255 / 70%);
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.canvas-hit-target--proposed {
+  border-style: dashed;
+}
+
+.canvas-selection-box {
+  position: absolute;
+  z-index: 80;
+  box-sizing: border-box;
+  border: 1px solid #fff;
+  outline: 1px solid rgb(0 0 0 / 75%);
+  pointer-events: none;
+}
+
+.canvas-selection-box--proposed {
+  border-style: dashed;
+}
+
+.canvas-selection-box--crop {
+  border-color: rgb(255 255 255 / 90%);
+}
+
+.canvas-selection-box__move {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: move;
+  pointer-events: auto;
+}
+
+.canvas-selection-box__move:focus-visible,
+.canvas-resize-handle:focus-visible,
+.canvas-rotation-handle:focus-visible,
+.canvas-crop-handle:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+.canvas-resize-handle,
+.canvas-rotation-handle,
+.canvas-crop-handle {
+  position: absolute;
+  z-index: 4;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #111;
+  border-radius: 50%;
+  padding: 0;
+  background: #fff;
+  pointer-events: auto;
+}
+
+.canvas-resize-handle--top-left { left: -8px; top: -8px; cursor: nwse-resize; }
+.canvas-resize-handle--top-right { right: -8px; top: -8px; cursor: nesw-resize; }
+.canvas-resize-handle--bottom-right { right: -8px; bottom: -8px; cursor: nwse-resize; }
+.canvas-resize-handle--bottom-left { left: -8px; bottom: -8px; cursor: nesw-resize; }
+
+.canvas-rotation-stem {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: 1px;
+  height: 28px;
+  background: #fff;
+  transform: translateX(-50%);
+}
+
+.canvas-rotation-handle {
+  left: 50%;
+  bottom: calc(100% + 22px);
+  cursor: grab;
+  transform: translateX(-50%);
+}
+
+.canvas-rotation-value {
+  position: absolute;
+  left: calc(50% + 14px);
+  bottom: calc(100% + 23px);
+  border: 1px solid rgb(255 255 255 / 60%);
+  padding: 2px 5px;
+  background: rgb(0 0 0 / 82%);
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.canvas-interaction-toolbar {
+  position: absolute;
+  z-index: 100;
+  top: 10px;
+  left: 50%;
+  display: flex;
+  max-width: calc(100% - 20px);
+  gap: 6px;
+  align-items: center;
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 7px;
+  padding: 6px;
+  background: rgb(8 8 8 / 92%);
+  color: #fff;
+  font-size: 11px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.canvas-interaction-toolbar button {
+  min-height: 30px;
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 5px;
+  padding: 4px 8px;
+  background: #161616;
+  color: #fff;
+}
+
+.canvas-safe-areas,
+.canvas-alignment-guides {
+  position: absolute;
+  z-index: 50;
+  inset: 0;
+  pointer-events: none;
+}
+
+.canvas-safe-area {
+  position: absolute;
+  border: 1px dashed rgb(255 255 255 / 40%);
+}
+.canvas-safe-area--action { inset: 10%; }
+.canvas-safe-area--title { inset: 20%; }
+.canvas-safe-area__horizontal,
+.canvas-safe-area__vertical {
+  position: absolute;
+  background: rgb(255 255 255 / 25%);
+}
+.canvas-safe-area__horizontal { top: 50%; left: 0; right: 0; height: 1px; }
+.canvas-safe-area__vertical { top: 0; bottom: 0; left: 50%; width: 1px; }
+
+.canvas-alignment-guide {
+  position: absolute;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 65%);
+}
+.canvas-alignment-guide--x { top: 0; bottom: 0; width: 1px; }
+.canvas-alignment-guide--y { left: 0; right: 0; height: 1px; }
+.canvas-alignment-guide > span {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 2px 4px;
+  background: #111;
+  color: #fff;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.canvas-crop-overlay {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  pointer-events: none;
+}
+.canvas-crop-overlay__shade {
+  position: absolute;
+  background: rgb(0 0 0 / 55%);
+}
+.canvas-crop-overlay__shade--top { top: 0; right: 0; left: 0; }
+.canvas-crop-overlay__shade--right { top: 0; right: 0; bottom: 0; }
+.canvas-crop-overlay__shade--bottom { right: 0; bottom: 0; left: 0; }
+.canvas-crop-overlay__shade--left { top: 0; bottom: 0; left: 0; }
+.canvas-crop-handle { border-radius: 3px; }
+.canvas-crop-handle--top { top: -7px; left: 50%; cursor: ns-resize; transform: translateX(-50%); }
+.canvas-crop-handle--right { top: 50%; right: -7px; cursor: ew-resize; transform: translateY(-50%); }
+.canvas-crop-handle--bottom { bottom: -7px; left: 50%; cursor: ns-resize; transform: translateX(-50%); }
+.canvas-crop-handle--left { top: 50%; left: -7px; cursor: ew-resize; transform: translateY(-50%); }
+.canvas-crop-overlay__values {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 6px;
+  background: rgb(0 0 0 / 82%);
+  color: #fff;
+  font-size: 11px;
+}
+
+.canvas-interaction-message,
+.canvas-interaction-error {
+  position: absolute;
+  z-index: 110;
+  right: 10px;
+  bottom: 10px;
+  max-width: min(360px, calc(100% - 20px));
+  margin: 0;
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: rgb(8 8 8 / 92%);
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
+}
+.canvas-interaction-error { border-color: #fff; }
+
+@media (max-width: 600px) {
+  .canvas-hit-target {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-interaction-layer *,
+  .canvas-interaction-layer *::before,
+  .canvas-interaction-layer *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}

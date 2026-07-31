@@ -22,6 +22,24 @@ describe('getRenderedVideoContentBox', () => {
       height: 400,
     })
   })
+
+  it('fits square media without stretching', () => {
+    expect(getRenderedVideoContentBox({ left: 0, top: 0, width: 800, height: 400 }, 1000, 1000)).toEqual({
+      left: 200,
+      top: 0,
+      width: 400,
+      height: 400,
+    })
+  })
+
+  it('fits ultrawide media without stretching', () => {
+    expect(getRenderedVideoContentBox({ left: 0, top: 0, width: 800, height: 400 }, 2560, 1080)).toEqual({
+      left: 0,
+      top: 31.25,
+      width: 800,
+      height: 337.5,
+    })
+  })
 })
 
 describe('capturePointTarget', () => {

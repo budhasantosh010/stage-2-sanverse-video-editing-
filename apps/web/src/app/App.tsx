@@ -65,6 +65,10 @@ export function App() {
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
   const conversationAbortRef = useRef<AbortController | null>(null)
   const conversationSequenceRef = useRef(0)
+  const latestEditProjectRef = useRef<EditProject | null>(null)
+
+  if (appState.screen === 'studio') latestEditProjectRef.current = appState.editProject
+  else latestEditProjectRef.current = null
 
   function resetExport(): void {
     exportAbortRef.current?.abort()
@@ -417,6 +421,8 @@ export function App() {
       }}
       onCreateOverlay={async (operation) => {
         if (appState.screen !== 'studio' || appState.proposal) return 'Finish the pending edit first.'
+        const currentProject = latestEditProjectRef.current
+        if (!currentProject) return 'Open a project first.'
         resetExport()
         try {
           // Exactly the same server-authoritative path a cut takes: the browser
@@ -427,13 +433,14 @@ export function App() {
             {
               schemaVersion: 'sanverse.change-set/v1' as const,
               changeSetId: `changeset_${operation.operationId.replace(/^operation_/, '').slice(0, 32)}`,
-              baseRevision: appState.editProject.revision,
+              baseRevision: currentProject.revision,
               operations: [operation],
               provenance: { source: 'direct' as const, requestId: null },
               extensions: {},
             },
             fetch,
           )
+          latestEditProjectRef.current = next
           setAppState((current) =>
             current.screen === 'studio' ? { ...current, editProject: next, editError: null } : current,
           )
@@ -446,6 +453,7 @@ export function App() {
         if (appState.screen !== 'studio') return 'Open a project first.'
         try {
           const { project, assetId } = await uploadProjectAsset(appState.project.id, file, fetch)
+          latestEditProjectRef.current = project
           setAppState((current) =>
             current.screen === 'studio' ? { ...current, editProject: project, editError: null } : current,
           )
