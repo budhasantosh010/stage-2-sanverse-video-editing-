@@ -8,16 +8,15 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 ## Current gate
 
-- **P1-F.0 — Primary-Footage Motion V1 is technically complete.** Evidence: `DOCS/evidence/2026-08-01-p1f0-primary-footage-motion-v1/`.
-- Primary footage has one stable motion identity anchored to the immutable source asset and source interval, not a temporary clip ID.
-- Position, uniform scale, rotation, crop, and bounded keyframes/easing survive split, trim, remove, gap, reorder, repeated placements, Undo, and Redo.
-- Render-plan v6 plus one shared source-time evaluator drive both the browser motion canvas and FFmpeg export.
-- Studio exposes Motion Inspector presets/numeric controls/keyframes/Apply/Reset/Remove, a Timeline Motion indicator, and direct Canvas move/scale/rotate/crop.
-- Pointer movement remains a detached draft; release creates one operation; Escape creates none; Point mode has precedence.
-- Exactly one native video and its native controls remain. Narrow layouts keep numeric controls and truthfully explain when precision handles need a wider screen.
-- Real Edge completed static motion, Canvas repair, Undo/Redo, Point, animated zoom, split/Undo/Redo, a real 1080p H.264/AAC export, tablet/mobile checks, and Home cleanup with zero page, console, or failed-HTTP errors.
-- Final suites pass: web 484/484, edit-domain 299/299, API 239/239, render-contract 65/65, intent-domain 27/27 — **1,114/1,114 total** — plus the all-workspace build.
-- **P1-F.1 and P1-F.2 have not started.** Continue only after the owner chooses the next milestone.
+- **P1-F.0.1 — Studio Workspaces and Docking V1 is technically complete.** Evidence: `DOCS/evidence/2026-08-01-p1f01-studio-workspaces-docking-v1/`.
+- Studio exposes accessible Edit, Effects, Color, and Audio tabs only inside Studio while keeping one project, revision, history, playhead, Timeline, selection, Canvas/Inspector draft, native video, AI conversation, proposal, preview, and export authority.
+- A closed `sanverse.workspace-layout/v1` contract validates and clamps dock widths, Timeline height, collapse state, Tool/AI tab, active workspace, and Edit/Motion/Timeline/Review/AI/Audio presets before local persistence.
+- Left, right, and Timeline splitters support bounded pointer and keyboard resizing, Shift steps, Home/End, and Escape cancellation. Compact layouts use explicit Media and Tool/AI switches.
+- Effects, Color, and Audio expose only current capabilities. Primary-video Color explicitly says grading is not implemented; future mixer and grading controls are not faked.
+- Real Edge preserved one video and the same AI draft through all workspaces, presets, splitters, Point mode, tablet/mobile layouts, export, and cleanup. Presentation changes kept revision `15 → 15`, caused no horizontal overflow, and produced zero page, console, or failed-HTTP errors.
+- The exported 18.033333-second MP4 is 1920×1080 H.264 High at 30 fps with AAC-LC stereo, 10,789,990 bytes.
+- Final suites pass: web 515/515, edit-domain 299/299, API 239/239, render-contract 65/65, intent-domain 27/27 — **1,145/1,145 total** — plus the all-workspace build.
+- **P1-F.0 remains complete. P1-F.1 and P1-F.2 have not started.** Continue only after the owner chooses the next milestone.
 - Open human evidence remains human-only: repeated owner workflows, representative non-editor workflows, and agreed performance budgets.
 - Real-provider connection still requires the owner's data-leaving-machine decision and keys. Accounts and SaaS operations remain conditional.
 

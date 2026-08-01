@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react'
 
 import { Button, DisabledAction, IconButton, SegmentedControl } from './ui'
+import { StudioWorkspaceTabs, type StudioWorkspace } from './workspace'
 import './EditorShell.css'
 
 export type EditorWorkspace = 'assist' | 'studio'
 
 export type EditorShellProps = {
   workspace: EditorWorkspace
+  studioWorkspace: StudioWorkspace
   projectName: string
   saveState: 'idle' | 'saving' | 'saved' | 'error'
   undoDisabledReason: string | null
@@ -14,6 +16,7 @@ export type EditorShellProps = {
   exportDisabledReason: string | null
   isExporting: boolean
   onWorkspaceChange(workspace: EditorWorkspace): void
+  onStudioWorkspaceChange(workspace: StudioWorkspace): void
   onBack(): void
   onUndo(): void
   onRedo(): void
@@ -47,6 +50,7 @@ function saveMessage(saveState: EditorShellProps['saveState']) {
 
 export function EditorShell({
   workspace,
+  studioWorkspace,
   projectName,
   saveState,
   undoDisabledReason,
@@ -54,6 +58,7 @@ export function EditorShell({
   exportDisabledReason,
   isExporting,
   onWorkspaceChange,
+  onStudioWorkspaceChange,
   onBack,
   onUndo,
   onRedo,
@@ -112,6 +117,12 @@ export function EditorShell({
           </DisabledAction>
         </div>
       </header>
+
+      {workspace === 'studio' ? (
+        <div className="editor-shell__studio-workspaces">
+          <StudioWorkspaceTabs value={studioWorkspace} onChange={onStudioWorkspaceChange} />
+        </div>
+      ) : null}
 
       <div className="editor-shell__workspace" aria-label={`${workspace === 'assist' ? 'Assist' : 'Studio'} workspace`}>
         {children}

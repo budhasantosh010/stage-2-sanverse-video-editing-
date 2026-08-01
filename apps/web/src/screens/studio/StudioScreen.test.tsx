@@ -9,14 +9,20 @@ import { TEST_ASSET_ID, TEST_CLIP_ID, ms, testChangeSet, testOperation, testProj
 
 afterEach(() => {
   cleanup()
+  window.localStorage.removeItem('sanverse.workspace-layout/v1')
   vi.restoreAllMocks()
 })
 
 let resizeObserverCallback: ResizeObserverCallback | null = null
 let videoFrameCallback: VideoFrameRequestCallback | null = null
 let cancelVideoFrameCallback: ReturnType<typeof vi.fn>
+const originalInnerWidth = window.innerWidth
+const originalInnerHeight = window.innerHeight
 
 beforeEach(() => {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 })
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 })
+  window.localStorage.removeItem('sanverse.workspace-layout/v1')
   resizeObserverCallback = null
   videoFrameCallback = null
   cancelVideoFrameCallback = vi.fn()
@@ -51,6 +57,8 @@ beforeEach(() => {
 afterEach(() => {
   delete (HTMLVideoElement.prototype as Partial<HTMLVideoElement>).requestVideoFrameCallback
   delete (HTMLVideoElement.prototype as Partial<HTMLVideoElement>).cancelVideoFrameCallback
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth })
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: originalInnerHeight })
   vi.unstubAllGlobals()
 })
 
@@ -143,6 +151,12 @@ function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = 
   const view = render(<StudioScreen {...props} />)
 
   return { ...view, props }
+}
+
+function renderStudioWithAi(overrides: Partial<ComponentProps<typeof StudioScreen>> = {}) {
+  const view = renderStudio(overrides)
+  fireEvent.click(screen.getByRole('tab', { name: 'AI' }))
+  return view
 }
 
 /** A hand-made pending proposal, as the app state would hold it. */
@@ -253,7 +267,7 @@ describe('StudioScreen', () => {
   })
 
   it('keeps export unavailable without accepted edits, but the assistant is open for business', () => {
-    renderStudio()
+    renderStudioWithAi()
 
     const exportButton = screen.getByRole('button', { name: /export unavailable/i })
     const chat = screen.getByRole('textbox', { name: /ask for an edit/i })
@@ -265,7 +279,7 @@ describe('StudioScreen', () => {
   })
 
   it('closes the assistant while a proposal is pending, so only one thing is decided at a time', () => {
-    renderStudio({ proposal: directProposal() })
+    renderStudioWithAi({ proposal: directProposal() })
 
     expect(screen.getByRole('textbox', { name: /ask for an edit/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /^send$/i })).toBeDisabled()
@@ -274,7 +288,7 @@ describe('StudioScreen', () => {
   it('sends what the user typed together with where they are in the video', async () => {
     const user = userEvent.setup()
     const onSendMessage = vi.fn()
-    renderStudio({ onSendMessage })
+    renderStudioWithAi({ onSendMessage })
 
     await user.type(screen.getByRole('textbox', { name: /ask for an edit/i }), 'put my name here')
     await user.click(screen.getByRole('button', { name: /^send$/i }))
@@ -290,7 +304,7 @@ describe('StudioScreen', () => {
   })
 
   it('shows the assistant question instead of guessing', () => {
-    renderStudio({
+    renderStudioWithAi({
       conversation: {
         status: 'clarification',
         lastMessage: 'add a nameplate',
@@ -303,7 +317,7 @@ describe('StudioScreen', () => {
   })
 
   it('announces one conversation failure instead of duplicating it in the proposal panel', () => {
-    renderStudio({
+    renderStudioWithAi({
       conversation: {
         status: 'error',
         lastMessage: 'add my name',
@@ -317,7 +331,7 @@ describe('StudioScreen', () => {
   })
 
   it('says plainly when an edit is not supported yet', () => {
-    renderStudio({
+    renderStudioWithAi({
       conversation: {
         status: 'unsupported',
         lastMessage: 'add background music',
@@ -330,7 +344,7 @@ describe('StudioScreen', () => {
   })
 
   it('marks an assistant proposal as coming from the assistant', () => {
-    renderStudio({
+    renderStudioWithAi({
       proposal: {
         operation: nameplate,
         origin: { source: 'ai', requestId: 'request_aaaaaaaa', explanation: 'Shows "Santosh".', note: 'Placed where you pointed.' },
@@ -345,7 +359,7 @@ describe('StudioScreen', () => {
     const user = userEvent.setup()
     const onRepairProposal = vi.fn()
     const onSendMessage = vi.fn()
-    renderStudio({ proposal: directProposal(), onRepairProposal, onSendMessage })
+    renderStudioWithAi({ proposal: directProposal(), onRepairProposal, onSendMessage })
 
     const primary = screen.getByLabelText(/main text/i)
     await user.clear(primary)
@@ -360,7 +374,7 @@ describe('StudioScreen', () => {
     const user = userEvent.setup()
     const accepted = projectWithNameplate()
     const onExport = vi.fn()
-    const { rerender, props } = renderStudio({ editProject: accepted, onExport })
+    const { rerender, props } = renderStudioWithAi({ editProject: accepted, onExport })
 
     await user.click(screen.getByRole('button', { name: /export video/i }))
     expect(onExport).toHaveBeenCalledOnce()
@@ -384,7 +398,7 @@ describe('StudioScreen', () => {
   })
 
   it('shows whether canonical edit history is saving, saved, or unsafe to leave', () => {
-    const { rerender, props } = renderStudio({ saveState: 'saving' })
+    const { rerender, props } = renderStudioWithAi({ saveState: 'saving' })
     expect(screen.getByRole('status', { name: /project save status/i })).toHaveTextContent(/saving/i)
 
     rerender(<StudioScreen {...props} saveState="saved" />)
@@ -405,11 +419,11 @@ describe('StudioScreen', () => {
   })
 
   it('builds the five-region Studio frame around one existing video editor', () => {
-    const { container } = renderStudio()
+    const { container } = renderStudioWithAi()
 
-    expect(screen.getByRole('region', { name: 'Project media' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Media dock' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Program canvas' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Inspector' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Inspector', hidden: true })).toBeInTheDocument()
     expect(screen.getByRole('complementary', { name: 'AI edit panel' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Timeline workspace' })).toBeInTheDocument()
     expect(container.querySelectorAll('video')).toHaveLength(1)
@@ -418,7 +432,7 @@ describe('StudioScreen', () => {
   it('shows the current project assets in the usable Media Bin', () => {
     renderStudio()
 
-    const media = screen.getByRole('region', { name: 'Project media' })
+    const media = screen.getByRole('region', { name: 'Media dock' })
     expect(within(media).getByText('cleaned-interview.mp4')).toBeInTheDocument()
     expect(within(media).getByLabelText(/cleaned-interview\.mp4, Video, Used 1 time/i)).toBeInTheDocument()
     expect(within(media).getByLabelText(/cleaned-interview\.mp4, Video, Used 1 time/i)).toHaveTextContent('Video · 30 sec')
@@ -431,7 +445,7 @@ describe('StudioScreen', () => {
       editProject: { ...testProject(), assets: [] },
     })
 
-    expect(screen.getByRole('region', { name: 'Project media' }))
+    expect(screen.getByRole('region', { name: 'Media dock' }))
       .toHaveTextContent(/no media yet/i)
     expect(screen.getByRole('region', { name: 'Inspector' }))
       .toHaveTextContent(/nothing selected/i)
@@ -440,7 +454,7 @@ describe('StudioScreen', () => {
 
   it('keeps the same chat composer and unsent text while the AI panel collapses', async () => {
     const user = userEvent.setup()
-    renderStudio()
+    renderStudioWithAi()
 
     const composer = screen.getByRole('textbox', { name: /ask for an edit/i })
     await user.type(composer, 'keep this draft')
@@ -458,7 +472,7 @@ describe('StudioScreen', () => {
 
   it('shows a pending-proposal indicator while the AI panel is collapsed', async () => {
     const user = userEvent.setup()
-    renderStudio({ proposal: directProposal() })
+    renderStudioWithAi({ proposal: directProposal() })
 
     await user.click(screen.getByRole('button', { name: /collapse ai panel/i }))
 
@@ -560,7 +574,7 @@ describe('StudioScreen', () => {
     })
     act(() => resizeObserverCallback?.([], {} as ResizeObserver))
 
-    expect(marker).toHaveStyle({ left: '27.777778%', top: '25%' })
+    await waitFor(() => expect(marker).toHaveStyle({ left: '27.777778%', top: '25%' }))
   })
 
   it('focuses a keyboard cursor, moves it in normalized steps, and captures at the current time', async () => {
@@ -813,7 +827,7 @@ describe('StudioScreen', () => {
   })
 
   it('describes the proposal duration from the typed action', () => {
-    renderStudio({
+    renderStudioWithAi({
       proposal: directProposal(testOperation({
         operationId: 'operation_studio02',
         sourceInterval: { start: ms(12_400), duration: ms(2_500) },
@@ -829,7 +843,7 @@ describe('StudioScreen', () => {
     const user = userEvent.setup()
     const onAcceptProposal = vi.fn()
     const onDiscardProposal = vi.fn()
-    renderStudio({ proposal: directProposal(), onAcceptProposal, onDiscardProposal })
+    renderStudioWithAi({ proposal: directProposal(), onAcceptProposal, onDiscardProposal })
 
     await user.click(screen.getByRole('button', { name: /^accept proposal$/i }))
     await user.click(screen.getByRole('button', { name: /^reject proposal$/i }))
@@ -841,7 +855,7 @@ describe('StudioScreen', () => {
   it('moves focus to an announced result after a proposal is accepted', async () => {
     const user = userEvent.setup()
     const onAcceptProposal = vi.fn()
-    const { rerender } = renderStudio({ proposal: directProposal(), onAcceptProposal })
+    const { rerender } = renderStudioWithAi({ proposal: directProposal(), onAcceptProposal })
 
     await user.click(screen.getByRole('button', { name: /^accept proposal$/i }))
     expect(onAcceptProposal).toHaveBeenCalledOnce()
@@ -948,7 +962,7 @@ describe('StudioScreen', () => {
   })
 
   it('shows edit transition failures visibly', () => {
-    renderStudio({ editError: 'This proposal could not be accepted.' })
+    renderStudioWithAi({ editError: 'This proposal could not be accepted.' })
 
     expect(screen.getByRole('alert')).toHaveTextContent(/could not be accepted/i)
   })

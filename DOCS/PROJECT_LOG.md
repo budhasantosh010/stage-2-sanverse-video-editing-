@@ -1,5 +1,16 @@
 # Project Log
 
+## 2026-08-01 — P1-F.0.1 Studio Workspaces and Docking V1 complete
+
+- Added accessible Studio-only Edit, Effects, Color, and Audio workspace views over the existing single editor, project, history, playhead, Timeline, selection, Canvas/Inspector draft, video, AI conversation, proposal, preview, and export authorities.
+- Added a closed `sanverse.workspace-layout/v1` local presentation contract with strict validation, viewport clamps, fail-closed recovery, Edit/Motion/Timeline/Review/AI/Audio presets, reset, collapsible docks, and bounded pointer/keyboard splitters with Escape cancellation.
+- Kept Tool and AI permanently mounted so hidden AI drafts and proposal state survive Assist/Studio, workspace, and dock switching; proposed Timeline items now reveal their authoritative Tool/Inspector actions.
+- Reused only existing capabilities: Edit uses Media/Inspector, Effects uses current motion/visual effects, Color states unsupported primary-video grading truthfully, and Audio uses existing V1/A1/A2 controls without pretending waveforms, EQ, compression, mixing, or cleanup exist.
+- Real Edge completed all workspaces, Tool/AI continuity, every preset, all splitters, dock collapse/reset, Point precedence, 1440×900 / 1024×768 / 390×844 responsive checks, export, and Home cleanup. One video and the AI draft survived; revision stayed 15→15; horizontal overflow and page/console/HTTP errors were zero.
+- Export probe: H.264 High 1920×1080 at 30 fps, AAC-LC stereo 48 kHz, 18.033333 seconds, 10,789,990 bytes, SHA-256 `176c85e64e8c44dc99cb8f65e4ccb5a5a221ac96da045d5f178ec8971eb59451`.
+- Final suites pass API 239/239, web 515/515, edit-domain 299/299, render-contract 65/65, intent-domain 27/27 — 1,145/1,145 total; all-workspace build passes.
+- P1-F.1 and P1-F.2 were not started.
+
 ## 2026-08-01 — P1-F.0 Primary-Footage Motion V1 complete
 
 - Added one stable, source-anchored `set-footage-motion` identity with full-state position, uniform scale, rotation, crop, and bounded keyframe/easing repairs.

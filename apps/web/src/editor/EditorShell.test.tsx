@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { EditorShell, type EditorWorkspace } from './EditorShell'
+import type { StudioWorkspace } from './workspace'
 
 afterEach(cleanup)
 
@@ -33,10 +34,12 @@ function ShellHarness({
   isExporting?: boolean
 }) {
   const [workspace, setWorkspace] = useState<EditorWorkspace>('assist')
+  const [studioWorkspace, setStudioWorkspace] = useState<StudioWorkspace>('edit')
 
   return (
     <EditorShell
       workspace={workspace}
+      studioWorkspace={studioWorkspace}
       projectName="cleaned-interview.mp4"
       saveState="saved"
       undoDisabledReason={undoDisabledReason}
@@ -44,6 +47,7 @@ function ShellHarness({
       exportDisabledReason={exportDisabledReason}
       isExporting={isExporting}
       onWorkspaceChange={setWorkspace}
+      onStudioWorkspaceChange={setStudioWorkspace}
       onBack={vi.fn()}
       onUndo={onUndo}
       onRedo={vi.fn()}
@@ -75,6 +79,28 @@ describe('EditorShell', () => {
     )
     expect(screen.getByRole('textbox', { name: /preserved editor state/i })).toBe(editorInput)
     expect(editorInput).toHaveValue('playhead and proposal stay here')
+  })
+
+  it('shows advanced workspace tabs only in Studio and remembers the last Studio workspace', async () => {
+    const user = userEvent.setup()
+    render(<ShellHarness />)
+
+    expect(screen.queryByRole('tablist', { name: 'Studio workspaces' })).not.toBeInTheDocument()
+    const editorInput = screen.getByRole('textbox', { name: /preserved editor state/i })
+    await user.type(editorInput, 'one editor')
+
+    await user.click(screen.getByRole('button', { name: /studio workspace/i }))
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Edit', 'Effects', 'Color', 'Audio'])
+    await user.click(screen.getByRole('tab', { name: 'Effects' }))
+    expect(screen.getByRole('tab', { name: 'Effects' })).toHaveAttribute('aria-selected', 'true')
+
+    await user.click(screen.getByRole('button', { name: /assist workspace/i }))
+    expect(screen.queryByRole('tablist', { name: 'Studio workspaces' })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: /preserved editor state/i })).toBe(editorInput)
+    expect(editorInput).toHaveValue('one editor')
+
+    await user.click(screen.getByRole('button', { name: /studio workspace/i }))
+    expect(screen.getByRole('tab', { name: 'Effects' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('keeps shared project, save, history and export actions in the persistent top bar', async () => {

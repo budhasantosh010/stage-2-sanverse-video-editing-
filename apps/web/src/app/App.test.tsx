@@ -604,10 +604,21 @@ describe('App', () => {
     if (video) video.currentTime = 7.5
 
     await user.click(screen.getByRole('button', { name: /studio workspace/i }))
+    await user.click(screen.getByRole('tab', { name: 'AI' }))
     expect(container.querySelectorAll('video')).toHaveLength(1)
     expect(container.querySelector('video')).toBe(video)
     expect(video?.currentTime).toBe(7.5)
     expect(screen.getByRole('textbox', { name: /ask for an edit/i })).toHaveValue('keep this unsent')
+
+    for (const workspaceName of ['Effects', 'Color', 'Audio', 'Edit']) {
+      await user.click(screen.getByRole('tab', { name: workspaceName }))
+      expect(screen.getByRole('tab', { name: workspaceName })).toHaveAttribute('aria-selected', 'true')
+      expect(container.querySelectorAll('video')).toHaveLength(1)
+      expect(container.querySelector('video')).toBe(video)
+      expect(video?.currentTime).toBe(7.5)
+      expect(screen.getByRole('textbox', { name: /ask for an edit/i })).toHaveValue('keep this unsent')
+      expect(api.current().revision).toBe(base.revision)
+    }
 
     await user.click(screen.getByRole('button', { name: /assist workspace/i }))
     expect(container.querySelectorAll('video')).toHaveLength(1)
@@ -636,6 +647,14 @@ describe('App', () => {
     expect(video?.currentTime).toBe(7.5)
     expect(screen.getByLabelText(/main text/i)).toHaveValue('Santosh Budha')
 
+    for (const workspaceName of ['Effects', 'Color', 'Audio', 'Edit']) {
+      await user.click(screen.getByRole('tab', { name: workspaceName }))
+      expect(screen.getByText(/suggested by the assistant/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/main text/i)).toHaveValue('Santosh Budha')
+      expect(container.querySelectorAll('video')).toHaveLength(1)
+      expect(api.current().revision).toBe(base.revision)
+    }
+
     await user.click(screen.getByRole('button', { name: /assist workspace/i }))
     expect(screen.getByText(/suggested by the assistant/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/main text/i)).toHaveValue('Santosh Budha')
@@ -653,5 +672,5 @@ describe('App', () => {
       expect.objectContaining({ primaryText: 'Santosh Budha' }),
     )
     expect(intentCalls).toBe(1)
-  })
+  }, 15_000)
 })

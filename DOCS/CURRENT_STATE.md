@@ -4,17 +4,21 @@ Last updated: 2026-08-01
 
 ## Active goal
 
-**P1-F.0 - Primary-Footage Motion V1 is technically complete on 2026-08-01.** The main talking-head footage now has one source-anchored, stable motion identity with full-state position, uniform scale, rotation, crop, and bounded keyframe repairs. The same exact-time evaluator drives the one-video browser canvas projection and FFmpeg expressions. Motion survives split, trim, gap, remove, reorder, Undo, Redo, and repeated source placements because it follows immutable source moments rather than temporary clip IDs.
+**P1-F.0.1 - Studio Workspaces and Docking V1 is technically complete on 2026-08-01.** Studio now exposes Edit, Effects, Color, and Audio as accessible Studio-only workspace views over one existing editor authority. The same `EditProject`, revision, accepted history, Undo/Redo stacks, playhead, Timeline selection and viewport, Canvas/Inspector draft, native video, AI conversation, pending proposal, preview, and export path survive every workspace and Tool/AI dock switch.
 
-Studio exposes Motion Inspector presets, numeric controls, keyframes/easing, Apply/Reset/Remove, a V1 Timeline Motion indicator, and direct Canvas move/scale/rotate/crop. Pointer movement stays detached; release creates one operation; Escape creates none; Point mode owns the picture while active. Narrow screens retain numeric controls and explain why precision handles require a wider screen. The legacy overlay Canvas layer no longer displays a false unsupported message for primary footage.
+Layout state is a separate closed `sanverse.workspace-layout/v1` presentation contract. It validates and clamps left/right dock widths, Timeline height, collapse state, active Tool/AI tab, active workspace, and bounded Edit/Motion/Timeline/Review/AI/Audio presets before local persistence. Pointer and keyboard splitters support bounded movement, Home/End, Shift steps, and Escape cancellation. Compact layouts use explicit Media and Tool/AI switches without creating a second editor or page-scroll authority.
 
-Real Edge completed static motion, Canvas repair, Undo/Redo, Point precedence, animated zoom, split/Undo/Redo, a real 1080p H.264/AAC export, tablet/mobile layouts, and Home cleanup with zero page, console, or failed-HTTP errors. Final suites pass API 239/239, web 484/484, edit-domain 299/299, intent-domain 27/27, and render-contract 65/65: **1,114/1,114 total**, plus the all-workspace build. Evidence: `DOCS/evidence/2026-08-01-p1f0-primary-footage-motion-v1/`.
+Workspace content is truthful. Edit reuses Media and Inspector; Effects exposes only current footage-motion and visual-effect capability; Color explicitly says primary-video grading is not implemented; Audio reuses existing V1/A1/A2 gain/fade/enabled controls and does not fake waveforms, EQ, compression, mixing, or cleanup. Layout changes use the existing throttled geometry refresh and create no edit operation, project rebuild, or revision.
+
+Real Microsoft Edge completed Assist → Studio, all four workspaces, Tool/AI continuity, every preset, all three keyboard splitters, dock collapse/reset, Point precedence, 1440×900 / 1024×768 / 390×844 responsive checks, export, and Home cleanup. The same video and AI draft survived; project revision stayed `15 → 15`; tablet/mobile had no horizontal overflow; page errors, console errors, and failed local HTTP responses were all zero. The browser-triggered export probed as 1920×1080 H.264 High at 30 fps with AAC-LC stereo, 18.033333 seconds, 10,789,990 bytes, SHA-256 `176c85e64e8c44dc99cb8f65e4ccb5a5a221ac96da045d5f178ec8971eb59451`. Final suites pass API 239/239, web 514/514, edit-domain 299/299, intent-domain 27/27, and render-contract 65/65: **1,144/1,144 total**, plus the all-workspace build. Evidence: `DOCS/evidence/2026-08-01-p1f01-studio-workspaces-docking-v1/`.
+
+**P1-F.0 - Primary-Footage Motion V1 remains complete.** Its source-anchored motion identity, shared evaluator, Inspector/Canvas controls, preview/export parity, and prior evidence remain authoritative at `DOCS/evidence/2026-08-01-p1f0-primary-footage-motion-v1/`.
 
 **P1-E.1 - Studio Vertical Flow remains complete.** The browser document is the one outer vertical-scroll authority. Studio uses natural height and normal-flow rows, while Media, Inspector, and AI retain intentional internal scrolling. Evidence: `DOCS/evidence/2026-08-01-p1e1-studio-vertical-flow/`.
 
 **P1-E - Media Bin V1 remains complete.** Import, search, filters, shared labels, usage, source probing, B-roll/music placement, missing-media truth, and responsive behavior remain intact. Evidence: `DOCS/evidence/2026-07-31-p1e-media-bin-v1/`.
 
-**P1-B remains the Production Timeline authority, P1-C the contextual Inspector, P1-D the overlay Canvas interaction layer, P1-E the Media Bin, and P1-F.0 the primary-footage motion authority. P1-F.1 and P1-F.2 have not started.**
+**P1-B remains the Production Timeline authority, P1-C the contextual Inspector, P1-D the overlay Canvas interaction layer, P1-E the Media Bin, P1-F.0 the primary-footage motion authority, and P1-F.0.1 the Studio workspace/docking presentation authority. P1-F.1 and P1-F.2 have not started.**
 
 **P1-B.1 repository-wide test truth is complete and owner-approved on 2026-07-30.** The three
 previously recorded verification failures are resolved without product changes:
@@ -154,12 +158,12 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
   render-contract   65
   intent-domain     27
   api              239
-  web              484
+  web              515
   ------------------------
-  total           1114 passing; all workspace builds clean
+  total           1145 passing; all workspace builds clean
 ```
 
-These are the final P1-F.0 closure totals from sequential commands on 2026-08-01.
+These are the final P1-F.0.1 closure totals from sequential commands on 2026-08-01.
 
 Focused P0-B/P0-C evidence on 2026-07-29: 12/12 web continuity tests passed
 (`EditorShell.test.tsx` plus `App.test.tsx`) and the web production build passed.

@@ -1,0 +1,241 @@
+.editor-shell__studio-workspaces {
+  position: sticky;
+  z-index: 19;
+  top: 64px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  border-bottom: 1px solid var(--color-border);
+  padding: 6px 16px;
+  background: rgb(247 247 245 / 96%);
+  backdrop-filter: blur(14px);
+}
+
+.studio-workspace-tabs,
+.workspace-right-dock__tabs {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.studio-workspace-tabs button,
+.workspace-right-dock__tabs button {
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 14px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.studio-workspace-tabs button[aria-selected="true"],
+.workspace-right-dock__tabs button[aria-selected="true"] {
+  border-color: var(--color-border-strong);
+  background: var(--color-ink);
+  color: var(--color-surface);
+}
+
+.studio-workspace-tabs button:focus-visible,
+.workspace-right-dock__tabs button:focus-visible,
+.workspace-splitter:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.workspace-preset-menu {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  margin-left: auto;
+}
+
+.workspace-preset-menu label {
+  display: grid;
+  gap: 2px;
+  color: var(--color-text-muted);
+  font-size: 0.62rem;
+  font-weight: 720;
+  text-transform: uppercase;
+}
+
+.workspace-preset-menu select,
+.workspace-preset-menu button {
+  min-height: 34px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  padding: 5px 9px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 0.72rem;
+}
+
+.workspace-splitter {
+  position: relative;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  touch-action: none;
+}
+
+.workspace-splitter--horizontal {
+  width: 12px;
+  cursor: col-resize;
+}
+
+.workspace-splitter--vertical {
+  width: 100%;
+  min-height: 12px;
+  cursor: row-resize;
+}
+
+.workspace-splitter span {
+  display: block;
+  border-radius: 999px;
+  background: var(--color-border-strong);
+}
+
+.workspace-splitter--horizontal span {
+  width: 2px;
+  height: 48px;
+}
+
+.workspace-splitter--vertical span {
+  width: 64px;
+  height: 2px;
+}
+
+.workspace-splitter:hover span,
+.workspace-splitter:focus-visible span {
+  background: var(--color-ink);
+}
+
+.workspace-right-dock {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+  border: var(--border-subtle);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.workspace-right-dock--assist {
+  display: contents;
+}
+
+.workspace-right-dock__tabs {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--color-border-soft);
+  padding: 8px;
+}
+
+.workspace-right-dock > [role="tabpanel"] {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.workspace-right-dock > [role="tabpanel"][hidden] {
+  display: none;
+}
+
+.studio-workspace-panel {
+  min-height: 0;
+  height: 100%;
+  border: var(--border-subtle);
+  border-radius: var(--radius-panel);
+  padding: 14px;
+  background: var(--color-surface);
+  overflow: auto;
+}
+
+.studio-workspace-panel h2 {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+}
+
+.studio-workspace-panel p,
+.studio-workspace-panel dt,
+.studio-workspace-panel dd {
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.studio-workspace-panel dl > div {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--color-border-soft);
+  padding: 7px 0;
+}
+
+.studio-workspace-panel dd {
+  margin: 0;
+  text-align: right;
+}
+
+.studio-workspace-panel__categories,
+.studio-workspace-panel__truth {
+  color: var(--color-text-muted);
+}
+
+.studio-workspace-panel__cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.studio-workspace-panel__cards button {
+  min-height: 44px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 9px;
+  padding: 8px;
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  .editor-shell__studio-workspaces {
+    position: relative;
+    top: auto;
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+
+  .workspace-preset-menu {
+    flex: 0 0 auto;
+  }
+
+  .workspace-splitter {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .editor-shell__studio-workspaces {
+    padding-inline: 10px;
+  }
+
+  .studio-workspace-tabs {
+    flex: 0 0 auto;
+  }
+
+  .workspace-preset-menu label span,
+  .workspace-preset-menu button {
+    display: none;
+  }
+}

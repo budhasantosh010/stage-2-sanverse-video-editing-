@@ -128,7 +128,7 @@ describe('shared visual and accessibility contract', () => {
     expect(studioRule).toContain('grid-template-rows: auto auto')
     expect(studioRule).toContain('overflow: visible')
     expect(studioRule).not.toMatch(/(?:^|\n)\s*height:\s*calc\(100vh\s*-\s*64px\)/)
-    expect(timelineRule).toContain('min-height: 390px')
+    expect(timelineRule).toContain('min-height: var(--studio-timeline-height, 390px)')
     expect(timelineRule).toContain('overflow: visible')
   })
 

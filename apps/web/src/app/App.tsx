@@ -44,6 +44,7 @@ import { probeMediaSourceStatus } from '../features/media'
 import { HomeScreen } from '../screens/home/HomeScreen'
 import { StudioScreen } from '../screens/studio/StudioScreen'
 import { EditorShell, type EditorWorkspace } from '../editor/EditorShell'
+import { loadWorkspaceLayout, type StudioWorkspace } from '../editor/workspace'
 
 const probeProjectMediaSource = (url: string) => probeMediaSourceStatus(url, fetch)
 
@@ -62,6 +63,10 @@ export function App() {
   const [isOpeningRecent, setIsOpeningRecent] = useState(false)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [workspace, setWorkspace] = useState<EditorWorkspace>('assist')
+  const [studioWorkspace, setStudioWorkspace] = useState<StudioWorkspace>(() => {
+    if (typeof window === 'undefined') return 'edit'
+    return loadWorkspaceLayout(window.localStorage, { width: window.innerWidth, height: window.innerHeight }).activeWorkspace
+  })
   const [assetOriginalNames, setAssetOriginalNames] = useState<Readonly<Record<string, string>>>({})
   const intakeAbortRef = useRef<AbortController | null>(null)
   const intakeInFlightRef = useRef(false)
@@ -318,6 +323,7 @@ export function App() {
   return (
     <EditorShell
       workspace={workspace}
+      studioWorkspace={studioWorkspace}
       projectName={appState.project.name}
       saveState={saveState}
       undoDisabledReason={undoDisabledReason}
@@ -325,6 +331,7 @@ export function App() {
       exportDisabledReason={exportDisabledReason}
       isExporting={exportState.status === 'rendering'}
       onWorkspaceChange={setWorkspace}
+      onStudioWorkspaceChange={setStudioWorkspace}
       onBack={() => {
         resetExport()
         const transitionSequence = transitionSequenceRef.current + 1
@@ -367,6 +374,8 @@ export function App() {
       <StudioScreen
       embedded
       workspace={workspace}
+      studioWorkspace={studioWorkspace}
+      onStudioWorkspaceChange={setStudioWorkspace}
       onWorkspaceChange={setWorkspace}
       project={appState.project}
       proposal={appState.proposal}

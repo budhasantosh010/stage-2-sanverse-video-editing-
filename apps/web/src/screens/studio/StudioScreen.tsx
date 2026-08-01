@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { AddNameplateOperation, EditProject, TimelineOperation } from '@sanverse/edit-domain'
 import {
   DEFAULT_CAPTION_STYLE_ID,
@@ -88,6 +88,23 @@ import {
 import { Timeline, reconcileTimelineSelection } from '../../editor/timeline'
 import { MediaBin } from '../../editor/media'
 import {
+  WORKSPACE_CONSTRAINTS,
+  WorkspacePresetMenu,
+  WorkspaceRightDock,
+  WorkspaceSplitter,
+  StudioWorkspacePanel,
+  applyWorkspacePreset,
+  clampWorkspaceLayout,
+  loadWorkspaceLayout,
+  resetWorkspaceLayout,
+  saveWorkspaceLayout,
+  withCustomWorkspaceLayout,
+  workspaceTimelineMaximum,
+  type StudioWorkspace,
+  type WorkspaceLayoutV1,
+  type WorkspaceRightTab,
+} from '../../editor/workspace'
+import {
   buildAddAsBrollOperation,
   buildAddAsMusicOperation,
   buildMediaBinViewModel,
@@ -112,6 +129,7 @@ const EMPTY_ASSET_ORIGINAL_NAMES: Readonly<Record<string, string>> = Object.free
 export type StudioScreenProps = {
   embedded?: boolean
   workspace?: EditorWorkspace
+  studioWorkspace?: StudioWorkspace
   project: StudioState['project']
   proposal: PendingProposal | null
   conversation: ConversationState
@@ -148,6 +166,7 @@ export type StudioScreenProps = {
   onExport(): void
   onBack(): void
   onWorkspaceChange?(workspace: EditorWorkspace): void
+  onStudioWorkspaceChange?(workspace: StudioWorkspace): void
 }
 
 const EXPORT_DESCRIPTION = 'studio-export-description'
@@ -229,6 +248,7 @@ function getVideoContentLayerStyle(video: HTMLVideoElement) {
 export function StudioScreen({
   embedded = false,
   workspace = 'studio',
+  studioWorkspace = 'edit',
   project,
   proposal,
   conversation,
@@ -253,6 +273,7 @@ export function StudioScreen({
   onExport,
   onBack,
   onWorkspaceChange,
+  onStudioWorkspaceChange,
 }: StudioScreenProps) {
   const draftRequest = project.draftRequest.trim()
   const [hasPreviewError, setHasPreviewError] = useState(false)
@@ -306,6 +327,13 @@ export function StudioScreen({
   const [fadeOutSeconds, setFadeOutSeconds] = useState(0)
   const [captionsNotice, setCaptionsNotice] = useState<string | null>(null)
   const [captionsBusy, setCaptionsBusy] = useState(false)
+  const [workspaceLayout, setWorkspaceLayout] = useState<WorkspaceLayoutV1>(() => {
+    const currentViewport = typeof window === 'undefined'
+      ? Object.freeze({ width: 1440, height: 900 })
+      : Object.freeze({ width: window.innerWidth, height: window.innerHeight })
+    const loaded = loadWorkspaceLayout(typeof window === 'undefined' ? null : window.localStorage, currentViewport)
+    return Object.freeze({ ...loaded, activeWorkspace: studioWorkspace })
+  })
   const videoRef = useRef<HTMLVideoElement>(null)
   const footageMotionCanvasRef = useRef<HTMLCanvasElement>(null)
   const footagePlanRef = useRef<ReturnType<typeof compilePreviewPlan>>(null)
@@ -318,12 +346,66 @@ export function StudioScreen({
   const proposalResultRef = useRef<HTMLParagraphElement>(null)
   const exportResultRef = useRef<HTMLElement>(null)
   const pendingProposalResolutionRef = useRef<'accepted' | 'discarded' | null>(null)
+  const geometryRefreshFrameRef = useRef<number | null>(null)
+  const layoutWriteCountRef = useRef(0)
+
+  const viewport = () => typeof window === 'undefined'
+    ? Object.freeze({ width: 1440, height: 900 })
+    : Object.freeze({ width: window.innerWidth, height: window.innerHeight })
+
+  const requestGeometryRefresh = () => {
+    if (geometryRefreshFrameRef.current !== null) return
+    geometryRefreshFrameRef.current = requestAnimationFrame(() => {
+      geometryRefreshFrameRef.current = null
+      setVideoLayoutRevision((revision) => revision + 1)
+    })
+  }
+
+  const persistWorkspaceLayout = (next: WorkspaceLayoutV1) => {
+    if (typeof window === 'undefined') return
+    if (saveWorkspaceLayout(window.localStorage, next)) layoutWriteCountRef.current += 1
+  }
+
+  const updateWorkspaceLayout = (
+    patch: Partial<Omit<WorkspaceLayoutV1, 'schemaVersion' | 'preset'>>,
+    persist = false,
+  ) => {
+    setWorkspaceLayout((current) => {
+      const next = withCustomWorkspaceLayout(current, patch, viewport())
+      if (persist) persistWorkspaceLayout(next)
+      return next
+    })
+    requestGeometryRefresh()
+  }
+
+  const setRightDockTab = (activeRightTab: WorkspaceRightTab) => {
+    if (activeRightTab === 'ai') setIsAiPanelCollapsed(false)
+    updateWorkspaceLayout({ activeRightTab, aiExpanded: activeRightTab === 'ai' }, true)
+  }
 
   useEffect(() => {
-    const update = () => setCanvasNarrow(window.innerWidth < 600)
+    const update = () => {
+      setCanvasNarrow(window.innerWidth < 600)
+      setWorkspaceLayout((current) => clampWorkspaceLayout(current, viewport()))
+      requestGeometryRefresh()
+    }
     update()
-    window.addEventListener('resize', update)
+    window.addEventListener('resize', update, { passive: true })
     return () => window.removeEventListener('resize', update)
+  }, [])
+
+  useEffect(() => {
+    setWorkspaceLayout((current) => {
+      if (current.activeWorkspace === studioWorkspace) return current
+      const next = clampWorkspaceLayout(Object.freeze({ ...current, activeWorkspace: studioWorkspace }), viewport())
+      persistWorkspaceLayout(next)
+      return next
+    })
+    requestGeometryRefresh()
+  }, [studioWorkspace])
+
+  useEffect(() => () => {
+    if (geometryRefreshFrameRef.current !== null) cancelAnimationFrame(geometryRefreshFrameRef.current)
   }, [])
 
   useEffect(() => {
@@ -384,7 +466,7 @@ export function StudioScreen({
     const video = videoRef.current
     if (!video) return
 
-    const refreshProjection = () => setVideoLayoutRevision((revision) => revision + 1)
+    const refreshProjection = requestGeometryRefresh
     const drawFootageMotion = (compositionTicks: number) => {
       const canvas = footageMotionCanvasRef.current
       const plan = footagePlanRef.current
@@ -1451,8 +1533,238 @@ export function StudioScreen({
     </div>
   )
 
+  const conversationPanel = (
+        <aside
+          className={`studio-screen__conversation${workspace === 'studio' && isAiPanelCollapsed ? ' studio-screen__conversation--collapsed' : ''}`}
+          aria-label={workspace === 'studio' ? 'AI edit panel' : 'Conversation'}
+        >
+          <div className="studio-screen__panel-heading">
+            <div>
+              <span className="studio-screen__section-index">{workspace === 'assist' ? '02' : '04'}</span>
+              <h2>{workspace === 'assist' ? 'Ask Sanverse' : 'AI edits'}</h2>
+            </div>
+            <div className="studio-screen__panel-heading-actions">
+              {workspace === 'studio' && isAiPanelCollapsed && proposal ? (
+                <span
+                  className="studio-screen__pending-indicator"
+                  role="status"
+                  aria-label="Pending AI proposal"
+                >
+                  1 pending
+                </span>
+              ) : null}
+              <span className="studio-screen__unavailable-tag">
+                {workspace === 'assist' ? 'Nothing applies without Accept' : 'Preview mode'}
+              </span>
+              {workspace === 'studio' ? (
+                <button
+                  className="studio-screen__ai-toggle"
+                  type="button"
+                  aria-controls="studio-ai-panel-content"
+                  aria-expanded={!isAiPanelCollapsed}
+                  aria-label={isAiPanelCollapsed ? 'Expand AI panel' : 'Collapse AI panel'}
+                  onClick={() => setIsAiPanelCollapsed((current) => {
+                    const nextCollapsed = !current
+                    updateWorkspaceLayout({ aiExpanded: !nextCollapsed }, true)
+                    return nextCollapsed
+                  })}
+                >
+                  {isAiPanelCollapsed ? 'Open' : 'Hide'}
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <div
+            id="studio-ai-panel-content"
+            className="studio-screen__ai-panel-content"
+            hidden={workspace === 'studio' && isAiPanelCollapsed}
+          >
+          <ChatComposer
+            conversation={conversation}
+            canSend={!proposal}
+            disabledReason={
+              proposal ? 'Accept or reject the pending proposal before asking for another edit.' : null
+            }
+            onSend={(message) => onSendMessage(message, buildIntentContext())}
+          />
+
+          <section className="studio-screen__draft" aria-labelledby="studio-draft-label">
+            <h3 id="studio-draft-label">Draft — not executed</h3>
+            {draftRequest ? (
+              <p>{draftRequest}</p>
+            ) : (
+              <p className="studio-screen__empty-copy">No draft request yet.</p>
+            )}
+          </section>
+
+          <AssistProposalPanel
+            proposal={proposal}
+            conversation={conversation}
+            editError={editError}
+            placedStartMs={proposalStartMs}
+            durationMs={proposalDurationMs}
+            summaryRef={proposalSummaryRef}
+            onAccept={handleAcceptProposal}
+            onReject={handleDiscardProposal}
+            onOpenStudio={() => onWorkspaceChange?.('studio')}
+            showOpenStudio={workspace === 'assist'}
+          >
+            {proposal ? (
+              <NameplateRepair
+                placedStartMs={proposalStartMs}
+                proposal={proposal.operation}
+                playheadMs={Math.max(0, playheadMs)}
+                isMovingPoint={isMovingProposalPoint}
+                onRepair={onRepairProposal}
+                onMovePoint={startMovingProposalPoint}
+              />
+            ) : null}
+          </AssistProposalPanel>
+
+          {proposalResult ? (
+            <p
+              ref={proposalResultRef}
+              className="studio-screen__proposal-result"
+              role="status"
+              aria-label="Proposal result"
+              tabIndex={-1}
+            >
+              {proposalResult}
+            </p>
+          ) : null}
+
+          {workspace === 'studio' ? <section className="studio-screen__history" aria-labelledby="studio-history-label">
+            <h3 id="studio-history-label">History</h3>
+            {acceptedCount > 0 ? (
+              <ol className="studio-screen__history-list">
+                {acceptedRecords.map((record) => (
+                  <li key={record.changeSet.changeSetId}>
+                    {record.changeSet.operations.map(describeOperation).join(', ')}
+                    {record.blockedReason ? <span className="studio-screen__history-blocked"> · needs attention</span> : null}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="studio-screen__empty-copy">No accepted edits.</p>
+            )}
+            {!embedded ? <div className="studio-screen__history-actions">
+              <button
+                type="button"
+                aria-label="Undo edit"
+                disabled={Boolean(proposal) || acceptedCount === 0}
+                onClick={onUndo}
+              >
+                Undo
+              </button>
+              <button
+                type="button"
+                aria-label="Redo edit"
+                disabled={Boolean(proposal) || editProject.redoStack.length === 0}
+                onClick={onRedo}
+              >
+                Redo
+              </button>
+            </div> : null}
+            {!embedded && saveState === 'saving' ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">Saving locally…</p> : null}
+            {!embedded && saveState === 'saved' ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">Saved locally</p> : null}
+            {!embedded && saveState === 'error' ? <p className="studio-screen__save-error" role="alert">This edit is open, but it could not be saved locally.</p> : null}
+          </section> : null}
+
+          <section
+            ref={exportResultRef}
+            className="studio-screen__export-result"
+            aria-labelledby="studio-export-label"
+            tabIndex={-1}
+          >
+            <h3 id="studio-export-label">Export</h3>
+            <p id={EXPORT_DESCRIPTION} className="studio-screen__empty-copy">
+              {acceptedCount === 0
+                ? 'Accept at least one edit before exporting.'
+                : proposal
+                  ? 'Accept or discard the pending proposal before exporting.'
+                  : 'Your accepted edits are ready to render.'}
+            </p>
+            {exportState.status === 'rendering' ? (
+              <p className="studio-screen__export-progress" role="status" aria-label="Export status">Rendering and verifying your MP4…</p>
+            ) : null}
+            {exportState.status === 'error' ? (
+              <div className="studio-screen__export-error" role="alert">
+                <p>{exportState.message}</p>
+                <button type="button" onClick={onExport}>Retry export</button>
+              </div>
+            ) : null}
+            {exportState.status === 'ready' ? (
+              <div className="studio-screen__export-ready" role="status" aria-label="Export status">
+                <strong>Export ready</strong>
+                <span>{exportState.result.width} × {exportState.result.height} · {Math.round(exportState.result.durationMs / 1000)}s</span>
+                <a href={exportState.result.mediaUrl} download="sanverse-edited.mp4">Download MP4</a>
+              </div>
+            ) : null}
+          </section>
+
+          </div>
+        </aside>
+  )
+
+  const workspaceStyle = Object.freeze({
+    '--studio-left-dock-width': workspaceLayout.leftDockCollapsed ? '0px' : `${workspaceLayout.leftDockWidthPx}px`,
+    '--studio-right-dock-width': workspaceLayout.rightDockCollapsed ? '0px' : `${workspaceLayout.rightDockWidthPx}px`,
+    '--studio-timeline-height': `${workspaceLayout.timelineHeightPx}px`,
+  }) as CSSProperties
+  const leftDockLabel = studioWorkspace === 'edit'
+    ? 'Media'
+    : studioWorkspace === 'effects'
+      ? 'Effects'
+      : studioWorkspace === 'color'
+        ? 'Color'
+        : 'Audio'
+  const visualToolSupported = ['caption', 'nameplate', 'title', 'callout', 'media-overlay'].includes(inspectorSelection.kind)
+  const audioToolSupported = ['video', 'dialogue', 'music'].includes(inspectorSelection.kind)
+  const toolSupported = studioWorkspace === 'edit'
+    || (studioWorkspace === 'effects' && (visualToolSupported || inspectorSelection.kind === 'video'))
+    || (studioWorkspace === 'color' && visualToolSupported)
+    || (studioWorkspace === 'audio' && audioToolSupported)
+
+  const applyPreset = (preset: Parameters<typeof applyWorkspacePreset>[0]) => {
+    const next = applyWorkspacePreset(preset, viewport())
+    setWorkspaceLayout(next)
+    persistWorkspaceLayout(next)
+    setIsAiPanelCollapsed(!next.aiExpanded)
+    if (next.activeWorkspace !== studioWorkspace) onStudioWorkspaceChange?.(next.activeWorkspace)
+    requestGeometryRefresh()
+  }
+
+  const resetLayout = () => {
+    const next = resetWorkspaceLayout(viewport())
+    setWorkspaceLayout(next)
+    persistWorkspaceLayout(next)
+    setIsAiPanelCollapsed(false)
+    if (studioWorkspace !== 'edit') onStudioWorkspaceChange?.('edit')
+    requestGeometryRefresh()
+  }
+
+  const commitLayoutValue = (patch: Partial<Omit<WorkspaceLayoutV1, 'schemaVersion' | 'preset'>>) => {
+    setWorkspaceLayout((current) => {
+      const next = withCustomWorkspaceLayout(current, patch, viewport())
+      persistWorkspaceLayout(next)
+      return next
+    })
+    requestGeometryRefresh()
+  }
+
   return (
-    <main className={`studio-screen studio-screen--${workspace}`} onKeyDown={handlePointModeKeyDown}>
+    <main
+      id={`studio-workspace-panel-${studioWorkspace}`}
+      role={workspace === 'studio' ? 'tabpanel' : undefined}
+      aria-labelledby={workspace === 'studio' ? `studio-workspace-tab-${studioWorkspace}` : undefined}
+      className={`studio-screen studio-screen--${workspace}`}
+      data-studio-workspace={studioWorkspace}
+      data-left-collapsed={workspaceLayout.leftDockCollapsed}
+      data-right-collapsed={workspaceLayout.rightDockCollapsed}
+      style={workspaceStyle}
+      onKeyDown={handlePointModeKeyDown}
+    >
       <a className="skip-link" href="#studio-primary">Skip to video editor</a>
       {!embedded ? <header className="studio-screen__topbar">
         <button className="studio-screen__back" type="button" onClick={onBack}>
@@ -1476,6 +1788,36 @@ export function StudioScreen({
           {isRendering ? 'Exporting…' : 'Export'}
         </button>
       </header> : null}
+
+      {workspace === 'studio' ? (
+        <div className="studio-screen__workspace-toolbar" aria-label="Workspace layout controls">
+          <WorkspacePresetMenu value={workspaceLayout.preset} onApply={applyPreset} onReset={resetLayout} />
+          <div className="studio-screen__dock-visibility">
+            {!embedded ? (
+              <>
+                <button type="button" aria-label="Undo edit" disabled={Boolean(proposal) || acceptedCount === 0} onClick={onUndo}>Undo</button>
+                <button type="button" aria-label="Redo edit" disabled={Boolean(proposal) || editProject.redoStack.length === 0} onClick={onRedo}>Redo</button>
+              </>
+            ) : null}
+            <button
+              type="button"
+              aria-pressed={!workspaceLayout.leftDockCollapsed}
+              aria-label={`${workspaceLayout.leftDockCollapsed ? 'Show' : 'Hide'} ${leftDockLabel} dock`}
+              onClick={() => commitLayoutValue({ leftDockCollapsed: !workspaceLayout.leftDockCollapsed })}
+            >
+              {workspaceLayout.leftDockCollapsed ? `Show ${leftDockLabel}` : `Hide ${leftDockLabel}`}
+            </button>
+            <button
+              type="button"
+              aria-pressed={!workspaceLayout.rightDockCollapsed}
+              aria-label={`${workspaceLayout.rightDockCollapsed ? 'Show' : 'Hide'} right dock`}
+              onClick={() => commitLayoutValue({ rightDockCollapsed: !workspaceLayout.rightDockCollapsed })}
+            >
+              {workspaceLayout.rightDockCollapsed ? 'Show Tool / AI' : 'Hide Tool / AI'}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="studio-screen__workspace">
         <section
@@ -1700,47 +2042,95 @@ export function StudioScreen({
         >
           <button
             type="button"
-            aria-controls="studio-media-region"
+            aria-controls="studio-left-dock"
             aria-expanded={compactSidePanel === 'media'}
             onClick={() => setCompactSidePanel((current) => current === 'media' ? null : 'media')}
           >
-            Media
+            {leftDockLabel}
           </button>
           <button
             type="button"
-            aria-controls="studio-inspector-region"
+            aria-controls="studio-right-dock-region"
             aria-expanded={compactSidePanel === 'inspector'}
             onClick={() => setCompactSidePanel((current) => current === 'inspector' ? null : 'inspector')}
           >
-            Inspector
+            Tool / AI
           </button>
         </div>
 
         <section
-          id="studio-media-region"
+          id="studio-left-dock"
           className={`studio-screen__media${compactSidePanel === 'media' ? ' studio-screen__side-region--compact-open' : ''}`}
-          aria-label="Project media"
+          aria-label={`${leftDockLabel} dock`}
           hidden={workspace !== 'studio'}
         >
-          <div className="studio-screen__region-heading">
-            <div>
-              <span className="studio-screen__section-index">01</span>
-              <h2>Media</h2>
-            </div>
-            <span>{editProject.assets.length}</span>
-          </div>
-          <MediaBin
-            model={mediaModel}
-            selectedAssetId={selectedMediaAssetId}
-            busy={timelineBusy}
-            onSelect={setSelectedMediaAssetId}
-            onImport={importMediaFiles}
-            onAddAsBroll={addMediaAsBroll}
-            onAddAsMusic={addMediaAsMusic}
-          />
+          {studioWorkspace === 'edit' ? (
+            <>
+              <div className="studio-screen__region-heading">
+                <div>
+                  <span className="studio-screen__section-index">01</span>
+                  <h2>Media</h2>
+                </div>
+                <span>{editProject.assets.length}</span>
+              </div>
+              <MediaBin
+                model={mediaModel}
+                selectedAssetId={selectedMediaAssetId}
+                busy={timelineBusy}
+                onSelect={setSelectedMediaAssetId}
+                onImport={importMediaFiles}
+                onAddAsBroll={addMediaAsBroll}
+                onAddAsMusic={addMediaAsMusic}
+              />
+            </>
+          ) : (
+            <StudioWorkspacePanel
+              workspace={studioWorkspace}
+              selection={inspectorSelection}
+              visualDraftController={visualDraftController}
+            />
+          )}
         </section>
 
-        <div className="studio-screen__right-rail">
+        {!workspaceLayout.leftDockCollapsed ? (
+          <WorkspaceSplitter
+            className="studio-screen__left-splitter"
+            label={`Resize ${leftDockLabel} dock`}
+            orientation="horizontal"
+            value={workspaceLayout.leftDockWidthPx}
+            minimum={WORKSPACE_CONSTRAINTS.leftDockMinPx}
+            maximum={WORKSPACE_CONSTRAINTS.leftDockMaxPx}
+            onChange={(leftDockWidthPx) => updateWorkspaceLayout({ leftDockWidthPx })}
+            onCommit={(leftDockWidthPx) => commitLayoutValue({ leftDockWidthPx })}
+            onCancel={(leftDockWidthPx) => updateWorkspaceLayout({ leftDockWidthPx })}
+          />
+        ) : null}
+
+        {!workspaceLayout.rightDockCollapsed ? (
+          <WorkspaceSplitter
+            className="studio-screen__right-splitter"
+            label="Resize right dock"
+            orientation="horizontal"
+            direction={-1}
+            value={workspaceLayout.rightDockWidthPx}
+            minimum={WORKSPACE_CONSTRAINTS.rightDockMinPx}
+            maximum={WORKSPACE_CONSTRAINTS.rightDockMaxPx}
+            onChange={(rightDockWidthPx) => updateWorkspaceLayout({ rightDockWidthPx })}
+            onCommit={(rightDockWidthPx) => commitLayoutValue({ rightDockWidthPx })}
+            onCancel={(rightDockWidthPx) => updateWorkspaceLayout({ rightDockWidthPx })}
+          />
+        ) : null}
+
+        <div
+          id="studio-right-dock-region"
+          className={`studio-screen__right-rail${compactSidePanel === 'inspector' ? ' studio-screen__side-region--compact-open' : ''}`}
+        >
+          <WorkspaceRightDock
+            workspace={studioWorkspace}
+            assist={workspace === 'assist'}
+            activeTab={workspaceLayout.activeRightTab}
+            onTabChange={setRightDockTab}
+            tool={(
           <section
             ref={inspectorRegionRef}
             id="studio-inspector-region"
@@ -1749,7 +2139,12 @@ export function StudioScreen({
             tabIndex={-1}
             hidden={workspace !== 'studio'}
           >
-            {selectedVideoSelection && footageMotionDraft ? (
+            <div className="studio-screen__workspace-tool-heading">
+              <span className="studio-screen__section-index">03</span>
+              <h2>{studioWorkspace === 'edit' ? 'Inspector' : studioWorkspace === 'effects' ? 'Effect controls' : studioWorkspace === 'color' ? 'Color controls' : 'Audio controls'}</h2>
+            </div>
+            {toolSupported ? <>
+            {selectedVideoSelection && footageMotionDraft && studioWorkspace !== 'color' && studioWorkspace !== 'audio' ? (
               <FootageMotionInspector
                 draft={footageMotionDraft}
                 accepted={acceptedFootageMotion}
@@ -1786,175 +2181,16 @@ export function StudioScreen({
               visualDraftController={visualDraftController}
               onRequestCanvasCrop={() => setCanvasCropMode(true)}
             />
+            </> : (
+              <div className="studio-screen__workspace-truth" role="status">
+                <strong>{studioWorkspace === 'color' ? 'Color adjustment is not available for this item yet.' : studioWorkspace === 'audio' ? 'Select V1, A1 or A2 to use current audio controls.' : 'This item does not support visual effects yet.'}</strong>
+                {studioWorkspace === 'color' && inspectorSelection.kind === 'video' ? <p>Primary-video color controls are coming in the Creator Color milestone.</p> : null}
+              </div>
+            )}
           </section>
-
-        <aside
-          className={`studio-screen__conversation${workspace === 'studio' && isAiPanelCollapsed ? ' studio-screen__conversation--collapsed' : ''}`}
-          aria-label={workspace === 'studio' ? 'AI edit panel' : 'Conversation'}
-        >
-          <div className="studio-screen__panel-heading">
-            <div>
-              <span className="studio-screen__section-index">{workspace === 'assist' ? '02' : '04'}</span>
-              <h2>{workspace === 'assist' ? 'Ask Sanverse' : 'AI edits'}</h2>
-            </div>
-            <div className="studio-screen__panel-heading-actions">
-              {workspace === 'studio' && isAiPanelCollapsed && proposal ? (
-                <span
-                  className="studio-screen__pending-indicator"
-                  role="status"
-                  aria-label="Pending AI proposal"
-                >
-                  1 pending
-                </span>
-              ) : null}
-              <span className="studio-screen__unavailable-tag">
-                {workspace === 'assist' ? 'Nothing applies without Accept' : 'Preview mode'}
-              </span>
-              {workspace === 'studio' ? (
-                <button
-                  className="studio-screen__ai-toggle"
-                  type="button"
-                  aria-controls="studio-ai-panel-content"
-                  aria-expanded={!isAiPanelCollapsed}
-                  aria-label={isAiPanelCollapsed ? 'Expand AI panel' : 'Collapse AI panel'}
-                  onClick={() => setIsAiPanelCollapsed((current) => !current)}
-                >
-                  {isAiPanelCollapsed ? 'Open' : 'Hide'}
-                </button>
-              ) : null}
-            </div>
-          </div>
-
-          <div
-            id="studio-ai-panel-content"
-            className="studio-screen__ai-panel-content"
-            hidden={workspace === 'studio' && isAiPanelCollapsed}
-          >
-          <ChatComposer
-            conversation={conversation}
-            canSend={!proposal}
-            disabledReason={
-              proposal ? 'Accept or reject the pending proposal before asking for another edit.' : null
-            }
-            onSend={(message) => onSendMessage(message, buildIntentContext())}
+            )}
+            ai={conversationPanel}
           />
-
-          <section className="studio-screen__draft" aria-labelledby="studio-draft-label">
-            <h3 id="studio-draft-label">Draft — not executed</h3>
-            {draftRequest ? (
-              <p>{draftRequest}</p>
-            ) : (
-              <p className="studio-screen__empty-copy">No draft request yet.</p>
-            )}
-          </section>
-
-          <AssistProposalPanel
-            proposal={proposal}
-            conversation={conversation}
-            editError={editError}
-            placedStartMs={proposalStartMs}
-            durationMs={proposalDurationMs}
-            summaryRef={proposalSummaryRef}
-            onAccept={handleAcceptProposal}
-            onReject={handleDiscardProposal}
-            onOpenStudio={() => onWorkspaceChange?.('studio')}
-            showOpenStudio={workspace === 'assist'}
-          >
-            {proposal ? (
-              <NameplateRepair
-                placedStartMs={proposalStartMs}
-                proposal={proposal.operation}
-                playheadMs={Math.max(0, playheadMs)}
-                isMovingPoint={isMovingProposalPoint}
-                onRepair={onRepairProposal}
-                onMovePoint={startMovingProposalPoint}
-              />
-            ) : null}
-          </AssistProposalPanel>
-
-          {proposalResult ? (
-            <p
-              ref={proposalResultRef}
-              className="studio-screen__proposal-result"
-              role="status"
-              aria-label="Proposal result"
-              tabIndex={-1}
-            >
-              {proposalResult}
-            </p>
-          ) : null}
-
-          {workspace === 'studio' ? <section className="studio-screen__history" aria-labelledby="studio-history-label">
-            <h3 id="studio-history-label">History</h3>
-            {acceptedCount > 0 ? (
-              <ol className="studio-screen__history-list">
-                {acceptedRecords.map((record) => (
-                  <li key={record.changeSet.changeSetId}>
-                    {record.changeSet.operations.map(describeOperation).join(', ')}
-                    {record.blockedReason ? <span className="studio-screen__history-blocked"> · needs attention</span> : null}
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="studio-screen__empty-copy">No accepted edits.</p>
-            )}
-            {!embedded ? <div className="studio-screen__history-actions">
-              <button
-                type="button"
-                aria-label="Undo edit"
-                disabled={Boolean(proposal) || acceptedCount === 0}
-                onClick={onUndo}
-              >
-                Undo
-              </button>
-              <button
-                type="button"
-                aria-label="Redo edit"
-                disabled={Boolean(proposal) || editProject.redoStack.length === 0}
-                onClick={onRedo}
-              >
-                Redo
-              </button>
-            </div> : null}
-            {!embedded && saveState === 'saving' ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">Saving locally…</p> : null}
-            {!embedded && saveState === 'saved' ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">Saved locally</p> : null}
-            {!embedded && saveState === 'error' ? <p className="studio-screen__save-error" role="alert">This edit is open, but it could not be saved locally.</p> : null}
-          </section> : null}
-
-          <section
-            ref={exportResultRef}
-            className="studio-screen__export-result"
-            aria-labelledby="studio-export-label"
-            tabIndex={-1}
-          >
-            <h3 id="studio-export-label">Export</h3>
-            <p id={EXPORT_DESCRIPTION} className="studio-screen__empty-copy">
-              {acceptedCount === 0
-                ? 'Accept at least one edit before exporting.'
-                : proposal
-                  ? 'Accept or discard the pending proposal before exporting.'
-                  : 'Your accepted edits are ready to render.'}
-            </p>
-            {exportState.status === 'rendering' ? (
-              <p className="studio-screen__export-progress" role="status" aria-label="Export status">Rendering and verifying your MP4…</p>
-            ) : null}
-            {exportState.status === 'error' ? (
-              <div className="studio-screen__export-error" role="alert">
-                <p>{exportState.message}</p>
-                <button type="button" onClick={onExport}>Retry export</button>
-              </div>
-            ) : null}
-            {exportState.status === 'ready' ? (
-              <div className="studio-screen__export-ready" role="status" aria-label="Export status">
-                <strong>Export ready</strong>
-                <span>{exportState.result.width} × {exportState.result.height} · {Math.round(exportState.result.durationMs / 1000)}s</span>
-                <a href={exportState.result.mediaUrl} download="sanverse-edited.mp4">Download MP4</a>
-              </div>
-            ) : null}
-          </section>
-
-          </div>
-        </aside>
         </div>
       </div>
 
@@ -1966,10 +2202,23 @@ export function StudioScreen({
           onSeek={seekAssistChange}
           onOpenStudio={() => onWorkspaceChange?.('studio')}
         />
-      ) : <section
-        className="studio-screen__time-strip"
-        aria-label="Timeline workspace"
-      >
+      ) : <>
+        <WorkspaceSplitter
+          className="studio-screen__timeline-splitter"
+          label="Resize Timeline"
+          orientation="vertical"
+          direction={-1}
+          value={workspaceLayout.timelineHeightPx}
+          minimum={WORKSPACE_CONSTRAINTS.timelineMinPx}
+          maximum={workspaceTimelineMaximum(viewport())}
+          onChange={(timelineHeightPx) => updateWorkspaceLayout({ timelineHeightPx })}
+          onCommit={(timelineHeightPx) => commitLayoutValue({ timelineHeightPx })}
+          onCancel={(timelineHeightPx) => updateWorkspaceLayout({ timelineHeightPx })}
+        />
+        <section
+          className="studio-screen__time-strip"
+          aria-label="Timeline workspace"
+        >
         <div className="studio-screen__time-strip-heading">
           <div>
             <span className="studio-screen__section-index">05</span>
@@ -1993,8 +2242,8 @@ export function StudioScreen({
           onSelect={requestTimelineSelection}
           onGesture={handleTimelineGesture}
           onOpenProposal={() => {
-            setIsAiPanelCollapsed(false)
-            requestAnimationFrame(() => proposalSummaryRef.current?.focus())
+            setRightDockTab('tool')
+            requestAnimationFrame(() => inspectorRegionRef.current?.focus())
           }}
         />
         {timelineNotice ? (
@@ -2002,7 +2251,8 @@ export function StudioScreen({
             {timelineNotice}
           </p>
         ) : null}
-      </section>}
+        </section>
+      </>}
     </main>
   )
 }

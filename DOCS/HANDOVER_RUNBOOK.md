@@ -4,7 +4,7 @@ Use this runbook when a new session, agent, or context window resumes the projec
 
 ## Current handoff
 
-P1-E.1 Studio Vertical Flow is technically complete with evidence at `DOCS/evidence/2026-08-01-p1e1-studio-vertical-flow/`. The browser document is the one outer vertical-scroll authority; Studio uses natural height, the complete Timeline is reachable, and the existing geometry controller refreshes Canvas/Point alignment after page scroll. P1-E Media Bin remains complete at `DOCS/evidence/2026-07-31-p1e-media-bin-v1/`. P1-F has not started. Unused asset deletion remains deferred until a server-authoritative service exists; `FAIL-021` and `INFRA-005` remain monitoring.
+P1-F.0.1 Studio Workspaces and Docking V1 is technically complete with evidence at `DOCS/evidence/2026-08-01-p1f01-studio-workspaces-docking-v1/`. Studio has Edit, Effects, Color, and Audio presentation views over one editor authority; validated local presets and bounded docks/splitters create no operation or project revision. Real Edge preserved one video, AI draft, playhead, selection, and revision `15 → 15` across all workspaces and required responsive sizes, then exported a verified 1080p H.264/AAC MP4 with zero page/console/HTTP errors. Full suites pass 1,145/1,145 and the all-workspace build passes. P1-F.0, P1-E.1, and P1-E remain complete. P1-F.1 and P1-F.2 have not started. Unused asset deletion remains deferred until a server-authoritative service exists; `FAIL-021` and `INFRA-005` remain monitoring.
 
 ## Fast resume
 

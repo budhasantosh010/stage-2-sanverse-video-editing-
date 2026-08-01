@@ -45,6 +45,22 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [ ] | FEATURE-002 | P2 | Capability gap | Accepted nameplate text cannot be repaired because no set-nameplate operation exists | PLANNED | Capability-gap review after P1-G |
 | [x] | INFRA-001 | P3 | Verification infrastructure | In-app viewport screenshots tiled the page texture | RESOLVED | P0-D.1 |
 | [x] | INFRA-004 | P3 | Dev-process cleanup | Stopping the Harness dev parent left Sanverse Vite/API children listening on ports 2000/2001 | RESOLVED | P1-B |
+| [x] | FAIL-036 | P1 | React continuity | Re-parenting the AI panel between Assist and Studio remounted ChatComposer and cleared unsent text | RESOLVED | P1-F.0.1 |
+| [x] | FAIL-037 | P1 | Interaction routing | Selecting a proposed Timeline item forced the AI tab instead of revealing authoritative Inspector actions | RESOLVED | P1-F.0.1 |
+
+## P1-F.0.1 validation-found issue details
+
+### FAIL-036 — AI panel re-parenting cleared the unsent draft
+
+- **What failed:** Assist and Studio placed the same conversation subtree under different parents. React remounted `ChatComposer`, so an unsent request disappeared even though project and proposal state survived.
+- **Resolution:** Keep one permanent right-dock component mounted across both top-level modes. Assist hides Studio dock tabs and exposes the same AI subtree; Studio reveals Tool/AI tabs around it.
+- **Evidence:** App continuity test preserves the same textarea value through Assist → Studio → Assist and Edit → Effects → Color → Audio → Edit. Real Edge recorded `workspace draft survives every surface` in every workspace.
+
+### FAIL-037 — proposed Timeline selection hid Inspector resolution actions
+
+- **What failed:** Opening a proposed Timeline item activated the AI tab, while Accept/Reject and repair authority already lived in the Inspector Tool surface.
+- **Resolution:** Route `onOpenProposal` to the Tool tab and focus the Inspector region. AI remains available as a separate preserved tab.
+- **Evidence:** Studio regression coverage and the final Edge Tool/AI walkthrough pass with one proposal authority and no state duplication.
 
 ## P1-F.0 browser-found issue details
 
