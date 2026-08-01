@@ -1,6 +1,6 @@
 # Build Tracker
 
-Last updated: 2026-07-31
+Last updated: 2026-08-01
 
 | ID | Goal | Deliverable | Status | Evidence |
 |---|---|---|---|---|
@@ -49,6 +49,7 @@ Last updated: 2026-07-31
 | P1C-01 | Inspector V1 | Contextual authoritative selection, local drafts, section Apply/Reset, dirty-selection guard, existing-operation editorial controls, visual properties, effects, transitions, and Keyframes V1 | Complete — owner visual approval open | Real Edge clip/title/visual/proposal/export workflow with revision chain 0→8 and zero page/console/HTTP errors; corrected 1080p export inspected; web 380/380, edit-domain 265/265, API 234/234, render 51/51, intent 27/27; all-workspace build |
 | P1D-01 | Canvas Direct Manipulation V1 | Shared Timeline/Canvas/Inspector selection and visual draft; move, nudge, resize, rotate, crop, snapping, proposal repair, Point precedence, responsive contained-video geometry, one-operation completion | Complete — owner approved | Real Edge title/callout/image/proposal/export workflow, one video, native controls, zero page/console/HTTP errors, 1440/1280/1024/390 screenshots, inspected 1080p export; web 442/442, edit-domain 265/265, API 235/235, render 51/51, intent 27/27; build passes |
 | P1E-01 | Media Bin V1 | Immutable accepted-project media view model; shared labels and usage; App-owned source probing; import/search/filters/selection; existing-operation B-roll/music placement; missing/removal truth; responsive and accessible controls | Complete | Real Edge with talking-head MP4, image, secondary MP4, and WAV; missing-source failure/restoration; one video, five lanes, zero unexpected browser/HTTP errors, no overflow/blob leak; 10 screenshots; probed H.264/AAC export and frame/audio evidence; web 473/473, edit-domain 265/265, API 235/235, render 51/51, intent 27/27; build passes |
+| P1E1-01 | Studio Vertical Flow | One browser-document vertical-scroll authority; natural Studio height; reachable full Timeline; bounded panel scrolling; passive existing-geometry refresh after document scroll | Complete | Real Edge at 1440/1280/1024/390; 1484px document at 1440×900; preserved playhead/selection/zoom/horizontal scroll/revision; Canvas and Point alignment; playback continuity; one video, five lanes, zero page/console/HTTP errors; 8 screenshots; web 476/476, edit-domain 265/265, API 235/235, render 51/51, intent 27/27; build passes |
 
 ## Status rules
 

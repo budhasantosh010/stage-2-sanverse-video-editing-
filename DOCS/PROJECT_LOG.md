@@ -1,5 +1,16 @@
 # Project Log
 
+## 2026-08-01 — P1-E.1 Studio Vertical Flow complete
+
+- Replaced the desktop Studio's fixed `calc(100vh - 64px)` height and hidden overflow with natural document flow and two normal-height grid rows.
+- Made the browser document the single outer vertical-scroll authority; Media, Inspector, and AI retain bounded internal scrolling without blocking scroll chaining.
+- Kept the P1-D contained preview size, native controls, Timeline horizontal scroll/zoom, one shared selection/draft, one main video, and the existing single video `ResizeObserver`.
+- Added one passive document-scroll refresh to the existing Studio geometry controller and removed it on unmount; page scrolling creates no operation, revision, project rebuild, or second geometry authority.
+- Real Edge proved full Timeline reachability and no horizontal overflow at 1440×900, 1280×800, 1024×768, and 390×844. Playhead, selection, zoom, horizontal scroll, accepted revision, Canvas alignment, Point placement, and playback remained correct.
+- Browser result: zero page errors, zero console errors, zero failed HTTP responses, one video, five lanes, and zero listener/video leak after returning Home.
+- Final suites pass: web 476/476, edit-domain 265/265, API 235/235, render-contract 51/51, intent-domain 27/27; all-workspace build passes.
+- `UX-013` is resolved. P1-F was not started in this change.
+
 ## 2026-07-31 — P1-E Media Bin V1 complete
 
 - Added one immutable Media Bin view model over the accepted project with import, search, All/Video/Images/Audio/Missing filters, usage, source status, keyboard navigation, right-click/Shift+F10 actions, and responsive layouts.

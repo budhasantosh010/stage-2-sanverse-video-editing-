@@ -939,6 +939,26 @@ describe('StudioScreen production timeline', () => {
     expect(videoItem.closest('[data-testid="timeline-item-shell"]')).toHaveAttribute('data-canonical-left', '0')
   })
 
+  it('refreshes client-space geometry on document scroll without changing selection or creating an edit', async () => {
+    const user = userEvent.setup()
+    const onCreateOverlay = vi.fn(async () => null)
+    const { container } = renderStudio({ onCreateOverlay })
+    const video = container.querySelector('video') as HTMLVideoElement
+    prepareVideoForPointing(video)
+    fireEvent.loadedMetadata(video)
+
+    const videoLane = screen.getByRole('group', { name: /V1 video lane/i })
+    const videoItem = within(videoLane).getByRole('button', { name: /^clip, cleaned-interview\.mp4,/i })
+    await user.click(videoItem)
+    const videoCount = container.querySelectorAll('video').length
+
+    act(() => window.dispatchEvent(new Event('scroll')))
+
+    expect(videoItem).toHaveAttribute('aria-selected', 'true')
+    expect(container.querySelectorAll('video')).toHaveLength(videoCount)
+    expect(onCreateOverlay).not.toHaveBeenCalled()
+  })
+
   it('opens the authoritative Inspector from Timeline selection and applies one existing audio operation', async () => {
     const user = userEvent.setup()
     const onCreateOverlay = vi.fn(async (_operation: EditOperation): Promise<string | null> => null)

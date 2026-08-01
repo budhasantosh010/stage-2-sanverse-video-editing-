@@ -480,6 +480,7 @@ export function StudioScreen({
       typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(refreshProjection)
 
     observer?.observe(video)
+    window.addEventListener('scroll', refreshProjection, { passive: true })
     video.addEventListener('loadedmetadata', refreshProjection)
     video.addEventListener('resize', refreshProjection)
 
@@ -506,6 +507,7 @@ export function StudioScreen({
         video.cancelVideoFrameCallback(videoFrameCallbackId)
       }
       observer?.disconnect()
+      window.removeEventListener('scroll', refreshProjection)
       video.removeEventListener('loadedmetadata', refreshProjection)
       video.removeEventListener('resize', refreshProjection)
       video.removeEventListener('loadedmetadata', refreshPlayhead)

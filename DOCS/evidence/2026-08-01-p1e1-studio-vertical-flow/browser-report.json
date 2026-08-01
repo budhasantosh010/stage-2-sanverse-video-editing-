@@ -1,0 +1,181 @@
+{
+  "browser": "Microsoft Edge / Chromium",
+  "main_media": "resources/test video/test-30s.mp4",
+  "page_errors": [],
+  "console_errors": [],
+  "failed_responses": [],
+  "viewports": {
+    "1440x900-top": {
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollY": 0,
+      "scrollHeight": 1484,
+      "clientHeight": 900,
+      "bodyScrollWidth": 1440,
+      "documentScrollWidth": 1440,
+      "mainVideos": 1,
+      "allVideos": 1,
+      "lanes": 5,
+      "timelineBottom": 1429.21875,
+      "pageScrollListeners": 1
+    },
+    "1440x900-middle": {
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollY": 584,
+      "scrollHeight": 1484,
+      "clientHeight": 900,
+      "bodyScrollWidth": 1440,
+      "documentScrollWidth": 1440,
+      "mainVideos": 1,
+      "allVideos": 1,
+      "lanes": 5,
+      "timelineBottom": 845.21875,
+      "pageScrollListeners": 1
+    },
+    "1440x900-bottom": {
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollY": 584,
+      "scrollHeight": 1484,
+      "clientHeight": 900,
+      "bodyScrollWidth": 1440,
+      "documentScrollWidth": 1440,
+      "mainVideos": 1,
+      "allVideos": 1,
+      "lanes": 5,
+      "timelineBottom": 845.21875,
+      "pageScrollListeners": 1
+    },
+    "1280x800": {
+      "innerWidth": 1280,
+      "innerHeight": 800,
+      "scrollY": 1250,
+      "scrollHeight": 2050,
+      "clientHeight": 800,
+      "bodyScrollWidth": 1280,
+      "documentScrollWidth": 1280,
+      "mainVideos": 1,
+      "allVideos": 1,
+      "lanes": 5,
+      "timelineBottom": 744.609375,
+      "pageScrollListeners": 1
+    },
+    "1024x768": {
+      "innerWidth": 1024,
+      "innerHeight": 768,
+      "scrollY": 1507,
+      "scrollHeight": 2275,
+      "clientHeight": 768,
+      "bodyScrollWidth": 1024,
+      "documentScrollWidth": 1024,
+      "mainVideos": 1,
+      "allVideos": 1,
+      "lanes": 5,
+      "timelineBottom": 734.59375,
+      "pageScrollListeners": 1
+    },
+    "390x844": {
+      "innerWidth": 390,
+      "innerHeight": 844,
+      "scrollY": 1678,
+      "scrollHeight": 2522,
+      "clientHeight": 844,
+      "bodyScrollWidth": 390,
+      "documentScrollWidth": 390,
+      "mainVideos": 1,
+      "allVideos": 1,
+      "lanes": 5,
+      "timelineBottom": 811.296875,
+      "pageScrollListeners": 1
+    }
+  },
+  "revisions": {
+    "initial": 0,
+    "split": 1,
+    "split_undo": 2,
+    "split_redo": 3,
+    "title_add": 4,
+    "title_move": 5
+  },
+  "scroll_state": {
+    "before": {
+      "playhead": "14400000",
+      "selected": "clip, test-30s.mp4, starts 00:00.000, duration 00:10.000, Committed",
+      "zoom": "125 px/s",
+      "scrollLeft": 370,
+      "revision": 3
+    },
+    "after": {
+      "playhead": "14400000",
+      "selected": "clip, test-30s.mp4, starts 00:00.000, duration 00:10.000, Committed",
+      "zoom": "125 px/s",
+      "scrollLeft": 370,
+      "revision": 3
+    }
+  },
+  "canvas_alignment": {
+    "before": {
+      "canvas": {
+        "left": 501.5,
+        "top": 355.484375,
+        "right": 838.4375,
+        "bottom": 404.609375,
+        "width": 336.9375,
+        "height": 49.125
+      },
+      "preview": {
+        "left": 287.765625,
+        "top": 165,
+        "width": 764.4375,
+        "height": 430
+      }
+    },
+    "after": {
+      "canvas": {
+        "left": 501.5,
+        "top": 355.484375,
+        "right": 838.4375,
+        "bottom": 404.609375,
+        "width": 336.9375,
+        "height": 49.125
+      },
+      "preview": {
+        "left": 287.765625,
+        "top": 165,
+        "width": 764.4375,
+        "height": 430
+      }
+    }
+  },
+  "point_alignment": {
+    "left": "61.9647%",
+    "top": "40.9302%"
+  },
+  "internal_scroll": {
+    "inspector": {
+      "scrollTop": 0,
+      "scrollHeight": 218,
+      "clientHeight": 218,
+      "outerBefore": 0,
+      "outerAfter": 900
+    },
+    "media": {
+      "scrollTop": 387,
+      "scrollHeight": 564,
+      "clientHeight": 177
+    }
+  },
+  "playback": {
+    "started": 20,
+    "advanced": 20.958212
+  },
+  "listener_cleanup": {
+    "before": 1,
+    "after": {
+      "scrollListeners": 0,
+      "videos": 0
+    }
+  },
+  "project_id": "project_b890daef9cac3dcf084d084265d6241e"
+}

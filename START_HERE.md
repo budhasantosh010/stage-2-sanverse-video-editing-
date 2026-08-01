@@ -8,17 +8,16 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 ## Current gate
 
-- **P1-E — Media Bin V1 is technically complete.** Evidence: `DOCS/evidence/2026-07-31-p1e-media-bin-v1/`.
-- Media is one immutable presentation model over the accepted project, with search, All/Video/Images/Audio/Missing filters, import, usage, source status, keyboard/context-menu actions, and responsive layouts.
-- Import adds an asset to the server-owned project shelf without placing it or creating Undo history. Image/video placement reuses `add-media-overlay`; audio placement reuses `add-music`; music repair reuses `set-music`.
-- Media selection is presentation-only. Timeline, Canvas, and Inspector retain one shared Studio selection and one shared visual draft.
-- One pure display-label authority now feeds Media, Timeline, Canvas, and Inspector; `UX-011` is resolved.
-- App owns bounded source probing. Checking and missing media fail closed without losing asset identity or accepted usage.
-- Used removal is refused. Unused removal remains deferred until a server-authoritative asset service exists.
-- A fresh real Edge workflow used a talking-head MP4, image, secondary MP4, and WAV; it completed placement, Canvas manipulation, music repair, Undo/Redo, filters, keyboard/context menus, missing-source failure/restoration, export/download, frame/audio inspection, and resource cleanup with zero unexpected browser/HTTP errors.
-- Final suites pass: web 473/473, edit-domain 265/265, API 235/235, render-contract 51/51, intent-domain 27/27, plus the all-workspace build.
-- No second project, history, media library, editor selection, visual draft, schema, operation family, API route, renderer architecture, or runtime dependency was added.
-- **P1-F has not started.** Begin it only after explicit owner instruction.
+- **P1-E.1 — Studio Vertical Flow is technically complete.** Evidence: `DOCS/evidence/2026-08-01-p1e1-studio-vertical-flow/`.
+- The browser document is the one outer vertical-scroll authority. Studio uses natural height and normal-flow rows, so the upper workspace and complete Production Timeline can extend below the fold instead of being compressed into one viewport.
+- Media, Inspector, and AI retain bounded internal scrolling while ordinary browser scroll chaining remains available.
+- Real Edge proved page scroll and complete Timeline reachability at 1440×900, 1280×800, 1024×768, and 390×844 with no horizontal page overflow.
+- Page scrolling preserves playhead, Timeline selection, zoom, horizontal scroll, accepted revision, one main video, and five lanes.
+- Canvas and Point use the existing displayed-video-content geometry after page scroll; one passive geometry-refresh listener is cleaned up on unmount.
+- **P1-E — Media Bin V1 remains complete.** Import, search, filters, shared names, usage, source probing, B-roll/music placement, missing-media truth, and responsive Media behavior remain intact.
+- Final suites pass: web 476/476, edit-domain 265/265, API 235/235, render-contract 51/51, intent-domain 27/27, plus the all-workspace build.
+- No second project, history, page-scroll owner, video-layout observer, media library, editor selection, visual draft, schema, operation family, API route, renderer architecture, or runtime dependency was added.
+- **P1-F has not started.** Begin P1-F.0 only from the clean pushed P1-E.1 commit.
 - Open human evidence remains human-only: repeated owner workflows, representative non-editor workflows, and agreed performance budgets.
 - Real-provider connection still requires the owner's data-leaving-machine decision and keys. Accounts and SaaS operations remain conditional.
 

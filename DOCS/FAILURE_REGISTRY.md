@@ -29,6 +29,7 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | FAIL-032 | P1 | React lifecycle | Unstable optional media-name defaults retriggered source probing and caused an infinite Studio render loop | RESOLVED | P1-E |
 | [x] | FAIL-033 | P3 | Verification typing | Deferred source-probe test resolver narrowed to `never` during production TypeScript build | RESOLVED | P1-E |
 | [x] | UX-012 | P1 | UX gate | P1-D Canvas direct manipulation required owner visual and interaction approval | RESOLVED | P1-D |
+| [x] | UX-013 | P1 | UX/Layout | Studio prevents document-level vertical scrolling and clips lower Timeline content | RESOLVED | P1-E.1 |
 | [ ] | FEATURE-003 | P2 | Capability gap | No server-authoritative remove-unused-asset action exists | PLANNED | Post-P1-E asset service |
 | [x] | FAIL-030 | P1 | Revision authority | Immediate B-roll placement used the stale pre-upload project revision | RESOLVED | P1-D |
 | [x] | FAIL-031 | P0 | Preview/export fidelity | FFmpeg crop dimensions were calculated from the target box instead of the actual scaled image | RESOLVED | P1-D |
@@ -383,6 +384,22 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 - **Owner:** Product owner.
 - **Target:** P1-D.
 - **Evidence:** `DOCS/evidence/2026-07-31-p1e-media-bin-v1/P1-D_OWNER_APPROVAL.md`.
+
+### UX-013 — Studio prevents document-level vertical scrolling
+
+- **What:** The complete Studio workspace was forced into one viewport-height grid, so the lower Timeline lanes and controls were clipped or compressed instead of contributing to ordinary page height.
+- **Where:** `.editor-shell .studio-screen--studio` in `apps/web/src/screens/studio/StudioScreen.css`, together with the document/root overflow contract in `apps/web/src/styles/global.css`.
+- **When:** Reproduced during the P1-E owner visual correction at laptop-height desktop viewports on 2026-08-01.
+- **Who was affected:** Laptop users, keyboard users reaching lower controls, users opening long Media/Inspector content, and future motion/keyframe workflows.
+- **Why:** `height: calc(100vh - 64px)`, fixed grid rows, and `overflow: hidden` made the editor itself exactly viewport-sized. Its lower content could not extend the document, so the browser had no vertical scroll range.
+- **How reproduced:** Open Studio at 1440×900 or 1280×800 and inspect `document.documentElement.scrollHeight`; the fixed editor height contains the upper workspace and Timeline while clipping the lower region.
+- **What was tried:** The layout authority was traced from `html/body/#root` through EditorShell and Studio before changing overflow; random nested overflow rules were rejected.
+- **One-line solution:** Give the browser document one vertical-scroll authority, let Studio use natural height and normal-flow rows, retain bounded panel scrolling, and refresh the existing client-space geometry controller passively on document scroll.
+- **Status:** RESOLVED on 2026-08-01. Real Edge proved document scrolling, full Timeline reachability, unchanged playhead/selection/zoom/horizontal scroll, Canvas and Point alignment after scrolling, playback continuity, one video, five lanes, zero horizontal overflow, and listener cleanup at all four required viewports.
+- **Severity:** P1.
+- **Owner:** Web editor.
+- **Target:** P1-E.1.
+- **Evidence:** `DOCS/evidence/2026-08-01-p1e1-studio-vertical-flow/`.
 
 ### UX-011 — Media panel and Timeline label the same image differently
 

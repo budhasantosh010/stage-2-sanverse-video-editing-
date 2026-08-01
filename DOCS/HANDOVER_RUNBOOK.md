@@ -4,7 +4,7 @@ Use this runbook when a new session, agent, or context window resumes the projec
 
 ## Current handoff
 
-P1-E Media Bin V1 is technically complete with evidence at `DOCS/evidence/2026-07-31-p1e-media-bin-v1/`. One accepted project feeds one Media view model, one label authority, one usage index, and App-owned source probing. P1-F has not started and must not begin without explicit owner instruction. Unused asset deletion remains deferred until a server-authoritative service exists; `FAIL-021` and `INFRA-005` remain monitoring.
+P1-E.1 Studio Vertical Flow is technically complete with evidence at `DOCS/evidence/2026-08-01-p1e1-studio-vertical-flow/`. The browser document is the one outer vertical-scroll authority; Studio uses natural height, the complete Timeline is reachable, and the existing geometry controller refreshes Canvas/Point alignment after page scroll. P1-E Media Bin remains complete at `DOCS/evidence/2026-07-31-p1e-media-bin-v1/`. P1-F has not started. Unused asset deletion remains deferred until a server-authoritative service exists; `FAIL-021` and `INFRA-005` remain monitoring.
 
 ## Fast resume
 

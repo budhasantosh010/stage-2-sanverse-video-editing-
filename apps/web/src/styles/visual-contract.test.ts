@@ -114,6 +114,35 @@ describe('shared visual and accessibility contract', () => {
     expect(desktopGridRule).not.toContain('grid-template-rows: minmax(0, 1fr)')
   })
 
+  test('gives document scrolling one outer authority and leaves Studio in normal page flow', () => {
+    const htmlRule = globalStyles.match(/html\s*{[^}]*}/s)?.[0] ?? ''
+    const bodyRule = globalStyles.match(/body\s*{[^}]*}/s)?.[0] ?? ''
+    const rootRule = globalStyles.match(/#root\s*{[^}]*}/s)?.[0] ?? ''
+    const studioRule = studioStyles.match(/\.editor-shell \.studio-screen--studio\s*{[^}]*}/s)?.[0] ?? ''
+    const timelineRule = studioStyles.match(/\.studio-screen--studio \.studio-screen__time-strip\s*{[^}]*}/s)?.[0] ?? ''
+
+    expect(htmlRule).toContain('overflow-y: auto')
+    expect(bodyRule).toContain('overflow-y: visible')
+    expect(rootRule).toContain('min-height: 100%')
+    expect(studioRule).toContain('height: auto')
+    expect(studioRule).toContain('grid-template-rows: auto auto')
+    expect(studioRule).toContain('overflow: visible')
+    expect(studioRule).not.toMatch(/(?:^|\n)\s*height:\s*calc\(100vh\s*-\s*64px\)/)
+    expect(timelineRule).toContain('min-height: 390px')
+    expect(timelineRule).toContain('overflow: visible')
+  })
+
+  test('retains bounded internal scrolling without creating a second page scroll surface', () => {
+    const mediaRule = studioStyles.match(/\.studio-screen__media\s*{[^}]*}/s)?.[0] ?? ''
+    const inspectorRule = studioStyles.match(/\.studio-screen__inspector\s*{\s*max-height:[^}]*}/s)?.[0] ?? ''
+    const aiRule = studioStyles.match(/\.studio-screen__ai-panel-content\s*{[^}]*}/s)?.[0] ?? ''
+
+    expect(mediaRule).toContain('overflow: auto')
+    expect(inspectorRule).toContain('overflow: auto')
+    expect(aiRule).toContain('overflow: auto')
+    expect(studioStyles).not.toMatch(/\.editor-shell \.studio-screen--studio\s*{[^}]*overflow-y:\s*auto/s)
+  })
+
   test('leaves native video controls reachable outside real Canvas targets', () => {
     const layerRule = canvasStyles.match(/\.canvas-interaction-layer\s*{[^}]*}/s)?.[0] ?? ''
     const hitRule = canvasStyles.match(/\.canvas-hit-target\s*{[^}]*}/s)?.[0] ?? ''

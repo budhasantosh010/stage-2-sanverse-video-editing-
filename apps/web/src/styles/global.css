@@ -6,6 +6,9 @@
 
 html {
   min-width: 320px;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--color-canvas);
   font-family: var(--font-body);
   line-height: 1.5;
@@ -15,10 +18,16 @@ html {
 
 body {
   min-width: 320px;
-  min-height: 100vh;
+  min-height: 100%;
   margin: 0;
+  overflow-x: hidden;
+  overflow-y: visible;
   color: var(--color-ink);
   background: var(--color-canvas);
+}
+
+#root {
+  min-height: 100%;
 }
 
 button,
