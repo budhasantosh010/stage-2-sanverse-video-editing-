@@ -9,6 +9,7 @@ import {
   validateRenderPlan,
   type CalloutOverlayNode,
   type CaptionOverlayNode,
+  type FootageMotionNode,
   type RenderPlan,
   type TextOverlayNode,
   type TitleOverlayNode,
@@ -462,6 +463,223 @@ function calloutFilters(node: CalloutOverlayNode, index: number, plan: RenderPla
   return filters
 }
 
+const MAX_FOOTAGE_MOTION_SAMPLES = 1_024
+
+const motionStateAtSourceTick = (motion: FootageMotionNode, sourceTicks: number) => {
+  const relativeTicks = Math.max(0, sourceTicks - motion.sourceInterval.start.ticks)
+  return evaluateVisualProperties(Object.freeze({
+    transform: motion.transform,
+    crop: motion.crop,
+    layer: 0,
+    mask: DEFAULT_VISUAL_PROPERTIES.mask,
+    tracks: motion.tracks,
+    transition: DEFAULT_VISUAL_PROPERTIES.transition,
+    effects: Object.freeze([]),
+  }), relativeTicks, motion.sourceInterval.duration.ticks)
+}
+
+const balancedStepExpression = (
+  values: readonly string[],
+  durationSeconds: number,
+  timeVariable: 't' | 'T',
+): string => {
+  if (values.length === 1 || values.every((value) => value === values[0])) return values[0]
+  const step = durationSeconds / Math.max(1, values.length - 1)
+  const build = (start: number, end: number): string => {
+    if (start === end) return values[start]
+    const middle = Math.floor((start + end) / 2)
+    const boundary = compactNumber((middle + 0.5) * step)
+    return `if(lt(${timeVariable},${boundary}),${build(start, middle)},${build(middle + 1, end)})`
+  }
+  return build(0, values.length - 1)
+}
+
+const motionExpression = (
+  motion: FootageMotionNode,
+  sourceStartTicks: number,
+  durationTicks: number,
+  frameRate: Readonly<{ numerator: number; denominator: number }>,
+  select: (state: ReturnType<typeof motionStateAtSourceTick>) => number,
+  timeVariable: 't' | 'T' = 't',
+): string => {
+  const frames = Math.ceil(
+    (durationTicks / PROJECT_TIMESCALE) * frameRate.numerator / frameRate.denominator,
+  )
+  const sampleCount = Math.max(2, Math.min(MAX_FOOTAGE_MOTION_SAMPLES, frames + 1))
+  const values: string[] = []
+  for (let index = 0; index < sampleCount; index += 1) {
+    const offset = Math.round((durationTicks * index) / (sampleCount - 1))
+    values.push(compactNumber(select(motionStateAtSourceTick(motion, sourceStartTicks + offset))))
+  }
+  return balancedStepExpression(values, durationTicks / PROJECT_TIMESCALE, timeVariable)
+}
+
+const footageMotionExpressions = (
+  motion: FootageMotionNode,
+  sourceStartTicks: number,
+  durationTicks: number,
+  frameRate: Readonly<{ numerator: number; denominator: number }>,
+) => Object.freeze({
+  translateX: motionExpression(
+    motion, sourceStartTicks, durationTicks, frameRate,
+    (state) => state.transform.translateX,
+  ),
+  translateY: motionExpression(
+    motion, sourceStartTicks, durationTicks, frameRate,
+    (state) => state.transform.translateY,
+  ),
+  scale: motionExpression(
+    motion, sourceStartTicks, durationTicks, frameRate,
+    (state) => state.transform.scale,
+  ),
+  rotation: motionExpression(
+    motion, sourceStartTicks, durationTicks, frameRate,
+    (state) => state.transform.rotationDegrees,
+  ),
+  cropTop: motionExpression(
+    motion, sourceStartTicks, durationTicks, frameRate,
+    (state) => state.crop.top,
+    'T',
+  ),
+  cropRight: motionExpression(
+    motion, sourceStartTicks, durationTicks, frameRate,
+    (state) => state.crop.right,
+    'T',
+  ),
+  cropBottom: motionExpression(
+    motion, sourceStartTicks, durationTicks, frameRate,
+    (state) => state.crop.bottom,
+    'T',
+  ),
+  cropLeft: motionExpression(
+    motion, sourceStartTicks, durationTicks, frameRate,
+    (state) => state.crop.left,
+    'T',
+  ),
+})
+
+const primaryFootageMotionFilters = (
+  segment: RenderPlan['segments'][number],
+  inputLabel: string,
+  outputLabel: string,
+  index: number,
+  width: number,
+  height: number,
+  rate: string,
+  frameRate: Readonly<{ numerator: number; denominator: number }>,
+  durationTicks: number,
+): readonly string[] => {
+  const motion = segment.footageMotions[0]
+  if (!motion) return Object.freeze([`[${inputLabel}]format=pix_fmts=yuv420p,setsar=1[${outputLabel}]`])
+
+  const expressions = footageMotionExpressions(
+    motion,
+    segment.sourceStartTicks,
+    durationTicks,
+    frameRate,
+  )
+  const masked = `motion_masked_${index}`
+  const scaled = `motion_scaled_${index}`
+  const transformed = `motion_transformed_${index}`
+  const background = `motion_background_${index}`
+  const composited = `motion_composited_${index}`
+  const durationSeconds = ticksToSeconds(durationTicks)
+  const hasCrop = [
+    expressions.cropTop,
+    expressions.cropRight,
+    expressions.cropBottom,
+    expressions.cropLeft,
+  ].some((expression) => expression !== '0')
+  const hasRotation = expressions.rotation !== '0'
+  const needsAlpha = hasCrop || hasRotation
+  const filters: string[] = []
+  let current = inputLabel
+
+  if (hasCrop) {
+    const alpha =
+      `if(gte(X,W*(${expressions.cropLeft}))*lt(X,W*(1-(${expressions.cropRight})))*` +
+      `gte(Y,H*(${expressions.cropTop}))*lt(Y,H*(1-(${expressions.cropBottom}))),alpha(X,Y),0)`
+    filters.push(
+      `[${current}]format=pix_fmts=rgba,` +
+        `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alpha}'[${masked}]`,
+    )
+    current = masked
+  }
+
+  filters.push(
+    `[${current}]scale=` +
+      `w='max(2,trunc(iw*(${expressions.scale})/2)*2)':` +
+      `h='max(2,trunc(ih*(${expressions.scale})/2)*2)':eval=frame[${scaled}]`,
+  )
+  current = scaled
+
+  if (hasRotation) {
+    filters.push(
+      `[${current}]${hasCrop ? '' : 'format=pix_fmts=rgba,'}` +
+        `rotate='(${expressions.rotation})*PI/180':` +
+        `ow='hypot(iw,ih)':oh='hypot(iw,ih)':c=black@0[${transformed}]`,
+    )
+    current = transformed
+  }
+
+  filters.push(
+    `color=c=black:s=${width}x${height}:r=${rate}:d=${durationSeconds},` +
+      `format=pix_fmts=${needsAlpha ? 'rgba' : 'yuv420p'}[${background}]`,
+    `[${background}][${current}]overlay=` +
+      `x='(W-w)/2+(${expressions.translateX})*W':` +
+      `y='(H-h)/2+(${expressions.translateY})*H':` +
+      `eval=frame:shortest=1:eof_action=pass[${composited}]`,
+    `[${composited}]format=pix_fmts=yuv420p,setsar=1[${outputLabel}]`,
+  )
+  return Object.freeze(filters)
+}
+
+const splitSegmentForMotion = (
+  segment: RenderPlan['segments'][number],
+): readonly RenderPlan['segments'][number][] => {
+  if (segment.footageMotions.length === 0) return Object.freeze([segment])
+  const sourceStart = segment.sourceStartTicks
+  const sourceEnd = sourceStart + segment.interval.duration.ticks
+  const boundaries = new Set<number>([sourceStart, sourceEnd])
+  for (const motion of segment.footageMotions) {
+    const start = Math.max(sourceStart, motion.sourceInterval.start.ticks)
+    const end = Math.min(sourceEnd, motion.sourceInterval.start.ticks + motion.sourceInterval.duration.ticks)
+    if (end > start) {
+      boundaries.add(start)
+      boundaries.add(end)
+    }
+  }
+  const ordered = [...boundaries].sort((left, right) => left - right)
+  return Object.freeze(ordered.slice(0, -1).map((start, index) => {
+    const end = ordered[index + 1]
+    const active = segment.footageMotions.filter((motion) =>
+      motion.sourceInterval.start.ticks <= start &&
+      start < motion.sourceInterval.start.ticks + motion.sourceInterval.duration.ticks,
+    )
+    const first = index === 0
+    const last = index === ordered.length - 2
+    return Object.freeze({
+      ...segment,
+      nodeId: `${segment.nodeId}.motion.${index}`,
+      interval: Object.freeze({
+        start: Object.freeze({
+          ticks: segment.interval.start.ticks + start - sourceStart,
+          timescale: segment.interval.start.timescale,
+        }),
+        duration: Object.freeze({ ticks: end - start, timescale: segment.interval.duration.timescale }),
+      }),
+      sourceStartTicks: start,
+      footageMotions: Object.freeze(active),
+      fadeInTicks: first ? segment.fadeInTicks : 0,
+      fadeOutTicks: last ? segment.fadeOutTicks : 0,
+      videoFadeInTicks: first ? segment.videoFadeInTicks : 0,
+      videoFadeOutTicks: last ? segment.videoFadeOutTicks : 0,
+      transitionAudioFadeInTicks: first ? segment.transitionAudioFadeInTicks : 0,
+      transitionAudioFadeOutTicks: last ? segment.transitionAudioFadeOutTicks : 0,
+    })
+  }))
+}
+
 /** One stretch of the finished video: either real footage or a deliberate hole. */
 type TimelinePiece =
   | { readonly kind: 'footage'; readonly durationTicks: number; readonly segment: RenderPlan['segments'][number] }
@@ -484,7 +702,13 @@ export function layOutTimeline(plan: RenderPlan): readonly TimelinePiece[] {
     if (segment.interval.start.ticks > cursor) {
       pieces.push({ kind: 'hole', durationTicks: segment.interval.start.ticks - cursor })
     }
-    pieces.push({ kind: 'footage', durationTicks: segment.interval.duration.ticks, segment })
+    for (const motionSegment of splitSegmentForMotion(segment)) {
+      pieces.push({
+        kind: 'footage',
+        durationTicks: motionSegment.interval.duration.ticks,
+        segment: motionSegment,
+      })
+    }
     cursor = segment.interval.start.ticks + segment.interval.duration.ticks
   }
   if (cursor < plan.durationTicks) {
@@ -547,11 +771,23 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
     } else {
       const from = ticksToSeconds(piece.segment.sourceStartTicks)
       const to = ticksToSeconds(piece.segment.sourceStartTicks + piece.durationTicks)
-      const videoSteps = [
-        `[0:v]trim=start=${from}:end=${to}`,
-        'setpts=PTS-STARTPTS',
-        `fps=${rate}`,
-      ]
+      const sourceVideoLabel = `source_video_${index}`
+      const motionVideoLabel = `motion_video_${index}`
+      graph.push(
+        `[0:v]trim=start=${from}:end=${to},setpts=PTS-STARTPTS,fps=${rate}[${sourceVideoLabel}]`,
+      )
+      graph.push(...primaryFootageMotionFilters(
+        piece.segment,
+        sourceVideoLabel,
+        motionVideoLabel,
+        index,
+        width,
+        height,
+        rate,
+        input.frameRate,
+        piece.durationTicks,
+      ))
+      const videoSteps: string[] = []
       if (piece.segment.videoFadeInTicks > 0) {
         videoSteps.push(`fade=t=in:st=0:d=${ticksToSeconds(piece.segment.videoFadeInTicks)}:color=black`)
       }
@@ -562,7 +798,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
         )
       }
       videoSteps.push('format=pix_fmts=yuv420p', 'setsar=1')
-      graph.push(`${videoSteps.join(',')}[${videoLabel}]`)
+      graph.push(`[${motionVideoLabel}]${videoSteps.join(',')}[${videoLabel}]`)
       if (input.hasAudio) {
         const steps = [
           `[0:a]atrim=start=${from}:end=${to}`,

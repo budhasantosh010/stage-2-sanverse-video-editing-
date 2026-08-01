@@ -28,6 +28,7 @@ export const testSegmentNode = (overrides: Partial<SourceSegmentNode> = {}): Sou
   interval: { start: ms(0), duration: ms(8_000) },
   assetId: 'asset_aaaaaaaa',
   sourceStartTicks: 0,
+  footageMotions: [],
   gainDb: 0,
   fadeInTicks: 0,
   fadeOutTicks: 0,
@@ -40,7 +41,7 @@ export const testSegmentNode = (overrides: Partial<SourceSegmentNode> = {}): Sou
 
 /** Matches the 1280x720, 8-second media the probe fixture reports. */
 export const testPlan = (overrides: Partial<RenderPlan> = {}): RenderPlan => ({
-  schemaVersion: 'sanverse.render-plan/v5',
+  schemaVersion: 'sanverse.render-plan/v6',
   projectId: 'project_aaaaaaaaaaaaaaaa',
   projectRevision: 1,
   compositionId: 'composition_aaaaaaaa',

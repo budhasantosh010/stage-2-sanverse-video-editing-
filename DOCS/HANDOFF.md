@@ -1,12 +1,12 @@
 # HANDOFF — everything a new agent needs to continue Sanverse Stage 2
 
-Updated 2026-08-01. **P1-E.1 — Studio Vertical Flow is technically complete.** The browser document is the one outer vertical-scroll authority. Studio uses natural height and normal-flow rows, so the upper workspace and complete Production Timeline can extend below the fold instead of being compressed into one viewport. Media, Inspector, and AI retain bounded internal scrolling without blocking normal page scroll chaining.
+Updated 2026-08-01. **P1-F.0 - Primary-Footage Motion V1 is technically complete.** Primary footage owns one stable `motionId` anchored to the immutable asset and source interval. Full-state position, uniform scale, rotation, crop, and bounded keyframes/easing survive split, trim, remove, gap, reorder, Undo, Redo, and repeated source placements. Browser preview and FFmpeg consume render-plan v6 plus the same source-time evaluator.
 
-Real Edge measured 1484 pixels of document height at 1440×900 and proved full Timeline reachability at 1440×900, 1280×800, 1024×768, and 390×844. Page scrolling preserved playhead, Timeline selection, zoom, horizontal scroll, and accepted revision. Canvas and Point remained aligned after scrolling, playback continued, exactly one main video and five lanes remained, and the single passive scroll listener was cleaned up on unmount. Page, console, and failed-HTTP counts were zero. Start with `DOCS/evidence/2026-08-01-p1e1-studio-vertical-flow/P1-E1_IMPLEMENTATION_REPORT.md`.
+Studio exposes Motion Inspector presets, numeric controls, keyframes, Apply/Reset/Remove, a Timeline Motion indicator, and direct Canvas move/scale/rotate/crop. Pointer movement is local; release sends one operation; Escape sends none; Point mode has precedence. One native video and native controls remain. Narrow screens retain numeric Inspector controls and show an honest wider-screen handle message.
 
-**P1-E — Media Bin V1 remains complete.** Import is not an edit. Image/video placement reuses `add-media-overlay`; audio placement reuses `add-music`; music repair reuses `set-music`. Media selection is presentation-only. Timeline, Canvas, and Inspector keep the existing shared Studio selection and visual draft. One pure label authority feeds all four surfaces. Unused asset deletion remains deferred.
+Real Edge completed the entire motion, split, export, responsive, and cleanup loop with zero page, console, or HTTP failures. The 30.033-second export is 1920x1080 H.264 with AAC stereo and completed in 53.3 seconds. Final suites pass API 239/239, web 484/484, edit-domain 299/299, intent-domain 27/27, and render-contract 65/65; all workspace builds pass. Start with `DOCS/evidence/2026-08-01-p1f0-primary-footage-motion-v1/P1-F0_IMPLEMENTATION_REPORT.md` and `DOCS/decisions/ADR-PRIMARY-FOOTAGE-MOTION.md`.
 
-Final P1-E.1 suites pass web 476/476, edit-domain 265/265, API 235/235, render-contract 51/51, intent-domain 27/27, plus the all-workspace build. P1-B remains the Production Timeline authority, P1-C the Inspector, P1-D the Canvas interaction layer, and P1-E the Media Bin. **P1-F has not started.**
+**P1-E.1 and P1-E remain complete.** P1-B remains the Production Timeline authority, P1-C the Inspector, P1-D the overlay Canvas interaction layer, P1-E the Media Bin, and P1-F.0 the primary-footage motion authority. **P1-F.1 and P1-F.2 have not started.**
 
 **Read this file, then `DOCS/CURRENT_STATE.md`, then the ADRs it names.**
 Nothing else is required to start work.
@@ -160,7 +160,7 @@ the edge of the picture is pulled back to the boundary — see 3.7.)
 
 ### 3.5 The render plan is the single description both renderers consume
 `packages/render-contract/src/render-plan.ts`, currently
-`sanverse.render-plan/v3`. It names no font file, no FFmpeg filter, and no CSS
+`sanverse.render-plan/v6`. It names no font file, no FFmpeg filter, and no CSS
 rule. The browser preview and the FFmpeg export read the **same plan**. Every
 visual number comes from a shared style contract
 (`nameplate-style.ts`, `caption-style.ts`, `overlay-style.ts`) that produces
@@ -168,9 +168,10 @@ NUMBERS; the browser turns them into CSS and the exporter turns them into
 FFmpeg arguments.
 
 ```
-  RenderPlan v3
+  RenderPlan v6
     sources[]     every file the renderer must open, FOOTAGE FIRST
-    segments[]    the footage the finished video is made of
+    segments[]    the footage the finished video is made of,
+                  including source-anchored footageMotions[]
     overlays[]    what is DRAWN on it
                     text-overlay | caption-overlay | title-overlay
                     | callout-overlay | media-overlay

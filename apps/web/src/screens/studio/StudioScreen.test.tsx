@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { acceptChangeSet, undoChangeSet, type EditOperation, type EditProject } from '@sanverse/edit-domain'
 
 import { StudioScreen } from './StudioScreen'
-import { TEST_CLIP_ID, ms, testChangeSet, testOperation, testProject } from '../../test-fixtures'
+import { TEST_ASSET_ID, TEST_CLIP_ID, ms, testChangeSet, testOperation, testProject } from '../../test-fixtures'
 
 afterEach(() => {
   cleanup()
@@ -166,6 +166,39 @@ function projectWithNameplate(
     sourceInterval: { start: ms(12_400), duration: ms(5_000) },
     ...overrides,
   }))
+  if (!accepted.ok) throw new Error(`fixture failed: ${JSON.stringify(accepted.error)}`)
+  return accepted.value
+}
+
+function projectWithFootageMotion(): EditProject {
+  const base = testProject()
+  const operation: EditOperation = {
+    schemaVersion: 'sanverse.operation/v3',
+    operationId: 'operation_motion01',
+    kind: 'set-footage-motion',
+    capabilityId: 'sanverse.footage.motion.primitive/v1',
+    motionId: 'motion_aaaaaaaa',
+    assetId: TEST_ASSET_ID,
+    sourceInterval: { start: ms(0), duration: ms(30_000) },
+    transform: {
+      translateX: 0,
+      translateY: 0,
+      scale: 1.2,
+      rotationDegrees: 0,
+      opacity: 1,
+    },
+    crop: { top: 0, right: 0, bottom: 0, left: 0 },
+    tracks: [],
+    extensions: {},
+  }
+  const accepted = acceptChangeSet(base, {
+    schemaVersion: 'sanverse.change-set/v1',
+    changeSetId: 'changeset_motion01',
+    baseRevision: base.revision,
+    operations: [operation],
+    provenance: { source: 'direct', requestId: null },
+    extensions: {},
+  })
   if (!accepted.ok) throw new Error(`fixture failed: ${JSON.stringify(accepted.error)}`)
   return accepted.value
 }
@@ -982,6 +1015,146 @@ describe('StudioScreen production timeline', () => {
       clipId: TEST_CLIP_ID,
       gainDb: -7,
     })
+  })
+
+  it('keeps primary-footage motion detached until Apply and emits one complete operation', async () => {
+    const user = userEvent.setup()
+    const onCreateOverlay = vi.fn(async (_operation: EditOperation): Promise<string | null> => null)
+    renderStudio({ onCreateOverlay })
+
+    const videoLane = screen.getByRole('group', { name: /V1 video lane/i })
+    await user.click(within(videoLane).getByRole('button', { name: /^clip, cleaned-interview\.mp4,/i }))
+
+    const inspector = screen.getByRole('region', { name: 'Inspector' })
+    expect(await within(inspector).findByRole('heading', { name: 'Motion' })).toBeInTheDocument()
+    const scale = within(inspector).getByRole('spinbutton', { name: /scale %/i })
+    fireEvent.change(scale, { target: { value: '125' } })
+    expect(onCreateOverlay).not.toHaveBeenCalled()
+    expect(scale).toHaveValue(125)
+
+    await user.click(within(inspector).getByRole('button', { name: 'Punch in 120%' }))
+    expect(scale).toHaveValue(120)
+    await user.click(within(inspector).getByRole('button', { name: 'Reset draft' }))
+    expect(scale).toHaveValue(100)
+    expect(onCreateOverlay).not.toHaveBeenCalled()
+
+    await user.click(within(inspector).getByRole('button', { name: 'Punch in 120%' }))
+    await user.click(within(inspector).getByRole('button', { name: /^Apply motion$/ }))
+
+    await waitFor(() => expect(onCreateOverlay).toHaveBeenCalledTimes(1))
+    expect(onCreateOverlay.mock.calls[0][0]).toMatchObject({
+      kind: 'set-footage-motion',
+      capabilityId: 'sanverse.footage.motion.primitive/v1',
+      assetId: TEST_ASSET_ID,
+      transform: { scale: 1.2, opacity: 1 },
+      tracks: [],
+    })
+  })
+
+  it('keeps one native video and gives Point mode precedence over primary-footage Canvas handles', async () => {
+    const user = userEvent.setup()
+    const { container } = renderStudio()
+    const video = container.querySelector('video') as HTMLVideoElement
+    prepareVideoForPointing(video)
+    vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+    fireEvent.loadedMetadata(video)
+
+    const videoLane = screen.getByRole('group', { name: /V1 video lane/i })
+    await user.click(within(videoLane).getByRole('button', { name: /^clip, cleaned-interview\.mp4,/i }))
+
+    expect(await screen.findByTestId('primary-footage-canvas-controls')).toBeInTheDocument()
+    expect(screen.queryByText('This item does not have canvas controls yet.')).not.toBeInTheDocument()
+    expect(container.querySelectorAll('video')).toHaveLength(1)
+    expect(video).toHaveAttribute('controls')
+
+    await user.click(screen.getByRole('button', { name: 'Enter Point mode' }))
+
+    expect(screen.queryByTestId('primary-footage-canvas-controls')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose a point on the visible video' })).toBeInTheDocument()
+    expect(container.querySelectorAll('video')).toHaveLength(1)
+  })
+
+  it('keeps Canvas movement detached and commits one footage-motion operation on release', async () => {
+    vi.stubGlobal('PointerEvent', MouseEvent)
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+    const user = userEvent.setup()
+    const onCreateOverlay = vi.fn(async (_operation: EditOperation): Promise<string | null> => null)
+    const { container } = renderStudio({ onCreateOverlay })
+    const video = container.querySelector('video') as HTMLVideoElement
+    prepareVideoForPointing(video)
+    vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+    fireEvent.loadedMetadata(video)
+
+    const videoLane = screen.getByRole('group', { name: /V1 video lane/i })
+    await user.click(within(videoLane).getByRole('button', { name: /^clip, cleaned-interview\.mp4,/i }))
+
+    const controls = await screen.findByTestId('primary-footage-canvas-controls')
+    vi.spyOn(controls, 'getBoundingClientRect').mockReturnValue(canvasDomRect(100, 137.5, 400, 225))
+    const move = within(controls).getByRole('button', { name: /Move primary footage/i })
+    const inspector = screen.getByRole('region', { name: 'Inspector' })
+
+    fireEvent.pointerDown(move, { clientX: 300, clientY: 250 })
+    fireEvent.pointerMove(window, { clientX: 340, clientY: 272.5 })
+
+    expect(onCreateOverlay).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(within(inspector).getByRole('spinbutton', { name: /Position X % frame/i })).toHaveValue(10)
+      expect(within(inspector).getByRole('spinbutton', { name: /Position Y % frame/i })).toHaveValue(10)
+    })
+
+    fireEvent.pointerUp(window, { clientX: 340, clientY: 272.5 })
+
+    await waitFor(() => expect(onCreateOverlay).toHaveBeenCalledTimes(1))
+    expect(onCreateOverlay.mock.calls[0][0]).toMatchObject({
+      kind: 'set-footage-motion',
+      transform: { translateX: 0.1, translateY: 0.1, opacity: 1 },
+    })
+  })
+
+  it('cancels a second Canvas gesture with Escape and emits no operation', async () => {
+    vi.stubGlobal('PointerEvent', MouseEvent)
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+    const user = userEvent.setup()
+    const onCreateOverlay = vi.fn(async (_operation: EditOperation): Promise<string | null> => null)
+    const { container } = renderStudio({ onCreateOverlay })
+    const video = container.querySelector('video') as HTMLVideoElement
+    prepareVideoForPointing(video)
+    vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+    fireEvent.loadedMetadata(video)
+
+    const videoLane = screen.getByRole('group', { name: /V1 video lane/i })
+    await user.click(within(videoLane).getByRole('button', { name: /^clip, cleaned-interview\.mp4,/i }))
+
+    const controls = await screen.findByTestId('primary-footage-canvas-controls')
+    vi.spyOn(controls, 'getBoundingClientRect').mockReturnValue(canvasDomRect(100, 137.5, 400, 225))
+    const move = within(controls).getByRole('button', { name: /Move primary footage/i })
+    const inspector = screen.getByRole('region', { name: 'Inspector' })
+
+    fireEvent.pointerDown(move, { clientX: 300, clientY: 250 })
+    fireEvent.pointerMove(window, { clientX: 380, clientY: 250 })
+    expect(onCreateOverlay).not.toHaveBeenCalled()
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(onCreateOverlay).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(within(inspector).getByRole('spinbutton', { name: /Position X % frame/i })).toHaveValue(0)
+    })
+  })
+
+  it('projects accepted primary motion into the V1 Timeline indicator and Inspector', async () => {
+    const user = userEvent.setup()
+    renderStudio({ editProject: projectWithFootageMotion() })
+
+    const videoLane = screen.getByRole('group', { name: /V1 video lane/i })
+    const videoItem = within(videoLane).getByRole('button', {
+      name: /Motion · 120% framing/i,
+    })
+    await user.click(videoItem)
+
+    const inspector = screen.getByRole('region', { name: 'Inspector' })
+    expect(await within(inspector).findByText('Accepted motion')).toBeInTheDocument()
+    expect(within(inspector).getByRole('button', { name: 'Remove motion' })).toBeEnabled()
+    expect(within(inspector).getByRole('spinbutton', { name: /scale %/i })).toHaveValue(120)
   })
 
   it('keeps Inspector proposal resolution actions available while unrelated timeline edits are paused', async () => {

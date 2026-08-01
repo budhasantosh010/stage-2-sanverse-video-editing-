@@ -11,8 +11,11 @@ import {
   clipAtCompositionTime,
   compositionDuration,
   effectiveComposition,
+  effectiveFootageMotions,
   isTimelineOperation,
+  mediaTime,
   toMilliseconds,
+  type SetFootageMotionOperation,
 } from '@sanverse/edit-domain'
 import { proposalPlacement } from '../../app/app-state'
 import type { ConversationState, PendingProposal, ProposalRepair, StudioState } from '../../app/app-state'
@@ -50,6 +53,15 @@ import {
   visibleNameplates,
   withPendingProposal,
 } from '../../features/render-plan/render-plan-preview'
+import { drawFootageMotionFrame } from '../../features/render-plan/footage-motion-preview'
+import {
+  FootageMotionInspector,
+  buildFootageMotionOperation,
+  createWideFootageMotionDraft,
+  footageMotionDraftFromOperation,
+  type FootageMotionDraft,
+} from '../../features/footage-motion/FootageMotionInspector'
+import { PrimaryFootageCanvasControls } from '../../features/footage-motion/PrimaryFootageCanvasControls'
 import type { ProjectExportState } from '../../features/project-export/project-export'
 import { NameplateComposer } from '../../features/nameplate/NameplateComposer'
 import { NameplateOverlay } from '../../features/nameplate/NameplateOverlay'
@@ -153,6 +165,12 @@ function createOperationId() {
   return `operation_${Array.from(bytes, (value) => value.toString(16).padStart(8, '0')).join('')}`.slice(0, 42)
 }
 
+function createMotionId() {
+  const bytes = new Uint32Array(4)
+  globalThis.crypto.getRandomValues(bytes)
+  return `motion_${Array.from(bytes, (value) => value.toString(16).padStart(8, '0')).join('')}`.slice(0, 39)
+}
+
 type NormalizedPoint = Pick<CapturedPointTarget, 'x' | 'y'>
 
 function clampNormalized(value: number) {
@@ -244,7 +262,7 @@ export function StudioScreen({
   const [isMovingProposalPoint, setIsMovingProposalPoint] = useState(false)
   const [pointTarget, setPointTarget] = useState<CapturedPointTarget | null>(null)
   const [draftPoint, setDraftPoint] = useState<NormalizedPoint>({ x: 0.5, y: 0.5 })
-  const [, setVideoLayoutRevision] = useState(0)
+  const [videoLayoutRevision, setVideoLayoutRevision] = useState(0)
   const [pointError, setPointError] = useState<string | null>(null)
   const [playheadMs, setPlayheadMs] = useState(0)
   /** True while the finished video is sitting on a deliberately empty stretch. */
@@ -268,7 +286,9 @@ export function StudioScreen({
   const [selectedMediaAssetId, setSelectedMediaAssetId] = useState<string | null>(null)
   const [mediaSourceStatuses, setMediaSourceStatuses] = useState<Readonly<Record<string, MediaStatus>>>({})
   const [pendingPlacedTimelineItemId, setPendingPlacedTimelineItemId] = useState<string | null>(null)
-  const [inspectorDirty, setInspectorDirty] = useState(false)
+  const [inspectorSectionDirty, setInspectorSectionDirty] = useState(false)
+  const [footageMotionDraft, setFootageMotionDraft] = useState<FootageMotionDraft | null>(null)
+  const [footageMotionBaseline, setFootageMotionBaseline] = useState<string | null>(null)
   const [pendingTimelineSelection, setPendingTimelineSelection] = useState<Readonly<{ itemId: string | null }> | null>(null)
   const [canvasCropMode, setCanvasCropMode] = useState(false)
   const [proposalCanvasPoint, setProposalCanvasPoint] = useState<NormalizedPoint | null>(null)
@@ -287,6 +307,9 @@ export function StudioScreen({
   const [captionsNotice, setCaptionsNotice] = useState<string | null>(null)
   const [captionsBusy, setCaptionsBusy] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const footageMotionCanvasRef = useRef<HTMLCanvasElement>(null)
+  const footagePlanRef = useRef<ReturnType<typeof compilePreviewPlan>>(null)
+  const reducedMotionRef = useRef(false)
   const videoContentLayerRef = useRef<HTMLDivElement>(null)
   const inspectorRegionRef = useRef<HTMLElement>(null)
   const pointModeButtonRef = useRef<HTMLButtonElement>(null)
@@ -362,6 +385,22 @@ export function StudioScreen({
     if (!video) return
 
     const refreshProjection = () => setVideoLayoutRevision((revision) => revision + 1)
+    const drawFootageMotion = (compositionTicks: number) => {
+      const canvas = footageMotionCanvasRef.current
+      const plan = footagePlanRef.current
+      if (!canvas || !plan) return
+      drawFootageMotionFrame({
+        canvas,
+        video,
+        plan,
+        compositionTicks,
+        reducedMotion: reducedMotionRef.current,
+      })
+    }
+    const hideFootageMotion = () => {
+      const canvas = footageMotionCanvasRef.current
+      if (canvas) canvas.hidden = true
+    }
 
     let holeFrameId: number | null = null
     const leaveHole = () => {
@@ -384,6 +423,7 @@ export function StudioScreen({
       if (inHoleRef.current) return
       inHoleRef.current = true
       setIsShowingHole(true)
+      hideFootageMotion()
       const resumePlaying = !video.paused
       video.pause()
       const startedAt = performance.now()
@@ -418,11 +458,14 @@ export function StudioScreen({
     const updatePlayhead = (currentTime: number) => {
       if (!Number.isFinite(currentTime) || currentTime < 0) {
         setPlayheadMs(-1)
+        hideFootageMotion()
         return
       }
       const segments = segmentsRef.current
       if (segments.length === 0 || isUncutPassthrough(segments)) {
-        setPlayheadMs(Math.round(currentTime * 1000))
+        const compositionTicks = Math.round(currentTime * PROJECT_TIMESCALE)
+        setPlayheadMs(compositionTicks / TICKS_PER_MS)
+        drawFootageMotion(compositionTicks)
         return
       }
       if (inHoleRef.current) return
@@ -437,18 +480,22 @@ export function StudioScreen({
         case 'show':
           segmentIndexRef.current = action.segmentIndex
           setPlayheadMs(action.compositionTicks / TICKS_PER_MS)
+          drawFootageMotion(action.compositionTicks)
           return
         case 'seek':
           segmentIndexRef.current = action.segmentIndex
           video.currentTime = action.sourceTicks / PROJECT_TIMESCALE
           setPlayheadMs(action.compositionTicks / TICKS_PER_MS)
+          drawFootageMotion(action.compositionTicks)
           return
         case 'hole':
+          hideFootageMotion()
           enterHole(action.compositionTicks, action.untilTicks)
           return
         case 'ended':
           video.pause()
           setPlayheadMs(action.compositionTicks / TICKS_PER_MS)
+          hideFootageMotion()
           return
         default:
           return
@@ -684,6 +731,108 @@ export function StudioScreen({
     }),
     [assetLabels, editProject, pendingTimelineInput, selectedTimelineItemId, timelineModel],
   )
+  const selectedVideoSelection = inspectorSelection.kind === 'video' ? inspectorSelection : null
+  const acceptedFootageMotions = useMemo(() => effectiveFootageMotions(editProject), [editProject])
+  const selectedSourceTime = selectedVideoSelection &&
+    playheadTicks >= selectedVideoSelection.clip.compositionStart.ticks &&
+    playheadTicks < selectedVideoSelection.clip.compositionStart.ticks + selectedVideoSelection.clip.sourceRange.duration.ticks
+      ? mediaTime(
+          selectedVideoSelection.clip.sourceRange.start.ticks +
+          playheadTicks -
+          selectedVideoSelection.clip.compositionStart.ticks,
+        )
+      : null
+  const acceptedFootageMotion = useMemo(() => {
+    if (!selectedVideoSelection) return null
+    const sourceStart = selectedVideoSelection.clip.sourceRange.start.ticks
+    const sourceEnd = sourceStart + selectedVideoSelection.clip.sourceRange.duration.ticks
+    const matching = acceptedFootageMotions.filter((motion) =>
+      motion.assetId === selectedVideoSelection.clip.assetId &&
+      motion.sourceInterval.start.ticks < sourceEnd &&
+      motion.sourceInterval.start.ticks + motion.sourceInterval.duration.ticks > sourceStart,
+    )
+    return matching.find((motion) =>
+      selectedSourceTime &&
+      selectedSourceTime.ticks >= motion.sourceInterval.start.ticks &&
+      selectedSourceTime.ticks < motion.sourceInterval.start.ticks + motion.sourceInterval.duration.ticks,
+    ) ?? matching[0] ?? null
+  }, [acceptedFootageMotions, selectedSourceTime, selectedVideoSelection])
+  const footageMotionDirty = Boolean(
+    footageMotionDraft &&
+    footageMotionBaseline !== null &&
+    JSON.stringify(footageMotionDraft) !== footageMotionBaseline,
+  )
+  const inspectorDirty = inspectorSectionDirty || footageMotionDirty
+
+  useEffect(() => {
+    if (!selectedVideoSelection) {
+      setFootageMotionDraft(null)
+      setFootageMotionBaseline(null)
+      return
+    }
+    if (footageMotionDirty) return
+    const next = acceptedFootageMotion
+      ? footageMotionDraftFromOperation(acceptedFootageMotion)
+      : createWideFootageMotionDraft(
+          createMotionId(),
+          selectedVideoSelection.clip.assetId,
+          selectedVideoSelection.clip.sourceRange,
+        )
+    setFootageMotionDraft(next)
+    setFootageMotionBaseline(JSON.stringify(next))
+  }, [acceptedFootageMotion, footageMotionDirty, selectedVideoSelection?.clip.clipId])
+
+  const footageDisplayPlan = useMemo(() => {
+    if (!footagePlan || !footageMotionDraft || !selectedVideoSelection) return footagePlan
+    if (!acceptedFootageMotion && !footageMotionDirty) return footagePlan
+    const draftNode = Object.freeze({
+      motionId: footageMotionDraft.motionId,
+      sourceInterval: footageMotionDraft.sourceInterval,
+      transform: footageMotionDraft.transform,
+      crop: footageMotionDraft.crop,
+      tracks: footageMotionDraft.tracks,
+    })
+    const draftStart = footageMotionDraft.sourceInterval.start.ticks
+    const draftEnd = draftStart + footageMotionDraft.sourceInterval.duration.ticks
+    return Object.freeze({
+      ...footagePlan,
+      segments: Object.freeze(footagePlan.segments.map((segment) => {
+        const segmentSourceStart = segment.sourceStartTicks
+        const segmentSourceEnd = segmentSourceStart + segment.interval.duration.ticks
+        const intersects =
+          segment.assetId === footageMotionDraft.assetId &&
+          draftStart < segmentSourceEnd &&
+          draftEnd > segmentSourceStart
+        if (!intersects) return segment
+        return Object.freeze({
+          ...segment,
+          footageMotions: Object.freeze([
+            ...segment.footageMotions.filter((motion) => motion.motionId !== footageMotionDraft.motionId),
+            draftNode,
+          ]),
+        })
+      })),
+    })
+  }, [acceptedFootageMotion, footageMotionDirty, footageMotionDraft, footagePlan, selectedVideoSelection])
+
+  useEffect(() => {
+    footagePlanRef.current = footageDisplayPlan
+    reducedMotionRef.current = reducedMotion
+    const canvas = footageMotionCanvasRef.current
+    const videoElement = videoRef.current
+    if (!canvas || !videoElement || !footageDisplayPlan) {
+      if (canvas) canvas.hidden = true
+      return
+    }
+    drawFootageMotionFrame({
+      canvas,
+      video: videoElement,
+      plan: footageDisplayPlan,
+      compositionTicks: playheadPreviewTicks,
+      reducedMotion,
+    })
+  }, [footageDisplayPlan, playheadPreviewTicks, reducedMotion, videoLayoutRevision])
+
   const canvasVisibleNodes = [
     ...previewNodes,
     ...previewCaptions,
@@ -764,7 +913,9 @@ export function StudioScreen({
 
   const discardInspectorDraftAndContinue = () => {
     const nextItemId = pendingTimelineSelection?.itemId ?? null
-    setInspectorDirty(false)
+    setInspectorSectionDirty(false)
+    setFootageMotionDraft(null)
+    setFootageMotionBaseline(null)
     setPendingTimelineSelection(null)
     setSelectedTimelineItemId(nextItemId)
   }
@@ -827,7 +978,9 @@ export function StudioScreen({
   useEffect(() => {
     const reconciled = reconcileTimelineSelection(timelineModel, selectedTimelineItemId)
     if (reconciled !== selectedTimelineItemId) {
-      setInspectorDirty(false)
+      setInspectorSectionDirty(false)
+      setFootageMotionDraft(null)
+      setFootageMotionBaseline(null)
       setPendingTimelineSelection(null)
       setSelectedTimelineItemId(reconciled)
     }
@@ -862,6 +1015,27 @@ export function StudioScreen({
     setIsShowingHole(false)
     segmentIndexRef.current = target.segmentIndex
     videoElement.currentTime = target.sourceTicks / PROJECT_TIMESCALE
+  }
+
+  async function applyFootageMotion(operation: SetFootageMotionOperation): Promise<string | null> {
+    const error = await onCreateOverlay(operation)
+    if (!error) {
+      const next = footageMotionDraftFromOperation(operation)
+      setFootageMotionDraft(next)
+      setFootageMotionBaseline(JSON.stringify(next))
+    }
+    return error
+  }
+
+  function commitFootageMotionGesture(nextDraft: FootageMotionDraft) {
+    void applyFootageMotion(buildFootageMotionOperation(nextDraft, createOperationId()))
+  }
+
+  function seekSelectedSourceTime(sourceTime: ReturnType<typeof mediaTime>) {
+    if (!selectedVideoSelection) return
+    const sourceOffset = sourceTime.ticks - selectedVideoSelection.clip.sourceRange.start.ticks
+    if (sourceOffset < 0 || sourceOffset > selectedVideoSelection.clip.sourceRange.duration.ticks) return
+    seekCompositionTicks(selectedVideoSelection.clip.compositionStart.ticks + sourceOffset)
   }
 
   function timelineRefusalMessage(code: string, fallback: string): string {
@@ -1332,6 +1506,16 @@ export function StudioScreen({
               >
                 Your browser does not support video playback.
               </video>
+              {videoContentLayerStyle ? (
+                <canvas
+                  ref={footageMotionCanvasRef}
+                  className="studio-screen__footage-motion-canvas"
+                  data-testid="footage-motion-canvas"
+                  style={{ ...videoContentLayerStyle, opacity: transitionOpacity }}
+                  hidden
+                  aria-hidden="true"
+                />
+              ) : null}
 
               {/*
                 A stretch that was removed but left in place is black in the
@@ -1403,7 +1587,21 @@ export function StudioScreen({
                       visualStyle={motionStyle(node)}
                     />
                   ))}
-                  {workspace === 'studio' && !isPointMode ? (
+                  {workspace === 'studio' && !isPointMode && selectedVideoSelection && footageMotionDraft && selectedSourceTime ? (
+                    <PrimaryFootageCanvasControls
+                      draft={footageMotionDraft}
+                      sourceTime={selectedSourceTime}
+                      setDraft={setFootageMotionDraft}
+                      busy={canvasBusy || timelineBusy}
+                      narrow={canvasNarrow}
+                      cropMode={canvasCropMode}
+                      onCropModeChange={setCanvasCropMode}
+                      onCommit={commitFootageMotionGesture}
+                      onPausePlayback={() => videoRef.current?.pause()}
+                      onFocusInspector={() => inspectorRegionRef.current?.focus()}
+                    />
+                  ) : null}
+                  {workspace === 'studio' && !isPointMode && !selectedVideoSelection ? (
                     <CanvasInteractionLayer
                       contentLayerRef={videoContentLayerRef}
                       selectionResult={canvasSelectionResult}
@@ -1551,6 +1749,17 @@ export function StudioScreen({
             tabIndex={-1}
             hidden={workspace !== 'studio'}
           >
+            {selectedVideoSelection && footageMotionDraft ? (
+              <FootageMotionInspector
+                draft={footageMotionDraft}
+                accepted={acceptedFootageMotion}
+                sourceTime={selectedSourceTime}
+                busy={timelineBusy}
+                setDraft={setFootageMotionDraft}
+                onApply={applyFootageMotion}
+                onSeekSourceTime={seekSelectedSourceTime}
+              />
+            ) : null}
             <Inspector
               selection={inspectorSelection}
               assets={editProject.assets}
@@ -1566,7 +1775,7 @@ export function StudioScreen({
                       : 'nothing selected',
                   }
                 : null}
-              onDirtyChange={setInspectorDirty}
+              onDirtyChange={setInspectorSectionDirty}
               onStaySelection={() => setPendingTimelineSelection(null)}
               onDiscardSelection={discardInspectorDraftAndContinue}
               onAcceptProposal={onAcceptProposal}

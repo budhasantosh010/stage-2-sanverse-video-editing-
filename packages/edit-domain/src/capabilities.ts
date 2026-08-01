@@ -42,6 +42,7 @@ export const CALLOUT_PRIMITIVE_ID = 'sanverse.callout.primitive/v1'
 export const MEDIA_OVERLAY_PRIMITIVE_ID = 'sanverse.broll.primitive/v1'
 export const MUSIC_PRIMITIVE_ID = 'sanverse.music.primitive/v1'
 export const VISUAL_PROPERTIES_PRIMITIVE_ID = 'sanverse.visual.properties.primitive/v1'
+export const FOOTAGE_MOTION_PRIMITIVE_ID = 'sanverse.footage.motion.primitive/v1'
 
 /** "Put a title on it." */
 export const TITLE_COMPONENT_ID = 'sanverse.title.component/v1'
@@ -205,6 +206,14 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     level: 'primitive' as const,
     accepts: 'One existing visual, its transform, crop, layer, mask, and bounded property tracks.',
     produces: Object.freeze(['set-visual-properties']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: FOOTAGE_MOTION_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One source-anchored interval of primary video and one complete bounded transform, crop, and keyframe state.',
+    produces: Object.freeze(['set-footage-motion']),
     requires: Object.freeze([]),
   }),
   Object.freeze({

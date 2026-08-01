@@ -8,16 +8,16 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 ## Current gate
 
-- **P1-E.1 — Studio Vertical Flow is technically complete.** Evidence: `DOCS/evidence/2026-08-01-p1e1-studio-vertical-flow/`.
-- The browser document is the one outer vertical-scroll authority. Studio uses natural height and normal-flow rows, so the upper workspace and complete Production Timeline can extend below the fold instead of being compressed into one viewport.
-- Media, Inspector, and AI retain bounded internal scrolling while ordinary browser scroll chaining remains available.
-- Real Edge proved page scroll and complete Timeline reachability at 1440×900, 1280×800, 1024×768, and 390×844 with no horizontal page overflow.
-- Page scrolling preserves playhead, Timeline selection, zoom, horizontal scroll, accepted revision, one main video, and five lanes.
-- Canvas and Point use the existing displayed-video-content geometry after page scroll; one passive geometry-refresh listener is cleaned up on unmount.
-- **P1-E — Media Bin V1 remains complete.** Import, search, filters, shared names, usage, source probing, B-roll/music placement, missing-media truth, and responsive Media behavior remain intact.
-- Final suites pass: web 476/476, edit-domain 265/265, API 235/235, render-contract 51/51, intent-domain 27/27, plus the all-workspace build.
-- No second project, history, page-scroll owner, video-layout observer, media library, editor selection, visual draft, schema, operation family, API route, renderer architecture, or runtime dependency was added.
-- **P1-F has not started.** Begin P1-F.0 only from the clean pushed P1-E.1 commit.
+- **P1-F.0 — Primary-Footage Motion V1 is technically complete.** Evidence: `DOCS/evidence/2026-08-01-p1f0-primary-footage-motion-v1/`.
+- Primary footage has one stable motion identity anchored to the immutable source asset and source interval, not a temporary clip ID.
+- Position, uniform scale, rotation, crop, and bounded keyframes/easing survive split, trim, remove, gap, reorder, repeated placements, Undo, and Redo.
+- Render-plan v6 plus one shared source-time evaluator drive both the browser motion canvas and FFmpeg export.
+- Studio exposes Motion Inspector presets/numeric controls/keyframes/Apply/Reset/Remove, a Timeline Motion indicator, and direct Canvas move/scale/rotate/crop.
+- Pointer movement remains a detached draft; release creates one operation; Escape creates none; Point mode has precedence.
+- Exactly one native video and its native controls remain. Narrow layouts keep numeric controls and truthfully explain when precision handles need a wider screen.
+- Real Edge completed static motion, Canvas repair, Undo/Redo, Point, animated zoom, split/Undo/Redo, a real 1080p H.264/AAC export, tablet/mobile checks, and Home cleanup with zero page, console, or failed-HTTP errors.
+- Final suites pass: web 484/484, edit-domain 299/299, API 239/239, render-contract 65/65, intent-domain 27/27 — **1,114/1,114 total** — plus the all-workspace build.
+- **P1-F.1 and P1-F.2 have not started.** Continue only after the owner chooses the next milestone.
 - Open human evidence remains human-only: repeated owner workflows, representative non-editor workflows, and agreed performance budgets.
 - Real-provider connection still requires the owner's data-leaving-machine decision and keys. Accounts and SaaS operations remain conditional.
 

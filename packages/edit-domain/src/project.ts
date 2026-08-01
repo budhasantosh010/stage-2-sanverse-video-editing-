@@ -15,6 +15,7 @@ import {
 import { emptyExtensions, validateExtensions, type Extensions, type ExtensionsError } from './json.ts'
 import {
   isCaptionOperation,
+  isFootageMotionOperation,
   isOverlayFamilyOperation,
   isTimelineOperation,
   isVisualPropertiesOperation,
@@ -34,6 +35,12 @@ import {
   foldVisualPropertiesOperations,
   type SetVisualPropertiesOperation,
 } from './visual-properties.ts'
+import {
+  foldFootageMotionOperations,
+  footageMotionsOverlap,
+  isDefaultFootageMotion,
+  type SetFootageMotionOperation,
+} from './footage-motion.ts'
 
 /**
  * The whole editable state of one video.
@@ -301,6 +308,8 @@ export type ProjectEvaluation = Readonly<{
   composition: Composition
   /** The same change sets, each carrying an up-to-date reason if it no longer fits. */
   records: readonly ChangeSetRecord[]
+  /** Latest active, valid full-state primary-footage motion per stable motion identity. */
+  footageMotions: readonly SetFootageMotionOperation[]
 }>
 
 /**
@@ -390,7 +399,7 @@ export const evaluateProject = (project: EditProject): ProjectEvaluation => {
     }
   }
 
-  const records = compositionCheckedRecords.map((record) => {
+  const visualCheckedRecords = compositionCheckedRecords.map((record) => {
     if (!record.active || record.blockedReason !== null) return record
     const missingTarget = record.changeSet.operations.find(
       (operation) => isVisualPropertiesOperation(operation) && !availableVisualIds.has(operation.visualId),
@@ -400,7 +409,44 @@ export const evaluateProject = (project: EditProject): ProjectEvaluation => {
       : record
   })
 
-  return Object.freeze({ composition, records: Object.freeze(records) })
+  // One source moment may have one effective primary-footage motion. Repairs of
+  // the same motion ID replace their prior full state before overlap is checked.
+  // A refused record contributes nothing to the effective map, so a later edit
+  // is never composed against motion the project did not accept.
+  const effectiveByMotionId = new Map<string, SetFootageMotionOperation>()
+  const records = visualCheckedRecords.map((record) => {
+    if (!record.active || record.blockedReason !== null) return record
+    const motions = record.changeSet.operations.filter(isFootageMotionOperation)
+    if (motions.length === 0) return record
+
+    const trial = new Map(effectiveByMotionId)
+    for (const motion of motions) {
+      trial.delete(motion.motionId)
+      // A default full-state repair truthfully removes the effective motion. It
+      // cannot overlap another motion because it draws no motion at all.
+      if (isDefaultFootageMotion(motion)) continue
+      if ([...trial.values()].some((existing) => footageMotionsOverlap(existing, motion))) {
+        return Object.freeze({ ...record, blockedReason: 'FOOTAGE_MOTION_OVERLAP' })
+      }
+      trial.set(motion.motionId, motion)
+    }
+    effectiveByMotionId.clear()
+    trial.forEach((motion, motionId) => effectiveByMotionId.set(motionId, motion))
+    return record
+  })
+
+  const footageMotions = foldFootageMotionOperations(
+    records
+      .filter((record) => record.active && record.blockedReason === null)
+      .flatMap((record) => record.changeSet.operations)
+      .filter(isFootageMotionOperation),
+  )
+
+  return Object.freeze({
+    composition,
+    records: Object.freeze(records),
+    footageMotions,
+  })
 }
 
 /**
@@ -565,6 +611,10 @@ export const activeOverlayOperations = (project: EditProject): readonly Resolved
 export const activeVisualProperties = (project: EditProject): readonly SetVisualPropertiesOperation[] =>
   foldVisualPropertiesOperations(activeOperations(project).filter(isVisualPropertiesOperation))
 
+/** Latest accepted non-overlapping primary-footage motion per stable motion ID. */
+export const effectiveFootageMotions = (project: EditProject): readonly SetFootageMotionOperation[] =>
+  evaluateProject(project).footageMotions
+
 export const canUndo = (project: EditProject): boolean => project.changeSets.length > 0
 export const canRedo = (project: EditProject): boolean => project.redoStack.length > 0
 
@@ -680,6 +730,7 @@ export {
   OPERATION_ID_PATTERN,
   OPERATION_SCHEMA_VERSION,
   isCaptionOperation,
+  isFootageMotionOperation,
   isNameplateOperation,
   isOverlayFamilyOperation,
   isSourceAnchoredOperation,
@@ -719,7 +770,24 @@ export {
   type VisualTransition,
   type VisualTransitionKind,
   type VisualTransitionPhase,
+  type VisualMotionState,
+  validateVisualMotionState,
 } from './visual-properties.ts'
+export {
+  DEFAULT_FOOTAGE_MOTION_STATE,
+  FOOTAGE_MOTION_CAPABILITY_ID,
+  FOOTAGE_MOTION_ID_PATTERN,
+  FOOTAGE_MOTION_OPERATION_KIND,
+  FOOTAGE_MOTION_PROPERTIES,
+  evaluateFootageMotionAt,
+  foldFootageMotionOperations,
+  footageMotionsOverlap,
+  isDefaultFootageMotion,
+  validateFootageMotionOperation,
+  type EvaluatedFootageMotion,
+  type FootageMotionError,
+  type SetFootageMotionOperation,
+} from './footage-motion.ts'
 export {
   BOUNCY_TITLE_RECIPE_ID,
   CALLOUT_RECIPE_ID,
@@ -831,6 +899,7 @@ export {
   CLIP_TRANSITION_COMPONENT_ID,
   CLIP_TRANSITION_PRIMITIVE_ID,
   CLIP_ENABLED_PRIMITIVE_ID,
+  FOOTAGE_MOTION_PRIMITIVE_ID,
   CALLOUT_COMPONENT_ID,
   CALLOUT_PRIMITIVE_ID,
   MEDIA_OVERLAY_COMPONENT_ID,

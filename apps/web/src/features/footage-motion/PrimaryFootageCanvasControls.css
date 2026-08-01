@@ -1,0 +1,105 @@
+.footage-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.footage-canvas__safe {
+  position: absolute;
+  inset: 10%;
+  border: 1px dashed rgb(255 255 255 / 45%);
+  pointer-events: none;
+}
+
+.footage-canvas__plane {
+  position: absolute;
+  min-width: 0;
+  min-height: 0;
+  border: 2px solid #fff;
+  padding: 0;
+  background: transparent;
+  box-shadow: 0 0 0 1px #000;
+  cursor: move;
+  pointer-events: auto;
+}
+
+.footage-canvas__plane:focus-visible,
+.footage-canvas__handle:focus-visible,
+.footage-canvas__crop:focus-visible,
+.footage-canvas__crop-toggle:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+.footage-canvas__handle,
+.footage-canvas__crop {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  transform: translate(-50%, -50%);
+  border: 2px solid #000;
+  border-radius: 50%;
+  padding: 0;
+  background: #fff;
+  pointer-events: auto;
+}
+
+.footage-canvas__handle--scale { cursor: nwse-resize; }
+.footage-canvas__handle--rotate { cursor: grab; }
+
+.footage-canvas__crop {
+  border-radius: 3px;
+  background: #fff;
+}
+
+.footage-canvas__crop--left,
+.footage-canvas__crop--right {
+  top: 50%;
+  height: 44px;
+  cursor: ew-resize;
+}
+
+.footage-canvas__crop--left { left: 0; }
+.footage-canvas__crop--right { left: 100%; }
+
+.footage-canvas__crop--top,
+.footage-canvas__crop--bottom {
+  left: 50%;
+  width: 44px;
+  cursor: ns-resize;
+}
+
+.footage-canvas__crop--top { top: 0; }
+.footage-canvas__crop--bottom { top: 100%; }
+
+.footage-canvas__crop-toggle {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  min-height: 34px;
+  border: 1px solid #fff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: rgb(0 0 0 / 80%);
+  color: #fff;
+  pointer-events: auto;
+}
+
+.footage-canvas__mobile-note {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  margin: 0;
+  border: 1px solid rgb(255 255 255 / 55%);
+  border-radius: 6px;
+  padding: 8px;
+  background: rgb(0 0 0 / 82%);
+  color: #fff;
+  font-size: 0.75rem;
+  pointer-events: none;
+}

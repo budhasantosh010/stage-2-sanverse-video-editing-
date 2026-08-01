@@ -46,6 +46,27 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | INFRA-001 | P3 | Verification infrastructure | In-app viewport screenshots tiled the page texture | RESOLVED | P0-D.1 |
 | [x] | INFRA-004 | P3 | Dev-process cleanup | Stopping the Harness dev parent left Sanverse Vite/API children listening on ports 2000/2001 | RESOLVED | P1-B |
 
+## P1-F.0 browser-found issue details
+
+### FAIL-034 — empty FFmpeg filter in the primary-motion chain
+
+- **What failed:** Real export failed because the generated graph contained `[motion_video],format=...`; the comma after the input label represented an empty filter.
+- **Why tests missed it:** Existing assertions checked individual expressions but did not reject the exact invalid label/comma sequence.
+- **Resolution:** Build the post-motion filter list separately, prefix it directly with the input label, and assert the graph contains `[motion_video]format=...` and never `],format=`.
+- **Evidence:** Focused renderer tests, exact-project FFmpeg reproduction, and the final Edge export all pass.
+
+### FAIL-035 — unnecessary full-frame work made ordinary zoom/pan impractical
+
+- **What failed:** Zero crop still ran per-pixel GEQ alpha masking and zero rotation still expanded and rotated every frame.
+- **Resolution:** Detect constant-zero crop and rotation expressions. Scale/pan-only motion now uses `scale → background → overlay`; crop/rotation retain the full alpha path only when authored.
+- **Evidence:** Regression test proves scale/pan graphs omit `geq=` and `rotate=`. The final 30.033-second 1080p export completed in 53.3 seconds.
+
+### UX-014 — false unsupported Canvas message
+
+- **What failed:** The old overlay Canvas layer rendered an unsupported-state message over the new primary-footage controls.
+- **Resolution:** Primary video selection renders only `PrimaryFootageCanvasControls`; the generic overlay layer remains authoritative for overlay selections.
+- **Evidence:** Studio regression assertion and final Edge screenshots contain the real footage controls without the false message.
+
 ## Legacy risk and failure summary
 
 | ID | Date | Area | Failure or risk | Status | Next evidence |

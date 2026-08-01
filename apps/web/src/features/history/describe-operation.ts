@@ -101,6 +101,10 @@ export const describeOperation = (operation: EditOperation): string => {
       return operation.tracks.length > 0
         ? 'Changed how something moves'
         : 'Changed its position or appearance'
+    case 'set-footage-motion':
+      return operation.tracks.length > 0
+        ? 'Changed how the main footage moves'
+        : 'Reframed the main footage'
     default: {
       const unreachable: never = operation
       void unreachable

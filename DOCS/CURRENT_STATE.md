@@ -4,13 +4,17 @@ Last updated: 2026-08-01
 
 ## Active goal
 
-**P1-E.1 — Studio Vertical Flow is technically complete on 2026-08-01.** The browser document is the one outer vertical-scroll authority. Studio no longer locks its complete workspace to `calc(100vh - 64px)` or hides overflow; the upper editor workspace and Production Timeline now contribute natural page height. Media, Inspector, and AI retain intentional internal scrolling, while normal browser scroll chaining remains available at panel boundaries.
+**P1-F.0 - Primary-Footage Motion V1 is technically complete on 2026-08-01.** The main talking-head footage now has one source-anchored, stable motion identity with full-state position, uniform scale, rotation, crop, and bounded keyframe repairs. The same exact-time evaluator drives the one-video browser canvas projection and FFmpeg expressions. Motion survives split, trim, gap, remove, reorder, Undo, Redo, and repeated source placements because it follows immutable source moments rather than temporary clip IDs.
 
-A fresh isolated Edge run at 1440×900 measured 1484 pixels of document height against a 900-pixel viewport. The full Timeline became reachable through ordinary page scrolling. The 1280×800, 1024×768, and 390×844 layouts also scrolled naturally with no page-level horizontal overflow. Page scrolling preserved playhead, Timeline selection, zoom, horizontal scroll, and accepted revision. Canvas and Point remained aligned after scrolling, playback continued, one main video and five Timeline lanes remained, and the passive geometry listener plus video were removed on unmount. Page, console, and failed-HTTP counts were zero. Evidence: `DOCS/evidence/2026-08-01-p1e1-studio-vertical-flow/`.
+Studio exposes Motion Inspector presets, numeric controls, keyframes/easing, Apply/Reset/Remove, a V1 Timeline Motion indicator, and direct Canvas move/scale/rotate/crop. Pointer movement stays detached; release creates one operation; Escape creates none; Point mode owns the picture while active. Narrow screens retain numeric controls and explain why precision handles require a wider screen. The legacy overlay Canvas layer no longer displays a false unsupported message for primary footage.
 
-**P1-E — Media Bin V1 remains complete.** Studio derives one immutable Media Bin view model from the accepted `EditProject`, with search, All/Video/Images/Audio/Missing filters, import, local presentation selection, usage, source status, keyboard navigation, right-click/Shift+F10 actions, and responsive layouts. One pure display-label authority feeds Media, Timeline, Canvas, and Inspector. App owns bounded source probing. Image/video placement reuses `add-media-overlay`; audio placement reuses `add-music`; music repair reuses `set-music`. Used removal is refused and unused removal remains deferred because no server-authoritative deletion operation exists. Evidence: `DOCS/evidence/2026-07-31-p1e-media-bin-v1/`.
+Real Edge completed static motion, Canvas repair, Undo/Redo, Point precedence, animated zoom, split/Undo/Redo, a real 1080p H.264/AAC export, tablet/mobile layouts, and Home cleanup with zero page, console, or failed-HTTP errors. Final suites pass API 239/239, web 484/484, edit-domain 299/299, intent-domain 27/27, and render-contract 65/65: **1,114/1,114 total**, plus the all-workspace build. Evidence: `DOCS/evidence/2026-08-01-p1f0-primary-footage-motion-v1/`.
 
-Final P1-E.1 suites pass web 476/476, edit-domain 265/265, API 235/235, render-contract 51/51, and intent-domain 27/27; the all-workspace build passes. **P1-B remains the Production Timeline authority, P1-C the contextual Inspector, P1-D the Canvas interaction layer, and P1-E the Media Bin. P1-F has not started.**
+**P1-E.1 - Studio Vertical Flow remains complete.** The browser document is the one outer vertical-scroll authority. Studio uses natural height and normal-flow rows, while Media, Inspector, and AI retain intentional internal scrolling. Evidence: `DOCS/evidence/2026-08-01-p1e1-studio-vertical-flow/`.
+
+**P1-E - Media Bin V1 remains complete.** Import, search, filters, shared labels, usage, source probing, B-roll/music placement, missing-media truth, and responsive behavior remain intact. Evidence: `DOCS/evidence/2026-07-31-p1e-media-bin-v1/`.
+
+**P1-B remains the Production Timeline authority, P1-C the contextual Inspector, P1-D the overlay Canvas interaction layer, P1-E the Media Bin, and P1-F.0 the primary-footage motion authority. P1-F.1 and P1-F.2 have not started.**
 
 **P1-B.1 repository-wide test truth is complete and owner-approved on 2026-07-30.** The three
 previously recorded verification failures are resolved without product changes:
@@ -146,16 +150,16 @@ marked complete, but it does not erase the completed G2/G3/G4-A foundation.
 ## Test and build state
 
 ```
-  edit-domain      265
-  render-contract   51
+  edit-domain      299
+  render-contract   65
   intent-domain     27
-  api              235
-  web              473
+  api              239
+  web              484
   ------------------------
-  total           1051 passing; all workspace builds clean
+  total           1114 passing; all workspace builds clean
 ```
 
-These are the final P1-E closure totals from sequential commands on 2026-07-31.
+These are the final P1-F.0 closure totals from sequential commands on 2026-08-01.
 
 Focused P0-B/P0-C evidence on 2026-07-29: 12/12 web continuity tests passed
 (`EditorShell.test.tsx` plus `App.test.tsx`) and the web production build passed.
@@ -187,8 +191,7 @@ technical browser evidence, not the owner's visual/interaction approval.
   rule, and a refusing default adapter exist; nothing is wired.
 - A verified Stage 1 transcript format. The importer follows the published
   Whisper word-timing shape and has never seen a real Stage 1 file.
-- Transform, crop, scale, rotation, keyframes, easing, spring/bounce,
-  transitions, or general effects
+- Primary-footage layer, mask, opacity, effect, or entrance/exit transition controls; P1-F.0 intentionally includes only position, uniform scale, rotation, crop, and bounded keyframes/easing
 - Reusable versioned titles, callouts, subtitle components, B-roll, or templates
 - Compound requests that produce more than one operation
 - Per-frame export percentage; durable milestone progress is implemented

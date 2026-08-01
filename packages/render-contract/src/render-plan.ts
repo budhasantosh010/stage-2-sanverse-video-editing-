@@ -1,9 +1,14 @@
 import {
+  FOOTAGE_MOTION_CAPABILITY_ID,
   VISUAL_PROPERTIES_PRIMITIVE_ID,
+  validateFootageMotionOperation,
   validateVisualPropertiesOperation,
   type SpatialTarget,
   type TimeRange,
+  type VisualCrop,
   type VisualProperties,
+  type VisualPropertyTrack,
+  type VisualTransform,
 } from '@sanverse/edit-domain'
 
 /**
@@ -14,6 +19,15 @@ import {
  * plan, which is what makes "what you approved is what you exported" a
  * structural property rather than a hope.
  */
+
+export type FootageMotionNode = Readonly<{
+  motionId: string
+  /** Half-open interval on the immutable source asset timeline. */
+  sourceInterval: TimeRange
+  transform: VisualTransform
+  crop: VisualCrop
+  tracks: readonly VisualPropertyTrack[]
+}>
 
 /**
  * One stretch of original footage that survived cutting, and where it now sits
@@ -33,6 +47,8 @@ export type SourceSegmentNode = Readonly<{
   assetId: string
   /** Where this piece starts inside the original footage. */
   sourceStartTicks: number
+  /** Source-anchored primary-footage motion that intersects this piece. */
+  footageMotions: readonly FootageMotionNode[]
   /** Loudness change in decibels. 0 means untouched. */
   gainDb: number
   /** Silence-to-full ramp at the head of this piece, in ticks. */
@@ -163,7 +179,7 @@ export type VisualPropertiesNode = VisualProperties & Readonly<{
 }>
 
 export type RenderPlan = Readonly<{
-  schemaVersion: 'sanverse.render-plan/v5'
+  schemaVersion: 'sanverse.render-plan/v6'
   projectId: string
   /**
    * The revision this plan was compiled from. An export carries it, so a file
@@ -210,7 +226,7 @@ export type RenderPlanError = {
   readonly issues: readonly { readonly path: string; readonly code: RenderPlanIssueCode }[]
 }
 
-export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v5'
+export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v6'
 /**
  * Raised from 512 because captions produce one node per line of speech. A
  * ten-minute talk is roughly 200 cues before cutting, and a cut through a cue
@@ -303,6 +319,62 @@ const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]
     }
     if (!Number.isSafeInteger(segment.sourceStartTicks) || (segment.sourceStartTicks as number) < 0) {
       issues.push({ path: `${path}.sourceStartTicks`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    if (!Array.isArray(segment.footageMotions)) {
+      issues.push({ path: `${path}.footageMotions`, code: 'TYPE_INVALID' })
+    } else {
+      const segmentSourceStart = Number.isSafeInteger(segment.sourceStartTicks)
+        ? segment.sourceStartTicks as number
+        : -1
+      const intervalCandidate = readInterval(segment.interval)
+      const segmentSourceEnd = intervalCandidate === null
+        ? -1
+        : segmentSourceStart + intervalCandidate.duration
+      segment.footageMotions.forEach((motion, motionIndex) => {
+        const motionPath = `${path}.footageMotions[${motionIndex}]`
+        if (!isRecord(motion)) {
+          issues.push({ path: motionPath, code: 'TYPE_INVALID' })
+          return
+        }
+        const motionKeys = ['motionId', 'sourceInterval', 'transform', 'crop', 'tracks']
+        if (
+          Object.keys(motion).some((key) => !motionKeys.includes(key)) ||
+          motionKeys.some((key) => !Object.hasOwn(motion, key))
+        ) {
+          issues.push({ path: motionPath, code: 'FIELD_UNKNOWN' })
+          return
+        }
+        const validated = validateFootageMotionOperation({
+          schemaVersion: 'sanverse.operation/v3',
+          operationId: `operation_render${String(index).padStart(4, '0')}${String(motionIndex).padStart(2, '0')}`,
+          kind: 'set-footage-motion',
+          capabilityId: FOOTAGE_MOTION_CAPABILITY_ID,
+          motionId: motion.motionId,
+          assetId: segment.assetId,
+          sourceInterval: motion.sourceInterval,
+          transform: motion.transform,
+          crop: motion.crop,
+          tracks: motion.tracks,
+          extensions: {},
+        }, motionPath)
+        if (!validated.ok) {
+          validated.error.issues.forEach((issue) => issues.push({
+            path: issue.path,
+            code: issue.code === 'TYPE_INVALID' ? 'TYPE_INVALID' : 'VALUE_OUT_OF_RANGE',
+          }))
+          return
+        }
+        const motionRange = readInterval(motion.sourceInterval)
+        if (
+          motionRange === null ||
+          segmentSourceStart < 0 ||
+          segmentSourceEnd <= segmentSourceStart ||
+          motionRange.start >= segmentSourceEnd ||
+          motionRange.start + motionRange.duration <= segmentSourceStart
+        ) {
+          issues.push({ path: `${motionPath}.sourceInterval`, code: 'NODE_OUTSIDE_COMPOSITION' })
+        }
+      })
     }
     if (typeof segment.gainDb !== 'number' || !Number.isFinite(segment.gainDb)) {
       issues.push({ path: `${path}.gainDb`, code: 'VALUE_OUT_OF_RANGE' })

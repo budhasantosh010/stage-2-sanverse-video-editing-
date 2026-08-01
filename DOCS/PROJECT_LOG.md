@@ -1,5 +1,18 @@
 # Project Log
 
+## 2026-08-01 — P1-F.0 Primary-Footage Motion V1 complete
+
+- Added one stable, source-anchored `set-footage-motion` identity with full-state position, uniform scale, rotation, crop, and bounded keyframe/easing repairs.
+- Preserved deterministic motion across split, trim, remove, gap, reorder, repeated placements, Undo, Redo, and selective deactivation without attaching state to temporary clip IDs.
+- Raised the render plan to v6, compiled motion onto surviving source segments, and made browser Canvas plus FFmpeg expressions consume one shared source-time evaluator.
+- Added Motion Inspector presets/numeric controls/keyframes/Apply/Reset/Remove, a V1 Timeline Motion indicator, and direct primary-footage Canvas move/scale/rotate/crop with detached movement, one release commit, Escape cancellation, and Point precedence.
+- Kept exactly one native video and native controls; removed the false legacy overlay-Canvas unsupported message for video selection.
+- Real Edge found and resolved `FAIL-034` invalid empty-filter syntax, `FAIL-035` unnecessary GEQ/rotation export cost, and `UX-014` misleading Canvas copy.
+- Final Edge loop completed static motion, Canvas repair, Undo/Redo, Point, animated zoom, split/Undo/Redo, real export, tablet/mobile, and cleanup with zero page/console/HTTP errors.
+- Probed export: 1920×1080 H.264 High, 30 fps, 901 frames, AAC-LC stereo 48 kHz, 30.033008 seconds, 17,261,471 bytes; render completed in 53.3 seconds and start/middle/end frames were inspected.
+- Final suites pass API 239/239, web 484/484, edit-domain 299/299, render-contract 65/65, intent-domain 27/27; all-workspace build passes.
+- P1-F.1 and P1-F.2 were not started.
+
 ## 2026-08-01 — P1-E.1 Studio Vertical Flow complete
 
 - Replaced the desktop Studio's fixed `calc(100vh - 64px)` height and hidden overflow with natural document flow and two normal-height grid rows.

@@ -23,12 +23,14 @@ import {
   CLIP_AUDIO_PRIMITIVE_ID,
   CLIP_TRANSITION_PRIMITIVE_ID,
   CLIP_ENABLED_PRIMITIVE_ID,
+  FOOTAGE_MOTION_PRIMITIVE_ID,
   REMOVE_PRIMITIVE_ID,
   REORDER_PRIMITIVE_ID,
   SPLIT_PRIMITIVE_ID,
   TRIM_PRIMITIVE_ID,
 } from './capabilities.ts'
 import { PROJECT_TIMESCALE, mediaTimeFromMilliseconds } from './time.ts'
+import type { SetFootageMotionOperation } from './footage-motion.ts'
 
 export const TEST_PROJECT_ID = 'project_aaaaaaaaaaaaaaaa'
 export const TEST_COMPOSITION_ID = 'composition_aaaaaaaa'
@@ -138,6 +140,29 @@ export const testOperation = (
   },
   primaryText: 'Ada Lovelace',
   secondaryText: 'Mathematician',
+  extensions: {},
+  ...overrides,
+})
+
+export const testFootageMotion = (
+  overrides: Partial<SetFootageMotionOperation> = {},
+): SetFootageMotionOperation => ({
+  schemaVersion: OPERATION_SCHEMA_VERSION,
+  operationId: 'operation_motion001',
+  kind: 'set-footage-motion',
+  capabilityId: FOOTAGE_MOTION_PRIMITIVE_ID,
+  motionId: 'motion_aaaaaaaa',
+  assetId: TEST_ASSET_ID,
+  sourceInterval: { start: ms(5_000), duration: ms(4_000) },
+  transform: {
+    translateX: 0,
+    translateY: 0,
+    scale: 1.2,
+    rotationDegrees: 0,
+    opacity: 1,
+  },
+  crop: { top: 0, right: 0, bottom: 0, left: 0 },
+  tracks: [],
   extensions: {},
   ...overrides,
 })

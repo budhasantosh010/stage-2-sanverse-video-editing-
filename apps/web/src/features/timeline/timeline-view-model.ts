@@ -354,13 +354,29 @@ export const buildTimelineViewModel = (
         clip.assetId,
         orderedClips.length === 1 ? 'Video' : `Video ${clipIndex + 1}`,
       )
+      const clipSourceStart = clip.sourceRange.start.ticks
+      const clipSourceEnd = clipSourceStart + clip.sourceRange.duration.ticks
+      const clipMotions = evaluation.footageMotions.filter((motion) =>
+        motion.assetId === clip.assetId &&
+        motion.sourceInterval.start.ticks < clipSourceEnd &&
+        motion.sourceInterval.start.ticks + motion.sourceInterval.duration.ticks > clipSourceStart,
+      )
+      const motionKeyframes = clipMotions.reduce(
+        (count, motion) => count + motion.tracks.reduce((trackCount, track) => trackCount + track.keyframes.length, 0),
+        0,
+      )
+      const motionDetail = clipMotions.length === 0
+        ? null
+        : motionKeyframes > 0
+          ? `Motion · ${motionKeyframes} ${motionKeyframes === 1 ? 'keyframe' : 'keyframes'}`
+          : `Motion · ${Math.round(clipMotions[0].transform.scale * 100)}% framing`
       addItem(videoLane, makeItem({
         id: videoId,
         laneId: videoLane.id,
         kind: 'clip',
         state: 'committed',
         label,
-        detail: null,
+        detail: motionDetail,
         startTicks: clip.compositionStart.ticks,
         durationTicks: clip.sourceRange.duration.ticks,
         enabled: clip.enabled,

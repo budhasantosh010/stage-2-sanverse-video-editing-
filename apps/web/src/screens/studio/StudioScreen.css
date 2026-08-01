@@ -266,11 +266,30 @@
   background: var(--color-ink-strong);
 }
 
+.studio-screen__footage-motion-canvas,
 .studio-screen__video-content-layer {
   position: absolute;
-  z-index: 4;
   overflow: hidden;
   pointer-events: none;
+}
+
+.studio-screen__footage-motion-canvas {
+  z-index: 1;
+  display: block;
+  background: #000;
+}
+
+/* The canvas is a truthful picture projection, not a second player. When the
+   real video itself receives hover or keyboard focus, reveal its native control
+   surface immediately. Canvas handles remain above this layer and keep their
+   own hit targets. */
+.studio-screen__video:hover + .studio-screen__footage-motion-canvas,
+.studio-screen__video:focus + .studio-screen__footage-motion-canvas {
+  opacity: 0 !important;
+}
+
+.studio-screen__video-content-layer {
+  z-index: 4;
 }
 
 .studio-screen__video {

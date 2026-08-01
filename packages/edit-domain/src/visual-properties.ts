@@ -1,4 +1,4 @@
-import { capabilityProduces } from './capabilities.ts'
+import { capabilityProduces, VISUAL_PROPERTIES_PRIMITIVE_ID } from './capabilities.ts'
 import { emptyExtensions, validateExtensions, type Extensions } from './json.ts'
 import { err, isRecord, ok, type Result } from './result.ts'
 import { OPERATION_SCHEMA_VERSION } from './timeline-operations.ts'
@@ -528,6 +528,86 @@ export const validateVisualPropertiesOperation = (
     transition,
     effects,
     extensions: extensions.ok ? extensions.value : emptyExtensions(),
+  }))
+}
+
+export type VisualMotionState = Readonly<{
+  transform: VisualTransform
+  crop: VisualCrop
+  tracks: readonly VisualPropertyTrack[]
+}>
+
+/**
+ * Validate the transform/crop/keyframe subset shared by overlays and primary footage.
+ *
+ * This intentionally delegates to the complete visual-properties validator so
+ * preview overlays and primary footage can never drift to different numeric,
+ * crop, easing, or keyframe limits. The synthetic fields are fixed internal
+ * values and never escape this function.
+ */
+export const validateVisualMotionState = (
+  input: unknown,
+  path = '$',
+  options: Readonly<{
+    allowedProperties?: readonly VisualProperty[]
+    requireOpaque?: boolean
+    maximumRelativeTicks?: number
+  }> = {},
+): Result<VisualMotionState, VisualPropertiesError> => {
+  const issues: Issue[] = []
+  if (!isRecord(input)) {
+    return err({ code: 'OPERATION_INVALID', issues: [{ path, code: 'TYPE_INVALID' }] })
+  }
+  const keys = ['transform', 'crop', 'tracks'] as const
+  closedKeys(input, keys, path, issues)
+  if (issues.length > 0) return err({ code: 'OPERATION_INVALID', issues })
+
+  const validated = validateVisualPropertiesOperation({
+    schemaVersion: OPERATION_SCHEMA_VERSION,
+    operationId: 'operation_motionvalidate',
+    kind: VISUAL_PROPERTIES_OPERATION_KIND,
+    capabilityId: VISUAL_PROPERTIES_PRIMITIVE_ID,
+    visualId: 'title_motionvalidation',
+    transform: input.transform,
+    crop: input.crop,
+    layer: 0,
+    mask: DEFAULT_VISUAL_PROPERTIES.mask,
+    tracks: input.tracks,
+    transition: DEFAULT_VISUAL_PROPERTIES.transition,
+    effects: [],
+    extensions: emptyExtensions(),
+  }, path)
+  if (!validated.ok) return validated
+
+  if (options.requireOpaque && validated.value.transform.opacity !== 1) {
+    issues.push({ path: `${path}.transform.opacity`, code: 'VALUE_OUT_OF_RANGE' })
+  }
+  const allowed = options.allowedProperties
+  if (allowed) {
+    validated.value.tracks.forEach((track, index) => {
+      if (!allowed.includes(track.property)) {
+        issues.push({ path: `${path}.tracks[${index}].property`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+    })
+  }
+  if (options.maximumRelativeTicks !== undefined) {
+    validated.value.tracks.forEach((track, trackIndex) => {
+      track.keyframes.forEach((keyframe, keyframeIndex) => {
+        if (keyframe.at.ticks > options.maximumRelativeTicks!) {
+          issues.push({
+            path: `${path}.tracks[${trackIndex}].keyframes[${keyframeIndex}].at`,
+            code: 'VALUE_OUT_OF_RANGE',
+          })
+        }
+      })
+    })
+  }
+  if (issues.length > 0) return err({ code: 'OPERATION_INVALID', issues })
+
+  return ok(Object.freeze({
+    transform: validated.value.transform,
+    crop: validated.value.crop,
+    tracks: validated.value.tracks,
   }))
 }
 

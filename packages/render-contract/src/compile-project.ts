@@ -5,6 +5,7 @@ import {
   activeVisualProperties,
   compositionDuration,
   effectiveComposition,
+  effectiveFootageMotions,
   findAsset,
   isNameplateOperation,
   placeSourceSpan,
@@ -48,6 +49,7 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     return { ok: false, error: { code: 'COMPILE_FAILED', reason: 'The composition is empty.' } }
   }
   const operations = activeOperations(project)
+  const footageMotions = effectiveFootageMotions(project)
   const transitionIn = new Map<string, { video: number; audio: number }>()
   const transitionOut = new Map<string, { video: number; audio: number }>()
   for (const operation of operations) {
@@ -89,6 +91,21 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
         }),
         assetId: clip.assetId,
         sourceStartTicks: clip.sourceRange.start.ticks,
+        footageMotions: Object.freeze(
+          footageMotions
+            .filter((motion) =>
+              motion.assetId === clip.assetId &&
+              motion.sourceInterval.start.ticks < clip.sourceRange.start.ticks + clip.sourceRange.duration.ticks &&
+              clip.sourceRange.start.ticks < motion.sourceInterval.start.ticks + motion.sourceInterval.duration.ticks,
+            )
+            .map((motion) => Object.freeze({
+              motionId: motion.motionId,
+              sourceInterval: motion.sourceInterval,
+              transform: motion.transform,
+              crop: motion.crop,
+              tracks: motion.tracks,
+            })),
+        ),
         gainDb: clip.gainDb,
         fadeInTicks: clip.fadeIn.ticks,
         fadeOutTicks: clip.fadeOut.ticks,

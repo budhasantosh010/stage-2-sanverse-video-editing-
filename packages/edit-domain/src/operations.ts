@@ -31,8 +31,15 @@ import {
   validateVisualPropertiesOperation,
   type SetVisualPropertiesOperation,
 } from './visual-properties.ts'
+import {
+  FOOTAGE_MOTION_OPERATION_KIND,
+  validateFootageMotionOperation,
+  type SetFootageMotionOperation,
+} from './footage-motion.ts'
 import { findAsset, type MediaAsset } from './assets.ts'
 import {
+  ZERO_TIME,
+  rangeWithin,
   validateTimeRange,
   type TimeRange,
 } from './time.ts'
@@ -92,6 +99,7 @@ export type EditOperation =
   | CaptionOperation
   | OverlayOperation
   | SetVisualPropertiesOperation
+  | SetFootageMotionOperation
 
 /** Every operation kind this build can execute. Unknown kinds are rejected. */
 export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze([
@@ -100,6 +108,7 @@ export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze([
   ...CAPTION_OPERATION_KINDS,
   ...OVERLAY_OPERATION_KINDS,
   VISUAL_PROPERTIES_OPERATION_KIND,
+  FOOTAGE_MOTION_OPERATION_KIND,
 ])
 
 /** True for the operations that change which footage the finished video is made of. */
@@ -118,6 +127,10 @@ export const isVisualPropertiesOperation = (
   operation: EditOperation,
 ): operation is SetVisualPropertiesOperation => operation.kind === VISUAL_PROPERTIES_OPERATION_KIND
 
+export const isFootageMotionOperation = (
+  operation: EditOperation,
+): operation is SetFootageMotionOperation => operation.kind === FOOTAGE_MOTION_OPERATION_KIND
+
 /**
  * True when this operation is pinned to a moment of original footage.
  *
@@ -127,11 +140,12 @@ export const isVisualPropertiesOperation = (
  */
 export const isSourceAnchoredOperation = (
   operation: EditOperation,
-): operation is AddNameplateOperation | Exclude<OverlayOperation, { kind: 'add-music' }> =>
+): operation is AddNameplateOperation | Exclude<OverlayOperation, { kind: 'add-music' }> | SetFootageMotionOperation =>
   operation.kind === 'add-nameplate' ||
   operation.kind === 'add-title' ||
   operation.kind === 'add-callout' ||
-  operation.kind === 'add-media-overlay'
+  operation.kind === 'add-media-overlay' ||
+  operation.kind === FOOTAGE_MOTION_OPERATION_KIND
 
 /** True for the operations that describe captions. */
 export const isCaptionOperation = (operation: EditOperation): operation is CaptionOperation =>
@@ -164,6 +178,10 @@ export type OperationIssueCode =
   /** The stretch of B-roll asked for runs past the end of the B-roll clip. */
   | 'OVERLAY_SPAN_OUTSIDE_ASSET'
   | 'VISUAL_TARGET_UNKNOWN'
+  | 'FOOTAGE_MOTION_ASSET_UNKNOWN'
+  | 'FOOTAGE_MOTION_ASSET_WRONG_KIND'
+  | 'FOOTAGE_MOTION_SPAN_OUTSIDE_ASSET'
+  | 'FOOTAGE_MOTION_OVERLAP'
 
 export type OperationError = {
   readonly code: 'OPERATION_INVALID'
@@ -309,6 +327,20 @@ export const validateOperation = (input: unknown, path = '$'): Result<EditOperat
     return ok(visual.value)
   }
 
+  if (input.kind === FOOTAGE_MOTION_OPERATION_KIND) {
+    const motion = validateFootageMotionOperation(input, path)
+    if (!motion.ok) {
+      return err({
+        code: 'OPERATION_INVALID',
+        issues: motion.error.issues.map((issue) => ({
+          path: issue.path,
+          code: issue.code as OperationIssueCode,
+        })),
+      })
+    }
+    return ok(motion.value)
+  }
+
   if (isTimelineOperationKind(input.kind)) {
     const timeline = validateTimelineOperation(input, path)
     if (!timeline.ok) {
@@ -349,6 +381,23 @@ export const validateOperationAgainstComposition = (
   // Whether the named visual exists is history-dependent and is checked in the
   // project replay, where earlier accepted operations are available.
   if (isVisualPropertiesOperation(operation)) return ok(operation)
+
+  if (isFootageMotionOperation(operation)) {
+    const asset = findAsset(assets, operation.assetId)
+    if (!asset) return fail('assetId', 'FOOTAGE_MOTION_ASSET_UNKNOWN')
+    if (asset.mediaKind !== 'video') return fail('assetId', 'FOOTAGE_MOTION_ASSET_WRONG_KIND')
+    if (!rangeWithin(operation.sourceInterval, { start: ZERO_TIME, duration: asset.duration })) {
+      return fail('sourceInterval', 'FOOTAGE_MOTION_SPAN_OUTSIDE_ASSET')
+    }
+    const usesAsset = composition.tracks.some((track) =>
+      track.clips.some((clip) => clip.assetId === operation.assetId),
+    )
+    if (!usesAsset) return fail('assetId', 'ASSET_NOT_IN_COMPOSITION')
+    if (placeSourceSpan(composition, operation.assetId, operation.sourceInterval).length === 0) {
+      return fail('sourceInterval', 'SOURCE_SPAN_REMOVED')
+    }
+    return ok(operation)
+  }
 
   if (operation.kind === 'add-music' || operation.kind === 'set-music') {
     // Music is judged only on whether the music itself is still here. It is not

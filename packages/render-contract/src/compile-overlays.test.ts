@@ -105,7 +105,7 @@ describe('drawing order', () => {
   })
 })
 
-describe('render-plan v5 visual properties', () => {
+describe('render-plan v6 visual properties', () => {
   it('binds one transform and motion contract to every concrete node made from its visual', () => {
     let project = testMultiAssetProject()
     project = accept(project, 'changeset_title001', [testTitle({ titleId: 'title_visual01' })])
@@ -135,7 +135,7 @@ describe('render-plan v5 visual properties', () => {
     }])
 
     const plan = compile(project)
-    expect(plan.schemaVersion).toBe('sanverse.render-plan/v5')
+    expect(plan.schemaVersion).toBe('sanverse.render-plan/v6')
     expect(plan.visuals).toHaveLength(1)
     expect(plan.visuals[0]).toMatchObject({
       visualId: 'title_visual01',

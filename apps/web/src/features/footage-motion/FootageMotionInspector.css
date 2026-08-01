@@ -1,0 +1,151 @@
+.footage-motion {
+  display: grid;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-border-muted);
+  padding: 14px;
+}
+
+.footage-motion__heading,
+.footage-motion__actions,
+.footage-motion__keyframe-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.footage-motion__heading h3,
+.footage-motion__eyebrow,
+.footage-motion__interval,
+.footage-motion__current,
+.footage-motion__notice {
+  margin: 0;
+}
+
+.footage-motion__eyebrow,
+.footage-motion__status {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.footage-motion__interval,
+.footage-motion__current,
+.footage-motion__notice {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.footage-motion__presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.footage-motion button,
+.footage-motion select,
+.footage-motion input {
+  min-height: 34px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.footage-motion button {
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.footage-motion button:focus-visible,
+.footage-motion select:focus-visible,
+.footage-motion input:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.footage-motion button:disabled,
+.footage-motion input:disabled,
+.footage-motion select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.footage-motion__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.footage-motion__field,
+.footage-motion__keyframes label {
+  display: grid;
+  gap: 4px;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.footage-motion__input-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+}
+
+.footage-motion__input-wrap input,
+.footage-motion__keyframes select {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 7px;
+}
+
+.footage-motion__keyframes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  border: 1px solid var(--color-border-muted);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.footage-motion__keyframes legend {
+  padding: 0 4px;
+  font-weight: 700;
+}
+
+.footage-motion__keyframe-actions,
+.footage-motion__keyframes ul {
+  grid-column: 1 / -1;
+}
+
+.footage-motion__keyframes ul {
+  max-height: 120px;
+  margin: 0;
+  padding-left: 18px;
+  overflow: auto;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.footage-motion__apply {
+  border-color: var(--color-ink-strong) !important;
+  background: var(--color-ink-strong) !important;
+  color: var(--color-surface) !important;
+}
+
+@media (max-width: 600px) {
+  .footage-motion__presets,
+  .footage-motion__grid,
+  .footage-motion__keyframes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .footage-motion__keyframe-actions,
+  .footage-motion__keyframes ul {
+    grid-column: 1;
+  }
+}

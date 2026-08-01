@@ -88,6 +88,118 @@ const MUSIC_SOURCES = [
   { assetId: 'asset_dddddddd', mediaKind: 'audio' as const },
 ]
 
+const footageMotion = (overrides: Record<string, unknown> = {}) => ({
+  motionId: 'motion_aaaaaaaa',
+  sourceInterval: { start: ms(2_000), duration: ms(3_000) },
+  transform: { translateX: 0.1, translateY: -0.05, scale: 1.2, rotationDegrees: 5, opacity: 1 },
+  crop: { top: 0.05, right: 0.02, bottom: 0.03, left: 0.04 },
+  tracks: [],
+  ...overrides,
+})
+
+describe('primary-footage motion', () => {
+  it('splits only at motion boundaries and transforms input zero without adding another primary input', () => {
+    const motionPlan = plan({
+      segments: [testSegmentNode({ footageMotions: [footageMotion()] as never })],
+    })
+    const graph = buildFilterGraph({ ...base, plan: motionPlan as never })
+    const command = buildFfmpegArguments({ ...base, plan: motionPlan as never })
+
+    expect(graph).toContain('[0:v]trim=start=0.000000000:end=2.000000000')
+    expect(graph).toContain('[0:v]trim=start=2.000000000:end=5.000000000')
+    expect(graph).toContain('[0:v]trim=start=5.000000000:end=8.000000000')
+    expect(graph).toContain('concat=n=3:v=1:a=1')
+    expect(graph).toContain("geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='")
+    expect(graph).toContain("scale=w='max(2,trunc(iw*(1.2)/2)*2)'")
+    expect(graph).toContain("rotate='(5)*PI/180'")
+    expect(graph).toContain("x='(W-w)/2+(0.1)*W'")
+    expect(graph).toContain("y='(H-h)/2+(-0.05)*H'")
+    expect(graph).toContain('[motion_video_1]format=pix_fmts=yuv420p,setsar=1[v1]')
+    expect(graph).not.toContain('],format=')
+    expect(command.filter((argument) => argument === base.sourcePath)).toHaveLength(1)
+  })
+
+  it('skips per-pixel crop masking and rotation for scale-and-pan-only motion', () => {
+    const graph = buildFilterGraph({
+      ...base,
+      plan: plan({
+        segments: [testSegmentNode({ footageMotions: [footageMotion({
+          transform: { translateX: 0.1, translateY: 0.05, scale: 1, rotationDegrees: 0, opacity: 1 },
+          crop: { top: 0, right: 0, bottom: 0, left: 0 },
+          tracks: [
+            {
+              property: 'scale',
+              keyframes: [
+                { at: ms(0), value: 1, easing: { kind: 'cubic-bezier', x1: 0.2, y1: 0, x2: 0, y2: 1 } },
+                { at: ms(3_000), value: 1.2, easing: { kind: 'linear' } },
+              ],
+            },
+          ],
+        })] as never })],
+      }) as never,
+    })
+
+    expect(graph).not.toContain('geq=')
+    expect(graph).not.toContain('rotate=')
+    expect(graph).toContain('[source_video_1]scale=')
+    expect(graph).toContain('[motion_background_1][motion_scaled_1]overlay=')
+  })
+
+  it('samples the shared evaluator for animated scale, pan, crop, and easing', () => {
+    const graph = buildFilterGraph({
+      ...base,
+      plan: plan({
+        segments: [testSegmentNode({ footageMotions: [footageMotion({
+          transform: { translateX: 0, translateY: 0, scale: 1, rotationDegrees: 0, opacity: 1 },
+          crop: { top: 0, right: 0, bottom: 0, left: 0 },
+          tracks: [
+            {
+              property: 'scale',
+              keyframes: [
+                { at: ms(0), value: 1, easing: { kind: 'cubic-bezier', x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
+                { at: ms(3_000), value: 1.35, easing: { kind: 'linear' } },
+              ],
+            },
+            {
+              property: 'translate-x',
+              keyframes: [
+                { at: ms(0), value: 0, easing: { kind: 'spring', mass: 1, stiffness: 120, damping: 14, velocity: 0 } },
+                { at: ms(3_000), value: 0.2, easing: { kind: 'linear' } },
+              ],
+            },
+            {
+              property: 'crop-left',
+              keyframes: [
+                { at: ms(0), value: 0, easing: { kind: 'bounce', intensity: 0.5 } },
+                { at: ms(3_000), value: 0.1, easing: { kind: 'linear' } },
+              ],
+            },
+          ],
+        })] as never })],
+      }) as never,
+    })
+
+    expect(graph).toContain('if(lt(t,')
+    expect(graph).toContain('if(lt(T,')
+    expect(graph).toContain(':eval=frame')
+    expect(graph.length).toBeLessThan(300_000)
+  })
+
+  it('keeps source audio timing and draws accepted overlays above transformed footage', () => {
+    const graph = buildFilterGraph({
+      ...base,
+      plan: plan({
+        segments: [testSegmentNode({ footageMotions: [footageMotion()] as never })],
+        overlays: [titleNode()],
+      }) as never,
+    })
+
+    expect(graph).toContain('[0:a]atrim=start=2.000000000:end=5.000000000')
+    expect(graph.indexOf('[motion_composited_1]')).toBeLessThan(graph.indexOf('concat=n=3'))
+    expect(graph.indexOf('concat=n=3')).toBeLessThan(graph.indexOf('drawtext='))
+  })
+})
+
 describe('input numbering', () => {
   it('always gives the main footage input 0, and the rest the plan order', () => {
     const inputs = planInputs(plan({ sources: VIDEO_SOURCES }) as never)
