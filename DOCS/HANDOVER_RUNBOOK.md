@@ -4,7 +4,7 @@ Use this runbook when a new session, agent, or context window resumes the projec
 
 ## Current handoff
 
-P1-F.0.1 Studio Workspaces and Docking V1 is technically complete with evidence at `DOCS/evidence/2026-08-01-p1f01-studio-workspaces-docking-v1/`. Studio has Edit, Effects, Color, and Audio presentation views over one editor authority; validated local presets and bounded docks/splitters create no operation or project revision. Real Edge preserved one video, AI draft, playhead, selection, and revision `15 → 15` across all workspaces and required responsive sizes, then exported a verified 1080p H.264/AAC MP4 with zero page/console/HTTP errors. Full suites pass 1,145/1,145 and the all-workspace build passes. P1-F.0, P1-E.1, and P1-E remain complete. P1-F.1 and P1-F.2 have not started. Unused asset deletion remains deferred until a server-authoritative service exists; `FAIL-021` and `INFRA-005` remain monitoring.
+P1-F.0.2 Nested Studio Layout Engine V2 is complete with evidence at `DOCS/evidence/2026-08-03-p1f02-nested-studio-layout-v2/`. The typed/versioned nested panel adapter preserves one editor authority, one mounted video, continuous playhead/draft/proposal/history, and the existing preview/export path. Full suites pass 1,158/1,158 and the all-workspace build passes. P1-F.1 and P1-F.2 have not started. Screenshot capture recurrence INFRA-004 and local HMR host mismatch INFRA-005 are documented nonblocking infrastructure work.
 
 ## Fast resume
 

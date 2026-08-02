@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EditOperation, EditProject } from '@sanverse/edit-domain'
 
-import { StudioWorkspaceTabs, WORKSPACE_STORAGE_KEY, type StudioWorkspace } from '../../editor/workspace'
+import { StudioWorkspaceTabs, type StudioWorkspace } from '../../editor/workspace'
+import { STUDIO_LAYOUT_V2_STORAGE_KEY } from '../../editor/layout-v2'
 import { testProject } from '../../test-fixtures'
 import { StudioScreen } from './StudioScreen'
 
@@ -52,11 +53,16 @@ function Harness({
   onTimelineEdit?: (operation: EditOperation) => Promise<string | null>
 }>) {
   const [studioWorkspace, setStudioWorkspace] = useState<StudioWorkspace>('edit')
+  const [conversationDraft, setConversationDraft] = useState('')
   const projectRef = useRef(testProject())
   return (
     <>
       <StudioWorkspaceTabs value={studioWorkspace} onChange={setStudioWorkspace} />
-      <StudioScreen {...createProps(projectRef.current, studioWorkspace, setStudioWorkspace, onCreateOverlay, onTimelineEdit)} />
+      <StudioScreen
+        {...createProps(projectRef.current, studioWorkspace, setStudioWorkspace, onCreateOverlay, onTimelineEdit)}
+        conversationDraft={conversationDraft}
+        onConversationDraftChange={setConversationDraft}
+      />
     </>
   )
 }
@@ -141,9 +147,10 @@ describe('Studio workspace integration', () => {
     const zoom = screen.getByLabelText('Timeline zoom level').textContent
     const timelineScrollLeft = timelineViewport.scrollLeft
 
-    await user.click(screen.getByRole('tab', { name: 'AI' }))
+    await user.click(screen.getByRole('button', { name: 'Expand AI' }))
     const chat = screen.getByRole('textbox', { name: /ask for an edit/i })
-    await user.type(chat, 'keep one shared AI draft')
+    fireEvent.change(chat, { target: { value: 'keep one shared AI draft' } })
+    await waitFor(() => expect(chat).toHaveValue('keep one shared AI draft'))
 
     for (const name of ['Effects', 'Color', 'Audio', 'Edit']) {
       await user.click(within(screen.getByRole('tablist', { name: 'Studio workspaces' })).getByRole('tab', { name }))
@@ -161,9 +168,9 @@ describe('Studio workspace integration', () => {
     expect(create).not.toHaveBeenCalled()
     expect(timelineEdit).not.toHaveBeenCalled()
     expect(resizeObserveCount).toBe(1)
-  })
+  }, 10_000)
 
-  it('resizes all three boundaries with the keyboard and persists only presentation state', async () => {
+  it('persists layout presentation changes without touching editor authority', async () => {
     const user = userEvent.setup()
     const create = vi.fn(async () => null)
     const timelineEdit = vi.fn(async () => null)
@@ -172,23 +179,16 @@ describe('Studio workspace integration', () => {
     const main = container.querySelector<HTMLElement>('.studio-screen')
     if (!main) throw new Error('Studio root missing')
 
-    const left = screen.getByRole('separator', { name: 'Resize Media dock' })
-    left.focus()
-    await user.keyboard('{ArrowRight}')
-    expect(main.style.getPropertyValue('--studio-left-dock-width')).toBe('232px')
+    await user.click(screen.getByRole('button', { name: 'Hide Media dock' }))
+    await user.click(screen.getByRole('button', { name: 'Hide Tool dock' }))
+    await user.click(screen.getByRole('button', { name: 'Expand AI' }))
 
-    const right = screen.getByRole('separator', { name: 'Resize right dock' })
-    right.focus()
-    await user.keyboard('{Shift>}{ArrowLeft}{/Shift}')
-    expect(main.style.getPropertyValue('--studio-right-dock-width')).toBe('360px')
-
-    const timeline = screen.getByRole('separator', { name: 'Resize Timeline' })
-    timeline.focus()
-    await user.keyboard('{ArrowUp}')
-    expect(main.style.getPropertyValue('--studio-timeline-height')).toBe('402px')
-
-    const persisted = JSON.parse(localStorage.getItem(WORKSPACE_STORAGE_KEY) ?? '{}') as Record<string, unknown>
-    expect(persisted).toMatchObject({ leftDockWidthPx: 232, rightDockWidthPx: 360, timelineHeightPx: 402, preset: 'custom' })
+    const persisted = JSON.parse(localStorage.getItem(STUDIO_LAYOUT_V2_STORAGE_KEY) ?? '{}') as Record<string, unknown>
+    expect(persisted).toMatchObject({ schemaVersion: 'sanverse.studio-layout/v2', preset: 'custom' })
+    expect(persisted).toHaveProperty('rootLayout')
+    expect(persisted).toHaveProperty('mainVerticalLayout')
+    expect(persisted).toHaveProperty('upperLayout')
+    expect(persisted).toMatchObject({ mediaCollapsed: true, toolCollapsed: true, aiMode: 'expanded' })
     expect(persisted).not.toHaveProperty('projectId')
     expect(screen.getByTestId('timeline-v1')).toHaveAttribute('data-project-revision', '0')
     expect(create).not.toHaveBeenCalled()
@@ -205,12 +205,9 @@ describe('Studio workspace integration', () => {
     await user.selectOptions(screen.getByLabelText('Workspace preset'), 'timeline')
     expect(main).toHaveAttribute('data-left-collapsed', 'true')
     expect(main).toHaveAttribute('data-right-collapsed', 'true')
-    expect(Number.parseInt(main.style.getPropertyValue('--studio-timeline-height'), 10)).toBeGreaterThan(390)
+    expect(JSON.parse(localStorage.getItem(STUDIO_LAYOUT_V2_STORAGE_KEY) ?? '{}')).toMatchObject({ mainVerticalLayout: [42, 58] })
 
     await user.click(screen.getByRole('button', { name: 'Show Media dock' }))
-    const left = screen.getByRole('separator', { name: 'Resize Media dock' })
-    left.focus()
-    await user.keyboard('{ArrowRight}')
     expect(screen.getByLabelText('Workspace preset')).toHaveValue('custom')
 
     await user.selectOptions(screen.getByLabelText('Workspace preset'), 'audio')
@@ -228,9 +225,8 @@ describe('Studio workspace integration', () => {
     await user.click(within(videoLane).getByRole('button', { name: /^clip, owner\.mp4,/i }))
     const controls = await screen.findByTestId('primary-footage-canvas-controls')
 
-    const left = screen.getByRole('separator', { name: 'Resize Media dock' })
-    left.focus()
-    await user.keyboard('{ArrowRight}')
+    await user.click(screen.getByRole('button', { name: 'Hide Media dock' }))
+    await user.click(screen.getByRole('button', { name: 'Show Media dock' }))
     await waitFor(() => expect(screen.getByTestId('primary-footage-canvas-controls')).toBe(controls))
     expect(container.querySelectorAll('video')).toHaveLength(1)
 

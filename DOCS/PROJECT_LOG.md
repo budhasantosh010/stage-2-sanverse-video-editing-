@@ -491,3 +491,12 @@
 - The final export is H.264 1920×1080 at 30 fps with AAC 48 kHz stereo and 30.033-second duration. Five extracted frames prove the repaired title is absent before/after its interval, visible during fade-in, and fully visible inside the interval.
 - Final gates: web 380/380, edit-domain 265/265, API 234/234, render-contract 51/51, intent-domain 27/27, and all-workspace build. One API mocked-export assertion failed once under the first parallel full run, then passed alone and on the complete rerun without a code change; this transient observation is preserved in the evidence.
 - Evidence: `DOCS/evidence/2026-07-31-p1c-inspector-v1/`. P1-D was not started.
+# 2026-08-03 — P1-F.0.2 Nested Studio Layout Engine V2 complete
+
+Replaced the V1 custom splitter presentation with an exact-version nested panel
+adapter while preserving the existing editor/domain authority. Added V2
+migration, persistence, presets, responsive behavior, keyboard accessibility,
+AI overlay continuity, and focused regression coverage. A real 30-second media
+walkthrough passed edit, Undo, Redo, export, and download. Final suites pass
+1,158/1,158; the production build passes. INFRA-004, INFRA-005, and SEC-001 are
+recorded as bounded follow-up work. P1-F.1 was not started.

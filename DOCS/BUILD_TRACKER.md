@@ -60,3 +60,14 @@ Last updated: 2026-08-01
 - `Complete`: acceptance evidence exists and limitations are recorded.
 - `Blocked`: progress requires owner authority or external state.
 - `Proposed`: planning exists but is not approved or active implementation.
+# P1-F.0.2 — Nested Studio Layout Engine V2 (2026-08-03)
+
+- [x] Exact `react-resizable-panels@4.12.2` dependency
+- [x] Nested AI/main, upper/timeline, media/preview/tool groups
+- [x] Typed V2 state, V1 migration, validation, persistence, presets, reset
+- [x] Responsive AI overlay, keyboard separators, reduced motion
+- [x] One editor/video/playhead/proposal/history/preview/export authority preserved
+- [x] Real edit → Undo → Redo → export/download walkthrough
+- [x] 1,158 tests and all-workspace production build pass
+- [x] Evidence and failure registry updated
+- [ ] P1-F.1 (not started by contract)

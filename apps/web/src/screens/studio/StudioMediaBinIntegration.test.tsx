@@ -139,11 +139,11 @@ describe('Studio Media Bin integration', () => {
     expect(screen.getByTestId('canvas-interaction-layer')).toBeInTheDocument()
     expect(container.querySelectorAll('video')).toHaveLength(1)
 
-    await user.click(screen.getByRole('button', { name: 'Undo edit' }))
+    await user.click(screen.getAllByRole('button', { name: 'Undo edit' })[0])
     await waitFor(() => expect(within(lane).queryByRole('button', { name: /hero\.png/i })).not.toBeInTheDocument())
     expect(screen.getByLabelText(/hero\.png, Image, Unused/i)).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Redo edit' }))
+    await user.click(screen.getAllByRole('button', { name: 'Redo edit' })[0])
     expect(await screen.findByLabelText(/hero\.png, Image, Used 1 time/i)).toBeInTheDocument()
     expect(await screen.findByTestId('media-overlay')).toHaveAttribute('src', expect.stringContaining('asset_p1eimage1'))
   })
@@ -162,10 +162,10 @@ describe('Studio Media Bin integration', () => {
     expect(within(inspector).getByRole('heading', { name: 'bed.wav' })).toBeInTheDocument()
     expect(within(inspector).getByLabelText('Music gain (dB)')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Undo edit' }))
+    await user.click(screen.getAllByRole('button', { name: 'Undo edit' })[0])
     await waitFor(() => expect(within(lane).queryByRole('button', { name: /bed\.wav/i })).not.toBeInTheDocument())
     expect(screen.getByLabelText(/bed\.wav, Audio, Unused/i)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Redo edit' }))
+    await user.click(screen.getAllByRole('button', { name: 'Redo edit' })[0])
     expect(await within(lane).findByRole('button', { name: /bed\.wav/i })).toBeInTheDocument()
   })
 

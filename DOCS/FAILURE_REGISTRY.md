@@ -1320,6 +1320,86 @@ Visually reject tiled captures and use exact-size disposable Edge evidence.
 All three final PNGs open as one page at 1440×900, 1280×800, and 1024×768.
 RESOLVED.
 
+## INFRA-004 — P1-F.0.2 desktop screenshot capture tiled the page
+
+- **Done:** [ ]
+- **Status:** OPEN, nonblocking application behavior
+- **Severity:** P3
+- **Type:** Verification infrastructure
+- **Found:** 2026-08-03
+- **Target milestone:** Evidence infrastructure maintenance
+- **Owner:** Codex/desktop capture surface
+
+### What / where / when / who / how / why?
+
+During the P1-F.0.2 responsive walkthrough, Codex captured the Studio page at
+1440×900, 1280×800, and 1024×768 through the desktop in-app browser. The DOM
+reported the intended responsive geometry, but each PNG repeated page tiles and
+had device-scaled pixel dimensions. This is a recurrence of the capture-surface
+scaling class previously recorded as INFRA-003, not an editor-layout failure.
+
+### What was tried?
+
+Viewport calibration and recapture were attempted. The application DOM,
+keyboard resizing, state continuity, real edit, Undo/Redo, export, and download
+were verified independently; invalid PNGs were retained only as failure evidence.
+
+### One-line solution
+
+Capture exact-size screenshots in a disposable browser context whose device scale is explicitly fixed to 1.
+
+## INFRA-005 — Local Vite HMR websocket host mismatch
+
+- **Done:** [ ]
+- **Status:** OPEN, nonblocking production behavior
+- **Severity:** P3
+- **Type:** Local development infrastructure
+- **Found:** 2026-08-03
+- **Target milestone:** Development-server maintenance
+- **Owner:** Web runtime
+
+### What / where / when / who / how / why?
+
+During the P1-F.0.2 browser walkthrough on port 2000, the page loaded through
+`127.0.0.1` while Vite attempted its HMR websocket through `localhost`. The host
+mismatch prevented only hot-reload reconnection; application APIs, editing,
+Undo/Redo, export, download, tests, and production build remained functional.
+
+### What was tried?
+
+The finding was isolated through the browser console/network walkthrough. It was
+not changed because HMR configuration is outside the bounded layout milestone.
+
+### One-line solution
+
+Configure one canonical dev-server and HMR host for port 2000.
+
+## SEC-001 — Installed dependency graph reports one high-severity advisory
+
+- **Done:** [ ]
+- **Status:** OPEN
+- **Severity:** P2
+- **Type:** Dependency security
+- **Found:** 2026-08-03
+- **Target milestone:** Bounded dependency security review
+- **Owner:** Web platform
+
+### What / where / when / who / how / why?
+
+After installing the contract-required `react-resizable-panels@4.12.2`, npm
+reported one high-severity advisory somewhere in the aggregate dependency graph.
+The advisory was not attributed or auto-fixed because a broad dependency upgrade
+could change unrelated production behavior outside P1-F.0.2.
+
+### What was tried?
+
+The exact package version, full regression suite, and production build were
+verified. No broad audit fix was attempted.
+
+### One-line solution
+
+Run a bounded advisory attribution and upgrade review before production release.
+
 ## Entry rules
 
 Do not delete a failure because it is fixed. Mark it resolved, link evidence, and preserve what prevented recurrence.

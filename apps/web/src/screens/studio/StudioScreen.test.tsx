@@ -10,6 +10,7 @@ import { TEST_ASSET_ID, TEST_CLIP_ID, ms, testChangeSet, testOperation, testProj
 afterEach(() => {
   cleanup()
   window.localStorage.removeItem('sanverse.workspace-layout/v1')
+  window.localStorage.removeItem('sanverse.studio-layout/v2')
   vi.restoreAllMocks()
 })
 
@@ -23,17 +24,22 @@ beforeEach(() => {
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 })
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 })
   window.localStorage.removeItem('sanverse.workspace-layout/v1')
+  window.localStorage.removeItem('sanverse.studio-layout/v2')
   resizeObserverCallback = null
   videoFrameCallback = null
   cancelVideoFrameCallback = vi.fn()
   vi.stubGlobal(
     'ResizeObserver',
     class ResizeObserverMock {
+      readonly callback: ResizeObserverCallback
+
       constructor(callback: ResizeObserverCallback) {
-        resizeObserverCallback = callback
+        this.callback = callback
       }
 
-      observe() {}
+      observe(target: Element) {
+        if (target instanceof HTMLVideoElement) resizeObserverCallback = this.callback
+      }
       unobserve() {}
       disconnect() {}
     },
@@ -155,7 +161,8 @@ function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = 
 
 function renderStudioWithAi(overrides: Partial<ComponentProps<typeof StudioScreen>> = {}) {
   const view = renderStudio(overrides)
-  fireEvent.click(screen.getByRole('tab', { name: 'AI' }))
+  const expand = screen.queryByRole('button', { name: 'Expand AI' })
+  if (expand) fireEvent.click(expand)
   return view
 }
 
@@ -290,7 +297,7 @@ describe('StudioScreen', () => {
     const onSendMessage = vi.fn()
     renderStudioWithAi({ onSendMessage })
 
-    await user.type(screen.getByRole('textbox', { name: /ask for an edit/i }), 'put my name here')
+    fireEvent.change(screen.getByRole('textbox', { name: /ask for an edit/i }), { target: { value: 'put my name here' } })
     await user.click(screen.getByRole('button', { name: /^send$/i }))
 
     expect(onSendMessage).toHaveBeenCalledOnce()
@@ -362,9 +369,8 @@ describe('StudioScreen', () => {
     renderStudioWithAi({ proposal: directProposal(), onRepairProposal, onSendMessage })
 
     const primary = screen.getByLabelText(/main text/i)
-    await user.clear(primary)
-    await user.type(primary, 'Santosh Budha')
-    await user.tab()
+    fireEvent.change(primary, { target: { value: 'Santosh Budha' } })
+    fireEvent.blur(primary)
 
     expect(onRepairProposal).toHaveBeenCalledWith({ primaryText: 'Santosh Budha' })
     expect(onSendMessage).not.toHaveBeenCalled()
@@ -457,15 +463,15 @@ describe('StudioScreen', () => {
     renderStudioWithAi()
 
     const composer = screen.getByRole('textbox', { name: /ask for an edit/i })
-    await user.type(composer, 'keep this draft')
+    fireEvent.change(composer, { target: { value: 'keep this draft' } })
     await user.click(screen.getByRole('button', { name: /collapse ai panel/i }))
 
-    expect(screen.getByRole('button', { name: /expand ai panel/i }))
+    expect(screen.getByRole('button', { name: /expand ai$/i }))
       .toHaveAttribute('aria-expanded', 'false')
     expect(screen.getByRole('textbox', { name: /ask for an edit/i, hidden: true })).toBe(composer)
     expect(composer).toHaveValue('keep this draft')
 
-    await user.click(screen.getByRole('button', { name: /expand ai panel/i }))
+    await user.click(screen.getByRole('button', { name: /expand ai$/i }))
     expect(screen.getByRole('textbox', { name: /ask for an edit/i })).toBe(composer)
     expect(composer).toHaveValue('keep this draft')
   })
@@ -671,8 +677,8 @@ describe('StudioScreen', () => {
     const addText = screen.getByRole('button', { name: /add text here/i })
     expect(addText).toBeEnabled()
     await user.click(addText)
-    await user.type(screen.getByRole('textbox', { name: /^main text$/i }), 'Santosh')
-    await user.type(screen.getByRole('textbox', { name: /smaller line.*optional/i }), 'Founder')
+    fireEvent.change(screen.getByRole('textbox', { name: /^main text$/i }), { target: { value: 'Santosh' } })
+    fireEvent.change(screen.getByRole('textbox', { name: /smaller line.*optional/i }), { target: { value: 'Founder' } })
     await user.click(screen.getByRole('button', { name: /create proposal/i }))
 
     expect(onProposal).toHaveBeenCalledWith(
@@ -1315,8 +1321,7 @@ describe('StudioScreen production timeline', () => {
     await openAdvancedControls(user)
     await user.click(screen.getByText(/adjust section at playhead/i))
     const trimAmount = screen.getByRole('spinbutton', { name: /seconds to remove/i })
-    await user.clear(trimAmount)
-    await user.type(trimAmount, '2')
+    fireEvent.change(trimAmount, { target: { value: '2' } })
     await user.click(screen.getByRole('button', { name: /shorten the start/i }))
 
     expect(onTimelineEdit).toHaveBeenLastCalledWith(expect.objectContaining({

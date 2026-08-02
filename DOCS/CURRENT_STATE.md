@@ -1,8 +1,21 @@
 # Current State
 
-Last updated: 2026-08-01
+Last updated: 2026-08-03
 
 ## Active goal
+
+**P1-F.0.2 — Nested Studio Layout Engine V2 is complete.** Studio now uses
+`react-resizable-panels@4.12.2` through a typed, versioned presentation adapter.
+The nested AI/main, upper/timeline, and media/preview/tool layout preserves one
+existing editor authority and adds validated migration, persistence, live presets,
+responsive overlays, keyboard separators, and draft/focus continuity. No new
+domain operation, renderer, project, history, proposal, preview, or export path
+was created. Final suites pass 1,158/1,158 and the production build passes.
+Evidence: `DOCS/evidence/2026-08-03-p1f02-nested-studio-layout-v2/`.
+
+**Stop boundary:** P1-F.1 has not started.
+
+### Prior completed milestone
 
 **P1-F.0.1 - Studio Workspaces and Docking V1 is technically complete on 2026-08-01.** Studio now exposes Edit, Effects, Color, and Audio as accessible Studio-only workspace views over one existing editor authority. The same `EditProject`, revision, accepted history, Undo/Redo stacks, playhead, Timeline selection and viewport, Canvas/Inspector draft, native video, AI conversation, pending proposal, preview, and export path survive every workspace and Tool/AI dock switch.
 

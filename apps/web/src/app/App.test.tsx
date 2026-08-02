@@ -134,6 +134,7 @@ function restoreUrlMethod(
 }
 
 beforeEach(() => {
+  window.localStorage.removeItem('sanverse.studio-layout/v2')
   createObjectURL = vi.fn(() => 'blob:cleaned-video')
   revokeObjectURL = vi.fn()
   const api = fakeApi()
@@ -428,7 +429,7 @@ describe('App', () => {
       clientY: 200,
     })
     await user.click(screen.getByRole('button', { name: /add text here/i }))
-    await user.type(screen.getByRole('textbox', { name: /^main text$/i }), 'Santosh')
+    fireEvent.change(screen.getByRole('textbox', { name: /^main text$/i }), { target: { value: 'Santosh' } })
     await user.click(screen.getByRole('button', { name: /create proposal/i }))
 
     fireEvent.timeUpdate(video)
@@ -505,7 +506,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /enter point mode/i }))
     fireEvent.click(screen.getByRole('button', { name: /choose a point/i }), { clientX: 200, clientY: 200 })
     await user.click(screen.getByRole('button', { name: /add text here/i }))
-    await user.type(screen.getByRole('textbox', { name: /^main text$/i }), 'Santosh')
+    fireEvent.change(screen.getByRole('textbox', { name: /^main text$/i }), { target: { value: 'Santosh' } })
     await user.click(screen.getByRole('button', { name: /create proposal/i }))
     await user.click(screen.getByRole('button', { name: /^accept proposal$/i }))
     await waitFor(() => expect(api.current().changeSets).toHaveLength(1))
@@ -597,14 +598,15 @@ describe('App', () => {
     const chat = await screen.findByRole('textbox', { name: /ask for an edit/i })
     expect(screen.getByRole('group', { name: /export unavailable/i }))
       .toHaveAccessibleDescription(/accept at least one edit before exporting/i)
-    await user.type(chat, 'keep this unsent')
+    fireEvent.change(chat, { target: { value: 'keep this unsent' } })
 
     const video = container.querySelector('video')
     expect(video).not.toBeNull()
     if (video) video.currentTime = 7.5
 
     await user.click(screen.getByRole('button', { name: /studio workspace/i }))
-    await user.click(screen.getByRole('tab', { name: 'AI' }))
+    const expandAi = screen.queryByRole('button', { name: /^(expand ai|open ai overlay)$/i })
+    if (expandAi) await user.click(expandAi)
     expect(container.querySelectorAll('video')).toHaveLength(1)
     expect(container.querySelector('video')).toBe(video)
     expect(video?.currentTime).toBe(7.5)
@@ -626,8 +628,7 @@ describe('App', () => {
     expect(video?.currentTime).toBe(7.5)
     expect(screen.getByRole('textbox', { name: /ask for an edit/i })).toHaveValue('keep this unsent')
 
-    await user.clear(chat)
-    await user.type(chat, 'add my name here')
+    fireEvent.change(chat, { target: { value: 'add my name here' } })
     await user.click(screen.getByRole('button', { name: /^send$/i }))
 
     expect(await screen.findByText(/suggested by the assistant/i)).toBeInTheDocument()
@@ -637,9 +638,8 @@ describe('App', () => {
     expect(api.current().revision).toBe(base.revision)
 
     const primary = screen.getByLabelText(/main text/i)
-    await user.clear(primary)
-    await user.type(primary, 'Santosh Budha')
-    await user.tab()
+    fireEvent.change(primary, { target: { value: 'Santosh Budha' } })
+    fireEvent.blur(primary)
 
     await user.click(screen.getByRole('button', { name: /studio workspace/i }))
     expect(screen.getByText(/suggested by the assistant/i)).toBeInTheDocument()

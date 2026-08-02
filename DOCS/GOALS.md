@@ -82,3 +82,7 @@ At every goal exit, record:
 7. Exact evidence level: unit, integration, real media, real browser, or owner acceptance.
 
 Never publish one invented percentage-complete number. A box closes only when its named evidence exists.
+# Current implementation checkpoint — 2026-08-03
+
+- [x] P1-F.0.2 Nested Studio Layout Engine V2
+- [ ] P1-F.1 — not started; requires the next approved implementation contract

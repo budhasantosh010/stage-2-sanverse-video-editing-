@@ -201,6 +201,7 @@ describe('Timeline V1', () => {
     const onViewportChange = vi.fn()
     const onGesture = vi.fn()
     renderTimeline({ onViewportChange, onGesture })
+    onViewportChange.mockClear()
 
     fireEvent.click(screen.getByRole('button', { name: 'Zoom timeline in' }))
     fireEvent.click(screen.getByRole('button', { name: /^fit$/i }))

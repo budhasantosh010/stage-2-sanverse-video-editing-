@@ -317,6 +317,17 @@ no button offers it yet — the owner cannot get to it from the screen.
 
 ## Macro completion
 
+### P1-F.0.2 — Nested Studio Layout Engine V2
+
+- [x] Replace custom splitters with exact-version reusable panel primitives
+- [x] Preserve the single editor/domain authority
+- [x] Add typed V2 state, migration, persistence, presets, responsive rules
+- [x] Preserve one video/playhead/draft/proposal/history through layout changes
+- [x] Verify real edit, Undo, Redo, export, and download
+- [x] Pass 1,158 tests and production build
+- [x] Record evidence and nonblocking failures
+- [ ] Begin P1-F.1 only after a new approved contract
+
 - [ ] Representative users finish acceptable videos in measured minutes
 - [ ] Default workflows require no professional editor knowledge
 - [ ] Ambiguity clarifies or fails closed

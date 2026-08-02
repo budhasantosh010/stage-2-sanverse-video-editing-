@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AddNameplateOperation, EditProject, TimelineOperation } from '@sanverse/edit-domain'
 import {
   DEFAULT_CAPTION_STYLE_ID,
@@ -88,22 +88,21 @@ import {
 import { Timeline, reconcileTimelineSelection } from '../../editor/timeline'
 import { MediaBin } from '../../editor/media'
 import {
-  WORKSPACE_CONSTRAINTS,
   WorkspacePresetMenu,
-  WorkspaceRightDock,
-  WorkspaceSplitter,
   StudioWorkspacePanel,
-  applyWorkspacePreset,
-  clampWorkspaceLayout,
-  loadWorkspaceLayout,
-  resetWorkspaceLayout,
-  saveWorkspaceLayout,
-  withCustomWorkspaceLayout,
-  workspaceTimelineMaximum,
   type StudioWorkspace,
-  type WorkspaceLayoutV1,
-  type WorkspaceRightTab,
 } from '../../editor/workspace'
+import {
+  StudioLayoutV2,
+  STUDIO_LAYOUT_PRESETS,
+  adaptStudioLayoutToViewport,
+  defaultStudioLayoutV2,
+  loadStudioLayoutV2,
+  saveStudioLayoutV2,
+  studioResponsiveMode,
+  type StudioLayoutV2State,
+  type StudioResponsiveMode,
+} from '../../editor/layout-v2'
 import {
   buildAddAsBrollOperation,
   buildAddAsMusicOperation,
@@ -133,6 +132,8 @@ export type StudioScreenProps = {
   project: StudioState['project']
   proposal: PendingProposal | null
   conversation: ConversationState
+  conversationDraft?: string
+  onConversationDraftChange?(draft: string): void
   editProject: EditProject
   editError: string | null
   assetOriginalNames?: Readonly<Record<string, string>>
@@ -252,6 +253,8 @@ export function StudioScreen({
   project,
   proposal,
   conversation,
+  conversationDraft: controlledConversationDraft,
+  onConversationDraftChange,
   editProject,
   editError,
   assetOriginalNames = EMPTY_ASSET_ORIGINAL_NAMES,
@@ -301,7 +304,9 @@ export function StudioScreen({
   }> | null>(null)
   const [proposalResult, setProposalResult] = useState<string | null>(null)
   const [selectedAssistChangeId, setSelectedAssistChangeId] = useState<string | null>(null)
-  const [isAiPanelCollapsed, setIsAiPanelCollapsed] = useState(false)
+  const [internalConversationDraft, setInternalConversationDraft] = useState('')
+  const conversationDraft = controlledConversationDraft ?? internalConversationDraft
+  const setConversationDraft = onConversationDraftChange ?? setInternalConversationDraft
   const [compactSidePanel, setCompactSidePanel] = useState<'media' | 'inspector' | null>(null)
   const [selectedTimelineItemId, setSelectedTimelineItemId] = useState<string | null>(null)
   const [selectedMediaAssetId, setSelectedMediaAssetId] = useState<string | null>(null)
@@ -327,13 +332,19 @@ export function StudioScreen({
   const [fadeOutSeconds, setFadeOutSeconds] = useState(0)
   const [captionsNotice, setCaptionsNotice] = useState<string | null>(null)
   const [captionsBusy, setCaptionsBusy] = useState(false)
-  const [workspaceLayout, setWorkspaceLayout] = useState<WorkspaceLayoutV1>(() => {
+  const [responsiveMode, setResponsiveMode] = useState<StudioResponsiveMode>(() => studioResponsiveMode(
+    typeof window === 'undefined'
+      ? Object.freeze({ width: 1440, height: 900 })
+      : Object.freeze({ width: window.innerWidth, height: window.innerHeight }),
+  ))
+  const [workspaceLayout, setWorkspaceLayout] = useState<StudioLayoutV2State>(() => {
     const currentViewport = typeof window === 'undefined'
       ? Object.freeze({ width: 1440, height: 900 })
       : Object.freeze({ width: window.innerWidth, height: window.innerHeight })
-    const loaded = loadWorkspaceLayout(typeof window === 'undefined' ? null : window.localStorage, currentViewport)
+    const loaded = loadStudioLayoutV2(typeof window === 'undefined' ? null : window.localStorage, currentViewport)
     return Object.freeze({ ...loaded, activeWorkspace: studioWorkspace })
   })
+  const isAiPanelCollapsed = workspace === 'studio' && workspaceLayout.aiMode === 'collapsed'
   const videoRef = useRef<HTMLVideoElement>(null)
   const footageMotionCanvasRef = useRef<HTMLCanvasElement>(null)
   const footagePlanRef = useRef<ReturnType<typeof compilePreviewPlan>>(null)
@@ -361,32 +372,30 @@ export function StudioScreen({
     })
   }
 
-  const persistWorkspaceLayout = (next: WorkspaceLayoutV1) => {
+  const persistWorkspaceLayout = (next: StudioLayoutV2State) => {
     if (typeof window === 'undefined') return
-    if (saveWorkspaceLayout(window.localStorage, next)) layoutWriteCountRef.current += 1
+    if (saveStudioLayoutV2(window.localStorage, next)) layoutWriteCountRef.current += 1
   }
 
-  const updateWorkspaceLayout = (
-    patch: Partial<Omit<WorkspaceLayoutV1, 'schemaVersion' | 'preset'>>,
-    persist = false,
-  ) => {
+  const updateWorkspaceLayout = (patch: Partial<Omit<StudioLayoutV2State, 'schemaVersion'>>, persist = false) => {
     setWorkspaceLayout((current) => {
-      const next = withCustomWorkspaceLayout(current, patch, viewport())
+      const next = adaptStudioLayoutToViewport(Object.freeze({ ...current, ...patch }), viewport())
       if (persist) persistWorkspaceLayout(next)
       return next
     })
     requestGeometryRefresh()
   }
 
-  const setRightDockTab = (activeRightTab: WorkspaceRightTab) => {
-    if (activeRightTab === 'ai') setIsAiPanelCollapsed(false)
-    updateWorkspaceLayout({ activeRightTab, aiExpanded: activeRightTab === 'ai' }, true)
+  const setAiOpen = (open: boolean) => {
+    updateWorkspaceLayout({ aiMode: open ? 'expanded' : 'collapsed' }, true)
   }
 
   useEffect(() => {
     const update = () => {
       setCanvasNarrow(window.innerWidth < 600)
-      setWorkspaceLayout((current) => clampWorkspaceLayout(current, viewport()))
+      const nextMode = studioResponsiveMode(viewport())
+      setResponsiveMode(nextMode)
+      setWorkspaceLayout((current) => adaptStudioLayoutToViewport(current, viewport()))
       requestGeometryRefresh()
     }
     update()
@@ -397,7 +406,7 @@ export function StudioScreen({
   useEffect(() => {
     setWorkspaceLayout((current) => {
       if (current.activeWorkspace === studioWorkspace) return current
-      const next = clampWorkspaceLayout(Object.freeze({ ...current, activeWorkspace: studioWorkspace }), viewport())
+      const next = Object.freeze({ ...current, activeWorkspace: studioWorkspace })
       persistWorkspaceLayout(next)
       return next
     })
@@ -1563,11 +1572,7 @@ export function StudioScreen({
                   aria-controls="studio-ai-panel-content"
                   aria-expanded={!isAiPanelCollapsed}
                   aria-label={isAiPanelCollapsed ? 'Expand AI panel' : 'Collapse AI panel'}
-                  onClick={() => setIsAiPanelCollapsed((current) => {
-                    const nextCollapsed = !current
-                    updateWorkspaceLayout({ aiExpanded: !nextCollapsed }, true)
-                    return nextCollapsed
-                  })}
+                  onClick={() => setAiOpen(isAiPanelCollapsed)}
                 >
                   {isAiPanelCollapsed ? 'Open' : 'Hide'}
                 </button>
@@ -1587,6 +1592,8 @@ export function StudioScreen({
               proposal ? 'Accept or reject the pending proposal before asking for another edit.' : null
             }
             onSend={(message) => onSendMessage(message, buildIntentContext())}
+            draft={conversationDraft}
+            onDraftChange={setConversationDraft}
           />
 
           <section className="studio-screen__draft" aria-labelledby="studio-draft-label">
@@ -1707,11 +1714,6 @@ export function StudioScreen({
         </aside>
   )
 
-  const workspaceStyle = Object.freeze({
-    '--studio-left-dock-width': workspaceLayout.leftDockCollapsed ? '0px' : `${workspaceLayout.leftDockWidthPx}px`,
-    '--studio-right-dock-width': workspaceLayout.rightDockCollapsed ? '0px' : `${workspaceLayout.rightDockWidthPx}px`,
-    '--studio-timeline-height': `${workspaceLayout.timelineHeightPx}px`,
-  }) as CSSProperties
   const leftDockLabel = studioWorkspace === 'edit'
     ? 'Media'
     : studioWorkspace === 'effects'
@@ -1726,27 +1728,25 @@ export function StudioScreen({
     || (studioWorkspace === 'color' && visualToolSupported)
     || (studioWorkspace === 'audio' && audioToolSupported)
 
-  const applyPreset = (preset: Parameters<typeof applyWorkspacePreset>[0]) => {
-    const next = applyWorkspacePreset(preset, viewport())
+  const applyPreset = (preset: Exclude<StudioLayoutV2State['preset'], 'custom'>) => {
+    const next = adaptStudioLayoutToViewport(STUDIO_LAYOUT_PRESETS[preset], viewport())
     setWorkspaceLayout(next)
     persistWorkspaceLayout(next)
-    setIsAiPanelCollapsed(!next.aiExpanded)
     if (next.activeWorkspace !== studioWorkspace) onStudioWorkspaceChange?.(next.activeWorkspace)
     requestGeometryRefresh()
   }
 
   const resetLayout = () => {
-    const next = resetWorkspaceLayout(viewport())
+    const next = adaptStudioLayoutToViewport(defaultStudioLayoutV2(), viewport())
     setWorkspaceLayout(next)
     persistWorkspaceLayout(next)
-    setIsAiPanelCollapsed(false)
     if (studioWorkspace !== 'edit') onStudioWorkspaceChange?.('edit')
     requestGeometryRefresh()
   }
 
-  const commitLayoutValue = (patch: Partial<Omit<WorkspaceLayoutV1, 'schemaVersion' | 'preset'>>) => {
+  const commitLayoutValue = (patch: Partial<Omit<StudioLayoutV2State, 'schemaVersion'>>) => {
     setWorkspaceLayout((current) => {
-      const next = withCustomWorkspaceLayout(current, patch, viewport())
+      const next = Object.freeze({ ...current, ...patch, preset: 'custom' as const })
       persistWorkspaceLayout(next)
       return next
     })
@@ -1760,9 +1760,8 @@ export function StudioScreen({
       aria-labelledby={workspace === 'studio' ? `studio-workspace-tab-${studioWorkspace}` : undefined}
       className={`studio-screen studio-screen--${workspace}`}
       data-studio-workspace={studioWorkspace}
-      data-left-collapsed={workspaceLayout.leftDockCollapsed}
-      data-right-collapsed={workspaceLayout.rightDockCollapsed}
-      style={workspaceStyle}
+      data-left-collapsed={workspaceLayout.mediaCollapsed}
+      data-right-collapsed={workspaceLayout.toolCollapsed}
       onKeyDown={handlePointModeKeyDown}
     >
       <a className="skip-link" href="#studio-primary">Skip to video editor</a>
@@ -1801,25 +1800,37 @@ export function StudioScreen({
             ) : null}
             <button
               type="button"
-              aria-pressed={!workspaceLayout.leftDockCollapsed}
-              aria-label={`${workspaceLayout.leftDockCollapsed ? 'Show' : 'Hide'} ${leftDockLabel} dock`}
-              onClick={() => commitLayoutValue({ leftDockCollapsed: !workspaceLayout.leftDockCollapsed })}
+              aria-pressed={!workspaceLayout.mediaCollapsed}
+              aria-label={`${workspaceLayout.mediaCollapsed ? 'Show' : 'Hide'} ${leftDockLabel} dock`}
+              onClick={() => commitLayoutValue({ mediaCollapsed: !workspaceLayout.mediaCollapsed })}
             >
-              {workspaceLayout.leftDockCollapsed ? `Show ${leftDockLabel}` : `Hide ${leftDockLabel}`}
+              {workspaceLayout.mediaCollapsed ? `Show ${leftDockLabel}` : `Hide ${leftDockLabel}`}
             </button>
             <button
               type="button"
-              aria-pressed={!workspaceLayout.rightDockCollapsed}
-              aria-label={`${workspaceLayout.rightDockCollapsed ? 'Show' : 'Hide'} right dock`}
-              onClick={() => commitLayoutValue({ rightDockCollapsed: !workspaceLayout.rightDockCollapsed })}
+              aria-pressed={!workspaceLayout.toolCollapsed}
+              aria-label={`${workspaceLayout.toolCollapsed ? 'Show' : 'Hide'} Tool dock`}
+              onClick={() => commitLayoutValue({ toolCollapsed: !workspaceLayout.toolCollapsed })}
             >
-              {workspaceLayout.rightDockCollapsed ? 'Show Tool / AI' : 'Hide Tool / AI'}
+              {workspaceLayout.toolCollapsed ? 'Show Tool' : 'Hide Tool'}
             </button>
           </div>
         </div>
       ) : null}
 
-      <div className="studio-screen__workspace">
+      <StudioLayoutV2
+        layout={workspaceLayout}
+        responsiveMode={responsiveMode}
+        aiOpen={!isAiPanelCollapsed}
+        pendingProposal={Boolean(proposal)}
+        ai={conversationPanel}
+        onAiOpenChange={setAiOpen}
+        onLayoutChange={(next) => {
+          setWorkspaceLayout(next)
+          persistWorkspaceLayout(next)
+          requestGeometryRefresh()
+        }}
+        preview={(<>
         <section
           id="studio-primary"
           className="studio-screen__canvas"
@@ -2034,6 +2045,8 @@ export function StudioScreen({
             </p>
           ) : null}
         </section>
+        </>)}
+        media={(<>
 
         <div
           className="studio-screen__compact-panel-switcher"
@@ -2091,46 +2104,8 @@ export function StudioScreen({
             />
           )}
         </section>
-
-        {!workspaceLayout.leftDockCollapsed ? (
-          <WorkspaceSplitter
-            className="studio-screen__left-splitter"
-            label={`Resize ${leftDockLabel} dock`}
-            orientation="horizontal"
-            value={workspaceLayout.leftDockWidthPx}
-            minimum={WORKSPACE_CONSTRAINTS.leftDockMinPx}
-            maximum={WORKSPACE_CONSTRAINTS.leftDockMaxPx}
-            onChange={(leftDockWidthPx) => updateWorkspaceLayout({ leftDockWidthPx })}
-            onCommit={(leftDockWidthPx) => commitLayoutValue({ leftDockWidthPx })}
-            onCancel={(leftDockWidthPx) => updateWorkspaceLayout({ leftDockWidthPx })}
-          />
-        ) : null}
-
-        {!workspaceLayout.rightDockCollapsed ? (
-          <WorkspaceSplitter
-            className="studio-screen__right-splitter"
-            label="Resize right dock"
-            orientation="horizontal"
-            direction={-1}
-            value={workspaceLayout.rightDockWidthPx}
-            minimum={WORKSPACE_CONSTRAINTS.rightDockMinPx}
-            maximum={WORKSPACE_CONSTRAINTS.rightDockMaxPx}
-            onChange={(rightDockWidthPx) => updateWorkspaceLayout({ rightDockWidthPx })}
-            onCommit={(rightDockWidthPx) => commitLayoutValue({ rightDockWidthPx })}
-            onCancel={(rightDockWidthPx) => updateWorkspaceLayout({ rightDockWidthPx })}
-          />
-        ) : null}
-
-        <div
-          id="studio-right-dock-region"
-          className={`studio-screen__right-rail${compactSidePanel === 'inspector' ? ' studio-screen__side-region--compact-open' : ''}`}
-        >
-          <WorkspaceRightDock
-            workspace={studioWorkspace}
-            assist={workspace === 'assist'}
-            activeTab={workspaceLayout.activeRightTab}
-            onTabChange={setRightDockTab}
-            tool={(
+        </>)}
+        tool={(<>
           <section
             ref={inspectorRegionRef}
             id="studio-inspector-region"
@@ -2188,12 +2163,8 @@ export function StudioScreen({
               </div>
             )}
           </section>
-            )}
-            ai={conversationPanel}
-          />
-        </div>
-      </div>
-
+        </>)}
+        timeline={(<>
       {workspace === 'assist' ? (
         <AssistChangeStrip
           items={assistChanges}
@@ -2203,18 +2174,6 @@ export function StudioScreen({
           onOpenStudio={() => onWorkspaceChange?.('studio')}
         />
       ) : <>
-        <WorkspaceSplitter
-          className="studio-screen__timeline-splitter"
-          label="Resize Timeline"
-          orientation="vertical"
-          direction={-1}
-          value={workspaceLayout.timelineHeightPx}
-          minimum={WORKSPACE_CONSTRAINTS.timelineMinPx}
-          maximum={workspaceTimelineMaximum(viewport())}
-          onChange={(timelineHeightPx) => updateWorkspaceLayout({ timelineHeightPx })}
-          onCommit={(timelineHeightPx) => commitLayoutValue({ timelineHeightPx })}
-          onCancel={(timelineHeightPx) => updateWorkspaceLayout({ timelineHeightPx })}
-        />
         <section
           className="studio-screen__time-strip"
           aria-label="Timeline workspace"
@@ -2242,7 +2201,7 @@ export function StudioScreen({
           onSelect={requestTimelineSelection}
           onGesture={handleTimelineGesture}
           onOpenProposal={() => {
-            setRightDockTab('tool')
+            commitLayoutValue({ toolCollapsed: false })
             requestAnimationFrame(() => inspectorRegionRef.current?.focus())
           }}
         />
@@ -2253,6 +2212,8 @@ export function StudioScreen({
         ) : null}
         </section>
       </>}
+        </>)}
+      />
     </main>
   )
 }

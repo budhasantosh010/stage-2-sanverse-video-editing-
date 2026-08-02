@@ -10,6 +10,9 @@ export type ChatComposerProps = {
   /** Why sending is unavailable, said plainly. */
   disabledReason: string | null
   onSend(message: string): void
+  /** Optional owner-controlled draft for shells that move this composer between layouts. */
+  draft?: string
+  onDraftChange?(draft: string): void
 }
 
 const STATUS_ID = 'chat-status'
@@ -21,8 +24,13 @@ const STATUS_ID = 'chat-status'
  * happened and what to do next. Nothing here names a model, a provider, or a
  * protocol: the user is editing a video, not operating an AI.
  */
-export function ChatComposer({ conversation, canSend, disabledReason, onSend }: ChatComposerProps) {
-  const [message, setMessage] = useState('')
+export function ChatComposer({ conversation, canSend, disabledReason, onSend, draft, onDraftChange }: ChatComposerProps) {
+  const [internalMessage, setInternalMessage] = useState('')
+  const message = draft ?? internalMessage
+  const setMessage = (next: string) => {
+    if (onDraftChange) onDraftChange(next)
+    else setInternalMessage(next)
+  }
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const isSending = conversation.status === 'sending'
 

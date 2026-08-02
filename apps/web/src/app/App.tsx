@@ -63,6 +63,7 @@ export function App() {
   const [isOpeningRecent, setIsOpeningRecent] = useState(false)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [workspace, setWorkspace] = useState<EditorWorkspace>('assist')
+  const [conversationDraft, setConversationDraft] = useState('')
   const [studioWorkspace, setStudioWorkspace] = useState<StudioWorkspace>(() => {
     if (typeof window === 'undefined') return 'edit'
     return loadWorkspaceLayout(window.localStorage, { width: window.innerWidth, height: window.innerHeight }).activeWorkspace
@@ -380,6 +381,8 @@ export function App() {
       project={appState.project}
       proposal={appState.proposal}
       conversation={appState.conversation}
+      conversationDraft={conversationDraft}
+      onConversationDraftChange={setConversationDraft}
       editProject={appState.editProject}
       editError={appState.editError}
       assetOriginalNames={assetOriginalNames}
