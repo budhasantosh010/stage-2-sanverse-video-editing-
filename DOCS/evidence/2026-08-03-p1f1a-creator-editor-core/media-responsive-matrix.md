@@ -25,14 +25,21 @@ about itself.
                         [All 5][Video 2][Image 2][Audio 1][More]
                                                           └── Missing folded in
 
-  COMPACT    221–300    Media · 5 assets      Import  Sort  Folder  ⋯
+  COMPACT    281–300    Media · 5 assets      Import  Sort  Folder  ⋯
                         [ Filter · Video                          ▾ ]
                                                           └── ONE button
 
-  MINIMUM    ≤ 220      Media 5               +  ⇅  ▾  ⋯
+  MINIMUM    ≤ 280      Media 5               +  ⇅  ▾  ⋯
                         [ ⚟•                                        ]
                                                           └── icon + dot
 ```
+
+> **Changed in Gate B1: the icon breakpoint moved from 220px to 280px.**
+> Measured in a real browser at a 228px panel, the header's words — "Media 5"
+> plus Import, Sort, Folder and the overflow button — need about **271px**, and
+> the overflow button was being pushed 2px past the panel edge and clipped. The
+> switch to icons now happens at 280px, with a margin, rather than at the exact
+> width where the words stop fitting.
 
 **Never five equal squeezed buttons.** Below about 320px, five buttons get
 roughly 55px each, the words clip to "Vid…" and "Ima…", and the control becomes
@@ -101,6 +108,61 @@ not displayed, so the page was not compositing frames and every screenshot
 attempt timed out. Everything above is therefore *measured numbers read from the
 live DOM* rather than pictures. That is weaker evidence for "does it look right"
 and identical evidence for "is it laid out right".
+
+---
+
+## Gate B1 re-measurement, 2026-08-03
+
+Same project, same real media, after the density refinement. Measured live:
+
+| panel width | row height | thumbnail | smallest control | clipped controls | h-scroll |
+|---|---|---|---|---|---|
+| **228 px** *(before the fix)* | 58 px | 40×28 | 28 px | **1 — the ⋯ button, 2px past the edge** | **yes** |
+| **228 px** *(after)* | **52 px** | 40×28 | 28 px | **0** | none |
+| **268 px** | 52 px | 40×28 | 28 px | 0 | none |
+
+Against the Gate B1 density targets:
+
+```
+  panel padding      6px      ✓  6px header, toolbar and results
+  control height    28–30px   ✓  smallest measured control 28px
+  asset row         48–54px   ✓  52px  (was 58px)
+  thumbnail         40–44px   ✓  40px compact, 48px wide
+  filename            12px    ✓
+  secondary        10–11px    ✓  10px
+```
+
+The row came down from 58px to 52px by naming the line heights (16px for the
+filename, 13px for the two detail lines) rather than by making any text smaller.
+Only the empty space shrank.
+
+**"1 result" is gone when it says nothing.** The results line now reads just
+`All media` when nothing is narrowing the list, because the header two rows
+above already says `Media · 5 assets`. The count returns the moment a search, a
+filter, or a folder makes the two numbers differ — which is the only moment it
+carries information.
+
+**Two honest limits on this re-measurement:** the Media pane would not grow past
+268px in this session, so only the compact and minimum bands were measured live;
+the standard and wide bands are held by tests that read the stylesheet. And the
+browser pane was again not compositing, so these are measured numbers, not
+pictures.
+
+---
+
+## The FAIL-047 note below is PARTLY WRONG — see the correction
+
+The section that follows was written during Gate B. Gate B1 found that the
+"stale responsive mode" it describes **could not be reproduced in a normally
+displayed browser**: the pane used for that testing never runs the browser's
+rendering steps, so `resize`, `matchMedia` and `ResizeObserver` notifications
+were *all* suppressed — measured as literally zero events across a real
+1440 → 1024 → 1440 change. The staleness was the instrument.
+
+A real defect of the same shape did exist and is fixed: at a window **exactly
+1100px** wide, `max-width: 1100px` matched and hid the docks while `width < 1100`
+was false and withheld the replacement controls. See `FAIL-047` for the full
+correction.
 
 ---
 

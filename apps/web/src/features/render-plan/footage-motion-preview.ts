@@ -6,6 +6,7 @@ import {
 import type { RenderPlan, SourceSegmentNode } from '@sanverse/render-contract'
 
 import { hasDecodableFrame } from './media-readiness'
+import { motionCanvasFrameToken } from './motion-frame-token'
 
 export type ActiveFootageMotion = Readonly<{
   segment: SourceSegmentNode
@@ -45,6 +46,13 @@ export type DrawFootageMotionInput = Readonly<{
   plan: RenderPlan
   compositionTicks: number
   reducedMotion?: boolean
+  /**
+   * Bumped whenever the canvas geometry changes — a panel resize, fullscreen.
+   *
+   * It is part of the frame's identity, so a frame drawn at the old size stops
+   * matching what the next render asks for and is redrawn before being trusted.
+   */
+  geometryVersion?: number
 }>
 
 /**
@@ -80,7 +88,9 @@ export const footageMotionDrawDecision = (input: Readonly<{
  * re-render, and keyed by source so that loading a different project cannot
  * leave the previous project's last frame on screen as if it were current.
  */
-const drawnFrames = new WeakMap<HTMLCanvasElement, string>()
+type DrawnFrame = Readonly<{ sourceKey: string; frameToken: string | null }>
+
+const drawnFrames = new WeakMap<HTMLCanvasElement, DrawnFrame>()
 
 const sourceKeyOf = (video: HTMLVideoElement): string => video.currentSrc || video.src || ''
 
@@ -88,6 +98,14 @@ const sourceKeyOf = (video: HTMLVideoElement): string => video.currentSrc || vid
 export const forgetFootageMotionFrame = (canvas: HTMLCanvasElement): void => {
   drawnFrames.delete(canvas)
 }
+
+/**
+ * The token of the frame this canvas is actually holding, or `null` if it holds
+ * nothing real. The monitor's base-layer resolver compares this against the
+ * token it is asking for, and shows the canvas only when they are equal.
+ */
+export const footageMotionDrawnToken = (canvas: HTMLCanvasElement): string | null =>
+  drawnFrames.get(canvas)?.frameToken ?? null
 
 /**
  * Draw the transformed primary picture from the one real video element.
@@ -99,8 +117,14 @@ export const forgetFootageMotionFrame = (canvas: HTMLCanvasElement): void => {
  * only by `videoWidth > 0`. That width is populated at HAVE_METADATA — before
  * any frame is decodable — so during load and during every seek the canvas
  * filled itself black, drew nothing, and was shown on top of a perfectly good
- * video. Base footage went black while the overlays and controls stayed
- * visible. The canvas is now revealed only after a real frame has landed on it.
+ * video. Base footage went black while the overlays and controls stayed visible.
+ *
+ * **This function no longer decides visibility at all.** It draws, and it
+ * records what it drew. `resolveMonitorBaseLayer` is the only thing that can
+ * show or hide the canvas. Two places deciding visibility is how the previous
+ * version ended up setting an attribute the stylesheet silently ignored.
+ *
+ * Returns whether a fresh frame was drawn this call.
  */
 export const drawFootageMotionFrame = (input: DrawFootageMotionInput): boolean => {
   const active = footageMotionAtCompositionTime(
@@ -109,7 +133,7 @@ export const drawFootageMotionFrame = (input: DrawFootageMotionInput): boolean =
     input.reducedMotion ?? false,
   )
   const sourceKey = sourceKeyOf(input.video)
-  const hasDrawnValidFrame = drawnFrames.get(input.canvas) === sourceKey && sourceKey !== ''
+  const hasDrawnValidFrame = drawnFrames.get(input.canvas)?.sourceKey === sourceKey && sourceKey !== ''
   const decision = footageMotionDrawDecision({
     motionActive: active !== null,
     videoWidth: input.video.videoWidth,
@@ -120,7 +144,6 @@ export const drawFootageMotionFrame = (input: DrawFootageMotionInput): boolean =
   if (decision === 'retain') return false
   if (decision === 'hide' || !active) {
     drawnFrames.delete(input.canvas)
-    input.canvas.hidden = true
     return false
   }
 
@@ -131,7 +154,6 @@ export const drawFootageMotionFrame = (input: DrawFootageMotionInput): boolean =
   const context = input.canvas.getContext('2d')
   if (!context) {
     drawnFrames.delete(input.canvas)
-    input.canvas.hidden = true
     return false
   }
 
@@ -174,10 +196,21 @@ export const drawFootageMotionFrame = (input: DrawFootageMotionInput): boolean =
     // calling it the footage is not.
     context.restore()
     drawnFrames.delete(input.canvas)
-    input.canvas.hidden = true
     return false
   }
-  drawnFrames.set(input.canvas, sourceKey)
-  input.canvas.hidden = false
+  // The token is minted HERE, from the same values the draw actually used, so
+  // the string the canvas reports can never describe a frame it did not draw.
+  // The monitor mints its request with the same helper, so equal strings mean
+  // equal pictures by construction rather than by careful coincidence.
+  drawnFrames.set(input.canvas, Object.freeze({
+    sourceKey,
+    frameToken: motionCanvasFrameToken({
+      assetId: active.segment.assetId,
+      sourceTicks: active.sourceTicks,
+      compositionTicks: input.compositionTicks,
+      motionId: active.motion.motionId,
+      geometryVersion: input.geometryVersion ?? 0,
+    }),
+  }))
   return true
 }

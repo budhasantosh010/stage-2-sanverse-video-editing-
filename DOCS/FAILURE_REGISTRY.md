@@ -1657,8 +1657,9 @@ Bound every wait, name every phase from something real, and never let "slow" and
 
 ## FAIL-047 — Resizing the window strands the user with no Media or Inspector panel
 
-- **Done:** [ ]
-- **Status:** OPEN
+- **Done:** [x]
+- **Status:** FIXED in Gate B1, 2026-08-03 — **and the original diagnosis was
+  partly wrong; see "What was tried?" below**
 - **Severity:** P1
 - **Found/target:** 2026-08-03 (during P1-F.1A Gate B browser testing) / Studio layout authority, NOT Gate B
 
@@ -1705,17 +1706,75 @@ is empty, and Gate B touched no layout file.
 
 ### What was tried?
 
-Nothing. Recorded rather than fixed: it belongs to the Studio layout authority,
-and the Gate B rule is to fix only Gate B blockers. Fixing it means making
-`responsiveMode` follow the viewport (a resize observer or matchMedia listener)
-and then re-proving the whole layout matrix, which is a change to a load-bearing
-authority and deserves its own slice.
+**Gate B1, 2026-08-03 — and the original diagnosis above was PARTLY WRONG.
+This is recorded rather than quietly corrected, because a wrong diagnosis that
+looks convincing is more dangerous than an open bug.**
+
+The code above *does* contain a `window.addEventListener('resize', …)` that
+recomputes the mode. It was there the whole time. So why did the DOM readings
+show a stale `'laptop'` after resizing to 1024?
+
+Because **the browser pane used for that testing never runs the browser's
+rendering steps** — it is not displayed, so it does not composite frames. That
+is the same limitation that made every screenshot attempt time out during Gate
+B. `resize` events, `matchMedia` change events, and `ResizeObserver` callbacks
+are *all* delivered as part of the rendering steps. Measured directly on
+2026-08-03 with counters installed in the page:
+
+```
+  viewport driven 1440 -> 1024 -> 1440 (window.innerWidth really changed,
+                                        the 1100px media query really crossed)
+
+  window 'resize' events fired                 0
+  matchMedia '(max-width: 1100px)' changes     0
+  ResizeObserver callbacks                     0
+```
+
+Manually dispatching one `resize` event corrected the mode immediately. **So the
+staleness was the instrument, not the product**, and it cannot be reproduced or
+disproved in that pane. It has never been observed in a normally displayed
+browser.
+
+**However, a real defect of exactly the described shape did exist**, and was
+found by reading the two authorities against each other rather than by driving
+the browser:
+
+```
+  CSS   @media (max-width: 1100px)   MATCHES at exactly 1100 -> docks hidden
+  JS    viewport.width < 1100        is FALSE at 1100        -> mode 'laptop'
+                                                             -> no replacement
+  at a window exactly 1100px wide: no Media panel, no Tool panel, no way back
+```
+
+One pixel of disagreement between a stylesheet and a comparison operator is
+enough to lose two whole panels.
+
+### What was done
+
+`apps/web/src/editor/layout-v2/studio-responsive-authority.ts` is now the single
+place the breakpoints exist. It:
+
+- compares with `<=`, so it agrees with `max-width` at the boundary pixel;
+- generates the media-query strings from the same numbers, and
+  `studio-responsive-authority.test.ts` **reads the real `.css` files** and fails
+  if the stylesheet ever contains a `max-width` condition above the breakpoint
+  the code knows about;
+- exposes `useStudioResponsiveMode()`, a `useSyncExternalStore` hook that
+  **re-reads the live width on every notification** — there is no copy of the
+  mode sitting in React state that can go stale by construction;
+- subscribes to `resize`, `orientationchange`, **and** `matchMedia` boundary
+  crossings, so a browser that throttles one still delivers another.
+
+`StudioResponsiveContinuity.test.tsx` drives the real screen from 1440 down
+through 1101, 1100, 1024, 620 and back, and requires the Media panel to be
+reachable at every single width, with the user's search text preserved and no
+project revision created.
 
 ### One-line solution
 
-Two authorities may not decide the same thing from different inputs — if CSS
-switches at a width, the JavaScript that renders the replacement must switch at
-the same width, every time the width changes.
+Two authorities may not decide the same thing from different inputs — and when a
+measurement disagrees with the code, check the instrument before you write down
+a cause.
 
 ---
 
@@ -1755,3 +1814,88 @@ needs an ADR, not a patch inside a gate about folders.
 
 A name the user typed or chose is theirs — decide where it lives before showing
 it, or the product will quietly forget it.
+
+---
+
+## FAIL-049 — The preview went black whenever the mouse was not on it
+
+- **Done:** [x]
+- **Status:** FIXED in Gate B1, 2026-08-03
+- **Severity:** P0 — the product's central surface showed nothing most of the time
+- **Found/target:** owner screen recording / Studio preview base layer
+
+### What / where / when / how / why?
+
+Move the mouse off the video and the picture turned black. Move it back on and
+the footage returned. Reported by the owner from a screen recording, which is the
+only reason it was caught at all: no test could see it, because no test moves a
+mouse away from something.
+
+Two faults, one stacked on the other.
+
+**Fault 1 — the motion canvas could not be switched off.** The canvas that draws
+zooms and pans sits above the video with an opaque black background. It was
+switched off with the HTML `hidden` attribute:
+
+```
+  code         canvas.hidden = true
+  stylesheet   .studio-screen__footage-motion-canvas { display: block; ... }
+```
+
+An author rule beats the browser's built-in `[hidden] { display: none }`, so
+`hidden` did **nothing**. Measured live in the running product:
+
+```
+  canvas.hidden = true  ->  computed display "block", background rgb(0,0,0),
+                            z-index 1        ← an opaque black lid on the video
+```
+
+**Fault 2 — a hover rule was added to cover fault 1 up.**
+
+```css
+  .studio-screen__video:hover + .studio-screen__footage-motion-canvas,
+  .studio-screen__video:focus + .studio-screen__footage-motion-canvas {
+    opacity: 0 !important;
+  }
+```
+
+"While the pointer is on the video, make the black lid transparent" —
+which necessarily means "the moment it leaves, put the lid back".
+
+### What was done
+
+`apps/web/src/editor/monitor/monitor-base-layer.ts` — one resolver returning
+`native-video | motion-canvas | gap | loading | error`, whose input type
+contains no pointer, hover, or focus field at all. The canvas is shown through
+one attribute that only the resolver writes:
+
+```css
+  .studio-screen__footage-motion-canvas[data-visible="false"] { display: none; }
+```
+
+Measured live: `data-visible="false"` -> computed display `"none"`. It actually
+goes away now.
+
+Two supporting rules:
+
+- **when in doubt, show the native video.** Untransformed real footage beats
+  black. The base picture is black in exactly one case now: a stretch the user
+  deliberately emptied, which is black in the export too.
+- **frame identity.** Every draw records a token (asset, source time,
+  composition time, motion, geometry version); every render states the token it
+  wants; the canvas is shown only when they match — so a cleared canvas, a stale
+  seek, a swapped source, or a frame drawn at the old panel size can never be
+  presented as the current picture.
+
+Held by `monitor-base-layer.test.ts` (15), `StudioPreviewNoHover.test.tsx` (6,
+which read the stylesheet as text because jsdom does not evaluate hover), and
+proved in the real browser: 20.5 s of playback plus 5 seeks with the pointer
+provably nowhere (`:hover` count 0 throughout) and **zero black frames**,
+brightness never below 105 out of 255. Full evidence:
+`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/gate-b1-preview-base-layer.md`.
+
+### One-line solution
+
+If a workaround is needed to make something look right, the thing it works
+around is the bug — and two mechanisms fighting over whether a layer is visible
+means neither of them is the authority.

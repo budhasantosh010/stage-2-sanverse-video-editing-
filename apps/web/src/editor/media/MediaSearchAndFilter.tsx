@@ -51,6 +51,8 @@ export function MediaSearchAndFilter({
 }>) {
   const active = FILTERS.find((item) => item.id === presentation.filter) ?? FILTERS[0]
   const filterIsOn = presentation.filter !== 'all'
+  /** Is the list showing fewer than everything the project holds? */
+  const narrowed = resultCount !== model.counts.all
 
   const item = (entry: (typeof FILTERS)[number]) => (
     <button
@@ -134,10 +136,24 @@ export function MediaSearchAndFilter({
         </MediaMenu>
       </div>
 
+      {/*
+        The count appears only when something is actually narrowing the list.
+
+        The header two rows above already says "Media · 12 assets". Repeating
+        "12 results" underneath it is the same fact twice, costs a line of a
+        panel that may be 255px wide, and trains the eye to skip the line — so
+        it is missed on the one occasion it matters, when the number is smaller
+        than the total and the user is wondering where their clip went.
+
+        `role="status"` stays on the element either way, so a screen reader is
+        told when a search or a filter changes what is on screen.
+      */}
       <p className="media-bin__result-count" role="status">
         <span data-testid="media-current-folder">{folderLabel}</span>
-        {' · '}
-        {resultCount} {resultCount === 1 ? 'result' : 'results'}
+        {narrowed ? <>
+          {' · '}
+          {resultCount} {resultCount === 1 ? 'result' : 'results'}
+        </> : null}
         {filterIsOn ? ` · ${active.label} only` : ''}
       </p>
     </div>

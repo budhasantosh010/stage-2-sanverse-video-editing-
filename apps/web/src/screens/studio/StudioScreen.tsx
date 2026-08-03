@@ -56,6 +56,8 @@ import {
 import {
   drawFootageMotionFrame,
   footageMotionAtCompositionTime,
+  footageMotionDrawnToken,
+  forgetFootageMotionFrame,
 } from '../../features/render-plan/footage-motion-preview'
 import {
   FootageMotionInspector,
@@ -70,9 +72,14 @@ import { ExportProgressStatus } from '../../features/project-export/ExportProgre
 import { HAVE_CURRENT_DATA } from '../../features/render-plan/media-readiness'
 import {
   monitorBaseFrameMessage,
-  monitorBaseFrameState,
-  showsGapLayer,
+  type MonitorBaseFrameState,
 } from '../../editor/monitor/monitor-base-frame'
+import {
+  motionCanvasFrameToken,
+  resolveMonitorBaseLayer,
+  showsGapLayer,
+  showsMotionCanvas,
+} from '../../editor/monitor/monitor-base-layer'
 import { NameplateComposer } from '../../features/nameplate/NameplateComposer'
 import { NameplateOverlay } from '../../features/nameplate/NameplateOverlay'
 import { CaptionOverlay } from '../../features/captions/CaptionOverlay'
@@ -116,9 +123,10 @@ import {
   defaultStudioLayoutV2,
   loadStudioLayoutV2,
   saveStudioLayoutV2,
-  studioResponsiveMode,
+  STUDIO_BREAKPOINTS,
+  subscribeStudioResponsiveMode,
+  useStudioResponsiveMode,
   type StudioLayoutV2State,
-  type StudioResponsiveMode,
 } from '../../editor/layout-v2'
 import {
   buildAddAsBrollOperation,
@@ -341,6 +349,8 @@ export function StudioScreen({
   const [pointTarget, setPointTarget] = useState<CapturedPointTarget | null>(null)
   const [draftPoint, setDraftPoint] = useState<NormalizedPoint>({ x: 0.5, y: 0.5 })
   const [videoLayoutRevision, setVideoLayoutRevision] = useState(0)
+  /** The same number, readable from inside the decoder's frame callback. */
+  const videoLayoutRevisionRef = useRef(0)
   const [pointError, setPointError] = useState<string | null>(null)
   const [playheadMs, setPlayheadMs] = useState(0)
   const [monitorFitMode, setMonitorFitMode] = useState<MonitorFitMode>('fit')
@@ -405,13 +415,33 @@ export function StudioScreen({
   const [clipGainDb, setClipGainDb] = useState(0)
   const [fadeInSeconds, setFadeInSeconds] = useState(0)
   const [fadeOutSeconds, setFadeOutSeconds] = useState(0)
+  /**
+   * The token of the frame the motion canvas is actually holding.
+   *
+   * Kept in state, not a ref, because the resolver runs during render and has
+   * to re-run the moment a draw lands — a ref would update silently and the
+   * canvas would stay hidden until something else happened to re-render.
+   */
+  const [drawnFrameToken, setDrawnFrameToken] = useState<string | null>(null)
+  /**
+   * The same value, readable from inside the decoder's frame callback.
+   *
+   * The playback loop draws many times a second. It uses this to notice the one
+   * transition that matters — nothing drawn, then something drawn — and calls
+   * `setDrawnFrameToken` exactly once for it. Calling React on every decoded
+   * frame would re-render the whole Studio at video rate.
+   */
+  const drawnFrameTokenRef = useRef<string | null>(null)
   const [captionsNotice, setCaptionsNotice] = useState<string | null>(null)
   const [captionsBusy, setCaptionsBusy] = useState(false)
-  const [responsiveMode, setResponsiveMode] = useState<StudioResponsiveMode>(() => studioResponsiveMode(
-    typeof window === 'undefined'
-      ? Object.freeze({ width: 1440, height: 900 })
-      : Object.freeze({ width: window.innerWidth, height: window.innerHeight }),
-  ))
+  /**
+   * One subscription for the whole Studio, not one resize listener per panel.
+   *
+   * It also cannot go stale: `useSyncExternalStore` re-reads the real width on
+   * every notification, so there is no copy of the mode sitting in state waiting
+   * to be forgotten. That staleness was FAIL-047.
+   */
+  const responsiveMode = useStudioResponsiveMode()
   const [workspaceLayout, setWorkspaceLayout] = useState<StudioLayoutV2State>(() => {
     const currentViewport = typeof window === 'undefined'
       ? Object.freeze({ width: 1440, height: 900 })
@@ -443,7 +473,10 @@ export function StudioScreen({
     if (geometryRefreshFrameRef.current !== null) return
     geometryRefreshFrameRef.current = requestAnimationFrame(() => {
       geometryRefreshFrameRef.current = null
-      setVideoLayoutRevision((revision) => revision + 1)
+      setVideoLayoutRevision((revision) => {
+        videoLayoutRevisionRef.current = revision + 1
+        return revision + 1
+      })
     })
   }
 
@@ -467,15 +500,16 @@ export function StudioScreen({
 
   useEffect(() => {
     const update = () => {
-      setCanvasNarrow(window.innerWidth < 600)
-      const nextMode = studioResponsiveMode(viewport())
-      setResponsiveMode(nextMode)
+      setCanvasNarrow(window.innerWidth <= STUDIO_BREAKPOINTS.mobile)
       setWorkspaceLayout((current) => adaptStudioLayoutToViewport(current, viewport()))
       requestGeometryRefresh()
     }
     update()
-    window.addEventListener('resize', update, { passive: true })
-    return () => window.removeEventListener('resize', update)
+    // The mode itself comes from `useStudioResponsiveMode`. This subscription
+    // exists only for the geometry refresh and the narrow-canvas flag, and it
+    // deliberately uses the SAME subscriber so the two cannot observe different
+    // events and therefore different widths.
+    return subscribeStudioResponsiveMode(update)
   }, [])
 
   useEffect(() => {
@@ -561,17 +595,29 @@ export function StudioScreen({
       const canvas = footageMotionCanvasRef.current
       const plan = footagePlanRef.current
       if (!canvas || !plan) return
-      drawFootageMotionFrame({
+      const drew = drawFootageMotionFrame({
         canvas,
         video,
         plan,
         compositionTicks,
         reducedMotion: reducedMotionRef.current,
+        geometryVersion: videoLayoutRevisionRef.current,
       })
+      // One React update on the transition into "the canvas holds something
+      // real", not one per decoded frame. While playing, the resolver accepts a
+      // real frame of the current source without demanding an exact token
+      // match, so React never has to keep pace with the decoder.
+      if (drew && drawnFrameTokenRef.current === null) {
+        const token = footageMotionDrawnToken(canvas)
+        drawnFrameTokenRef.current = token
+        setDrawnFrameToken(token)
+      }
     }
     const hideFootageMotion = () => {
       const canvas = footageMotionCanvasRef.current
-      if (canvas) canvas.hidden = true
+      if (canvas) forgetFootageMotionFrame(canvas)
+      drawnFrameTokenRef.current = null
+      setDrawnFrameToken(null)
     }
 
     let holeFrameId: number | null = null
@@ -1034,13 +1080,35 @@ export function StudioScreen({
     })
   }, [acceptedFootageMotion, footageMotionDirty, footageMotionDraft, footagePlan, selectedVideoSelection])
 
+  const activeFootageMotion = footageDisplayPlan
+    ? footageMotionAtCompositionTime(footageDisplayPlan, playheadPreviewTicks, reducedMotion)
+    : null
+
+  /**
+   * The frame this render is ASKING the canvas to hold.
+   *
+   * `videoLayoutRevision` is the geometry version: a panel resize changes the
+   * canvas size, so a frame drawn at the old size is no longer the frame being
+   * asked for and must be redrawn before it is trusted.
+   */
+  const requestedFrameToken = activeFootageMotion
+    ? motionCanvasFrameToken({
+      assetId: activeFootageMotion.segment.assetId,
+      sourceTicks: activeFootageMotion.sourceTicks,
+      compositionTicks: playheadPreviewTicks,
+      motionId: activeFootageMotion.motion.motionId ?? null,
+      geometryVersion: videoLayoutRevision,
+    })
+    : null
+
   useEffect(() => {
     footagePlanRef.current = footageDisplayPlan
     reducedMotionRef.current = reducedMotion
     const canvas = footageMotionCanvasRef.current
     const videoElement = videoRef.current
     if (!canvas || !videoElement || !footageDisplayPlan) {
-      if (canvas) canvas.hidden = true
+      drawnFrameTokenRef.current = null
+      setDrawnFrameToken(null)
       return
     }
     drawFootageMotionFrame({
@@ -1049,33 +1117,48 @@ export function StudioScreen({
       plan: footageDisplayPlan,
       compositionTicks: playheadPreviewTicks,
       reducedMotion,
+      geometryVersion: videoLayoutRevision,
     })
-  }, [footageDisplayPlan, playheadPreviewTicks, reducedMotion, videoLayoutRevision])
+    const drawn = footageMotionDrawnToken(canvas)
+    drawnFrameTokenRef.current = drawn
+    setDrawnFrameToken(drawn)
+  }, [footageDisplayPlan, playheadPreviewTicks, reducedMotion, requestedFrameToken, videoLayoutRevision])
 
   /**
-   * One named answer for what the base picture is doing.
+   * One named answer for what the base picture is, and the ONLY thing allowed
+   * to decide it.
    *
-   * Four situations used to render as an identical black rectangle — an
-   * intentional gap, media still loading, a seek in flight, and a real failure
-   * — and nothing on screen distinguished them. Deciding it in one place means
-   * the black layer and the sentence explaining it can never disagree.
+   * The pointer is deliberately not an input. The preview used to depend on
+   * hover — the motion canvas was made transparent while the pointer was over
+   * the video and opaque black the moment it left — so moving the mouse away
+   * blacked out the footage. See `monitor-base-layer.ts` for the full story.
    */
-  const activeFootageMotion = footageDisplayPlan
-    ? footageMotionAtCompositionTime(footageDisplayPlan, playheadPreviewTicks, reducedMotion)
-    : null
-  const baseFrameState = monitorBaseFrameState({
+  const baseLayer = resolveMonitorBaseLayer({
     hasSource: project.mediaUrl.length > 0,
     readyState: videoReadiness.readyState,
     seeking: videoReadiness.seeking,
-    hasMediaError: hasPreviewError,
+    mediaError: hasPreviewError ? 'Preview unavailable' : null,
     // The ONLY input allowed to produce 'gap': the canonical composition
     // mapping reported a stretch with no active source segment.
     inCanonicalGap: isShowingHole,
     hasPresentedFrame: videoReadiness.hasPresentedFrame,
     motionActive: activeFootageMotion !== null,
-    // The canvas can hold a real frame exactly when the video can supply one.
-    motionFrameValid: videoReadiness.readyState >= HAVE_CURRENT_DATA,
+    requestedFrameToken,
+    drawnFrameToken,
+    playing: monitorPlaying,
   })
+  /**
+   * The status word is DERIVED from the layer rather than computed a second
+   * time. Two independent calculations of "what is the preview doing" is
+   * exactly how a monitor ends up saying "No media at this time" over a picture
+   * that is playing.
+   */
+  const baseFrameState: MonitorBaseFrameState =
+    baseLayer.kind === 'error' ? 'error'
+      : baseLayer.kind === 'gap' ? 'gap'
+        : baseLayer.kind === 'loading' ? 'loading'
+          : videoReadiness.seeking ? 'seeking'
+            : 'ready'
   const baseFrameMessage = monitorBaseFrameMessage(baseFrameState)
 
   const canvasVisibleNodes = [
@@ -2077,13 +2160,24 @@ export function StudioScreen({
               >
                 Your browser does not support video playback.
               </video>
+              {/*
+                Visibility comes from ONE place: the base-layer resolver.
+
+                `data-visible` rather than the `hidden` attribute on purpose.
+                The stylesheet sets `display: block` on this class, and an author
+                rule beats the browser's own `[hidden] { display: none }` — so
+                `hidden` was being set and silently ignored, leaving a canvas
+                that had never drawn a frame sitting over healthy video as an
+                opaque black rectangle. That is the black preview the owner
+                recorded. See `monitor-base-layer.ts`.
+              */}
               {videoContentLayerStyle ? (
                 <canvas
                   ref={footageMotionCanvasRef}
                   className="studio-screen__footage-motion-canvas"
                   data-testid="footage-motion-canvas"
+                  data-visible={showsMotionCanvas(baseLayer) ? 'true' : 'false'}
                   style={{ ...videoContentLayerStyle, opacity: transitionOpacity }}
-                  hidden
                   aria-hidden="true"
                 />
               ) : null}
@@ -2098,7 +2192,7 @@ export function StudioScreen({
                 waiting canvas, a panel resize, or a loading source can never
                 paint this. If it is black here, the exported file is black too.
               */}
-              {showsGapLayer(baseFrameState) ? (
+              {showsGapLayer(baseLayer) ? (
                 <div className="studio-screen__video-hole" data-testid="video-hole" aria-hidden="true" />
               ) : null}
 

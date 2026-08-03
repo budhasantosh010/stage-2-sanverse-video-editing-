@@ -5,6 +5,7 @@ import { compileProjectToRenderPlan } from '@sanverse/render-contract/compile-pr
 import { ms, testProject } from '../../test-fixtures'
 import {
   drawFootageMotionFrame,
+  footageMotionDrawnToken,
   footageMotionAtCompositionTime,
   footageMotionDrawDecision,
   forgetFootageMotionFrame,
@@ -97,7 +98,11 @@ describe('primary-footage browser projection', () => {
       plan: motionProject(),
       compositionTicks: ms(7_000).ticks,
     })).toBe(true)
-    expect(canvas.hidden).toBe(false)
+    // Visibility is no longer this function's business — the base-layer
+    // resolver owns it. What this function owes is a truthful record of the
+    // frame it drew, and that record is strictly stronger than a boolean:
+    // it says WHICH frame, of WHICH asset, at WHICH geometry.
+    expect(footageMotionDrawnToken(canvas)).toBe('asset_aaaaaaaa|10080000|10080000|motion_web00001|0')
     expect(context.translate).toHaveBeenCalledWith(960 + 192, 540 - 54)
     expect(context.scale).toHaveBeenCalledWith(1.2, 1.2)
     expect(context.drawImage).toHaveBeenCalledOnce()
@@ -114,7 +119,7 @@ describe('primary-footage browser projection', () => {
       plan: motionProject(),
       compositionTicks: ms(1_000).ticks,
     })).toBe(false)
-    expect(canvas.hidden).toBe(true)
+    expect(footageMotionDrawnToken(canvas)).toBeNull()
     expect(document.querySelectorAll('video')).toHaveLength(1)
     video.remove()
   })
@@ -129,7 +134,9 @@ describe('primary-footage browser projection', () => {
       plan: motionProject(),
       compositionTicks: ms(7_000).ticks,
     })).toBe(false)
-    expect(canvas.hidden).toBe(true)
+    // Nothing real was drawn, so the canvas reports holding nothing, so the
+    // resolver falls back to the native video instead of showing black.
+    expect(footageMotionDrawnToken(canvas)).toBeNull()
     expect(context.fillRect).not.toHaveBeenCalled()
     expect(context.drawImage).not.toHaveBeenCalled()
   })
@@ -140,15 +147,16 @@ describe('primary-footage browser projection', () => {
     expect(drawFootageMotionFrame({
       canvas, video: readyVideo(), plan, compositionTicks: ms(7_000).ticks,
     })).toBe(true)
-    expect(canvas.hidden).toBe(false)
+    const retainedToken = footageMotionDrawnToken(canvas)
+    expect(retainedToken).not.toBeNull()
 
     const drawsAfterFirstFrame = context.drawImage.mock.calls.length
     expect(drawFootageMotionFrame({
       canvas, video: readyVideo(HAVE_NOTHING), plan, compositionTicks: ms(7_500).ticks,
     })).toBe(false)
-    // Still visible, still holding the previous real frame, and nothing was
+    // Still holding the previous real frame, unchanged, and nothing was
     // cleared out from under it.
-    expect(canvas.hidden).toBe(false)
+    expect(footageMotionDrawnToken(canvas)).toBe(retainedToken)
     expect(context.clearRect).toHaveBeenCalledTimes(1)
     expect(context.drawImage).toHaveBeenCalledTimes(drawsAfterFirstFrame)
   })
@@ -165,7 +173,9 @@ describe('primary-footage browser projection', () => {
     expect(drawFootageMotionFrame({
       canvas, video: replacement, plan, compositionTicks: ms(7_000).ticks,
     })).toBe(false)
-    expect(canvas.hidden).toBe(true)
+    // The previous asset's frame is forgotten outright. A stale token would
+    // let the resolver show one project's picture inside another's.
+    expect(footageMotionDrawnToken(canvas)).toBeNull()
   })
 
   it('decides draw, retain, or hide from readiness alone', () => {

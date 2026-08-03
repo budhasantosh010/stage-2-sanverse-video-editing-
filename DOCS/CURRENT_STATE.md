@@ -4,6 +4,64 @@ Last updated: 2026-08-03
 
 ## Active goal
 
+**P1-F.1A Gate B1 — Preview and responsive owner repair is complete.**
+
+**The preview no longer depends on where the mouse is.** The owner recorded a
+picture that went black the instant the pointer left the video. Two faults,
+stacked: the motion canvas could not be switched off (the code set the HTML
+`hidden` attribute; the stylesheet's `display: block` on the same element beat
+the browser's own `[hidden] { display: none }`, so a never-drawn opaque black
+canvas sat on top of healthy video), and a hover rule was then added to make
+that black lid transparent *while the pointer was on the video* — which is
+precisely why it came back when the pointer left.
+
+One resolver now decides what the picture is — `native-video`,
+`motion-canvas`, `gap`, `loading`, `error` — and its input type contains no
+pointer, hover, or focus field at all. **When in doubt it shows the native
+video:** untransformed real footage beats black. The base picture is black in
+exactly one case, a stretch the user deliberately emptied, which is black in the
+exported file too. Every canvas draw records a frame token (asset, source time,
+composition time, motion, geometry version) and the canvas is shown only when
+that token is the one being asked for, so a cleared canvas, a stale seek, a
+swapped source, or a frame drawn at the old panel size can never be presented as
+the current picture. `FAIL-049`, and
+`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/gate-b1-preview-base-layer.md`.
+
+**FAIL-047 is fixed, and its original diagnosis was partly wrong — recorded, not
+quietly corrected.** The "stale responsive mode after resize" could not be
+reproduced in a normally displayed browser: the pane used for that testing never
+runs the browser's rendering steps, so `resize`, `matchMedia` **and**
+`ResizeObserver` notifications were all suppressed — measured as literally zero
+events across a real 1440 → 1024 → 1440 change. The staleness was the
+instrument. The real defect was one pixel wide: `@media (max-width: 1100px)`
+matches **at** 1100 and hid the docks, while `width < 1100` was false and
+withheld the replacement controls, so a window exactly 1100px wide had no Media
+panel, no Tool panel, and no way back. `studio-responsive-authority.ts` is now
+the single place the breakpoints exist, compares with `<=`, re-reads the live
+width through `useSyncExternalStore` so no stale copy can exist, and is held by
+a test that reads the real `.css` files.
+
+Media density was refined: rows 58px → **52px** (by naming line heights, not by
+shrinking text), panel padding a flat 6px, and the header's word labels switch
+to icons at 280px rather than 220px — measured, because at a 228px panel the
+words needed 271px and the overflow button was being clipped 2px past the edge.
+The redundant "N results" line now appears only when something is actually
+narrowing the list.
+
+Suites: web 667, edit-domain 312, api 248, render-contract 65, intent-domain 27
+— **1,319 total** (Gate B 1,283); all-workspace build passes; no assertion
+weakened. Real-browser proof: 20.5 s of playback plus five seeks with the
+pointer provably nowhere (`:hover` count 0 throughout) and **zero black
+frames**, brightness never below 105 of 255; the project came out unchanged at
+revision 4.
+
+**Stop boundary: Gate C (Creator Timeline Core V2) and Gate D (filmstrips and
+waveforms) have not started.** `FAIL-048` (imported names forgotten on reload)
+remains open as a P2 and is deliberately deferred to its own ADR-backed slice,
+"Asset Metadata Sidecar V1".
+
+### Previous checkpoint
+
 **P1-F.1A Gate B — Media Library V2 Essentials is complete.** The Media panel is
 a compact, container-responsive shelf with import by media kind, drop from the
 operating system, sorting, filtering, and durable one-level folders.

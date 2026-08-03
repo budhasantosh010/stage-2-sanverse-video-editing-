@@ -278,19 +278,29 @@
   pointer-events: none;
 }
 
+/* The canvas is a truthful picture projection, not a second player.
+
+   Its visibility is decided in exactly one place — `resolveMonitorBaseLayer` in
+   `editor/monitor/monitor-base-layer.ts` — and arrives here as `data-visible`.
+
+   It is NOT driven by the `hidden` attribute. `display: block` on this class is
+   an author rule and beats the browser's own `[hidden] { display: none }`, so
+   setting `hidden` did nothing: a canvas that had never drawn a frame stayed on
+   screen as an opaque black rectangle covering healthy video. A hover rule was
+   then added to hide it while the pointer was over the video, which is why the
+   preview went black the moment the pointer left. Both are gone.
+
+   Nothing about the base picture may depend on :hover, :focus, or
+   :focus-visible. `StudioPreviewNoHover.test.tsx` reads this file and fails if
+   any such selector appears. */
 .studio-screen__footage-motion-canvas {
   z-index: 1;
   display: block;
   background: #000;
 }
 
-/* The canvas is a truthful picture projection, not a second player. When the
-   real video itself receives hover or keyboard focus, reveal its native control
-   surface immediately. Canvas handles remain above this layer and keep their
-   own hit targets. */
-.studio-screen__video:hover + .studio-screen__footage-motion-canvas,
-.studio-screen__video:focus + .studio-screen__footage-motion-canvas {
-  opacity: 0 !important;
+.studio-screen__footage-motion-canvas[data-visible="false"] {
+  display: none;
 }
 
 .studio-screen__video-content-layer {

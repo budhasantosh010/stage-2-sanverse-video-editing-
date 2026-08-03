@@ -131,7 +131,7 @@ describe('Media Library V2 — structure and density', () => {
   it('defines all four widths, and never five squeezed filter buttons at the narrow ones', () => {
     expect(css).toContain('@container studio-media (max-width: 380px)')
     expect(css).toContain('@container studio-media (max-width: 300px)')
-    expect(css).toContain('@container studio-media (max-width: 220px)')
+    expect(css).toContain('@container studio-media (max-width: 280px)')
     expect(css).toContain('@container studio-media (min-width: 381px)')
     // At compact the row of buttons is gone entirely and one menu replaces it.
     expect(css).toMatch(/max-width:\s*300px\)\s*\{[^@]*\.media-bin__filters\s*\{\s*display:\s*none/s)
