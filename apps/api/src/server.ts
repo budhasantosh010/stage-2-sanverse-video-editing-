@@ -26,6 +26,11 @@ import { createIntentService, type IntentService } from './intent/intent-service
 import { buildCaptionsChangeSet } from './transcripts/build-captions.ts'
 import { createFfmpegRenderAdapter } from './render/ffmpeg-render-adapter.ts'
 import { createRenderService } from './render/render-service.ts'
+import {
+  createMediaOrganizationService,
+  MediaOrganizationServiceError,
+  parseCommand,
+} from './projects/media-organization-service.ts'
 import { buildLocalDiagnostics } from './diagnostics/local-diagnostics.ts'
 import {
   createLocalExportJobStore,
@@ -184,6 +189,10 @@ export function createSanverseServer(options: ServerOptions) {
   const projectState = options.projectStateService ?? createProjectStateService({ repository, mediaProbe })
   const renderService = options.renderService ?? (options.fontPath ? createRenderService({ renderer: createFfmpegRenderAdapter({ fontPath: options.fontPath, mediaProbe }) }) : undefined)
   const generateExportId = options.exportIdGenerator ?? (() => `export_${randomBytes(16).toString('hex')}`)
+  const mediaOrganization = createMediaOrganizationService({
+    repository,
+    loadProject: (projectId) => projectState.load(projectId),
+  })
   const generateExportJobId = options.exportJobIdGenerator ?? (() => `job_${randomBytes(16).toString('hex')}`)
   const exportJobs = options.exportJobStore ?? createLocalExportJobStore(options.dataRoot)
   const runningExportJobs = new Map<string, AbortController>()
@@ -363,6 +372,32 @@ export function createSanverseServer(options: ServerOptions) {
         if (!PROJECT_ID_PATTERN.test(projectId)) { json(response, 404, { error: 'Project was not found.' }); return }
         const manifest = await repository.readProject(projectId)
         json(response, 200, { ...manifest, project: await projectState.load(projectId) })
+        return
+      }
+
+      /*
+       * How the user has filed their own media.
+       *
+       * Deliberately NOT an editing route. Putting a file in a folder changes
+       * no pixel and no timing, so it creates no operation, no change set, no
+       * revision, and no undo entry, and it is stored beside the project rather
+       * than inside it. See DOCS/decisions/ADR-MEDIA-ORGANIZATION-V1.md.
+       */
+      const organizationMatch = /^\/api\/projects\/([^/]+)\/media-organization$/.exec(requestUrl.pathname)
+      if (organizationMatch && (request.method === 'GET' || request.method === 'POST')) {
+        const projectId = organizationMatch[1]
+        if (!PROJECT_ID_PATTERN.test(projectId)) { request.resume(); json(response, 404, { error: 'Project was not found.' }); return }
+        if (request.method === 'GET') {
+          request.resume()
+          json(response, 200, { organization: await mediaOrganization.load(projectId) })
+          return
+        }
+        const payload = await readJsonBody(request)
+        if (typeof payload !== 'object' || payload === null || !('command' in payload)) {
+          throw new ApiRequestError('INVALID_JSON', 'A media organization command is required.')
+        }
+        const command = parseCommand((payload as { command: unknown }).command)
+        json(response, 200, { organization: await mediaOrganization.apply(projectId, command) })
         return
       }
 

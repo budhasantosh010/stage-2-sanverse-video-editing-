@@ -162,9 +162,17 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
     return manifest
   }
 
-  async function readControlledProjectState(projectId: string): Promise<string | null> {
+  /**
+   * Read one project-owned JSON file, refusing anything that is not exactly the
+   * regular file we expect.
+   *
+   * Shared by the saved project and by media organization so the symlink,
+   * hard-link, and file-identity checks exist in ONE place. Two copies of this
+   * would eventually disagree, and the one that drifted would be the hole.
+   */
+  async function readControlledProjectFile(projectId: string, filename: string): Promise<string | null> {
     const { sourcePath } = await resolvePublishedMedia(projectId)
-    const statePath = join(dirname(sourcePath), 'edit-project.json')
+    const statePath = join(dirname(sourcePath), filename)
     let handle
     try {
       const before = await lstat(statePath, { bigint: true })
@@ -186,6 +194,42 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
       throw error
     } finally {
       await handle?.close().catch(() => undefined)
+    }
+  }
+
+  /**
+   * Write one project-owned JSON file so it is either wholly there or untouched.
+   *
+   * Written to a temporary name, flushed, then renamed into place. A crash
+   * halfway through can leave a stray `.tmp`, never a half-written file under
+   * the real name.
+   */
+  async function writeControlledProjectFile(
+    projectId: string,
+    filename: string,
+    contents: string,
+    maxBytes: number,
+  ): Promise<void> {
+    if (typeof contents !== 'string' || contents.length === 0 || Buffer.byteLength(contents, 'utf8') > maxBytes) {
+      throw new Error(`${filename} must be non-empty bounded JSON text.`)
+    }
+    const { sourcePath } = await resolvePublishedMedia(projectId)
+    const projectDir = dirname(sourcePath)
+    const finalPath = join(projectDir, filename)
+    const temporaryPath = join(projectDir, `.${filename}-${randomBytes(12).toString('hex')}.tmp`)
+    let handle
+    try {
+      handle = await open(temporaryPath, 'wx', 0o600)
+      await handle.writeFile(contents, 'utf8')
+      await handle.sync()
+      await handle.close()
+      handle = undefined
+      await rename(temporaryPath, finalPath)
+      await syncDirectory(projectDir)
+    } catch (error) {
+      await handle?.close().catch(() => undefined)
+      await rm(temporaryPath, { force: true }).catch(() => undefined)
+      throw error
     }
   }
 
@@ -374,7 +418,25 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
 
     async readProjectState(projectId: string): Promise<string | null> {
       assertProjectId(projectId)
-      return readControlledProjectState(projectId)
+      return readControlledProjectFile(projectId, 'edit-project.json')
+    },
+
+    /**
+     * The user's filing of their own media — folders and which asset is in which.
+     *
+     * A sidecar, never inside the project, because it changes no pixel and no
+     * timing. See DOCS/decisions/ADR-MEDIA-ORGANIZATION-V1.md. Absent is a valid
+     * state meaning "every asset is at the root", so a project that has never
+     * had a folder needs no file and no migration.
+     */
+    async readMediaOrganization(projectId: string): Promise<string | null> {
+      assertProjectId(projectId)
+      return readControlledProjectFile(projectId, 'media-organization.json')
+    },
+
+    async saveMediaOrganization(projectId: string, serialized: string): Promise<void> {
+      assertProjectId(projectId)
+      await writeControlledProjectFile(projectId, 'media-organization.json', serialized, 256 * 1024)
     },
 
     async resolveMediaPaths(projectId: string) {
@@ -470,27 +532,7 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
 
     async saveProjectState(projectId: string, serializedProject: string): Promise<void> {
       assertProjectId(projectId)
-      if (typeof serializedProject !== 'string' || serializedProject.length === 0 || Buffer.byteLength(serializedProject, 'utf8') > 1024 * 1024) {
-        throw new Error('Serialized project state must be non-empty bounded JSON text.')
-      }
-      const { sourcePath } = await resolvePublishedMedia(projectId)
-      const projectDir = dirname(sourcePath)
-      const statePath = join(projectDir, 'edit-project.json')
-      const temporaryPath = join(projectDir, `.edit-project-${randomBytes(12).toString('hex')}.tmp`)
-      let handle
-      try {
-        handle = await open(temporaryPath, 'wx', 0o600)
-        await handle.writeFile(serializedProject, 'utf8')
-        await handle.sync()
-        await handle.close()
-        handle = undefined
-        await rename(temporaryPath, statePath)
-        await syncDirectory(projectDir)
-      } catch (error) {
-        await handle?.close().catch(() => undefined)
-        await rm(temporaryPath, { force: true }).catch(() => undefined)
-        throw error
-      }
+      await writeControlledProjectFile(projectId, 'edit-project.json', serializedProject, 1024 * 1024)
     },
 
     async allocateExport(projectId: string, exportId: string) {

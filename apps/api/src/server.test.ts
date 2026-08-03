@@ -68,6 +68,8 @@ function readRepository(bytes: Uint8Array, bodyFactory: () => AsyncIterable<Uint
     async readProject() { throw new Error('not used') },
     async readProjectState() { return null },
     async saveProjectState() { throw new Error('not used') },
+    async readMediaOrganization() { return null },
+    async saveMediaOrganization() { throw new Error('not used') },
     async resolveMediaPaths(projectId) {
       return { sourcePath: `C:\safe\${projectId}\source.mp4`, trustedWorkDir: `C:\safe\${projectId}` }
     },

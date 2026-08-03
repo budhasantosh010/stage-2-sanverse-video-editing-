@@ -126,11 +126,14 @@ import {
   buildMediaBinViewModel,
   createMediaActionIds,
   deriveAssetDisplayLabels,
+  EMPTY_MEDIA_PRESENTATION,
   probeMediaAssetStatuses,
   type MediaAssetSource,
+  type MediaPresentationState,
   type MediaSourceProbe,
   type MediaStatus,
 } from '../../features/media'
+import { useMediaOrganization } from '../../features/media/use-media-organization'
 import {
   formatPointTargetTime,
   type CapturedPointTarget,
@@ -377,6 +380,11 @@ export function StudioScreen({
   const [compactSidePanel, setCompactSidePanel] = useState<'media' | 'inspector' | null>(null)
   const [selectedTimelineItemId, setSelectedTimelineItemId] = useState<string | null>(null)
   const [selectedMediaAssetId, setSelectedMediaAssetId] = useState<string | null>(null)
+  // Media presentation lives HERE, not inside the Media panel, because the panel
+  // is unmounted whenever the user switches workspace. Held here it survives —
+  // search text, filter, sort and chosen folder all come back unchanged.
+  const [mediaPresentation, setMediaPresentation] = useState<MediaPresentationState>(EMPTY_MEDIA_PRESENTATION)
+  const mediaOrganization = useMediaOrganization(project.id)
   const [mediaSourceStatuses, setMediaSourceStatuses] = useState<Readonly<Record<string, MediaStatus>>>({})
   const [pendingPlacedTimelineItemId, setPendingPlacedTimelineItemId] = useState<string | null>(null)
   const [inspectorSectionDirty, setInspectorSectionDirty] = useState(false)
@@ -2278,6 +2286,9 @@ export function StudioScreen({
               model={mediaModel}
               selectedAssetId={selectedMediaAssetId}
               busy={timelineBusy}
+              presentation={mediaPresentation}
+              organization={mediaOrganization}
+              onPresentationChange={setMediaPresentation}
               onSelect={setSelectedMediaAssetId}
               onImport={importMediaFiles}
               onAddAsBroll={addMediaAsBroll}

@@ -2,42 +2,60 @@
 
 ## Current checkpoint
 
-**P1-F.1A Gate A — Preview Reliability and Export Runtime is complete.**
+**P1-F.1A Gate B — Media Library V2 Essentials is complete.**
 
-The Preview black-base-footage failure and the export "spinner that could never
-end" are both fixed, with real-media evidence in
-`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/`.
+The Media panel is now a compact, responsive shelf with import by kind, drop
+from the operating system, sorting, filtering, and **durable one-level folders
+that live on the server and never touch the video**.
 
-- **Preview root cause:** `drawFootageMotionFrame` revealed the motion canvas
-  guarded only by `videoWidth > 0`. That is populated at `HAVE_METADATA`, before
-  any frame is decodable, so during load and every seek the canvas filled itself
-  black, drew nothing, and was shown over a healthy video. It now reveals only
-  after a real frame lands, retains the previous frame on a readiness dip, and
-  never retains a frame across a source change.
-- **One named base-frame state** (`loading | ready | seeking | gap | error`)
-  replaces four situations that all rendered as identical black. `showsGapLayer`
-  is the only expression that can paint the deliberate black layer, so a pause,
-  seek, resize, or waiting canvas structurally cannot.
-- **Export root cause:** the render was never hung — it genuinely takes 60–90 s
-  for a 30 s 1080p file with an overlay and full-length motion. The UI collapsed
-  queued/encoding/verifying into one word, showed no elapsed time, and polled
-  with **no bound at all**, so slow and dead looked identical forever. Now:
-  server-derived `queued | rendering | verifying | done` phases from real
-  renderer milestones, a visible `m:ss` clock, a 10-minute bound producing a
-  recoverable timed-out state that leaves the job alive, and Retry.
-- Two further defects fixed by inspection: an orphaned `running` job was handed
-  back and never executed; and there is still no wall-clock limit on the FFmpeg
-  child process (recorded as open, not guessed at).
+- **Where folders live:** `.sanverse-data/projects/<id>/media-organization.json`
+  — a server file BESIDE the project, not inside `EditProject` and not in the
+  browser. Full reasoning in `DOCS/decisions/ADR-MEDIA-ORGANIZATION-V1.md`.
+  Rejected localStorage (per-browser, silently cleared) and rejected
+  `EditProject` (Undo would step through folder renames, and the export key
+  `sha256(projectId : revision : renderPlanSchemaVersion)` would move, so
+  renaming a folder would re-encode an identical MP4 for 60–90 s).
+- **A folder is a LABEL, not a container.** Deleting one returns its media to
+  the top level. It can never delete media.
+- **Five typed validated commands** (create / rename / move-to-folder /
+  move-to-root / delete), so a future AI calls exactly what the buttons call.
+- **Proved byte-identical in the real browser**: create → duplicate refusal →
+  rename → move in → move out → delete left the project at
+  `revision 4, changeSets 0, assets 5, sha256 39e6e054…27389d84` — the same hash
+  before and after. Filing survived a full page reload.
+- **Media-to-Timeline drag is built, tested, and deliberately switched OFF**
+  (`MEDIA_DRAG_ENABLED = false`). The closed `sanverse.media-drag/v1` payload
+  carries only `assetId`, `mediaKind`, `sourceDurationTicks` — no path, no URL,
+  no object URL, no project or asset object. Gate C flips one boolean.
+- **Only the results region scrolls.** Header, search, filter and sort stay
+  pinned, so the moment a user has enough media to scroll is not the moment the
+  tools for coping with a lot of media leave the screen.
+- **Never five squeezed filter buttons.** Four shapes by panel width: five
+  buttons > 380px, four + More at 301–380, one Filter button at 221–300, icons
+  at ≤ 220 — all writing ONE filter value through ONE callback.
 
-Real export probed: 1920×1080 H.264, 30/1, AAC-LC 48 kHz stereo, 30.033008 s,
-18,044,871 bytes. Frames at 1.0 / 4.0 / 9.0 / 20.0 s inspected.
+Suites: web 631, edit-domain 312, api 248, render-contract 65, intent-domain 27
+— **1,283 total** (Gate A baseline 1,203, program floor 1,176). All-workspace
+build passes. No assertion weakened.
 
-Suites: web 571, api 241, edit-domain 299, render-contract 65, intent-domain 27
-— **1,203 total** (program floor 1,176). All-workspace build passes.
+Evidence: `DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/` —
+`media-library-contract.md`, `media-folders.md`, `media-drag-contract.md`,
+`media-responsive-matrix.md`, `media-browser-walkthrough.md`,
+`test-results-gate-b.md`.
 
-**Gates B, C and D of P1-F.1A have not started. P1-F.2 has not started.**
+**Gate C (Creator Timeline Core) has NOT started. Gate D has not started.
+P1-F.2 has not started.**
 
-### Previous checkpoint
+Two pre-existing defects were found while testing Gate B and are recorded but
+NOT fixed here, because this gate fixes only Gate B blockers:
+**FAIL-047** (resizing the window past 1100px strands the user with no Media or
+Inspector panel until reload) and **FAIL-048** (imported file names are
+forgotten on reload).
+
+### Previous checkpoint — Gate A
+
+**P1-F.1A Gate A — Preview Reliability and Export Runtime.**
+
 
 **P1-F.0.2.2 — Media Panel Completion and Editor Monitor V1 is technically
 complete; owner visual acceptance is open.** Media has one container-responsive

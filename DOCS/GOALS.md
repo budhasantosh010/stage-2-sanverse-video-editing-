@@ -87,7 +87,17 @@ Never publish one invented percentage-complete number. A box closes only when it
 - [x] P1-F.0.2 Nested Studio Layout Engine V2
 - [x] P1-F.0.2.1 Nested Layout Stabilization — technical and E2E gates
 - [ ] P1-F.0.2.1 owner visual acceptance
-- [ ] P1-F.1 — not started; requires the next approved implementation contract
+- [x] P1-F.1A Gate A — Preview reliability and export runtime (`0ecffc3`)
+- [x] P1-F.1A Gate B — Media Library V2 essentials: compact panel, import by
+      kind, OS file drop, sort, filter, durable one-level server folders, closed
+      drag payload built but switched off until Gate C
+- [ ] P1-F.1A Gate B owner visual acceptance — no screenshots exist; the browser
+      pane was not displayed, so layout is measured but appearance is unproved
+- [ ] P1-F.1A Gate C — Creator Timeline Core — not started
+- [ ] P1-F.1A Gate D — filmstrips and waveforms — not started
+- [ ] P1-F.2 — not started
 - [x] P1-F.0.2.2 Media responsive presentation and Editor Monitor V1 — technical gate
 - [ ] P1-F.0.2.2 owner visual acceptance
-- [ ] Media V2 sorting/bins/multiselect/batch/drag/drop policies — proposed, not started
+- [x] Media V2 sorting and one-level bins — done in Gate B
+- [ ] Media V2 multiselect, batch actions, visible Timeline drag/drop — deferred;
+      the drag payload and parser exist and are tested, the gesture is off

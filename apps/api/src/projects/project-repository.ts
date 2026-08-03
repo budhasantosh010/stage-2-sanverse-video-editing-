@@ -46,6 +46,19 @@ export interface ProjectRepository {
   readProject(projectId: string): Promise<ProjectManifest>
   readProjectState(projectId: string): Promise<string | null>
   saveProjectState(projectId: string, serializedProject: string): Promise<void>
+  /**
+   * The user's filing of their own media, stored beside the project.
+   *
+   * Deliberately NOT part of the project: putting a file in a folder changes no
+   * pixel and no timing, so it must not create a revision, must not appear in
+   * Undo, and must not reach the render compiler.
+   * See DOCS/decisions/ADR-MEDIA-ORGANIZATION-V1.md.
+   *
+   * `null` means the file does not exist, which is a valid state meaning every
+   * asset is at the root.
+   */
+  readMediaOrganization(projectId: string): Promise<string | null>
+  saveMediaOrganization(projectId: string, serialized: string): Promise<void>
   /** Where the controlled source media lives, for probing without exporting. */
   resolveMediaPaths(projectId: string): Promise<{ sourcePath: string; trustedWorkDir: string }>
   /**

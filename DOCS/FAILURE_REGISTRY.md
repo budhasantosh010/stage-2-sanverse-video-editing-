@@ -1652,3 +1652,106 @@ orphaned `running` job. Measured a real export succeeding and probed the MP4.
 
 Bound every wait, name every phase from something real, and never let "slow" and
 "dead" look the same.
+
+---
+
+## FAIL-047 — Resizing the window strands the user with no Media or Inspector panel
+
+- **Done:** [ ]
+- **Status:** OPEN
+- **Severity:** P1
+- **Found/target:** 2026-08-03 (during P1-F.1A Gate B browser testing) / Studio layout authority, NOT Gate B
+
+### What / where / when / how / why?
+
+Load Studio at 1440 px wide, then drag the window down to 1024 px. The Media
+dock and the Inspector disappear and there is **no way to get either back**
+without reloading the page.
+
+Two authorities disagree because one of them never re-runs:
+
+```
+  CSS   apps/web/src/screens/studio/StudioScreen.css
+        @media (max-width: 1100px) { .studio-screen--studio .studio-screen__media,
+                                     .studio-screen--studio .studio-screen__inspector
+                                     { display: none } }
+        ── reacts to the window immediately, as CSS always does
+
+  JS    apps/web/src/editor/layout-v2/StudioLayoutV2.tsx
+        renders the compact panel switcher only when
+        responsiveMode === 'tablet' || 'mobile'
+        ── `responsiveMode` is computed from the viewport but is NOT recomputed
+           on resize, so after shrinking from 1440 it is still 'laptop'
+```
+
+So between the two, the docks are hidden by CSS while the switcher that is meant
+to replace them is not rendered at all. Confirmed live in the DOM:
+
+```
+  loaded at 1440, resized to 1024   window 1024   responsiveMode 'laptop'
+                                    switcher in DOM: NO      Media: unreachable
+  reloaded at 1024                  window 1024   responsiveMode 'tablet'
+                                    switcher in DOM: YES     Media: reachable
+```
+
+It fails in the other direction too: loaded at 1024 and grown to 1280, the mode
+stayed `tablet` when it should be `laptop`.
+
+`studio-layout-responsive.ts` has the right thresholds
+(`< 600 mobile`, `< 1100 tablet`, `< 1360 laptop`). Nothing re-reads them.
+
+**Not caused by Gate B.** `git diff 0ecffc3 -- apps/web/src/screens/studio/StudioScreen.css`
+is empty, and Gate B touched no layout file.
+
+### What was tried?
+
+Nothing. Recorded rather than fixed: it belongs to the Studio layout authority,
+and the Gate B rule is to fix only Gate B blockers. Fixing it means making
+`responsiveMode` follow the viewport (a resize observer or matchMedia listener)
+and then re-proving the whole layout matrix, which is a change to a load-bearing
+authority and deserves its own slice.
+
+### One-line solution
+
+Two authorities may not decide the same thing from different inputs — if CSS
+switches at a width, the JavaScript that renders the replacement must switch at
+the same width, every time the width changes.
+
+---
+
+## FAIL-048 — Imported file names are forgotten on reload
+
+- **Done:** [ ]
+- **Status:** OPEN
+- **Severity:** P2
+- **Found/target:** 2026-08-03 (during P1-F.1A Gate B browser testing) / asset naming, NOT Gate B
+
+### What / where / when / how / why?
+
+Import `logo.png`. The Media list shows `logo.png`. Reload the page and the same
+asset is now called **`Image 1`**.
+
+The name the user recognises arrives with the upload and is kept only in browser
+session state — `setAssetOriginalNames` in `apps/web/src/app/App.tsx` — which is
+handed to `deriveAssetDisplayLabels` to build the label. Nothing persists it. On
+a fresh load there are no original names, so the label falls back to a generated
+one.
+
+It is cosmetic in that no data is lost and no edit is affected. It is not
+cosmetic in that it is directly against the product standard: the user should
+never have to hold information the product could hold for them, and "which one
+was my logo?" across eleven pictures called `Image 1` … `Image 11` is exactly
+that.
+
+### What was tried?
+
+Nothing. Recorded rather than fixed: persisting it means either a new field on
+the asset (which is inside `EditProject`, so it moves the revision and the
+export key for a naming change — the very thing ADR-MEDIA-ORGANIZATION-V1
+refused for folders) or a second server sidecar. That is a real decision and
+needs an ADR, not a patch inside a gate about folders.
+
+### One-line solution
+
+A name the user typed or chose is theirs — decide where it lives before showing
+it, or the product will quietly forget it.

@@ -4,20 +4,32 @@ Use this runbook when a new session, agent, or context window resumes the projec
 
 ## Current handoff
 
-P1-F.0.2.2 Media Panel Completion and Editor Monitor V1 is technically complete
-with evidence at
-`DOCS/evidence/2026-08-03-p1f022-media-monitor/`. Media owns adaptive
-presentation and results scrolling; one monitor wraps the existing
-video/content layer without creating editor authority. The full suite passed
-1,174/1,174 before blocker review and the final affected gate passed 31/31 after
-two new assertions (current inventory 1,176); builds pass. Owner visual review is next.
-Media V2, P1-F.1, and P1-F.2 have not started. The real export runtime timeout
-and screenshot-compositor limitation are recorded in the failure registry.
+**P1-F.1A Gate B — Media Library V2 Essentials is complete**, with evidence in
+`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/`.
 
-### Previous checkpoint
+The one thing to carry forward: **a user's filing of their media lives on the
+server beside the project, and is not part of the project.** Folders, sorting,
+filtering and search change nothing about the video — proved byte-identical in
+the real browser. `DOCS/decisions/ADR-MEDIA-ORGANIZATION-V1.md` holds the
+reasoning, including what was rejected and why.
 
-P1-F.0.2 Nested Studio Layout Engine V2 is complete with evidence at `DOCS/evidence/2026-08-03-p1f02-nested-studio-layout-v2/`. The typed/versioned nested panel adapter preserves one editor authority, one mounted video, continuous playhead/draft/proposal/history, and the existing preview/export path. Full suites pass 1,158/1,158 and the all-workspace build passes. P1-F.1 and P1-F.2 have not started. Screenshot capture recurrence INFRA-004 and local HMR host mismatch INFRA-005 are documented nonblocking infrastructure work.
+Media-to-Timeline drag is built and tested but switched off
+(`MEDIA_DRAG_ENABLED = false` in
+`apps/web/src/features/media/media-drag-contract.ts`). Gate C flips that one
+boolean, adds a visible affordance, and makes Timeline lanes accept
+`application/vnd.sanverse.media-drag+json`.
 
+Suites: 1,283 total (web 631, edit-domain 312, api 248, render-contract 65,
+intent-domain 27). All-workspace build passes.
+
+**Gate C (Creator Timeline Core) has not started. Gate D has not started.
+P1-F.2 has not started.** Two pre-existing defects are open and recorded:
+FAIL-047 and FAIL-048.
+
+Read in this order when resuming: `DOCS/HANDOFF.md`, `DOCS/CURRENT_STATE.md`,
+then the Gate B evidence above.
+
+### Previous handoff
 ## Fast resume
 
 1. Read `START_HERE.md`.

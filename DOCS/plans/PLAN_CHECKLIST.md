@@ -343,7 +343,24 @@ no button offers it yet — the owner cannot get to it from the screen.
 - [x] Run focused and real-browser acceptance checks
 - [x] Record real export timeout and screenshot-tool limitation
 - [ ] Owner visual acceptance
-- [ ] Media V2 capabilities — not started
+- [x] P1-F.1A Gate A — preview reliability and export runtime (`0ecffc3`)
+- [x] P1-F.1A Gate B — Media Library V2 essentials
+  - [x] ADR-MEDIA-ORGANIZATION-V1 written before any folder code
+  - [x] Closed `sanverse.media-organization/v1` domain contract, five validated commands
+  - [x] Durable server sidecar, hardened shared file path, API routes
+  - [x] Compact panel: header / search+filter / results, results-only scrolling
+  - [x] Import by Video / Image / Audio / All supported, one hidden input, truthful filters
+  - [x] Operating-system file drop with per-file refusals
+  - [x] Four sort fields, both directions, stable ties
+  - [x] Responsive filter — never five squeezed buttons
+  - [x] One-level folders: create, rename, move to folder, move to root, delete
+  - [x] Closed `sanverse.media-drag/v1` payload, built and tested, gesture OFF
+  - [x] Continuity through resize, collapse and workspace switching
+  - [x] 1,283 tests, all-workspace build, real-browser proof, byte-identical project
+  - [ ] Owner visual acceptance — no screenshots captured this session
+- [ ] P1-F.1A Gate C — Creator Timeline Core — not started
+- [ ] P1-F.1A Gate D — filmstrips and waveforms — not started
+- [ ] Media V2 multiselect, batch actions, visible Timeline drag — deferred
 
 - [ ] Representative users finish acceptable videos in measured minutes
 - [ ] Default workflows require no professional editor knowledge

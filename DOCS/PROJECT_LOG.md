@@ -1,5 +1,20 @@
 # Project Log
 
+## 2026-08-03 — P1-F.1A Gate B: Media Library V2 Essentials complete
+
+- Media organization is a **server-owned sidecar**, `media-organization.json` beside the project, never in `EditProject` and never in the browser. Rejected localStorage (per-browser, silently cleared, invisible to the server) and rejected `EditProject` (Undo would step through folder renames, and moving the revision would move the export key so a rename would re-encode an identical MP4 for 60–90 s). Decision: `DOCS/decisions/ADR-MEDIA-ORGANIZATION-V1.md`.
+- A folder is a label, not a container: deleting one returns its media to the top level and can never delete media. One level only, max 32 folders, names unique after trimming and case-folding.
+- Five typed validated commands (create / rename / move-to-folder / move-to-root / delete) are the only way to change it, so a future AI calls exactly what the buttons call. Unknown shapes are refused, never repaired; a corrupt file is refused with its bytes left on disk so folders can be recovered.
+- Refactored the hardened project-file reader into `readControlledProjectFile` / `writeControlledProjectFile` so project state and organization share ONE symlink, hard-link and file-identity check.
+- Media panel rebuilt as MediaHeader / MediaSearchAndFilter / MediaResults with **only the results region scrolling**, compact density (28–32 px controls, 48–60 px rows, 40–48 px thumbnails, 12 px filenames), Import by kind with truthful accept filters behind one hidden input, operating-system file drop with per-file refusals, four sort fields in both directions with stable ties, and a filter that never renders five squeezed buttons.
+- Presentation state (search, filter, sort, folder, selection) moved OUT of the panel to the Studio screen, because the panel is unmounted on every workspace switch and state held inside it vanishes silently.
+- `sanverse.media-drag/v1` closed payload built and tested but **deliberately switched off** (`MEDIA_DRAG_ENABLED = false`): assetId, mediaKind, sourceDurationTicks only — no path, no URL, no object URL, no project or asset object. Gate C flips one boolean.
+- Real browser on real video, image and audio: the project came out **byte-identical** (revision 4→4, changeSets 0→0, assets 5→5, same sha256) after create → duplicate refusal → rename → move in → move out → delete, and the filing survived a full page reload. Zero console errors, zero failed HTTP calls, zero object URLs in the panel.
+- Suites: web 631, edit-domain 312, api 248, render-contract 65, intent-domain 27 — 1,283 total (Gate A baseline 1,203, floor 1,176). All-workspace build passes. No assertion weakened.
+- Found and recorded but NOT fixed, because this gate fixes only Gate B blockers: FAIL-047 (resizing past 1100 px strands the user with no Media or Inspector until reload) and FAIL-048 (imported file names are forgotten on reload).
+- Gate C, Gate D and P1-F.2 were not started.
+- No screenshots exist for Gate B: the browser pane was not displayed, so layout is proved by measured DOM geometry and appearance is not proved.
+
 ## 2026-08-01 — P1-F.0.1 Studio Workspaces and Docking V1 complete
 
 - Added accessible Studio-only Edit, Effects, Color, and Audio workspace views over the existing single editor, project, history, playhead, Timeline, selection, Canvas/Inspector draft, video, AI conversation, proposal, preview, and export authorities.

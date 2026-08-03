@@ -1,6 +1,6 @@
 # Build Tracker
 
-Last updated: 2026-08-01
+Last updated: 2026-08-03
 
 | ID | Goal | Deliverable | Status | Evidence |
 |---|---|---|---|---|
@@ -84,3 +84,4 @@ Last updated: 2026-08-01
 - [x] Real browser responsive, transport, viewer mode, Point, fullscreen checks
 - [ ] Owner visual acceptance
 - [ ] Media V2 (not started)
+| P1F1A-B | P1-F.1A | Media Library V2 essentials: compact responsive panel, import by kind, OS file drop, sort, filter, durable one-level server folders, closed drag payload (switched off) | Complete | `DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/media-library-contract.md`, `media-folders.md`, `media-drag-contract.md`, `media-responsive-matrix.md`, `media-browser-walkthrough.md`, `test-results-gate-b.md` |

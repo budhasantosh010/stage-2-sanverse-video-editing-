@@ -9,6 +9,7 @@
     "./history": "./src/history.ts",
     "./time": "./src/time.ts",
     "./assets": "./src/assets.ts",
+    "./media-organization": "./src/media-organization.ts",
     "./geometry": "./src/geometry.ts",
     "./composition": "./src/composition.ts",
     "./operations": "./src/operations.ts",

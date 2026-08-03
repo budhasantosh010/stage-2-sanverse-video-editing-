@@ -4,29 +4,58 @@ Last updated: 2026-08-03
 
 ## Active goal
 
-**P1-F.1A Gate A — Preview Reliability and Export Runtime is complete.** The
-recorded black-base-footage Preview failure and the unbounded export spinner are
-both fixed and proved on real media. One named base-frame state
-(`loading | ready | seeking | gap | error`) now decides what the base picture is
-doing, and `showsGapLayer` is the only expression anywhere that can paint the
-deliberate black gap layer. The motion canvas is revealed only after a real
-frame lands on it. Export phases are derived on the server from real renderer
-milestones, elapsed time is visible, and the client poll loop is bounded at ten
-minutes into a recoverable timed-out state that leaves the job alive.
+**P1-F.1A Gate B — Media Library V2 Essentials is complete.** The Media panel is
+a compact, container-responsive shelf with import by media kind, drop from the
+operating system, sorting, filtering, and durable one-level folders.
 
-Root causes are recorded in full: the Preview canvas was guarded by
-`videoWidth > 0`, which is true at `HAVE_METADATA` before any frame is
-decodable; and the export was never hung — it genuinely takes 60–90 seconds on
-this machine, while the UI could not distinguish slow from dead.
+**The load-bearing decision: your filing of your media lives on the server,
+beside the project, and is not part of the project.**
+`.sanverse-data/projects/<id>/media-organization.json` holds a closed
+`sanverse.media-organization/v1` document. It is not in the browser (per-browser
+storage is silently cleared and the server can never see it) and it is not in
+`EditProject` (Undo would step through folder renames, and moving the revision
+would move the export key `sha256(projectId : revision : renderPlanSchemaVersion)`,
+so renaming a folder would re-encode an identical MP4 for 60–90 seconds).
+See `DOCS/decisions/ADR-MEDIA-ORGANIZATION-V1.md`.
 
-Suites: web 571, api 241, edit-domain 299, render-contract 65, intent-domain 27
-— **1,203 total**; all-workspace build passes. Real export probed at 1920×1080
-H.264 30/1, AAC-LC 48 kHz stereo, 30.033008 s, 18,044,871 bytes, with frames
-inspected. Evidence:
-`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/`.
+A folder is a **label, not a container**: deleting one returns its media to the
+top level and can never delete media. Five typed validated commands
+(create / rename / move-to-folder / move-to-root / delete) are the only way to
+change it, so a future AI calls exactly what the buttons call.
 
-**Stop boundary: P1-F.1A Gates B, C and D have not started. P1-F.2 has not
-started.** Owner visual acceptance of Gate A is open.
+Sorting, filtering, folder choice, search and selection are **presentation
+only** and are owned by the Studio screen rather than the panel, because the
+panel is unmounted whenever the user switches workspace — state held inside it
+would silently vanish and the user would never know why.
+
+Media-to-Timeline drag is **built, tested, and deliberately switched off**
+(`MEDIA_DRAG_ENABLED = false`). The closed `sanverse.media-drag/v1` payload
+carries `assetId`, `mediaKind` and `sourceDurationTicks` and nothing else — no
+filesystem path, no URL, no object URL, no project or asset object. A gesture
+that can start and can never finish teaches the user the product is broken, so
+it stays off until a Timeline can accept a drop in Gate C.
+
+Only the results region scrolls. The filter never renders five squeezed buttons:
+five > 380px, four + More at 301–380, one Filter button at 221–300, icons at
+≤ 220 — every shape writing one filter value through one callback.
+
+Suites: web 631, edit-domain 312, api 248, render-contract 65, intent-domain 27
+— **1,283 total** (Gate A baseline 1,203, program floor 1,176); all-workspace
+build passes; no assertion weakened. Real-browser proof on real video, image and
+audio: the project came out **byte-identical** after create → duplicate refusal →
+rename → move in → move out → delete, and the filing survived a full page
+reload. Evidence: `DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/`.
+
+Two pre-existing defects were found and recorded but NOT fixed here, because
+this gate fixes only Gate B blockers: **FAIL-047** (resizing a window past
+1100px strands the user with no Media or Inspector panel until reload) and
+**FAIL-048** (imported file names are forgotten on reload).
+
+**Stop boundary: P1-F.1A Gates C and D have not started. P1-F.2 has not
+started.** Owner visual acceptance of Gate B is open — and note that no
+screenshots exist for it, because the browser pane was not displayed during the
+session, so its layout is proved by measured DOM geometry and its appearance is
+not proved at all.
 
 ### Previous checkpoint
 

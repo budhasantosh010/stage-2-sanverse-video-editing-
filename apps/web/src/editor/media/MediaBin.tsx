@@ -1,22 +1,53 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react'
-import { filterMediaAssets, type MediaAssetView, type MediaBinViewModel, type MediaFilter } from '../../features/media'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import {
+  EMPTY_MEDIA_ORGANIZATION,
+  type MediaOrganizationV1,
+} from '@sanverse/edit-domain/media-organization'
+import {
+  applyMediaPresentation,
+  EMPTY_MEDIA_PRESENTATION,
+  mediaFolderCounts,
+  mediaImportChoice,
+  reconcileFolderSelection,
+  selectMediaResults,
+  splitImportFiles,
+  type MediaBinViewModel,
+  type MediaImportKind,
+  type MediaPresentationState,
+} from '../../features/media'
+import type { MediaOrganizationController } from '../../features/media/use-media-organization'
 import { DisabledAction } from '../ui/DisabledAction'
-import { MediaAssetCard } from './MediaAssetCard'
+import { MediaHeader } from './MediaHeader'
+import { MediaSearchAndFilter } from './MediaSearchAndFilter'
+import { MediaResults } from './MediaResults'
 import { MediaContextMenu } from './MediaContextMenu'
 import './MediaBin.css'
 
-const FILTERS: readonly Readonly<{ id: MediaFilter; label: string }>[] = Object.freeze([
-  { id: 'all', label: 'All' },
-  { id: 'video', label: 'Video' },
-  { id: 'image', label: 'Images' },
-  { id: 'audio', label: 'Audio' },
-  { id: 'missing', label: 'Missing' },
-])
-
+/**
+ * The Media panel: the shelf the project's material sits on.
+ *
+ *   MediaHeader            fixed   what this is, and the four whole-shelf menus
+ *   MediaSearchAndFilter   fixed   search, which folder, which kind
+ *   MediaResults           SCROLLS the rows
+ *   details                fixed   what you can do with the one you picked
+ *
+ * Nothing in this panel is an edit. Searching, filtering, sorting, choosing a
+ * folder, and moving something between folders all leave the project's revision,
+ * its history, and the exported MP4 exactly as they were. The two things here
+ * that DO touch the project are importing (which adds an asset — still not an
+ * edit, see ADR-007) and the two "Add …" actions, which propose a real edit
+ * through the callbacks the screen owns.
+ *
+ * Presentation state is a PROP, not local state, because this component is
+ * unmounted whenever the user switches workspace — see media-presentation.ts.
+ */
 export function MediaBin({
   model,
   selectedAssetId,
   busy,
+  presentation = EMPTY_MEDIA_PRESENTATION,
+  organization,
+  onPresentationChange,
   onSelect,
   onImport,
   onAddAsBroll,
@@ -25,45 +56,92 @@ export function MediaBin({
   model: MediaBinViewModel
   selectedAssetId: string | null
   busy: boolean
+  presentation?: MediaPresentationState
+  /** Server-owned folders. Absent in surfaces that do not offer folders yet. */
+  organization?: MediaOrganizationController
+  onPresentationChange?(next: MediaPresentationState): void
   onSelect(assetId: string): void
   onImport(files: readonly File[]): Promise<string | null>
   onAddAsBroll(assetId: string): Promise<string | null>
   onAddAsMusic(assetId: string): Promise<string | null>
 }>) {
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<MediaFilter>('all')
+  const [localPresentation, setLocalPresentation] = useState<MediaPresentationState>(presentation)
   const [working, setWorking] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
-  const [dragActive, setDragActive] = useState(false)
+  const [refusals, setRefusals] = useState<readonly string[]>(Object.freeze([]))
+  const [dropActive, setDropActive] = useState(false)
   const [menuAssetId, setMenuAssetId] = useState<string | null>(null)
-  const [filterMenuOpen, setFilterMenuOpen] = useState(false)
+  const [folderPrompt, setFolderPrompt] = useState<Readonly<{ folderId: string | null; value: string }> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const listRef = useRef<HTMLUListElement>(null)
-  const filterButtonRef = useRef<HTMLButtonElement>(null)
-  const filtered = useMemo(() => filterMediaAssets(model, query, filter), [filter, model, query])
-  const selected = model.assets.find((asset) => asset.assetId === selectedAssetId) ?? null
-  const menuAsset = model.assets.find((asset) => asset.assetId === menuAssetId) ?? null
-  const disabled = busy || working
+  const listRef = useRef<HTMLDivElement>(null)
+  const importingRef = useRef(false)
 
+  // When the screen owns the state, that is the truth. When it does not — the
+  // panel used standalone, or in a test — the panel keeps its own copy so it is
+  // never a broken control. One of the two, never a mix of both.
+  const view = onPresentationChange ? presentation : localPresentation
+  const change = (patch: Partial<MediaPresentationState>) => {
+    const next = applyMediaPresentation(view, patch)
+    if (onPresentationChange) onPresentationChange(next)
+    else setLocalPresentation(next)
+  }
+
+  const folders = organization?.organization.folders ?? EMPTY_MEDIA_ORGANIZATION.folders
+  const organizationValue: MediaOrganizationV1 = organization?.organization ?? EMPTY_MEDIA_ORGANIZATION
+  const organizationPending = organization?.pending ?? false
+
+  // A folder that has gone — deleted here, or in another window — must not leave
+  // the panel pointing at an empty list forever.
   useEffect(() => {
-    if (!filterMenuOpen) return
-    const close = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      setFilterMenuOpen(false)
-      filterButtonRef.current?.focus()
+    const reconciled = reconcileFolderSelection(view, folders.map((folder) => folder.folderId))
+    if (reconciled !== view) {
+      if (onPresentationChange) onPresentationChange(reconciled)
+      else setLocalPresentation(reconciled)
     }
-    window.addEventListener('keydown', close)
-    return () => window.removeEventListener('keydown', close)
-  }, [filterMenuOpen])
+  }, [folders, onPresentationChange, view])
+
+  const results = useMemo(
+    () => selectMediaResults(model, view, organizationValue),
+    [model, organizationValue, view],
+  )
+  const counts = useMemo(() => mediaFolderCounts(model, organizationValue), [model, organizationValue])
+  const selected = model.assets.find((item) => item.assetId === selectedAssetId) ?? null
+  const menuAsset = model.assets.find((item) => item.assetId === menuAssetId) ?? null
+  const disabled = busy || working
+  const activeFolder = folders.find((folder) => folder.folderId === view.folderId) ?? null
+  const assignments = organizationValue.assetFolderAssignments
 
   const importFiles = async (files: readonly File[]) => {
-    if (disabled || files.length === 0) return
+    if (disabled || importingRef.current || files.length === 0) return
+    const split = splitImportFiles(files)
+    setRefusals(split.refusals)
+    if (split.accepted.length === 0) {
+      setNotice(null)
+      return
+    }
+    // A ref, not the `working` flag: two file-chooser events in the same frame
+    // both read the old state, so only a ref can stop the same files being
+    // uploaded twice.
+    importingRef.current = true
     setWorking(true)
     setNotice(null)
-    const failure = await onImport(files)
+    const failure = await onImport(split.accepted)
+    importingRef.current = false
     setWorking(false)
-    setNotice(failure ?? `${files.length} ${files.length === 1 ? 'file' : 'files'} imported.`)
+    setNotice(failure ?? `${split.accepted.length} ${split.accepted.length === 1 ? 'file' : 'files'} imported.`)
+  }
+
+  /**
+   * One hidden file input for all four Import choices. Its `accept` is set
+   * directly on the element rather than through React state because the dialog
+   * has to open in the same user gesture — a state update would not have been
+   * applied yet, and the user would get the previous choice's filter.
+   */
+  const openPicker = (kind: MediaImportKind) => {
+    const input = inputRef.current
+    if (!input || disabled) return
+    input.accept = mediaImportChoice(kind).accept
+    input.click()
   }
 
   const run = async (action: () => Promise<string | null>) => {
@@ -76,6 +154,28 @@ export function MediaBin({
     setNotice(failure ?? 'Added. Undo removes the placement but keeps the imported media.')
   }
 
+  const runOrganization = async (command: Parameters<MediaOrganizationController['run']>[0]) => {
+    if (!organization) return
+    setMenuAssetId(null)
+    const failure = await organization.run(command)
+    // A refused folder change is answered in the same place every other Media
+    // outcome is answered, so the user has one place to look.
+    setNotice(failure)
+  }
+
+  const submitFolderPrompt = async () => {
+    if (!folderPrompt || !organization) return
+    const name = folderPrompt.value.trim()
+    if (name.length === 0) return
+    const command = folderPrompt.folderId === null
+      ? Object.freeze({ kind: 'create-folder' as const, name })
+      : Object.freeze({ kind: 'rename-folder' as const, folderId: folderPrompt.folderId, name })
+    const failure = await organization.run(command)
+    // A refused name leaves the form open with the text still in it, so the
+    // user can fix a clash instead of typing the whole thing again.
+    if (!failure) setFolderPrompt(null)
+  }
+
   const navigate = (event: KeyboardEvent<HTMLButtonElement>, assetId: string) => {
     if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Enter', ' '].includes(event.key)) return
     if (event.key === 'Enter' || event.key === ' ') {
@@ -84,18 +184,12 @@ export function MediaBin({
       return
     }
     event.preventDefault()
-    const current = filtered.findIndex((asset) => asset.assetId === assetId)
+    const current = results.visible.findIndex((item) => item.assetId === assetId)
     const direction = event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : -1
-    const next = filtered[(current + direction + filtered.length) % filtered.length]
+    const next = results.visible[(current + direction + results.visible.length) % results.visible.length]
     if (!next) return
     onSelect(next.assetId)
     listRef.current?.querySelector<HTMLButtonElement>(`[data-asset-id="${next.assetId}"]`)?.focus()
-  }
-
-  const drop = (event: DragEvent<HTMLElement>) => {
-    event.preventDefault()
-    setDragActive(false)
-    void importFiles(Object.freeze([...event.dataTransfer.files]))
   }
 
   const openMenu = (assetId: string, _event: MouseEvent<HTMLButtonElement>) => {
@@ -104,80 +198,102 @@ export function MediaBin({
   }
 
   return (
-    <div
-      className={`media-bin${dragActive ? ' media-bin--drag-active' : ''}`}
-      onDragEnter={(event) => { event.preventDefault(); if (!disabled) setDragActive(true) }}
-      onDragOver={(event) => event.preventDefault()}
-      onDragLeave={(event) => { if (event.currentTarget === event.target) setDragActive(false) }}
-      onDrop={drop}
-    >
-      <header className="media-bin__header">
-        <div><h2>Media</h2><span>{model.counts.all} {model.counts.all === 1 ? 'asset' : 'assets'}</span></div>
-      </header>
-      <div className="media-bin__toolbar">
-        <label className="media-bin__search">
-          <span className="sr-only">Search media</span>
-          <input value={query} maxLength={120} placeholder="Search media" onChange={(event) => setQuery(event.currentTarget.value)} />
-        </label>
-        {query ? <button type="button" className="media-bin__clear" onClick={() => setQuery('')}>Clear</button> : null}
-        <button type="button" className="media-bin__import" disabled={disabled} onClick={() => inputRef.current?.click()}>
-          {working ? 'Working…' : 'Import media'}
-        </button>
-        <input
-          ref={inputRef}
-          className="media-bin__file-input"
-          type="file"
-          aria-label="Choose media files to import"
-          accept="video/*,image/*,audio/*"
-          multiple
-          disabled={disabled}
-          onChange={(event) => {
-            const files = Object.freeze([...(event.currentTarget.files ?? [])])
-            event.currentTarget.value = ''
-            void importFiles(files)
-          }}
-        />
-        <div className="media-bin__filters" aria-label="Filter media">
-          {FILTERS.map((item) => (
-            <button key={item.id} type="button" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>
-              {item.label}<span>{item.id === 'all' ? model.counts.all : item.id === 'missing' ? model.counts.missing : model.counts[item.id]}</span>
-            </button>
-          ))}
-        </div>
-        <div className="media-bin__filter-overflow">
-          <button ref={filterButtonRef} type="button" aria-label={`Filter media, ${FILTERS.find((item) => item.id === filter)?.label ?? 'All'} selected`} aria-expanded={filterMenuOpen} onClick={() => setFilterMenuOpen((value) => !value)}>Filter <span>{FILTERS.find((item) => item.id === filter)?.label}</span></button>
-          {filterMenuOpen ? <div role="menu" aria-label="Media filters">{FILTERS.map((item) => <button key={item.id} role="menuitemradio" aria-checked={filter === item.id} type="button" onClick={() => { setFilter(item.id); setFilterMenuOpen(false); filterButtonRef.current?.focus() }}>{item.label} <span>{item.id === 'all' ? model.counts.all : item.id === 'missing' ? model.counts.missing : model.counts[item.id]}</span></button>)}</div> : null}
-        </div>
-        <p className="media-bin__result-count" role="status">{filtered.length} {filtered.length === 1 ? 'result' : 'results'}</p>
-      </div>
+    <div className="media-bin" data-testid="media-panel">
+      <MediaHeader
+        assetCount={model.counts.all}
+        presentation={view}
+        folders={folders}
+        folderCounts={counts.byFolder}
+        rootCount={counts.root}
+        busy={disabled}
+        importing={working}
+        organizationPending={organizationPending}
+        organizationLoading={organization?.loading ?? false}
+        organizationError={organization?.errorKind === 'load' ? organization.error : null}
+        onRetryFolders={() => organization?.refresh()}
+        onChange={change}
+        onImport={openPicker}
+        onCreateFolder={() => setFolderPrompt(Object.freeze({ folderId: null, value: '' }))}
+        onRenameFolder={(folderId) => setFolderPrompt(Object.freeze({
+          folderId,
+          value: folders.find((folder) => folder.folderId === folderId)?.name ?? '',
+        }))}
+        onDeleteFolder={(folderId) => void runOrganization({ kind: 'delete-folder', folderId })}
+      />
 
-      <div className="media-bin__results">
-      {model.assets.length === 0 ? (
-        <div className="media-bin__empty">
-          <strong>No media yet</strong>
-          <p>Import a video, image, or audio file to keep it with this project.</p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="media-bin__empty">
-          <strong>No matching media</strong>
-          <p>Clear the search or choose another filter.</p>
-          <button type="button" onClick={() => { setQuery(''); setFilter('all') }}>Show all media</button>
-        </div>
-      ) : (
-        <ul ref={listRef} className="media-bin__list" role="listbox" aria-label="Project media assets">
-          {filtered.map((asset, index) => (
-            <MediaAssetCard
-              key={asset.assetId}
-              asset={asset}
-              selected={asset.assetId === selectedAssetId}
-              tabIndex={asset.assetId === selectedAssetId || selectedAssetId === null && index === 0 ? 0 : -1}
-              onSelect={() => onSelect(asset.assetId)}
-              onOpenMenu={(event) => openMenu(asset.assetId, event)}
-              onKeyDown={(event) => navigate(event, asset.assetId)}
+      <input
+        ref={inputRef}
+        className="media-bin__file-input"
+        type="file"
+        aria-label="Choose media files to import"
+        accept={mediaImportChoice('all').accept}
+        multiple
+        disabled={disabled}
+        onChange={(event) => {
+          const files = Object.freeze([...(event.currentTarget.files ?? [])])
+          event.currentTarget.value = ''
+          void importFiles(files)
+        }}
+      />
+
+      <MediaSearchAndFilter
+        model={model}
+        presentation={view}
+        folderLabel={activeFolder?.name ?? 'All media'}
+        resultCount={results.visible.length}
+        onChange={change}
+      />
+
+      {folderPrompt ? (
+        <form
+          className="media-bin__folder-prompt"
+          onSubmit={(event) => { event.preventDefault(); void submitFolderPrompt() }}
+        >
+          <label>
+            <span className="sr-only">{folderPrompt.folderId === null ? 'New folder name' : 'New name for this folder'}</span>
+            <input
+              autoFocus
+              value={folderPrompt.value}
+              maxLength={64}
+              placeholder={folderPrompt.folderId === null ? 'New folder name' : 'Rename folder'}
+              onChange={(event) => setFolderPrompt(Object.freeze({ ...folderPrompt, value: event.currentTarget.value }))}
+              onKeyDown={(event) => { if (event.key === 'Escape') setFolderPrompt(null) }}
             />
-          ))}
-        </ul>
-      )}
+          </label>
+          <button type="submit" disabled={organizationPending || folderPrompt.value.trim().length === 0}>
+            {folderPrompt.folderId === null ? 'Create' : 'Rename'}
+          </button>
+          <button type="button" onClick={() => setFolderPrompt(null)}>Cancel</button>
+        </form>
+      ) : null}
+
+      {/*
+        A folder failure is reported INSIDE the folder controls, never as a
+        panel-wide banner. The user asked about folders; their media, their
+        timeline and their export are all untouched by it, and a red bar across
+        the whole panel would say otherwise.
+      */}
+      {organization?.error && folderPrompt ? (
+        <p className="media-bin__folder-state media-bin__folder-state--error" role="status">
+          {organization.error}
+          <button type="button" onClick={organization.dismissError}>Dismiss</button>
+        </p>
+      ) : null}
+
+      <div ref={listRef} className="media-bin__results-host">
+        <MediaResults
+          assets={results.visible}
+          totalAssets={model.assets.length}
+          selectedAssetId={selectedAssetId}
+          dropActive={dropActive}
+          onSelect={onSelect}
+          onOpenMenu={openMenu}
+          onKeyDown={navigate}
+          onShowAll={() => change({ query: '', filter: 'all', folderId: null })}
+          onDropFiles={(files) => void importFiles(files)}
+          onDropActiveChange={setDropActive}
+        />
+      </div>
 
       {selected ? (
         <section className="media-bin__details" aria-label={`${selected.displayName} details`}>
@@ -214,18 +330,35 @@ export function MediaBin({
           {selected.removeBlockedReason ? <p className="media-bin__disabled-reason">{selected.removeBlockedReason}</p> : null}
         </section>
       ) : null}
-      </div>
 
       {menuAsset ? (
         <MediaContextMenu
           asset={menuAsset}
+          folders={folders}
+          currentFolderId={assignments[menuAsset.assetId] ?? null}
           busy={disabled}
+          organizationPending={organizationPending}
           onAddAsBroll={() => void run(() => onAddAsBroll(menuAsset.assetId))}
           onAddAsMusic={() => void run(() => onAddAsMusic(menuAsset.assetId))}
+          onMoveToFolder={(folderId) => void runOrganization({ kind: 'move-asset-to-folder', assetId: menuAsset.assetId, folderId })}
+          onMoveToRoot={() => void runOrganization({ kind: 'move-asset-to-root', assetId: menuAsset.assetId })}
+          onShowSource={() => {
+            setMenuAssetId(null)
+            setNotice(
+              `${menuAsset.displayName} · ${menuAsset.originalName ?? 'name unknown'} · ` +
+              `${menuAsset.width && menuAsset.height ? `${menuAsset.width}×${menuAsset.height}` : 'no picture size'} · ` +
+              (menuAsset.status === 'available' ? 'local source available' : `source ${menuAsset.status}`),
+            )
+          }}
           onClose={() => setMenuAssetId(null)}
         />
       ) : null}
-      {dragActive ? <p className="media-bin__drop-message">Drop files to import them</p> : null}
+
+      {refusals.length > 0 ? (
+        <ul className="media-bin__refusals" aria-label="Files that were not imported">
+          {refusals.map((reason) => <li key={reason} role="alert">{reason}</li>)}
+        </ul>
+      ) : null}
       {notice ? <p className="media-bin__notice" role="status" aria-live="polite">{notice}</p> : null}
     </div>
   )

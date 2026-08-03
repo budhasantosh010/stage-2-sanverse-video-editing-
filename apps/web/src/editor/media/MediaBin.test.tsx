@@ -80,7 +80,7 @@ describe('MediaBin', () => {
     expect(screen.getByRole('button', { name: 'Import media' })).toBeEnabled()
     expect(screen.getByText('owner.mp4')).toBeInTheDocument()
     expect(screen.getByText('hero.png')).toBeInTheDocument()
-    expect(screen.getByText('1920×1080')).toBeInTheDocument()
+    expect(screen.getByText(/1920×1080/)).toBeInTheDocument()
     const image = document.querySelector<HTMLImageElement>('.media-bin__thumbnail-image')
     if (!image) throw new Error('Expected the image thumbnail')
     fireEvent.error(image)
@@ -91,7 +91,7 @@ describe('MediaBin', () => {
     const user = userEvent.setup()
     renderBin()
     await user.type(screen.getByLabelText('Search media'), 'HERO')
-    expect(screen.getByText('1 result')).toBeInTheDocument()
+    expect(screen.getByText(/1 result/)).toBeInTheDocument()
     expect(screen.queryByText('bed.wav')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Clear' }))
     await user.click(screen.getByRole('button', { name: /Audio 1/ }))
@@ -121,8 +121,9 @@ describe('MediaBin', () => {
     const second = new File(['audio'], 'two.wav', { type: 'audio/wav' })
     await userEvent.upload(screen.getByLabelText('Choose media files to import'), [first, second])
     await waitFor(() => expect(onImport).toHaveBeenCalledWith([first, second]))
-    const region = screen.getByLabelText('Project media assets').closest('.media-bin') as HTMLElement
-    fireEvent.drop(region, { dataTransfer: { files: [first] } })
+    // Files land on the RESULTS region, not the whole panel: a file released
+    // over Import or over the search box must not be swallowed silently.
+    fireEvent.drop(screen.getByTestId('media-results'), { dataTransfer: { types: ['Files'], files: [first] } })
     await waitFor(() => expect(onImport).toHaveBeenLastCalledWith([first]))
   })
 

@@ -1,3 +1,4 @@
+import { MediaOrganizationServiceError } from '../projects/media-organization-service.ts'
 import { ProjectIntakeError } from '../projects/project-repository.ts'
 import { ProjectStateError } from '../projects/project-state-service.ts'
 
@@ -102,6 +103,13 @@ export const describeFailure = (error: unknown): FailureAnswer | null => {
   if (error instanceof ProjectStateError) {
     const status = PROJECT_STATE_STATUS[error.code] ?? 500
     return { status, message: error.message, code: error.code, log: status >= 500 }
+  }
+
+  // Media organization refusals are the user's problem to fix, not a server
+  // fault: a name that clashes, a folder that is gone, a limit reached. The
+  // message is already plain enough to show without translation.
+  if (error instanceof MediaOrganizationServiceError) {
+    return { status: 400, message: error.message, code: error.code }
   }
 
   if (code !== undefined && UNRENDERABLE_CODES.has(code)) {
