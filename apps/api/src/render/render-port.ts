@@ -20,7 +20,20 @@ export type RenderRequest = {
    */
   readonly plan: RenderPlan
   readonly signal?: AbortSignal
+  /**
+   * Report crossing a real boundary inside the export.
+   *
+   * Not a progress percentage. A percentage the renderer cannot actually
+   * measure would be an invented number, and the user would read a moving bar
+   * as evidence of progress that may not exist. These are two moments the
+   * renderer genuinely knows it has reached, so a stalled export can be
+   * attributed to encoding or to verification rather than to "somewhere".
+   */
+  readonly onMilestone?: (milestone: RenderMilestone) => void
 }
+
+/** 'rendering' — FFmpeg started. 'verifying' — FFmpeg exited 0; checking the file. */
+export type RenderMilestone = 'rendering' | 'verifying'
 
 export type RenderResult = {
   readonly outputPath: string

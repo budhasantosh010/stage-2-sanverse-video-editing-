@@ -27,7 +27,7 @@ import {
   type IntentContextInput,
 } from '../features/conversation/conversation-client'
 import { uploadProject } from '../features/project-intake/project-intake'
-import { exportProject, type ProjectExportState } from '../features/project-export/project-export'
+import { exportProject, ProjectExportTimeout, type ProjectExportState } from '../features/project-export/project-export'
 import {
   acceptChangeSet,
   addCaptionsFromTranscript,
@@ -103,6 +103,60 @@ export function App() {
       exportInFlightRef.current = false
     }
   }, [])
+
+  /**
+   * Start one export, or do nothing.
+   *
+   * `exportInFlightRef` is the single-flight guard: repeated clicks on Export
+   * cannot open a second job, and the server is idempotent on
+   * project + revision + render-plan version as a second line of defence.
+   *
+   * A timeout is kept apart from a failure on purpose. A failed export produced
+   * nothing; a timed-out export is still running on the server and may still
+   * succeed, so the user is offered a retry that re-attaches to the same job
+   * rather than being told the export broke.
+   */
+  const startExport = (projectId: string) => {
+    if (exportInFlightRef.current) return
+    exportInFlightRef.current = true
+    const controller = new AbortController()
+    exportAbortRef.current = controller
+    const startedAt = Date.now()
+    setExportState({ status: 'rendering', phase: 'queued', jobId: null, startedAt })
+    const isCurrent = () => exportAbortRef.current === controller && !controller.signal.aborted
+    const settle = () => {
+      exportAbortRef.current = null
+      exportInFlightRef.current = false
+    }
+    void exportProject(projectId, fetch, controller.signal, {
+      onProgress: (progress) => {
+        if (!isCurrent()) return
+        setExportState({ status: 'rendering', phase: progress.phase, jobId: progress.jobId, startedAt })
+      },
+    })
+      .then((result) => {
+        if (!isCurrent()) return
+        settle()
+        setExportState({ status: 'ready', result })
+      })
+      .catch((error: unknown) => {
+        if (!isCurrent()) return
+        settle()
+        if (error instanceof ProjectExportTimeout) {
+          setExportState({
+            status: 'timed-out',
+            jobId: error.jobId,
+            elapsedMs: error.elapsedMs,
+            phase: error.phase,
+          })
+          return
+        }
+        setExportState({
+          status: 'error',
+          message: error instanceof Error ? error.message : 'We could not export the video. Your accepted edits are still safe.',
+        })
+      })
+  }
 
   useEffect(() => {
     if (appState.screen !== 'home') return
@@ -352,24 +406,8 @@ export function App() {
       onUndo={() => requestEdit((projectId) => undoProject(projectId, fetch))}
       onRedo={() => requestEdit((projectId) => redoProject(projectId, fetch))}
       onExport={() => {
-        if (exportInFlightRef.current || appState.proposal || appState.editProject.changeSets.length === 0) return
-        exportInFlightRef.current = true
-        const controller = new AbortController()
-        exportAbortRef.current = controller
-        setExportState({ status: 'rendering' })
-        void exportProject(appState.project.id, fetch, controller.signal)
-          .then((result) => {
-            if (exportAbortRef.current !== controller || controller.signal.aborted) return
-            exportAbortRef.current = null
-            exportInFlightRef.current = false
-            setExportState({ status: 'ready', result })
-          })
-          .catch((error: unknown) => {
-            if (exportAbortRef.current !== controller || controller.signal.aborted) return
-            exportAbortRef.current = null
-            exportInFlightRef.current = false
-            setExportState({ status: 'error', message: error instanceof Error ? error.message : 'We could not export the video. Your accepted edits are still safe.' })
-          })
+        if (appState.proposal || appState.editProject.changeSets.length === 0) return
+        startExport(appState.project.id)
       }}
     >
       <StudioScreen
@@ -502,24 +540,8 @@ export function App() {
         requestEdit((projectId) => redoProject(projectId, fetch))
       }}
       onExport={() => {
-        if (exportInFlightRef.current || appState.proposal || appState.editProject.changeSets.length === 0) return
-        exportInFlightRef.current = true
-        const controller = new AbortController()
-        exportAbortRef.current = controller
-        setExportState({ status: 'rendering' })
-        void exportProject(appState.project.id, fetch, controller.signal)
-          .then((result) => {
-            if (exportAbortRef.current !== controller || controller.signal.aborted) return
-            exportAbortRef.current = null
-            exportInFlightRef.current = false
-            setExportState({ status: 'ready', result })
-          })
-          .catch((error: unknown) => {
-            if (exportAbortRef.current !== controller || controller.signal.aborted) return
-            exportAbortRef.current = null
-            exportInFlightRef.current = false
-            setExportState({ status: 'error', message: error instanceof Error ? error.message : 'We could not export the video. Your accepted edits are still safe.' })
-          })
+        if (appState.proposal || appState.editProject.changeSets.length === 0) return
+        startExport(appState.project.id)
       }}
       onBack={() => {}}
     />

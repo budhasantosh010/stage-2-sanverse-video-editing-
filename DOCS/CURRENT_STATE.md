@@ -4,6 +4,32 @@ Last updated: 2026-08-03
 
 ## Active goal
 
+**P1-F.1A Gate A — Preview Reliability and Export Runtime is complete.** The
+recorded black-base-footage Preview failure and the unbounded export spinner are
+both fixed and proved on real media. One named base-frame state
+(`loading | ready | seeking | gap | error`) now decides what the base picture is
+doing, and `showsGapLayer` is the only expression anywhere that can paint the
+deliberate black gap layer. The motion canvas is revealed only after a real
+frame lands on it. Export phases are derived on the server from real renderer
+milestones, elapsed time is visible, and the client poll loop is bounded at ten
+minutes into a recoverable timed-out state that leaves the job alive.
+
+Root causes are recorded in full: the Preview canvas was guarded by
+`videoWidth > 0`, which is true at `HAVE_METADATA` before any frame is
+decodable; and the export was never hung — it genuinely takes 60–90 seconds on
+this machine, while the UI could not distinguish slow from dead.
+
+Suites: web 571, api 241, edit-domain 299, render-contract 65, intent-domain 27
+— **1,203 total**; all-workspace build passes. Real export probed at 1920×1080
+H.264 30/1, AAC-LC 48 kHz stereo, 30.033008 s, 18,044,871 bytes, with frames
+inspected. Evidence:
+`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/`.
+
+**Stop boundary: P1-F.1A Gates B, C and D have not started. P1-F.2 has not
+started.** Owner visual acceptance of Gate A is open.
+
+### Previous checkpoint
+
 **P1-F.0.2.2 — Media Panel Completion and Editor Monitor V1 is technically
 complete; owner visual acceptance is open.** Media now adapts to its own pane
 and only results scroll. One custom editor monitor surrounds the existing video

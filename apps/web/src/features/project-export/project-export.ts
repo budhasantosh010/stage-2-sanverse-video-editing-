@@ -8,11 +8,81 @@ export type ProjectExportResult = {
   hasAudio: boolean
 }
 
+/**
+ * Which half of the export is running, as reported by the server.
+ *
+ * Derived on the server from real milestones and sent down as `phase`, so the
+ * browser never holds its own copy of the thresholds. 'queued' means no work
+ * has started; 'rendering' means FFmpeg is encoding; 'verifying' means FFmpeg
+ * finished and the file is being checked.
+ */
+export type ProjectExportPhase = 'queued' | 'rendering' | 'verifying'
+
 export type ProjectExportState =
   | { status: 'idle' }
-  | { status: 'rendering' }
+  | { status: 'rendering'; phase: ProjectExportPhase; jobId: string | null; startedAt: number }
   | { status: 'ready'; result: ProjectExportResult }
   | { status: 'error'; message: string }
+  | { status: 'timed-out'; jobId: string; elapsedMs: number; phase: ProjectExportPhase }
+
+/**
+ * How long the browser waits before it stops claiming an export is coming.
+ *
+ * This is NOT a fix for a slow renderer, and raising it is not a fix for a
+ * stalled one. It exists because the previous loop polled
+ * `while (status === 'queued' || status === 'running')` with no bound at all,
+ * so any job the server never finished produced a spinner that could not end
+ * and said nothing. Ten minutes is far longer than any observed successful
+ * export; passing it means something is wrong and the user must be told.
+ */
+export const EXPORT_CLIENT_TIMEOUT_MS = 10 * 60_000
+
+/** One plain sentence per phase. Never a percentage the renderer cannot measure. */
+export const exportPhaseMessage = (phase: ProjectExportPhase): string => {
+  switch (phase) {
+    case 'queued':
+      return 'Waiting to start…'
+    case 'verifying':
+      return 'Checking the finished MP4…'
+    default:
+      return 'Rendering your MP4…'
+  }
+}
+
+/** Elapsed time as m:ss, so a stalled export is visibly stalled. */
+export const formatExportElapsed = (elapsedMs: number): string => {
+  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
+
+export type ProjectExportProgress = Readonly<{
+  jobId: string
+  phase: ProjectExportPhase
+  elapsedMs: number
+}>
+
+/**
+ * The browser gave up waiting. The server job is deliberately left alive.
+ *
+ * Cancelling it here would throw away a render that may be seconds from
+ * finishing. Retrying re-posts the same project revision, which the server
+ * treats idempotently and re-attaches to this very job.
+ */
+export class ProjectExportTimeout extends Error {
+  readonly jobId: string
+  readonly elapsedMs: number
+  readonly phase: ProjectExportPhase
+
+  constructor(jobId: string, elapsedMs: number, phase: ProjectExportPhase) {
+    super('The export is taking longer than expected.')
+    this.name = 'ProjectExportTimeout'
+    this.jobId = jobId
+    this.elapsedMs = elapsedMs
+    this.phase = phase
+  }
+}
 
 const PROJECT_ID = /^project_[a-z0-9]{16,64}$/
 const EXPORT_ID = /^export_[a-z0-9]{16,64}$/
@@ -87,6 +157,7 @@ type ExportJobResponse = {
   projectId: string
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
   progress: number
+  phase: 'queued' | 'rendering' | 'verifying' | 'done'
   result?: ProjectExportResult
   error?: { code: string; message: string }
 }
@@ -99,11 +170,18 @@ function isExportJob(value: unknown, projectId: string): value is ExportJobRespo
     job.projectId === projectId &&
     typeof job.status === 'string' &&
     ['queued', 'running', 'succeeded', 'failed', 'cancelled'].includes(job.status) &&
+    typeof job.phase === 'string' &&
+    ['queued', 'rendering', 'verifying', 'done'].includes(job.phase) &&
     typeof job.progress === 'number' &&
     Number.isFinite(job.progress) &&
     job.progress >= 0 &&
     job.progress <= 1
   )
+}
+
+/** The phase to show while a job is still unfinished. */
+function activePhase(job: ExportJobResponse): ProjectExportPhase {
+  return job.phase === 'done' ? 'rendering' : job.phase
 }
 
 function waitForPoll(signal?: AbortSignal): Promise<void> {
@@ -132,12 +210,23 @@ function waitForPoll(signal?: AbortSignal): Promise<void> {
  * exported is always the project the user accepted — a stale or tampered
  * browser cannot cause a different video to be produced.
  */
+export type ExportProjectOptions = Readonly<{
+  onProgress?: (progress: ProjectExportProgress) => void
+  /** Override only for tests; production uses EXPORT_CLIENT_TIMEOUT_MS. */
+  timeoutMs?: number
+  now?: () => number
+}>
+
 export async function exportProject(
   projectId: string,
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal,
+  options: ExportProjectOptions = {},
 ): Promise<ProjectExportResult> {
   if (!PROJECT_ID.test(projectId)) throw new Error(EXPORT_ERROR)
+  const now = options.now ?? (() => Date.now())
+  const timeoutMs = options.timeoutMs ?? EXPORT_CLIENT_TIMEOUT_MS
+  const startedAt = now()
   let activeJobId: string | undefined
   try {
     const response = await fetcher(`/api/projects/${projectId}/exports`, {
@@ -160,13 +249,26 @@ export async function exportProject(
     if (!isExportJob(created, projectId)) throw new Error('invalid export job response')
     let job = created
     activeJobId = job.jobId
+    /** Only reported while the job is genuinely unfinished. */
+    const reportProgress = () => {
+      if (job.status !== 'queued' && job.status !== 'running') return
+      options.onProgress?.({ jobId: job.jobId, phase: activePhase(job), elapsedMs: now() - startedAt })
+    }
+    reportProgress()
     while (job.status === 'queued' || job.status === 'running') {
+      if (now() - startedAt >= timeoutMs) {
+        // Stop waiting, but leave the job running. It may still finish, and its
+        // result stays valid and downloadable; what must not continue is a
+        // spinner that tells the user something is coming when nothing may be.
+        throw new ProjectExportTimeout(job.jobId, now() - startedAt, activePhase(job))
+      }
       await waitForPoll(signal)
       const polled = await fetcher(`/api/projects/${projectId}/export-jobs/${job.jobId}`, { signal })
       if (polled.status !== 200) throw new Error('export job unavailable')
       const value: unknown = await polled.json()
       if (!isExportJob(value, projectId)) throw new Error('invalid export job response')
       job = value
+      reportProgress()
     }
     if (job.status === 'succeeded' && isExportResult(job.result, projectId)) return job.result
     const code = isExportErrorCode(job.error?.code) ? job.error.code : 'EXPORT_FAILED'
@@ -178,6 +280,8 @@ export async function exportProject(
       }
       throw error
     }
+    // Deliberately NOT cancelled: a timed-out job is left to finish.
+    if (error instanceof ProjectExportTimeout) throw error
     if (error instanceof ProjectExportError) throw error
     throw new ProjectExportError('EXPORT_FAILED', EXPORT_ERROR, { cause: error })
   }

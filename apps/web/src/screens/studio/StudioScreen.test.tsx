@@ -387,8 +387,15 @@ describe('StudioScreen', () => {
     await user.click(screen.getByRole('button', { name: /export video/i }))
     expect(onExport).toHaveBeenCalledOnce()
 
-    rerender(<StudioScreen {...props} editProject={accepted} exportState={{ status: 'rendering' }} />)
+    rerender(<StudioScreen
+      {...props}
+      editProject={accepted}
+      exportState={{ status: 'rendering', phase: 'rendering', jobId: 'job_abcdef0123456789', startedAt: Date.now() }}
+    />)
     expect(screen.getByRole('status', { name: /export status/i })).toHaveTextContent(/rendering/i)
+    // Elapsed time is part of the contract: a spinner alone cannot tell a
+    // four-second export from a nine-minute stall.
+    expect(screen.getByTestId('export-elapsed')).toHaveTextContent(/^\d+:\d{2}$/)
     expect(screen.getByRole('button', { name: /exporting video/i })).toBeDisabled()
 
     rerender(<StudioScreen {...props} editProject={accepted} exportState={{ status: 'error', message: 'We could not export the video. Your accepted edits are still safe.' }} />)

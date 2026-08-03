@@ -89,6 +89,9 @@ function exportResponse() {
     jobId: 'job_1234567890abcdef',
     projectId: 'project_1234567890abcdef',
     status: 'succeeded',
+    // The server states which half of the export it is in; the browser never
+    // guesses. A job response without a phase is refused.
+    phase: 'done',
     progress: 1,
     result: {
       id: 'export_1234567890abcdef',
@@ -512,7 +515,13 @@ describe('App', () => {
     await waitFor(() => expect(api.current().changeSets).toHaveLength(1))
 
     await user.click(await screen.findByRole('button', { name: /export video/i }))
-    expect(screen.getByRole('status', { name: /export status/i })).toHaveTextContent(/rendering/i)
+    // The status names the phase the server is actually in and shows elapsed
+    // time. A bare spinner cannot tell a four-second export from a nine-minute
+    // stall, which is how an export was left "rendering" past 90 seconds with
+    // nothing on screen admitting it.
+    const exportStatus = screen.getByRole('status', { name: /export status/i })
+    expect(exportStatus).toHaveTextContent(/waiting to start|rendering|checking the finished/i)
+    expect(screen.getByTestId('export-elapsed')).toHaveTextContent(/^\d+:\d{2}$/)
     // No edit list is sent: the server compiles the project it has stored.
     expect(fetchMock).toHaveBeenLastCalledWith('/api/projects/project_1234567890abcdef/exports', expect.objectContaining({ method: 'POST' }))
     const exportInit = fetchMock.mock.calls.at(-1)?.[1] as RequestInit

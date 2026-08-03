@@ -53,7 +53,10 @@ import {
   visibleNameplates,
   withPendingProposal,
 } from '../../features/render-plan/render-plan-preview'
-import { drawFootageMotionFrame } from '../../features/render-plan/footage-motion-preview'
+import {
+  drawFootageMotionFrame,
+  footageMotionAtCompositionTime,
+} from '../../features/render-plan/footage-motion-preview'
 import {
   FootageMotionInspector,
   buildFootageMotionOperation,
@@ -62,7 +65,14 @@ import {
   type FootageMotionDraft,
 } from '../../features/footage-motion/FootageMotionInspector'
 import { PrimaryFootageCanvasControls } from '../../features/footage-motion/PrimaryFootageCanvasControls'
-import type { ProjectExportState } from '../../features/project-export/project-export'
+import { formatExportElapsed, type ProjectExportState } from '../../features/project-export/project-export'
+import { ExportProgressStatus } from '../../features/project-export/ExportProgressStatus'
+import { HAVE_CURRENT_DATA } from '../../features/render-plan/media-readiness'
+import {
+  monitorBaseFrameMessage,
+  monitorBaseFrameState,
+  showsGapLayer,
+} from '../../editor/monitor/monitor-base-frame'
 import { NameplateComposer } from '../../features/nameplate/NameplateComposer'
 import { NameplateOverlay } from '../../features/nameplate/NameplateOverlay'
 import { CaptionOverlay } from '../../features/captions/CaptionOverlay'
@@ -177,6 +187,31 @@ export type StudioScreenProps = {
 
 const EXPORT_DESCRIPTION = 'studio-export-description'
 const KEYBOARD_POINT_STEP = 0.05
+
+/**
+ * Every media event that can change what the base picture layer is doing.
+ *
+ * Playback readiness is never inferred from toolbar state. A button says what
+ * the user asked for; these say what the element actually did, and the gap
+ * between the two is where an unexplained black frame lives.
+ */
+const MEDIA_READINESS_EVENTS = [
+  'loadstart',
+  'loadedmetadata',
+  'loadeddata',
+  'canplay',
+  'canplaythrough',
+  'play',
+  'playing',
+  'waiting',
+  'pause',
+  'seeking',
+  'seeked',
+  'ended',
+  'stalled',
+  'suspend',
+  'error',
+] as const
 
 function createClipId() {
   const bytes = new Uint32Array(2)
@@ -312,6 +347,17 @@ export function StudioScreen({
   const [monitorVolume, setMonitorVolume] = useState(1)
   /** True while the finished video is sitting on a deliberately empty stretch. */
   const [isShowingHole, setIsShowingHole] = useState(false)
+  /**
+   * What the element itself reports, read from real media events rather than
+   * inferred from a toolbar button. Toolbar state says what the user asked for;
+   * these say what the media is actually doing, and the difference between the
+   * two is exactly where an unexplained black frame lives.
+   */
+  const [videoReadiness, setVideoReadiness] = useState({
+    readyState: 0,
+    seeking: false,
+    hasPresentedFrame: false,
+  })
   // Playback state the media effect needs but must not re-subscribe for. The
   // effect is attached once, so what it reads has to arrive through refs.
   const segmentsRef = useRef<readonly PlaybackSegment[]>([])
@@ -668,6 +714,34 @@ export function StudioScreen({
     video.addEventListener('pause', syncPlayback)
     video.addEventListener('ended', syncPlayback)
     video.addEventListener('volumechange', syncVolume)
+
+    /**
+     * Read readiness from the element on every media event.
+     *
+     * `hasPresentedFrame` is sticky for the life of one source: once a real
+     * frame has been shown, a later dip in readyState means "seeking", not
+     * "nothing to show", and the previous frame is kept on screen rather than
+     * being replaced by black.
+     */
+    const syncReadiness = () => {
+      setVideoReadiness((current) => {
+        const readyState = video.readyState
+        const seeking = video.seeking
+        const hasPresentedFrame = current.hasPresentedFrame || readyState >= HAVE_CURRENT_DATA
+        if (
+          current.readyState === readyState &&
+          current.seeking === seeking &&
+          current.hasPresentedFrame === hasPresentedFrame
+        ) return current
+        return { readyState, seeking, hasPresentedFrame }
+      })
+    }
+    // A new source has no frames of its own, so nothing may be retained from
+    // the previous one.
+    const resetReadiness = () => setVideoReadiness({ readyState: 0, seeking: false, hasPresentedFrame: false })
+    for (const name of MEDIA_READINESS_EVENTS) video.addEventListener(name, syncReadiness)
+    video.addEventListener('emptied', resetReadiness)
+    syncReadiness()
     syncPlayback()
     syncVolume()
     if (hasVideoFrameCallback) requestNextVideoFrame()
@@ -694,6 +768,8 @@ export function StudioScreen({
       video.removeEventListener('pause', syncPlayback)
       video.removeEventListener('ended', syncPlayback)
       video.removeEventListener('volumechange', syncVolume)
+      for (const name of MEDIA_READINESS_EVENTS) video.removeEventListener(name, syncReadiness)
+      video.removeEventListener('emptied', resetReadiness)
     }
   }, [])
 
@@ -967,6 +1043,32 @@ export function StudioScreen({
       reducedMotion,
     })
   }, [footageDisplayPlan, playheadPreviewTicks, reducedMotion, videoLayoutRevision])
+
+  /**
+   * One named answer for what the base picture is doing.
+   *
+   * Four situations used to render as an identical black rectangle — an
+   * intentional gap, media still loading, a seek in flight, and a real failure
+   * — and nothing on screen distinguished them. Deciding it in one place means
+   * the black layer and the sentence explaining it can never disagree.
+   */
+  const activeFootageMotion = footageDisplayPlan
+    ? footageMotionAtCompositionTime(footageDisplayPlan, playheadPreviewTicks, reducedMotion)
+    : null
+  const baseFrameState = monitorBaseFrameState({
+    hasSource: project.mediaUrl.length > 0,
+    readyState: videoReadiness.readyState,
+    seeking: videoReadiness.seeking,
+    hasMediaError: hasPreviewError,
+    // The ONLY input allowed to produce 'gap': the canonical composition
+    // mapping reported a stretch with no active source segment.
+    inCanonicalGap: isShowingHole,
+    hasPresentedFrame: videoReadiness.hasPresentedFrame,
+    motionActive: activeFootageMotion !== null,
+    // The canvas can hold a real frame exactly when the video can supply one.
+    motionFrameValid: videoReadiness.readyState >= HAVE_CURRENT_DATA,
+  })
+  const baseFrameMessage = monitorBaseFrameMessage(baseFrameState)
 
   const canvasVisibleNodes = [
     ...previewNodes,
@@ -1758,7 +1860,17 @@ export function StudioScreen({
                   : 'Your accepted edits are ready to render.'}
             </p>
             {exportState.status === 'rendering' ? (
-              <p className="studio-screen__export-progress" role="status" aria-label="Export status">Rendering and verifying your MP4…</p>
+              <ExportProgressStatus phase={exportState.phase} startedAt={exportState.startedAt} />
+            ) : null}
+            {exportState.status === 'timed-out' ? (
+              <div className="studio-screen__export-error" role="alert">
+                <p>
+                  The export is still running after {formatExportElapsed(exportState.elapsedMs)} and
+                  has not finished. Your accepted edits are safe. It may still complete — retry to
+                  reconnect to the same export.
+                </p>
+                <button type="button" onClick={onExport}>Retry export</button>
+              </div>
             ) : null}
             {exportState.status === 'error' ? (
               <div className="studio-screen__export-error" role="alert">
@@ -1973,9 +2085,29 @@ export function StudioScreen({
                 exported file, so it is black here too. Covering the element
                 rather than hiding it keeps the layout, the point marker, and
                 the overlay positions exactly where they were.
+
+                Driven only by the base-frame state, so a pause, a seek, a
+                waiting canvas, a panel resize, or a loading source can never
+                paint this. If it is black here, the exported file is black too.
               */}
-              {isShowingHole ? (
+              {showsGapLayer(baseFrameState) ? (
                 <div className="studio-screen__video-hole" data-testid="video-hole" aria-hidden="true" />
+              ) : null}
+
+              {/*
+                Say which of the four black states this is, rather than leaving
+                the user to guess whether the preview is broken.
+              */}
+              {baseFrameMessage ? (
+                <p
+                  className="studio-screen__base-frame-status"
+                  data-testid="base-frame-status"
+                  data-state={baseFrameState}
+                  role="status"
+                  aria-label="Preview status"
+                >
+                  {baseFrameMessage}
+                </p>
               ) : null}
 
               {videoContentLayerStyle ? (

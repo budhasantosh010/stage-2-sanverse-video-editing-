@@ -1,7 +1,7 @@
 import { activeOperations, type EditProject } from '@sanverse/edit-domain'
 import { compileProjectToRenderPlan } from '@sanverse/render-contract/compile-project'
 
-import type { RenderPort, RenderResult } from './render-port.ts'
+import type { RenderMilestone, RenderPort, RenderResult } from './render-port.ts'
 
 export type RenderServiceErrorCode = 'RENDER_PROJECT_INVALID' | 'NOTHING_TO_RENDER'
 
@@ -26,6 +26,7 @@ type ExportProjectInput = {
   readonly outputPath: string
   readonly trustedWorkDir: string
   readonly signal?: AbortSignal
+  readonly onMilestone?: (milestone: RenderMilestone) => void
 }
 
 export function createRenderService({ renderer }: { renderer: RenderPort }) {
@@ -55,6 +56,7 @@ export function createRenderService({ renderer }: { renderer: RenderPort }) {
         trustedWorkDir: input.trustedWorkDir,
         plan: plan.value,
         signal: input.signal,
+        onMilestone: input.onMilestone,
       })
     },
   }

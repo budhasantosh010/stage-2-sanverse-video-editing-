@@ -1330,6 +1330,7 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
         }
         await write(FILTER_GRAPH_FILENAME, buildFilterGraph(buildInput))
         const command = buildFfmpegArguments(buildInput)
+        request.onMilestone?.('rendering')
         const rendered = await runCommand({
           executable: ffmpegExecutable,
           args: command,
@@ -1339,6 +1340,10 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
         if (rendered.exitCode !== 0) {
           throw renderError('RENDER_FAILED', 'FFmpeg could not render the accepted edits.')
         }
+        // FFmpeg has exited successfully. Everything after this point reads the
+        // produced file rather than encoding, so a stall here is a verification
+        // stall and is attributable as one.
+        request.onMilestone?.('verifying')
         const outputInfo = await lstat(partialPath).catch((error) => {
           if (isMissing(error)) throw renderError('RENDER_OUTPUT_MISSING', 'FFmpeg completed without producing an output file.')
           throw error

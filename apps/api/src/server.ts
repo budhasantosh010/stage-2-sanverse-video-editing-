@@ -30,6 +30,8 @@ import { buildLocalDiagnostics } from './diagnostics/local-diagnostics.ts'
 import {
   createLocalExportJobStore,
   EXPORT_JOB_ID_PATTERN,
+  EXPORT_RENDERING_PROGRESS,
+  EXPORT_VERIFYING_PROGRESS,
   type LocalExportJobStore,
 } from './jobs/local-export-job-store.ts'
 import {
@@ -195,6 +197,27 @@ export function createSanverseServer(options: ServerOptions) {
     createOperationId: () => `operation_${randomBytes(16).toString('hex')}`,
   })
 
+  /**
+   * Start work for a job this process is not already running.
+   *
+   * A job recorded as `running` with no live process behind it is an orphan:
+   * the previous server was stopped mid-render, or the export route was reached
+   * again for the same project revision. Before this, such a job was handed
+   * straight back to the browser and never executed, and the browser polled a
+   * status that could not change — an export spinner that could never end.
+   */
+  const startExportJob = async (jobId: string): Promise<void> => {
+    if (runningExportJobs.has(jobId) || !renderService) return
+    const current = await exportJobs.read(jobId)
+    if (!current) return
+    if (current.status === 'running') {
+      await exportJobs.update(jobId, { status: 'queued', progress: 0, error: undefined })
+    } else if (current.status !== 'queued') {
+      return
+    }
+    await executeExportJob(jobId)
+  }
+
   const executeExportJob = async (jobId: string): Promise<void> => {
     if (runningExportJobs.has(jobId) || !renderService) return
     const initial = await exportJobs.read(jobId)
@@ -216,12 +239,26 @@ export function createSanverseServer(options: ServerOptions) {
         if (path !== null) extraSourcePaths[asset.assetId] = path
       }
       await exportJobs.update(jobId, { progress: 0.15 })
+      // Two real boundaries, not an invented percentage. EXPORT_RENDERING_PROGRESS
+      // means FFmpeg started; EXPORT_VERIFYING_PROGRESS means FFmpeg exited 0 and
+      // the file is being checked. The browser reads these thresholds back to
+      // tell the user which half of the export is slow.
+      let milestoneWrites: Promise<unknown> = Promise.resolve()
       const result = await renderService.exportProject({
         project: job.projectSnapshot,
         ...paths,
         extraSourcePaths,
         signal: controller.signal,
+        onMilestone: (milestone) => {
+          const progress = milestone === 'verifying'
+            ? EXPORT_VERIFYING_PROGRESS
+            : EXPORT_RENDERING_PROGRESS
+          milestoneWrites = milestoneWrites
+            .then(() => exportJobs.update(jobId, { progress }))
+            .catch(() => undefined)
+        },
       })
+      await milestoneWrites
       if (resolve(result.outputPath) !== resolve(paths.outputPath)) throw new Error('Renderer returned an unexpected output path.')
       const current = await exportJobs.read(jobId)
       if (controller.signal.aborted || current?.status === 'cancelled') return
@@ -474,7 +511,7 @@ export function createSanverseServer(options: ServerOptions) {
           .digest('hex')
         const created = await exportJobs.create({ jobId, project, exportId, idempotencyKey })
         json(response, 202, exportJobs.publicJob(created.job))
-        if (created.job.status === 'queued') void executeExportJob(created.job.jobId)
+        void startExportJob(created.job.jobId)
         return
       }
 

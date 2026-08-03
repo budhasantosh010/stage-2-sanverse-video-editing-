@@ -5,7 +5,46 @@ import { join } from 'node:path'
 import { test } from 'vitest'
 
 import { testProject } from '@sanverse/edit-domain/test-fixtures'
-import { createLocalExportJobStore } from './local-export-job-store.ts'
+import {
+  createLocalExportJobStore,
+  EXPORT_RENDERING_PROGRESS,
+  EXPORT_VERIFYING_PROGRESS,
+  exportJobPhase,
+} from './local-export-job-store.ts'
+
+test('the reported phase comes from real milestones, never from an invented percentage', () => {
+  assert.equal(exportJobPhase({ status: 'queued', progress: 0 }), 'queued')
+  assert.equal(exportJobPhase({ status: 'running', progress: 0.05 }), 'rendering')
+  assert.equal(exportJobPhase({ status: 'running', progress: EXPORT_RENDERING_PROGRESS }), 'rendering')
+  // Verification begins exactly when FFmpeg exits 0, so a stall after this
+  // point is attributable to checking the file rather than to encoding.
+  assert.equal(exportJobPhase({ status: 'running', progress: EXPORT_VERIFYING_PROGRESS }), 'verifying')
+  assert.equal(exportJobPhase({ status: 'succeeded', progress: 1 }), 'done')
+  assert.equal(exportJobPhase({ status: 'failed', progress: 1 }), 'done')
+  assert.equal(exportJobPhase({ status: 'cancelled', progress: 1 }), 'done')
+})
+
+test('a public job always states its phase and never leaks the project snapshot or key', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'sanverse-jobs-public-'))
+  try {
+    const store = createLocalExportJobStore(root)
+    const { job } = await store.create({
+      jobId: 'job_3333333333333333',
+      project: testProject(),
+      exportId: 'export_3333333333333333',
+      idempotencyKey: 'c'.repeat(64),
+    })
+    const published = store.publicJob(job)
+    assert.equal(published.phase, 'queued')
+    assert.equal('projectSnapshot' in published, false)
+    assert.equal('idempotencyKey' in published, false)
+
+    const running = await store.update(job.jobId, { status: 'running', progress: EXPORT_VERIFYING_PROGRESS })
+    assert.equal(store.publicJob(running).phase, 'verifying')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
 test('export jobs persist, deduplicate, and recover running work as queued', async () => {
   const root = await mkdtemp(join(tmpdir(), 'sanverse-jobs-'))

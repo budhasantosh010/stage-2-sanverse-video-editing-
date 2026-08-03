@@ -1582,3 +1582,73 @@ tests and the final web production build.
 ### One-line solution
 
 Keep hidden semantics, keyboard ownership, action truth, and evidence validity executable and review-gated.
+
+## FAIL-045 — Preview showed black base footage with no explanation
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P0
+- **Found/target:** 2026-08-03 / P1-F.1A Gate A
+
+### What / where / when / how / why?
+
+The owner recorded base footage going black while the monitor controls and an
+accepted overlay stayed visible. `drawFootageMotionFrame`
+(`apps/web/src/features/render-plan/footage-motion-preview.ts`) filled the motion
+canvas black, called `drawImage`, and revealed the canvas unconditionally,
+guarded only by `videoWidth > 0`. That is populated at `HAVE_METADATA`, before
+any frame is decodable, so during load and every seek an empty black canvas was
+shown over a perfectly healthy video. Separately, an intentional timeline gap,
+loading, seeking, and a real error all rendered as identical black with nothing
+distinguishing them.
+
+### What was tried?
+
+Split the drawing rule into a pure `draw | retain | hide` decision requiring
+`readyState >= HAVE_CURRENT_DATA`; revealed the canvas only after a real frame
+lands; retained the previous frame on a readiness dip, keyed per canvas AND per
+source so a project change cannot show the previous project's frame. Added one
+`MonitorBaseFrameState` (`loading | ready | seeking | gap | error`) derived from
+real media events, with `showsGapLayer` as the only expression that can paint
+the black layer. Proved the guards fail when the readiness check is reverted
+(4 tests), then measured 96 real-browser samples across 20 cycles with zero
+unexplained black and a motion canvas 97–100% lit.
+
+### One-line solution
+
+Never reveal a surface that has not been proved to contain a real frame, and give
+every black state a name the user can read.
+
+## FAIL-046 — Export spinner could never end
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P0
+- **Found/target:** 2026-08-03 / P1-F.1A Gate A
+
+### What / where / when / how / why?
+
+The export stayed in "Rendering and verifying your MP4…" past 90 seconds with no
+way to tell a slow render from a dead one. `exportProject`
+(`apps/web/src/features/project-export/project-export.ts`) polled
+`while (status === 'queued' || 'running')` with no bound, collapsed queued,
+encoding and verifying into one word, and showed no elapsed time. Measurement
+proved the render was never hung: it genuinely takes 60–90 seconds on this
+machine for a 30 s 1080p file with an overlay and full-length motion. Reading the
+code also found that an orphaned `running` job was returned to the browser and
+never executed, because work only started `if (created.job.status === 'queued')`.
+
+### What was tried?
+
+Added `RenderRequest.onMilestone` reporting the two boundaries the renderer
+genuinely knows it crossed; derived `queued | rendering | verifying | done` on
+the server so the browser holds no second copy of the thresholds; added a visible
+`m:ss` elapsed clock, a ten-minute client bound producing a recoverable
+timed-out state that deliberately leaves the job alive, and Retry that
+re-attaches to the same job by idempotency. Added `startExportJob` to resume an
+orphaned `running` job. Measured a real export succeeding and probed the MP4.
+
+### One-line solution
+
+Bound every wait, name every phase from something real, and never let "slow" and
+"dead" look the same.

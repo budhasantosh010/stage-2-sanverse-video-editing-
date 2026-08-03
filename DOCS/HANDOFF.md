@@ -2,6 +2,43 @@
 
 ## Current checkpoint
 
+**P1-F.1A Gate A — Preview Reliability and Export Runtime is complete.**
+
+The Preview black-base-footage failure and the export "spinner that could never
+end" are both fixed, with real-media evidence in
+`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/`.
+
+- **Preview root cause:** `drawFootageMotionFrame` revealed the motion canvas
+  guarded only by `videoWidth > 0`. That is populated at `HAVE_METADATA`, before
+  any frame is decodable, so during load and every seek the canvas filled itself
+  black, drew nothing, and was shown over a healthy video. It now reveals only
+  after a real frame lands, retains the previous frame on a readiness dip, and
+  never retains a frame across a source change.
+- **One named base-frame state** (`loading | ready | seeking | gap | error`)
+  replaces four situations that all rendered as identical black. `showsGapLayer`
+  is the only expression that can paint the deliberate black layer, so a pause,
+  seek, resize, or waiting canvas structurally cannot.
+- **Export root cause:** the render was never hung — it genuinely takes 60–90 s
+  for a 30 s 1080p file with an overlay and full-length motion. The UI collapsed
+  queued/encoding/verifying into one word, showed no elapsed time, and polled
+  with **no bound at all**, so slow and dead looked identical forever. Now:
+  server-derived `queued | rendering | verifying | done` phases from real
+  renderer milestones, a visible `m:ss` clock, a 10-minute bound producing a
+  recoverable timed-out state that leaves the job alive, and Retry.
+- Two further defects fixed by inspection: an orphaned `running` job was handed
+  back and never executed; and there is still no wall-clock limit on the FFmpeg
+  child process (recorded as open, not guessed at).
+
+Real export probed: 1920×1080 H.264, 30/1, AAC-LC 48 kHz stereo, 30.033008 s,
+18,044,871 bytes. Frames at 1.0 / 4.0 / 9.0 / 20.0 s inspected.
+
+Suites: web 571, api 241, edit-domain 299, render-contract 65, intent-domain 27
+— **1,203 total** (program floor 1,176). All-workspace build passes.
+
+**Gates B, C and D of P1-F.1A have not started. P1-F.2 has not started.**
+
+### Previous checkpoint
+
 **P1-F.0.2.2 — Media Panel Completion and Editor Monitor V1 is technically
 complete; owner visual acceptance is open.** Media has one container-responsive
 presentation and one results-scroll owner. One custom monitor owns Point,

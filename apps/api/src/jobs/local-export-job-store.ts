@@ -39,13 +39,35 @@ export type LocalExportJob = {
   readonly error?: { readonly code: string; readonly message: string }
 }
 
-export type PublicExportJob = Omit<LocalExportJob, 'projectSnapshot' | 'idempotencyKey'>
+/**
+ * Progress values that mean something real.
+ *
+ * The renderer cannot honestly measure how far through an encode it is, so
+ * these are not a percentage — they are the two boundaries the renderer
+ * genuinely knows it crossed. Keeping the thresholds here, and deriving the
+ * phase on the server, means the browser never holds a second copy of these
+ * numbers that could drift away from this one.
+ */
+export const EXPORT_RENDERING_PROGRESS = 0.2
+export const EXPORT_VERIFYING_PROGRESS = 0.85
+
+export type ExportJobPhase = 'queued' | 'rendering' | 'verifying' | 'done'
+
+export function exportJobPhase(job: Pick<LocalExportJob, 'status' | 'progress'>): ExportJobPhase {
+  if (job.status === 'queued') return 'queued'
+  if (job.status !== 'running') return 'done'
+  return job.progress >= EXPORT_VERIFYING_PROGRESS ? 'verifying' : 'rendering'
+}
+
+export type PublicExportJob = Omit<LocalExportJob, 'projectSnapshot' | 'idempotencyKey'> & {
+  readonly phase: ExportJobPhase
+}
 
 export type LocalExportJobStore = ReturnType<typeof createLocalExportJobStore>
 
 function publicJob(job: LocalExportJob): PublicExportJob {
   const { projectSnapshot: _snapshot, idempotencyKey: _key, ...safe } = job
-  return safe
+  return { ...safe, phase: exportJobPhase(job) }
 }
 
 function validateJob(value: unknown): LocalExportJob {

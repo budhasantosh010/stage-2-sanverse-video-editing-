@@ -736,6 +736,29 @@
   pointer-events: none;
 }
 
+/* One unobtrusive sentence saying which state the base picture is in. It sits
+   in a corner rather than over the middle of the frame so it never hides the
+   footage it is describing. */
+.studio-screen__base-frame-status {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 72%);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+.studio-screen__base-frame-status[data-state='error'] {
+  background: rgb(0 0 0 / 88%);
+  outline: 1px solid #fff;
+}
+
 .studio-screen__static-track {
   display: flex;
   align-items: center;

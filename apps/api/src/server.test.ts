@@ -9,6 +9,7 @@ import type { EditProject } from '@sanverse/edit-domain'
 
 import { stubMediaProbe } from './test-fixtures.ts'
 import { createSanverseServer } from './server.ts'
+import { exportJobPhase } from './jobs/local-export-job-store.ts'
 import type { LocalExportJob, LocalExportJobStore, PublicExportJob } from './jobs/local-export-job-store.ts'
 import type { ProjectRepository } from './projects/project-repository.ts'
 
@@ -186,7 +187,7 @@ function inMemoryExportJobStore(): LocalExportJobStore {
   const jobs = new Map<string, LocalExportJob>()
   const publicJob = (job: LocalExportJob): PublicExportJob => {
     const { projectSnapshot: _snapshot, idempotencyKey: _key, ...safe } = job
-    return safe
+    return { ...safe, phase: exportJobPhase(job) }
   }
   return {
     publicJob,
