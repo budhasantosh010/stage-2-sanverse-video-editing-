@@ -513,3 +513,14 @@ One video, AI draft continuity, ten stable 1440×900 expand/collapse cycles, key
 reachability, edit, Undo, Redo, and export passed. Final suites pass 1,164/1,164;
 all builds pass; the export probes as 1920×1080 H.264/AAC. Invalid tiled PNGs
 were not presented as evidence. P1-F.1 was not started.
+
+# 2026-08-03 — P1-F.0.2.2 Media panel and Editor Monitor V1
+
+Completed the container-responsive Media presentation and replaced native video
+controls plus the permanent Point row with one custom editor monitor over the
+existing video/content layer. Media search/filter/selection survived 420, 304,
+239, and 220 px panel widths; monitor, Point, transport, viewer modes, guides,
+fullscreen fallback, and shared geometry survived responsive browser checks
+with exactly one video. A real nameplate edit, Undo, and Redo passed. Real export
+remained rendering beyond 90 seconds and is recorded without renderer drift.
+Media V2 was not started.

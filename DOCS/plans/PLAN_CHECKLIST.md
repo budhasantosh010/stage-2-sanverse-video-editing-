@@ -332,6 +332,19 @@ no button offers it yet — the owner cannot get to it from the screen.
 - [ ] Owner visual acceptance of P1-F.0.2.1
 - [ ] Begin P1-F.1 only after a new approved contract
 
+### P1-F.0.2.2 — Media panel and Editor Monitor V1
+
+- [x] Complete responsive Media presentation without Media V2 state
+- [x] Make only Media results scroll
+- [x] Add one custom monitor around the existing video
+- [x] Move Point into the compact monitor toolbar
+- [x] Add custom transport, Fit/Fill/100%, guides, and fullscreen fallback
+- [x] Preserve one editor/project/revision/video/playhead/proposal/history/export path
+- [x] Run focused and real-browser acceptance checks
+- [x] Record real export timeout and screenshot-tool limitation
+- [ ] Owner visual acceptance
+- [ ] Media V2 capabilities — not started
+
 - [ ] Representative users finish acceptable videos in measured minutes
 - [ ] Default workflows require no professional editor knowledge
 - [ ] Ambiguity clarifies or fails closed

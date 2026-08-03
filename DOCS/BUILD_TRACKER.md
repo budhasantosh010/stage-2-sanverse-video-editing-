@@ -57,6 +57,8 @@ Last updated: 2026-08-01
 
 ## Status rules
 
+| P1F022-01 | Media panel and Editor Monitor V1 | Container-responsive Media shell/cards and one custom monitor with Point, transport, viewer modes, guides, shared geometry, and fullscreen fallback | Complete — owner visual approval open | 1,174/1,174 full suite plus 31/31 post-review affected gate; current inventory 1,176; real browser across Media 420/304/239/220 px and 1440/1280/1238/1024/390 regimes; one video; edit/Undo/Redo; export runtime timeout recorded; builds pass |
+
 - `Pending`: not started.
 - `In progress`: active work exists but the acceptance gate is open.
 - `Complete`: acceptance evidence exists and limitations are recorded.
@@ -73,3 +75,12 @@ Last updated: 2026-08-01
 - [x] 1,158 tests and all-workspace production build pass
 - [x] Evidence and failure registry updated
 - [ ] P1-F.1 (not started by contract)
+
+# P1-F.0.2.2 — Media panel and Editor Monitor V1 (2026-08-03)
+
+- [x] Media responsive presentation and single results-scroll authority
+- [x] Editor Monitor V1 and compact Point tool
+- [x] One video/playhead/project/revision/history/proposal/export authority
+- [x] Real browser responsive, transport, viewer mode, Point, fullscreen checks
+- [ ] Owner visual acceptance
+- [ ] Media V2 (not started)

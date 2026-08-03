@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react'
 import { filterMediaAssets, type MediaAssetView, type MediaBinViewModel, type MediaFilter } from '../../features/media'
 import { DisabledAction } from '../ui/DisabledAction'
 import { MediaAssetCard } from './MediaAssetCard'
@@ -36,12 +36,26 @@ export function MediaBin({
   const [notice, setNotice] = useState<string | null>(null)
   const [dragActive, setDragActive] = useState(false)
   const [menuAssetId, setMenuAssetId] = useState<string | null>(null)
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  const filterButtonRef = useRef<HTMLButtonElement>(null)
   const filtered = useMemo(() => filterMediaAssets(model, query, filter), [filter, model, query])
   const selected = model.assets.find((asset) => asset.assetId === selectedAssetId) ?? null
   const menuAsset = model.assets.find((asset) => asset.assetId === menuAssetId) ?? null
   const disabled = busy || working
+
+  useEffect(() => {
+    if (!filterMenuOpen) return
+    const close = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setFilterMenuOpen(false)
+      filterButtonRef.current?.focus()
+    }
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
+  }, [filterMenuOpen])
 
   const importFiles = async (files: readonly File[]) => {
     if (disabled || files.length === 0) return
@@ -97,10 +111,13 @@ export function MediaBin({
       onDragLeave={(event) => { if (event.currentTarget === event.target) setDragActive(false) }}
       onDrop={drop}
     >
+      <header className="media-bin__header">
+        <div><h2>Media</h2><span>{model.counts.all} {model.counts.all === 1 ? 'asset' : 'assets'}</span></div>
+      </header>
       <div className="media-bin__toolbar">
         <label className="media-bin__search">
-          <span>Search media</span>
-          <input value={query} maxLength={120} onChange={(event) => setQuery(event.currentTarget.value)} />
+          <span className="sr-only">Search media</span>
+          <input value={query} maxLength={120} placeholder="Search media" onChange={(event) => setQuery(event.currentTarget.value)} />
         </label>
         {query ? <button type="button" className="media-bin__clear" onClick={() => setQuery('')}>Clear</button> : null}
         <button type="button" className="media-bin__import" disabled={disabled} onClick={() => inputRef.current?.click()}>
@@ -120,17 +137,21 @@ export function MediaBin({
             void importFiles(files)
           }}
         />
+        <div className="media-bin__filters" aria-label="Filter media">
+          {FILTERS.map((item) => (
+            <button key={item.id} type="button" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>
+              {item.label}<span>{item.id === 'all' ? model.counts.all : item.id === 'missing' ? model.counts.missing : model.counts[item.id]}</span>
+            </button>
+          ))}
+        </div>
+        <div className="media-bin__filter-overflow">
+          <button ref={filterButtonRef} type="button" aria-label={`Filter media, ${FILTERS.find((item) => item.id === filter)?.label ?? 'All'} selected`} aria-expanded={filterMenuOpen} onClick={() => setFilterMenuOpen((value) => !value)}>Filter <span>{FILTERS.find((item) => item.id === filter)?.label}</span></button>
+          {filterMenuOpen ? <div role="menu" aria-label="Media filters">{FILTERS.map((item) => <button key={item.id} role="menuitemradio" aria-checked={filter === item.id} type="button" onClick={() => { setFilter(item.id); setFilterMenuOpen(false); filterButtonRef.current?.focus() }}>{item.label} <span>{item.id === 'all' ? model.counts.all : item.id === 'missing' ? model.counts.missing : model.counts[item.id]}</span></button>)}</div> : null}
+        </div>
+        <p className="media-bin__result-count" role="status">{filtered.length} {filtered.length === 1 ? 'result' : 'results'}</p>
       </div>
 
-      <div className="media-bin__filters" aria-label="Filter media">
-        {FILTERS.map((item) => (
-          <button key={item.id} type="button" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>
-            {item.label}<span>{item.id === 'all' ? model.counts.all : item.id === 'missing' ? model.counts.missing : model.counts[item.id]}</span>
-          </button>
-        ))}
-      </div>
-      <p className="media-bin__result-count" role="status">{filtered.length} {filtered.length === 1 ? 'result' : 'results'}</p>
-
+      <div className="media-bin__results">
       {model.assets.length === 0 ? (
         <div className="media-bin__empty">
           <strong>No media yet</strong>
@@ -193,6 +214,7 @@ export function MediaBin({
           {selected.removeBlockedReason ? <p className="media-bin__disabled-reason">{selected.removeBlockedReason}</p> : null}
         </section>
       ) : null}
+      </div>
 
       {menuAsset ? (
         <MediaContextMenu

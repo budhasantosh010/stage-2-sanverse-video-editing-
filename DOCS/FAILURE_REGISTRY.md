@@ -1467,3 +1467,118 @@ Use one bounded tablet authority and one explicit intrinsic-height mobile author
 ## Entry rules
 
 Do not delete a failure because it is fixed. Mark it resolved, link evidence, and preserve what prevented recurrence.
+
+## FAIL-040 — Media and Preview owner-visible gaps
+
+- **Done:** [x]
+- **Status:** RESOLVED TECHNICALLY — OWNER REVIEW OPEN
+- **Severity:** P1
+- **Found/target:** 2026-08-03 / P1-F.0.2.2
+
+### What / where / when / how / why?
+
+Media squeezed fixed desktop content into narrow panes and Preview exposed
+native controls, technical status, and a permanent Point row because both
+surfaces lacked container-owned responsive presentation.
+
+### What was tried?
+
+Added container-responsive Media layout with one results scroll owner and one
+custom monitor around the existing video/content layer; inspected real browser
+widths and screenshots.
+
+### One-line solution
+
+Adapt presentation at the panel boundary while retaining the single editor authority.
+
+## FAIL-041 — parallel full-web run exceeded test timeouts
+
+- **Done:** [x]
+- **Status:** RESOLVED / INFRASTRUCTURE OBSERVATION
+- **Severity:** P2
+- **Found/target:** 2026-08-03 / P1-F.0.2.2
+
+### What / where / when / how / why?
+
+Six integration tests exceeded existing 5/10 second deadlines only in the
+parallel full-web run under machine contention. The same affected files passed
+39/39 with one worker. One additional failure was a stale assertion expecting
+the entire Media shell to scroll.
+
+### What was tried?
+
+Corrected the stale assertion to results-only scrolling and reran only affected
+files with `--maxWorkers=1` without weakening behavior assertions.
+
+### One-line solution
+
+Use deterministic worker bounds for acceptance runs.
+
+## FAIL-042 — real browser export stayed rendering beyond 90 seconds
+
+- **Done:** [ ]
+- **Status:** OPEN — OUTSIDE THIS MILESTONE
+- **Severity:** P1
+- **Found/target:** 2026-08-03 / future export-runtime repair
+
+### What / where / when / how / why?
+
+After a real nameplate Accept → Undo → Redo path on `test-30s.mp4`, Export stayed
+at `Rendering and verifying your MP4…` for more than 90 seconds. No completion,
+download, visible failure, console error, or API diagnostic surfaced. Renderer
+work was explicitly forbidden for P1-F.0.2.2, so root cause remains unverified.
+
+### What was tried?
+
+Observed the real browser state and checked browser and local dev logs.
+
+### One-line solution
+
+Trace the export job ID through API/job-store completion with a bounded UI timeout in a dedicated renderer milestone.
+
+## FAIL-043 — in-app browser full-viewport screenshots tiled
+
+- **Done:** [ ]
+- **Status:** OPEN — TOOLING
+- **Severity:** P2
+- **Found/target:** 2026-08-03 / evidence tooling
+
+### What / where / when / how / why?
+
+The in-app screenshot compositor returned repeated/tiled pixels for full-viewport
+captures under its scaled viewport. Malformed PNGs were deleted; bounded
+non-tiled JPEG captures were retained. Screen recording was not exposed.
+
+### What was tried?
+
+Used bounded screenshot clips, visually inspected key captures, and removed the
+malformed full-viewport file.
+
+### One-line solution
+
+Use a corrected capture backend or external recorder for exact full-viewport evidence.
+
+## FAIL-044 — pre-commit accessibility and evidence blockers
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P0
+- **Found/target:** 2026-08-03 / P1-F.0.2.2
+
+### What / where / when / how / why?
+
+Independent review found that `sr-only` had no CSS definition, monitor shortcuts
+could intercept keys from native controls, Escape prioritized fullscreen over
+active Point mode, Media exposed an inert options button, and the fullscreen
+screenshot was not valid evidence.
+
+### What was tried?
+
+Added one global screen-reader utility and regression test, ignored bubbled
+keyboard events from native controls, restored Point-first Escape order, removed
+the inert action and CSS, deleted the screenshot, then passed 31/31 affected
+tests and the final web production build.
+
+### One-line solution
+
+Keep hidden semantics, keyboard ownership, action truth, and evidence validity executable and review-gated.

@@ -88,6 +88,13 @@ import {
 import { Timeline, reconcileTimelineSelection } from '../../editor/timeline'
 import { MediaBin } from '../../editor/media'
 import {
+  MonitorSafeAreas,
+  SanverseEditorMonitor,
+  frameStepTicks,
+  resolveMonitorContentRect,
+  type MonitorFitMode,
+} from '../../editor/monitor'
+import {
   WorkspacePresetMenu,
   StudioWorkspacePanel,
   type StudioWorkspace,
@@ -115,9 +122,7 @@ import {
   type MediaStatus,
 } from '../../features/media'
 import {
-  capturePointTarget,
   formatPointTargetTime,
-  getRenderedVideoContentBox,
   type CapturedPointTarget,
 } from '../../features/point-target/point-target'
 import './StudioScreen.css'
@@ -215,11 +220,22 @@ function videoLayoutDimensions(video: HTMLVideoElement) {
     : { width: 16, height: 9 }
 }
 
-function projectPointOntoVideoElement(point: NormalizedPoint, video: HTMLVideoElement) {
+function monitorGeometry(video: HTMLVideoElement, fitMode: MonitorFitMode) {
   const elementBox = video.getBoundingClientRect()
   const dimensions = videoLayoutDimensions(video)
-  const contentBox = getRenderedVideoContentBox(elementBox, dimensions.width, dimensions.height)
-  if (!contentBox) return null
+  return resolveMonitorContentRect({
+    stageRect: { left: elementBox.left, top: elementBox.top, width: elementBox.width, height: elementBox.height },
+    sourceWidth: dimensions.width,
+    sourceHeight: dimensions.height,
+    fitMode,
+  })
+}
+
+function projectPointOntoVideoElement(point: NormalizedPoint, video: HTMLVideoElement, fitMode: MonitorFitMode) {
+  const elementBox = video.getBoundingClientRect()
+  const geometry = monitorGeometry(video, fitMode)
+  if (!geometry || elementBox.width <= 0 || elementBox.height <= 0) return null
+  const contentBox = geometry.displayedContentRect
 
   return {
     left: roundCssPercentage(
@@ -232,11 +248,11 @@ function projectPointOntoVideoElement(point: NormalizedPoint, video: HTMLVideoEl
   }
 }
 
-function getVideoContentLayerStyle(video: HTMLVideoElement) {
+function getVideoContentLayerStyle(video: HTMLVideoElement, fitMode: MonitorFitMode) {
   const elementBox = video.getBoundingClientRect()
-  const dimensions = videoLayoutDimensions(video)
-  const contentBox = getRenderedVideoContentBox(elementBox, dimensions.width, dimensions.height)
-  if (!contentBox) return null
+  const geometry = monitorGeometry(video, fitMode)
+  if (!geometry || elementBox.width <= 0 || elementBox.height <= 0) return null
+  const contentBox = geometry.displayedContentRect
 
   return {
     left: `${roundCssPercentage(((contentBox.left - elementBox.left) / elementBox.width) * 100)}%`,
@@ -289,6 +305,11 @@ export function StudioScreen({
   const [videoLayoutRevision, setVideoLayoutRevision] = useState(0)
   const [pointError, setPointError] = useState<string | null>(null)
   const [playheadMs, setPlayheadMs] = useState(0)
+  const [monitorFitMode, setMonitorFitMode] = useState<MonitorFitMode>('fit')
+  const [monitorGuides, setMonitorGuides] = useState(false)
+  const [monitorPlaying, setMonitorPlaying] = useState(false)
+  const [monitorMuted, setMonitorMuted] = useState(false)
+  const [monitorVolume, setMonitorVolume] = useState(1)
   /** True while the finished video is sitting on a deliberately empty stretch. */
   const [isShowingHole, setIsShowingHole] = useState(false)
   // Playback state the media effect needs but must not re-subscribe for. The
@@ -415,6 +436,12 @@ export function StudioScreen({
 
   useEffect(() => () => {
     if (geometryRefreshFrameRef.current !== null) cancelAnimationFrame(geometryRefreshFrameRef.current)
+  }, [])
+
+  useEffect(() => {
+    const refresh = () => requestGeometryRefresh()
+    document.addEventListener('fullscreenchange', refresh)
+    return () => document.removeEventListener('fullscreenchange', refresh)
   }, [])
 
   useEffect(() => {
@@ -632,6 +659,17 @@ export function StudioScreen({
     video.addEventListener('timeupdate', refreshPlayhead)
     video.addEventListener('seeked', refreshPlayhead)
     video.addEventListener('play', resumeTimelineHole)
+    const syncPlayback = () => setMonitorPlaying(!video.paused)
+    const syncVolume = () => {
+      setMonitorMuted(video.muted)
+      setMonitorVolume(video.volume)
+    }
+    video.addEventListener('play', syncPlayback)
+    video.addEventListener('pause', syncPlayback)
+    video.addEventListener('ended', syncPlayback)
+    video.addEventListener('volumechange', syncVolume)
+    syncPlayback()
+    syncVolume()
     if (hasVideoFrameCallback) requestNextVideoFrame()
 
     return () => {
@@ -652,13 +690,17 @@ export function StudioScreen({
       video.removeEventListener('timeupdate', refreshPlayhead)
       video.removeEventListener('seeked', refreshPlayhead)
       video.removeEventListener('play', resumeTimelineHole)
+      video.removeEventListener('play', syncPlayback)
+      video.removeEventListener('pause', syncPlayback)
+      video.removeEventListener('ended', syncPlayback)
+      video.removeEventListener('volumechange', syncVolume)
     }
   }, [])
 
   const video = videoRef.current
-  const markerPosition = pointTarget && video ? projectPointOntoVideoElement(pointTarget, video) : null
-  const draftPosition = isPointMode && video ? projectPointOntoVideoElement(draftPoint, video) : null
-  const videoContentLayerStyle = video ? getVideoContentLayerStyle(video) : null
+  const markerPosition = pointTarget && video ? projectPointOntoVideoElement(pointTarget, video, monitorFitMode) : null
+  const draftPosition = isPointMode && video ? projectPointOntoVideoElement(draftPoint, video, monitorFitMode) : null
+  const videoContentLayerStyle = video ? getVideoContentLayerStyle(video, monitorFitMode) : null
 
   // The preview is compiled from the project by the same compiler the exporter
   // uses. A pending proposal is layered on top without touching saved state.
@@ -691,12 +733,7 @@ export function StudioScreen({
   const previewCallouts = previewPlan ? visibleCallouts(previewPlan, playheadPreviewTicks) : []
   const previewMedia = previewPlan ? visibleMediaOverlays(previewPlan, playheadPreviewTicks) : []
   const assetKinds = new Map(editProject.assets.map((asset) => [asset.assetId, asset.mediaKind]))
-  const contentBox = video
-    ? (() => {
-        const dimensions = videoLayoutDimensions(video)
-        return getRenderedVideoContentBox(video.getBoundingClientRect(), dimensions.width, dimensions.height)
-      })()
-    : null
+  const contentBox = video ? monitorGeometry(video, monitorFitMode)?.displayedContentRect ?? null : null
   const previewScale = contentBox && composition.width > 0 ? contentBox.width / composition.width : 0
   const reducedMotion =
     typeof window !== 'undefined' &&
@@ -793,6 +830,13 @@ export function StudioScreen({
     assetSources: mediaAssetSources,
     selectedAssetId: selectedMediaAssetId,
   }), [assetOriginalNames, editProject, mediaAssetSources, project.name, selectedMediaAssetId])
+  const primaryVideoAsset = editProject.assets.find((asset) => asset.assetId === primaryAssetId && asset.mediaKind === 'video')
+  const primaryMediaStatus = primaryAssetId ? mediaAssetSources[primaryAssetId]?.status ?? 'checking' : 'missing'
+  const monitorSourceStatus = primaryMediaStatus === 'available'
+    ? 'Local source available'
+    : primaryMediaStatus === 'checking'
+      ? 'Checking local source'
+      : 'Local source missing'
   const pendingTimelineInput = useMemo(
     () => proposal
       ? Object.freeze({
@@ -1108,6 +1152,31 @@ export function StudioScreen({
     videoElement.currentTime = target.sourceTicks / PROJECT_TIMESCALE
   }
 
+  function toggleMonitorPlayback() {
+    const videoElement = videoRef.current
+    if (!videoElement) return
+    if (videoElement.paused) void videoElement.play()
+    else videoElement.pause()
+  }
+
+  function stepMonitorFrame(direction: -1 | 1) {
+    videoRef.current?.pause()
+    seekCompositionTicks(playheadTicksRef.current + direction * frameStepTicks(primaryVideoAsset?.frameRate ?? null))
+  }
+
+  function setMonitorMutedState(muted: boolean) {
+    const videoElement = videoRef.current
+    if (videoElement) videoElement.muted = muted
+    setMonitorMuted(muted)
+  }
+
+  function setMonitorVolumeState(volume: number) {
+    const next = Math.min(1, Math.max(0, Number.isFinite(volume) ? volume : 0))
+    const videoElement = videoRef.current
+    if (videoElement) videoElement.volume = next
+    setMonitorVolume(next)
+  }
+
   async function applyFootageMotion(operation: SetFootageMotionOperation): Promise<string | null> {
     const error = await onCreateOverlay(operation)
     if (!error) {
@@ -1320,22 +1389,25 @@ export function StudioScreen({
     const video = videoRef.current
     if (!video) return
 
-    const elementBox = video.getBoundingClientRect()
-    const result = capturePointTarget({
-      clientX,
-      clientY,
-      elementBox,
-      videoWidth: video.videoWidth,
-      videoHeight: video.videoHeight,
-      currentTimeSeconds: video.currentTime,
-    })
-
-    if (!result.ok) {
-      setPointError(result.error)
+    const geometry = monitorGeometry(video, monitorFitMode)
+    if (!geometry || video.videoWidth <= 0 || video.videoHeight <= 0 || !Number.isFinite(video.currentTime)) {
+      setPointError('The video is not ready for pointing yet.')
       return
     }
-
-    completePointCapture(result.value)
+    const content = geometry.displayedContentRect
+    const visibleLeft = Math.max(geometry.stageRect.left, content.left)
+    const visibleTop = Math.max(geometry.stageRect.top, content.top)
+    const visibleRight = Math.min(geometry.stageRect.left + geometry.stageRect.width, content.left + content.width)
+    const visibleBottom = Math.min(geometry.stageRect.top + geometry.stageRect.height, content.top + content.height)
+    if (clientX < visibleLeft || clientX > visibleRight || clientY < visibleTop || clientY > visibleBottom) {
+      setPointError('Choose a point inside the visible video.')
+      return
+    }
+    completePointCapture(Object.freeze({
+      x: clampNormalized((clientX - content.left) / content.width),
+      y: clampNormalized((clientY - content.top) / content.height),
+      timeMs: Math.max(0, Math.round(video.currentTime * 1_000)),
+    }))
   }
 
   function handleAcceptProposal() {
@@ -1358,6 +1430,12 @@ export function StudioScreen({
     }
 
     if (event.target !== pointLayerRef.current) return
+
+    if (event.key === 'Tab' && !event.shiftKey) {
+      event.preventDefault()
+      pointModeButtonRef.current?.focus()
+      return
+    }
 
     const movement = {
       ArrowLeft: { x: -KEYBOARD_POINT_STEP, y: 0 },
@@ -1844,20 +1922,33 @@ export function StudioScreen({
           aria-label={workspace === 'studio' ? 'Program canvas' : 'Video canvas'}
           tabIndex={-1}
         >
-          <div className="studio-screen__canvas-heading">
-            <div>
-              <span className="studio-screen__section-index">01</span>
-              <h1>{workspace === 'assist' ? 'Your video' : 'Video preview'}</h1>
-            </div>
-            <span className="studio-screen__local-badge">Local source</span>
-          </div>
-
+          <SanverseEditorMonitor
+            sourceStatus={monitorSourceStatus}
+            fitMode={monitorFitMode}
+            guides={monitorGuides}
+            pointActive={isPointMode}
+            pointSelected={Boolean(pointTarget)}
+            playing={monitorPlaying}
+            currentTicks={playheadTicks}
+            durationTicks={compositionDurationTicks}
+            frameRate={primaryVideoAsset?.frameRate ?? null}
+            muted={monitorMuted}
+            volume={monitorVolume}
+            pointButtonRef={pointModeButtonRef}
+            onTogglePoint={isPointMode ? cancelPointMode : enterPointMode}
+            onFitModeChange={(mode) => { setMonitorFitMode(mode); requestGeometryRefresh() }}
+            onGuidesChange={setMonitorGuides}
+            onTogglePlayback={toggleMonitorPlayback}
+            onStepFrame={stepMonitorFrame}
+            onSeek={seekCompositionTicks}
+            onMutedChange={setMonitorMutedState}
+            onVolumeChange={setMonitorVolumeState}
+          >
           <div className="studio-screen__video-frame">
             <div className="studio-screen__video-surface">
               <video
                 ref={videoRef}
                 className="studio-screen__video"
-                controls
                 preload="metadata"
                 src={project.mediaUrl}
                 aria-label={`Preview of ${project.name}`}
@@ -1894,6 +1985,7 @@ export function StudioScreen({
                   data-testid="video-content-layer"
                   style={{ ...videoContentLayerStyle, ...nameplateVariables, ...captionVariables, ...titleVariables }}
                 >
+                  <MonitorSafeAreas visible={monitorGuides} />
                   {previewMedia.map((node) => (
                     <MediaOverlay
                       key={node.nodeId}
@@ -1986,12 +2078,15 @@ export function StudioScreen({
               ) : null}
 
               {markerPosition ? (
-                <span
-                  className="studio-screen__point-marker"
-                  role="img"
-                  aria-label="Selected point"
-                  style={{ left: `${markerPosition.left}%`, top: `${markerPosition.top}%` }}
-                />
+                <>
+                  <span
+                    className="studio-screen__point-marker"
+                    role="img"
+                    aria-label="Selected point"
+                    style={{ left: `${markerPosition.left}%`, top: `${markerPosition.top}%` }}
+                  />
+                  {pointTarget ? <p className="studio-screen__point-selection" role="status">Here · {formatPointTargetTime(pointTarget.timeMs)}</p> : null}
+                </>
               ) : null}
 
               {isPointMode ? (
@@ -2012,29 +2107,14 @@ export function StudioScreen({
                       style={{ left: `${draftPosition.left}%`, top: `${draftPosition.top}%` }}
                     />
                   ) : null}
+                  <p id="point-mode-guidance" className="studio-screen__point-guidance" role="status" aria-label="Point guidance" aria-live="polite">
+                    Click or use Arrow keys to place the cursor · Enter confirms · Esc cancels
+                  </p>
                 </>
               ) : null}
             </div>
           </div>
-          <div className="studio-screen__point-tools">
-            <button
-              ref={pointModeButtonRef}
-              className="studio-screen__point-action"
-              type="button"
-              aria-label={isPointMode ? 'Cancel Point mode' : 'Enter Point mode'}
-              aria-pressed={isPointMode}
-              onClick={isPointMode ? cancelPointMode : enterPointMode}
-            >
-              {isPointMode ? 'Cancel' : 'Point'}
-            </button>
-            <p id="point-mode-guidance" role="status" aria-label="Point guidance" aria-live="polite">
-              {isPointMode
-                ? 'Click or use Arrow keys to place the cursor. Press Enter to choose or Escape to cancel.'
-                : pointTarget
-                  ? `Here · ${formatPointTargetTime(pointTarget.timeMs)}`
-                  : 'Pause anywhere, then choose Point to mark an exact place.'}
-            </p>
-          </div>
+          </SanverseEditorMonitor>
           {pointTarget ? (
             <NameplateComposer
               target={pointTarget}
@@ -2062,24 +2142,15 @@ export function StudioScreen({
           hidden={workspace !== 'studio'}
         >
           {studioWorkspace === 'edit' ? (
-            <>
-              <div className="studio-screen__region-heading">
-                <div>
-                  <span className="studio-screen__section-index">01</span>
-                  <h2>Media</h2>
-                </div>
-                <span>{editProject.assets.length}</span>
-              </div>
-              <MediaBin
-                model={mediaModel}
-                selectedAssetId={selectedMediaAssetId}
-                busy={timelineBusy}
-                onSelect={setSelectedMediaAssetId}
-                onImport={importMediaFiles}
-                onAddAsBroll={addMediaAsBroll}
-                onAddAsMusic={addMediaAsMusic}
-              />
-            </>
+            <MediaBin
+              model={mediaModel}
+              selectedAssetId={selectedMediaAssetId}
+              busy={timelineBusy}
+              onSelect={setSelectedMediaAssetId}
+              onImport={importMediaFiles}
+              onAddAsBroll={addMediaAsBroll}
+              onAddAsMusic={addMediaAsMusic}
+            />
           ) : (
             <StudioWorkspacePanel
               workspace={studioWorkspace}

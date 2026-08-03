@@ -4,6 +4,18 @@ Use this runbook when a new session, agent, or context window resumes the projec
 
 ## Current handoff
 
+P1-F.0.2.2 Media Panel Completion and Editor Monitor V1 is technically complete
+with evidence at
+`DOCS/evidence/2026-08-03-p1f022-media-monitor/`. Media owns adaptive
+presentation and results scrolling; one monitor wraps the existing
+video/content layer without creating editor authority. The full suite passed
+1,174/1,174 before blocker review and the final affected gate passed 31/31 after
+two new assertions (current inventory 1,176); builds pass. Owner visual review is next.
+Media V2, P1-F.1, and P1-F.2 have not started. The real export runtime timeout
+and screenshot-compositor limitation are recorded in the failure registry.
+
+### Previous checkpoint
+
 P1-F.0.2 Nested Studio Layout Engine V2 is complete with evidence at `DOCS/evidence/2026-08-03-p1f02-nested-studio-layout-v2/`. The typed/versioned nested panel adapter preserves one editor authority, one mounted video, continuous playhead/draft/proposal/history, and the existing preview/export path. Full suites pass 1,158/1,158 and the all-workspace build passes. P1-F.1 and P1-F.2 have not started. Screenshot capture recurrence INFRA-004 and local HMR host mismatch INFRA-005 are documented nonblocking infrastructure work.
 
 ## Fast resume
@@ -30,6 +42,14 @@ Do not reconstruct the project from the compacted chat summary alone. Reload com
 - Known failures, limitations, and unverified claims
 - Next action and permission gate
 - Git branch, commit, and remote state
+
+## P1-F.0.2.2 resume note
+
+The latest technical milestone is the completed Media responsive presentation
+and Editor Monitor V1. Preserve `SanverseEditorMonitor` around the existing
+single video/content layer and keep `.media-bin__results` as Media's only scroll
+owner. The next proposed milestone is Media V2, but it is not authorized by this
+checkpoint.
 
 ## Stop conditions
 

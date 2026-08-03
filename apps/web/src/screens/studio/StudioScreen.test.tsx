@@ -225,13 +225,15 @@ function projectWithFootageMotion(): EditProject {
 }
 
 describe('StudioScreen', () => {
-  it('shows the selected filename and a real controlled video preview', () => {
+  it('shows the selected filename inside one custom editor monitor', () => {
     const { container } = renderStudio()
 
     expect(screen.getAllByText('cleaned-interview.mp4')).toHaveLength(3)
     const video = container.querySelector('video')
     expect(video).toHaveAttribute('src', 'blob:cleaned-interview')
-    expect(video).toHaveAttribute('controls')
+    expect(video).not.toHaveAttribute('controls')
+    expect(screen.getByRole('region', { name: 'Editor monitor' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
     expect(video).not.toHaveAttribute('autoplay')
     expect(video).toHaveTextContent(/browser does not support video playback/i)
   })
@@ -508,11 +510,12 @@ describe('StudioScreen', () => {
     expect(screen.queryByText(/export (?:is )?ready/i)).not.toBeInTheDocument()
   })
 
-  it('offers Point mode without blocking ordinary video controls', () => {
+  it('offers Point mode beside the custom playback controls', () => {
     const { container } = renderStudio()
 
     expect(screen.getByRole('button', { name: /enter point mode/i })).toBeEnabled()
-    expect(container.querySelector('video')).toHaveAttribute('controls')
+    expect(container.querySelector('video')).not.toHaveAttribute('controls')
+    expect(screen.getByRole('button', { name: 'Play' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: /choose a point on the visible video/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /add text here/i })).not.toBeInTheDocument()
   })
@@ -548,7 +551,7 @@ describe('StudioScreen', () => {
     expect(screen.getByText('Here · 00:12.400')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /choose a point on the visible video/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /enter point mode/i })).toBeEnabled()
-    expect(video).toHaveAttribute('controls')
+    expect(video).not.toHaveAttribute('controls')
   })
 
   it('remaps a captured normalized target when the video element changes size', async () => {
@@ -603,7 +606,6 @@ describe('StudioScreen', () => {
       left: '55%',
       top: '52.8125%',
     })
-    expect(screen.getByText(/here .* 00:07\.250/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /enter point mode/i })).toHaveFocus()
   })
 
@@ -1085,7 +1087,7 @@ describe('StudioScreen production timeline', () => {
     expect(await screen.findByTestId('primary-footage-canvas-controls')).toBeInTheDocument()
     expect(screen.queryByText('This item does not have canvas controls yet.')).not.toBeInTheDocument()
     expect(container.querySelectorAll('video')).toHaveLength(1)
-    expect(video).toHaveAttribute('controls')
+    expect(video).not.toHaveAttribute('controls')
 
     await user.click(screen.getByRole('button', { name: 'Enter Point mode' }))
 

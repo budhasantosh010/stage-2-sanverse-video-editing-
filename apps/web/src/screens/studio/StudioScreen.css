@@ -207,6 +207,11 @@
   padding: 22px;
 }
 
+.studio-screen__canvas > .editor-monitor {
+  min-height: clamp(300px, 44vh, 640px);
+  flex: 1 1 auto;
+}
+
 .studio-screen__canvas-heading,
 .studio-screen__panel-heading,
 .studio-screen__time-strip-heading {
@@ -301,6 +306,9 @@
   background: var(--color-ink-strong);
   object-fit: contain;
 }
+
+.editor-monitor--fill .studio-screen__video { object-fit: cover; }
+.editor-monitor--actual .studio-screen__video { object-fit: none; }
 
 .studio-screen__point-layer {
   position: absolute;
@@ -773,6 +781,40 @@
   overflow: hidden;
 }
 
+.studio-screen__point-guidance {
+  position: absolute;
+  z-index: 16;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  margin: auto;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 6px;
+  padding: 6px 9px;
+  background: rgb(12 13 14 / 82%);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+.studio-screen__point-selection {
+  position: absolute;
+  z-index: 15;
+  top: 10px;
+  left: 10px;
+  margin: 0;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgb(12 13 14 / 78%);
+  color: #fff;
+  font-size: 9px;
+  pointer-events: none;
+}
+
 .studio-screen__workspace-toolbar {
   display: flex;
   min-width: 0;
@@ -806,7 +848,7 @@
   grid-area: canvas;
   min-height: 0;
   height: 100%;
-  padding: 12px;
+  padding: 0;
   border-radius: var(--radius-panel);
   background: var(--color-surface);
 }
@@ -817,9 +859,11 @@
   max-height: none;
   aspect-ratio: auto;
   flex: 1 1 auto;
-  margin-top: 12px;
-  padding: 10px;
+  margin-top: 0;
+  padding: 0;
 }
+
+.studio-screen--studio .studio-screen__canvas > .editor-monitor { min-height: 0; border: 0; border-radius: inherit; }
 
 .studio-screen--studio .studio-screen__video-surface,
 .studio-screen--studio .studio-screen__video {
@@ -847,7 +891,8 @@
   grid-area: media;
   min-height: 0;
   max-height: none;
-  overflow: auto;
+  overflow: hidden;
+  padding: 0;
 }
 
 .studio-screen__left-splitter {
@@ -1145,6 +1190,12 @@
 
   .studio-screen--studio .studio-screen__canvas {
     min-height: 0;
+  }
+
+  .studio-screen--studio .studio-screen__canvas > .editor-monitor {
+    min-height: clamp(320px, 46vh, 380px);
+    height: clamp(320px, 46vh, 380px);
+    flex: none;
   }
 
   .studio-screen--studio .studio-screen__video-frame {

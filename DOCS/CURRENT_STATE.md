@@ -4,6 +4,22 @@ Last updated: 2026-08-03
 
 ## Active goal
 
+**P1-F.0.2.2 — Media Panel Completion and Editor Monitor V1 is technically
+complete; owner visual acceptance is open.** Media now adapts to its own pane
+and only results scroll. One custom editor monitor surrounds the existing video
+and exposes Point, custom transport, Fit/Fill/100%, guides, and fullscreen while
+preserving one editor/project/revision/video/playhead/proposal/history/export
+authority. The full suite passed 1,174/1,174 before blocker review; the final
+affected gate passed 31/31 after two new assertions (current inventory 1,176).
+The all-workspace and final web production builds pass. The real browser edit,
+Undo, and Redo passed; the real export runtime
+remained rendering beyond 90 seconds and is recorded without claiming success.
+Evidence: `DOCS/evidence/2026-08-03-p1f022-media-monitor/`.
+
+**Stop boundary:** Media V2 and P1-F.1 have not started.
+
+### Previous checkpoint
+
 **P1-F.0.2.1 — Nested Layout Stabilization and Panel-Responsive Components is
 technically complete; owner visual acceptance is open.** Desktop now has one
 viewport-height authority, AI collapses to a real full-height 52 px rail,
@@ -326,3 +342,15 @@ all have real-media and real-browser evidence, recorded with measured numbers in
 `DOCS/evidence/`. Everything else is unimplemented. Historical detail belongs in
 `PROJECT_LOG.md`, `FAILURE_REGISTRY.md`, and `changes/`; it must not be copied
 back here as contradictory current state.
+
+## P1-F.0.2.2 current checkpoint — 2026-08-03
+
+Media responsive presentation and Editor Monitor V1 are technically complete.
+Media now has one adaptive header/control surface and one results-scroll owner.
+The existing video is wrapped by one custom editor monitor with Point, custom
+transport, Fit/Fill/100%, guides, frame stepping, seek, sound, and bounded
+fullscreen. One project, revision, video, playhead, selection, proposal,
+history, preview, and export path remain authoritative. Media V2 capabilities,
+Timeline V2, Inspector expansion, AI expansion, and renderer work have not
+started. Owner visual approval remains open. Evidence:
+`DOCS/evidence/2026-08-03-p1f022-media-monitor/`.

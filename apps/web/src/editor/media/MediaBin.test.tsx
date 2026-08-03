@@ -65,6 +65,15 @@ const renderBin = (overrides: Partial<React.ComponentProps<typeof MediaBin>> = {
 afterEach(cleanup)
 
 describe('MediaBin', () => {
+  it('owns one compact fixed header and toolbar while only results scroll', () => {
+    const { container } = renderBin()
+    expect(screen.getByRole('heading', { name: 'Media' })).toBeInTheDocument()
+    expect(screen.getByText('4 assets')).toBeInTheDocument()
+    expect(container.querySelector('.media-bin__header')).toBeInTheDocument()
+    expect(container.querySelector('.media-bin__toolbar')).toBeInTheDocument()
+    expect(container.querySelector('.media-bin__results')).toContainElement(screen.getByLabelText('Project media assets'))
+  })
+
   it('renders compact cards, truthful metadata, import control, and image thumbnail fallback', () => {
     renderBin()
     expect(screen.getByLabelText('Project media assets')).toBeInTheDocument()

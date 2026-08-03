@@ -46,6 +46,7 @@ describe('shared visual and accessibility contract', () => {
   const main = readSource('main.tsx')
   const homeStyles = readSource('screens/home/HomeScreen.css')
   const studioStyles = readSource('screens/studio/StudioScreen.css')
+  const mediaStyles = readSource('editor/media/MediaBin.css')
   const editorShellStyles = readSource('editor/EditorShell.css')
   const layoutStyles = readSource('editor/layout-v2/StudioLayoutV2.css')
   const inspectorStyles = readSource('editor/inspector/Inspector.css')
@@ -141,15 +142,21 @@ describe('shared visual and accessibility contract', () => {
 
   test('keeps only intentional panel bodies scrollable on desktop', () => {
     const mediaRule = studioStyles.match(/\.studio-screen__media\s*{[^}]*}/s)?.[0] ?? ''
+    const mediaResultsRule = mediaStyles.match(/\.media-bin__results\s*{[^}]*}/s)?.[0] ?? ''
     const inspectorRule = studioStyles.match(/\.studio-screen__inspector\s*{\s*max-height:[^}]*}/s)?.[0] ?? ''
     const aiRule = studioStyles.match(/\.studio-screen__ai-panel-content\s*{[^}]*}/s)?.[0] ?? ''
 
-    expect(mediaRule).toContain('overflow: auto')
+    expect(mediaRule).toContain('overflow: hidden')
+    expect(mediaResultsRule).toContain('overflow-y: auto')
     expect(inspectorRule).toContain('overflow: auto')
     expect(aiRule).toContain('overflow: auto')
     expect(layoutStyles).toMatch(/\.studio-layout-v2__frame--preview[^}]*overflow:\s*hidden/s)
     expect(layoutStyles).toMatch(/\.studio-layout-v2__frame--timeline[^}]*overflow:\s*hidden/s)
     expect(layoutStyles).not.toMatch(/\.studio-layout-v2__frame\s*{[^}]*overflow:\s*auto/s)
+  })
+
+  test('keeps shared screen-reader labels visually hidden', () => {
+    expect(globalStyles).toMatch(/\.sr-only\s*{[^}]*clip-path:\s*inset\(50%\)/s)
   })
 
   test('names every panel container and protects visible resize affordances', () => {

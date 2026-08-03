@@ -1,5 +1,22 @@
 # HANDOFF — everything a new agent needs to continue Sanverse Stage 2
 
+## Current checkpoint
+
+**P1-F.0.2.2 — Media Panel Completion and Editor Monitor V1 is technically
+complete; owner visual acceptance is open.** Media has one container-responsive
+presentation and one results-scroll owner. One custom monitor owns Point,
+custom transport, Fit/Fill/100%, guides, and fullscreen presentation around the
+existing single video/content layer. The full suite passed 1,174/1,174 before
+blocker review and the final affected gate passed 31/31 after two new assertions
+(current inventory 1,176); all-workspace and final web builds pass. Real-browser
+Media resizing, monitor modes, Point,
+edit, Undo, and Redo passed; the real export runtime remained rendering beyond
+90 seconds and is recorded as open. Evidence:
+`DOCS/evidence/2026-08-03-p1f022-media-monitor/`. Media V2 and P1-F.1 have not
+started.
+
+### Previous checkpoint
+
 Updated 2026-08-03. **P1-F.0.2.1 — Nested Layout Stabilization and Panel-Responsive Components is technically complete; owner visual acceptance is open.** Desktop has one bounded height/scroll authority; AI collapses to a full-height 52 px rail; Preview and Timeline retain useful geometry; named containers adapt Media, Preview, Inspector, Timeline, and AI; laptop AI uses an overlay before panel minimums conflict; tablet/mobile Media and Tool use reachable drawers; and below 981 px the document owns natural flow. One existing `EditProject`, revision, history, Undo/Redo stack, playhead, Timeline selection/viewport, Canvas/Inspector draft, native video, AI conversation, proposal, preview, and export path remain authoritative. Final suites pass 1,164/1,164 and the production build passes. Real browser evidence includes draft/workspace continuity, ten collapse cycles, keyboard resize, edit, Undo, Redo, and a probed 1080p export. Evidence is in `DOCS/evidence/2026-08-03-p1f021-layout-stabilization/`. P1-F.1 has not started.
 
 A closed `sanverse.workspace-layout/v1` contract owns only local presentation: validated/clamped dock widths, Timeline height, collapse state, Tool/AI tab, active workspace, and bounded Edit/Motion/Timeline/Review/AI/Audio presets. Pointer and keyboard splitters support bounds, Shift steps, Home/End, and Escape cancellation. Compact layouts use explicit Media and Tool/AI switches. Layout changes use the existing geometry refresh and create no operation, project rebuild, or revision.
@@ -477,3 +494,12 @@ two caption sets on screen at once · karaoke word-by-word highlighting.
 
 **A commit message prefix of `[verified]` means real-media evidence exists.
 `[wip]` means it does not.** Do not use `[verified]` without an evidence file.
+
+## Latest handoff — P1-F.0.2.2
+
+Media panel responsive completion and Editor Monitor V1 are implemented on the
+same mounted editor session. Read
+`DOCS/evidence/2026-08-03-p1f022-media-monitor/IMPLEMENTATION_REPORT.md` before
+continuing. Owner visual review is next. Do not begin Media V2 until a new
+approved contract defines sorting, bins, multiselect, batch behavior, drag
+initiation, drop targets, and insert/overwrite/append policy.

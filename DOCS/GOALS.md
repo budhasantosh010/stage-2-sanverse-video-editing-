@@ -88,3 +88,6 @@ Never publish one invented percentage-complete number. A box closes only when it
 - [x] P1-F.0.2.1 Nested Layout Stabilization — technical and E2E gates
 - [ ] P1-F.0.2.1 owner visual acceptance
 - [ ] P1-F.1 — not started; requires the next approved implementation contract
+- [x] P1-F.0.2.2 Media responsive presentation and Editor Monitor V1 — technical gate
+- [ ] P1-F.0.2.2 owner visual acceptance
+- [ ] Media V2 sorting/bins/multiselect/batch/drag/drop policies — proposed, not started
