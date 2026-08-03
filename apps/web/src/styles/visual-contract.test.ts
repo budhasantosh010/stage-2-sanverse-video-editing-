@@ -46,6 +46,8 @@ describe('shared visual and accessibility contract', () => {
   const main = readSource('main.tsx')
   const homeStyles = readSource('screens/home/HomeScreen.css')
   const studioStyles = readSource('screens/studio/StudioScreen.css')
+  const editorShellStyles = readSource('editor/EditorShell.css')
+  const layoutStyles = readSource('editor/layout-v2/StudioLayoutV2.css')
   const inspectorStyles = readSource('editor/inspector/Inspector.css')
   const canvasStyles = readSource('editor/canvas/CanvasInteractionLayer.css')
   const allStyles = [tokens, globalStyles, homeStyles, studioStyles, inspectorStyles, canvasStyles].join('\n')
@@ -114,25 +116,30 @@ describe('shared visual and accessibility contract', () => {
     expect(desktopGridRule).not.toContain('grid-template-rows: minmax(0, 1fr)')
   })
 
-  test('gives document scrolling one outer authority and leaves Studio in normal page flow', () => {
+  test('gives the desktop editor one explicit viewport-height and scroll authority', () => {
     const htmlRule = globalStyles.match(/html\s*{[^}]*}/s)?.[0] ?? ''
     const bodyRule = globalStyles.match(/body\s*{[^}]*}/s)?.[0] ?? ''
     const rootRule = globalStyles.match(/#root\s*{[^}]*}/s)?.[0] ?? ''
+    const shellRule = editorShellStyles.match(/\.editor-shell\s*{[^}]*}/s)?.[0] ?? ''
+    const workspaceRule = editorShellStyles.match(/\.editor-shell__workspace\s*{[^}]*}/s)?.[0] ?? ''
     const studioRule = studioStyles.match(/\.editor-shell \.studio-screen--studio\s*{[^}]*}/s)?.[0] ?? ''
-    const timelineRule = studioStyles.match(/\.studio-screen--studio \.studio-screen__time-strip\s*{[^}]*}/s)?.[0] ?? ''
 
-    expect(htmlRule).toContain('overflow-y: auto')
-    expect(bodyRule).toContain('overflow-y: visible')
-    expect(rootRule).toContain('min-height: 100%')
-    expect(studioRule).toContain('height: auto')
-    expect(studioRule).toContain('grid-template-rows: auto auto')
-    expect(studioRule).toContain('overflow: visible')
-    expect(studioRule).not.toMatch(/(?:^|\n)\s*height:\s*calc\(100vh\s*-\s*64px\)/)
-    expect(timelineRule).toContain('min-height: var(--studio-timeline-height, 390px)')
-    expect(timelineRule).toContain('overflow: visible')
+    expect(htmlRule).toContain('height: 100%')
+    expect(bodyRule).toContain('height: 100%')
+    expect(rootRule).toContain('height: 100%')
+    expect(shellRule).toContain('height: 100dvh')
+    expect(shellRule).toContain('display: flex')
+    expect(shellRule).toContain('overflow: hidden')
+    expect(workspaceRule).toContain('min-height: 0')
+    expect(workspaceRule).toContain('flex: 1 1 auto')
+    expect(studioRule).toContain('height: 100%')
+    expect(studioRule).toContain('min-height: 0')
+    expect(studioRule).toContain('grid-template-rows: auto minmax(0, 1fr)')
+    expect(studioRule).toContain('overflow: hidden')
+    expect(layoutStyles).toMatch(/\.studio-layout-v2__root[^}]*height:\s*100%/s)
   })
 
-  test('retains bounded internal scrolling without creating a second page scroll surface', () => {
+  test('keeps only intentional panel bodies scrollable on desktop', () => {
     const mediaRule = studioStyles.match(/\.studio-screen__media\s*{[^}]*}/s)?.[0] ?? ''
     const inspectorRule = studioStyles.match(/\.studio-screen__inspector\s*{\s*max-height:[^}]*}/s)?.[0] ?? ''
     const aiRule = studioStyles.match(/\.studio-screen__ai-panel-content\s*{[^}]*}/s)?.[0] ?? ''
@@ -140,7 +147,28 @@ describe('shared visual and accessibility contract', () => {
     expect(mediaRule).toContain('overflow: auto')
     expect(inspectorRule).toContain('overflow: auto')
     expect(aiRule).toContain('overflow: auto')
-    expect(studioStyles).not.toMatch(/\.editor-shell \.studio-screen--studio\s*{[^}]*overflow-y:\s*auto/s)
+    expect(layoutStyles).toMatch(/\.studio-layout-v2__frame--preview[^}]*overflow:\s*hidden/s)
+    expect(layoutStyles).toMatch(/\.studio-layout-v2__frame--timeline[^}]*overflow:\s*hidden/s)
+    expect(layoutStyles).not.toMatch(/\.studio-layout-v2__frame\s*{[^}]*overflow:\s*auto/s)
+  })
+
+  test('names every panel container and protects visible resize affordances', () => {
+    for (const name of ['studio-ai', 'studio-media', 'studio-preview', 'studio-tool', 'studio-timeline']) {
+      expect(layoutStyles).toContain(`container-name: ${name}`)
+    }
+    expect(layoutStyles).toMatch(/\.studio-layout-v2__separator\s*{[^}]*flex:\s*0 0 (?:8|10|12)px/s)
+    expect(layoutStyles).toContain('cursor: col-resize')
+    expect(layoutStyles).toContain('cursor: row-resize')
+  })
+
+  test('hands narrow screens to an explicit natural-flow panel authority', () => {
+    expect(globalStyles).toMatch(/@media \(max-width: 980px\)[\s\S]*html,[\s\S]*body,[\s\S]*#root\s*{[^}]*height: auto/s)
+    expect(layoutStyles).toMatch(/@media \(max-width: 980px\)[\s\S]*\.studio-layout-v2__root,[\s\S]*display: block !important/s)
+    expect(layoutStyles).toMatch(/#studio-preview-pane,[\s\S]*#studio-timeline-pane\s*{[^}]*height: auto !important[^}]*flex: none !important/s)
+    expect(layoutStyles).toContain('#studio-media-pane:not(:has(.studio-screen__side-region--compact-open))')
+    expect(layoutStyles).toContain('#studio-tool-pane:not(:has(.studio-screen__side-region--compact-open))')
+    expect(layoutStyles).toContain(".studio-layout-v2[data-responsive='tablet'] #studio-media-pane:has(.studio-screen__side-region--compact-open)")
+    expect(studioStyles).toMatch(/@media \(min-width: 981px\) and \(max-width: 1100px\)[\s\S]*\.editor-shell \.studio-screen--studio\s*{[^}]*height: 100%[^}]*overflow: hidden/s)
   })
 
   test('leaves native video controls reachable outside real Canvas targets', () => {

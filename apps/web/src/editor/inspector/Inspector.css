@@ -63,6 +63,28 @@
   padding: 0 14px 18px;
 }
 
+@container studio-tool (max-width: 340px) {
+  .inspector__header {
+    gap: 7px;
+    padding: 10px 11px 9px;
+  }
+
+  .inspector__body {
+    padding-inline: 10px;
+  }
+
+  .inspector-row,
+  .inspector__facts > div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .inspector-row dd,
+  .inspector__facts dd {
+    text-align: left;
+  }
+}
+
 .inspector__empty,
 .inspector__notice,
 .inspector__proposal {

@@ -11,6 +11,8 @@
   padding: 6px 16px;
   background: rgb(247 247 245 / 96%);
   backdrop-filter: blur(14px);
+  flex: 0 0 46px;
+  overflow: hidden;
 }
 
 .studio-workspace-tabs,

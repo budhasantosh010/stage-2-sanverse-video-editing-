@@ -85,4 +85,6 @@ Never publish one invented percentage-complete number. A box closes only when it
 # Current implementation checkpoint — 2026-08-03
 
 - [x] P1-F.0.2 Nested Studio Layout Engine V2
+- [x] P1-F.0.2.1 Nested Layout Stabilization — technical and E2E gates
+- [ ] P1-F.0.2.1 owner visual acceptance
 - [ ] P1-F.1 — not started; requires the next approved implementation contract

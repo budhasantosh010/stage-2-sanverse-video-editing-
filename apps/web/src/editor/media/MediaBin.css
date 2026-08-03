@@ -124,13 +124,15 @@
 .media-bin__context-menu { position: absolute; z-index: 30; right: 4px; bottom: 54px; display: grid; min-width: 160px; gap: 4px; border: 1px solid var(--color-ink-strong); border-radius: 7px; padding: 6px; background: var(--color-surface); box-shadow: 0 8px 24px rgb(0 0 0 / 22%); }
 .media-bin__context-menu > * { text-align: left; font-size: 11px; }
 
-@media (max-width: 1100px) {
-  .media-bin { min-height: 420px; }
-  .media-bin__list { max-height: 48vh; }
+@container studio-media (max-width: 320px) {
+  .media-bin__toolbar { grid-template-columns: minmax(0, 1fr); }
+  .media-bin__import { width: 100%; }
+  .media-bin__card-select { grid-template-columns: 48px minmax(0, 1fr); }
+  .media-bin__thumbnail { width: 48px; height: 36px; }
+  .media-bin__actions { display: grid; grid-template-columns: 1fr; }
 }
 
-@media (max-width: 600px) {
-  .media-bin { min-height: min(70vh, 600px); }
+@container studio-media (min-width: 360px) {
   .media-bin__card-select { grid-template-columns: 72px minmax(0, 1fr); }
   .media-bin__thumbnail { width: 72px; height: 48px; }
 }

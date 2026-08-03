@@ -500,3 +500,16 @@ AI overlay continuity, and focused regression coverage. A real 30-second media
 walkthrough passed edit, Undo, Redo, export, and download. Final suites pass
 1,158/1,158; the production build passes. INFRA-004, INFRA-005, and SEC-001 are
 recorded as bounded follow-up work. P1-F.1 was not started.
+
+# 2026-08-03 — P1-F.0.2.1 layout stabilization technically complete
+
+Real-browser measurement found and fixed two milestone blockers: Reset could
+leave a physically expanded AI panel behind an `Expand AI` label, and the old
+natural-flow breakpoint collapsed nested Preview/Timeline panel ancestors to
+zero height at 1024 and mobile widths. Stable initial geometry, final
+presentation authority, a bounded 1024 tablet regime, and an explicit mobile
+natural-flow escape resolved both without changing editor/domain authority.
+One video, AI draft continuity, ten stable 1440×900 expand/collapse cycles, keyboard resize, responsive
+reachability, edit, Undo, Redo, and export passed. Final suites pass 1,164/1,164;
+all builds pass; the export probes as 1920×1080 H.264/AAC. Invalid tiled PNGs
+were not presented as evidence. P1-F.1 was not started.

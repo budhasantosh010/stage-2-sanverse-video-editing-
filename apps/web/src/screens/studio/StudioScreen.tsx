@@ -1544,7 +1544,7 @@ export function StudioScreen({
 
   const conversationPanel = (
         <aside
-          className={`studio-screen__conversation${workspace === 'studio' && isAiPanelCollapsed ? ' studio-screen__conversation--collapsed' : ''}`}
+          className="studio-screen__conversation"
           aria-label={workspace === 'studio' ? 'AI edit panel' : 'Conversation'}
         >
           <div className="studio-screen__panel-heading">
@@ -1565,25 +1565,12 @@ export function StudioScreen({
               <span className="studio-screen__unavailable-tag">
                 {workspace === 'assist' ? 'Nothing applies without Accept' : 'Preview mode'}
               </span>
-              {workspace === 'studio' ? (
-                <button
-                  className="studio-screen__ai-toggle"
-                  type="button"
-                  aria-controls="studio-ai-panel-content"
-                  aria-expanded={!isAiPanelCollapsed}
-                  aria-label={isAiPanelCollapsed ? 'Expand AI panel' : 'Collapse AI panel'}
-                  onClick={() => setAiOpen(isAiPanelCollapsed)}
-                >
-                  {isAiPanelCollapsed ? 'Open' : 'Hide'}
-                </button>
-              ) : null}
             </div>
           </div>
 
           <div
             id="studio-ai-panel-content"
             className="studio-screen__ai-panel-content"
-            hidden={workspace === 'studio' && isAiPanelCollapsed}
           >
           <ChatComposer
             conversation={conversation}
@@ -1823,6 +1810,26 @@ export function StudioScreen({
         responsiveMode={responsiveMode}
         aiOpen={!isAiPanelCollapsed}
         pendingProposal={Boolean(proposal)}
+        compactControls={(
+          <div className="studio-screen__compact-panel-switcher" aria-label="Studio side panels">
+            <button
+              type="button"
+              aria-controls="studio-left-dock"
+              aria-expanded={compactSidePanel === 'media'}
+              onClick={() => setCompactSidePanel((current) => current === 'media' ? null : 'media')}
+            >
+              {compactSidePanel === 'media' ? `Hide ${leftDockLabel}` : `Show ${leftDockLabel}`}
+            </button>
+            <button
+              type="button"
+              aria-controls="studio-inspector-region"
+              aria-expanded={compactSidePanel === 'inspector'}
+              onClick={() => setCompactSidePanel((current) => current === 'inspector' ? null : 'inspector')}
+            >
+              {compactSidePanel === 'inspector' ? 'Hide Tool' : 'Show Tool'}
+            </button>
+          </div>
+        )}
         ai={conversationPanel}
         onAiOpenChange={setAiOpen}
         onLayoutChange={(next) => {
@@ -2047,29 +2054,6 @@ export function StudioScreen({
         </section>
         </>)}
         media={(<>
-
-        <div
-          className="studio-screen__compact-panel-switcher"
-          aria-label="Studio side panels"
-          hidden={workspace !== 'studio'}
-        >
-          <button
-            type="button"
-            aria-controls="studio-left-dock"
-            aria-expanded={compactSidePanel === 'media'}
-            onClick={() => setCompactSidePanel((current) => current === 'media' ? null : 'media')}
-          >
-            {leftDockLabel}
-          </button>
-          <button
-            type="button"
-            aria-controls="studio-right-dock-region"
-            aria-expanded={compactSidePanel === 'inspector'}
-            onClick={() => setCompactSidePanel((current) => current === 'inspector' ? null : 'inspector')}
-          >
-            Tool / AI
-          </button>
-        </div>
 
         <section
           id="studio-left-dock"

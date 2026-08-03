@@ -26,6 +26,25 @@
   align-items: center;
 }
 
+@container studio-timeline (max-width: 760px) {
+  .timeline-v1 {
+    gap: 7px;
+  }
+
+  .timeline-v1__toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px;
+  }
+
+  .timeline-v1__selection-summary {
+    display: none;
+  }
+
+  .timeline-v1__viewport-grid {
+    grid-template-columns: 62px minmax(0, 1fr);
+  }
+}
+
 .timeline-v1__toolbar-title {
   display: flex;
   gap: 8px;

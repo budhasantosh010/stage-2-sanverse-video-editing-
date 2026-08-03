@@ -464,7 +464,7 @@ describe('StudioScreen', () => {
 
     const composer = screen.getByRole('textbox', { name: /ask for an edit/i })
     fireEvent.change(composer, { target: { value: 'keep this draft' } })
-    await user.click(screen.getByRole('button', { name: /collapse ai panel/i }))
+    await user.click(screen.getByRole('button', { name: /^collapse ai$/i }))
 
     expect(screen.getByRole('button', { name: /expand ai$/i }))
       .toHaveAttribute('aria-expanded', 'false')
@@ -480,7 +480,7 @@ describe('StudioScreen', () => {
     const user = userEvent.setup()
     renderStudioWithAi({ proposal: directProposal() })
 
-    await user.click(screen.getByRole('button', { name: /collapse ai panel/i }))
+    await user.click(screen.getByRole('button', { name: /^collapse ai$/i }))
 
     expect(screen.getByRole('status', { name: /pending ai proposal/i }))
       .toHaveTextContent(/1 pending/i)

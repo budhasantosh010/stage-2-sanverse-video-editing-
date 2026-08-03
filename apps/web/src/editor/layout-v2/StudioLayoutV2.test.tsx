@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -56,6 +56,26 @@ describe('StudioLayoutV2', () => {
     expect(screen.getByRole('region', { name: 'AI editor' }).querySelector('[data-mode="overlay"]')).not.toBeNull()
   })
 
+  it('renders collapsed AI as a full-height status rail with one unambiguous action', () => {
+    render(<StudioLayoutV2 layout={defaultStudioLayoutV2()} responsiveMode="desktop" aiOpen={false} pendingProposal onLayoutChange={vi.fn()} {...panes} />)
+
+    const frame = screen.getByRole('region', { name: 'AI editor' })
+    const rail = frame.querySelector('[data-mode="collapsed"]')
+    expect(rail).toHaveAttribute('data-open', 'false')
+    expect(screen.getAllByRole('button', { name: 'Expand AI' })).toHaveLength(1)
+    expect(screen.getByRole('status', { name: 'Pending AI proposal' })).toHaveTextContent('1 pending')
+    expect(frame.querySelector('.studio-layout-v2__ai-content')).toHaveAttribute('inert')
+  })
+
+  it('keeps the AI panel physically collapsed when a preset layout changes at the same time', async () => {
+    const { container, rerender } = render(<StudioLayoutV2 layout={{ ...defaultStudioLayoutV2(), aiMode: 'expanded' }} responsiveMode="desktop" aiOpen onLayoutChange={vi.fn()} {...panes} />)
+
+    rerender(<StudioLayoutV2 layout={{ ...defaultStudioLayoutV2(), rootLayout: [30, 70] }} responsiveMode="desktop" aiOpen={false} onLayoutChange={vi.fn()} {...panes} />)
+
+    await waitFor(() => expect(container.querySelector('#studio-ai-pane')).toHaveStyle({ flexGrow: '0' }))
+    expect(screen.getByRole('button', { name: 'Expand AI' })).toHaveAttribute('aria-expanded', 'false')
+  })
+
   it('gives horizontal and vertical resize handles a real keyboard hit target', () => {
     render(<StudioLayoutV2 layout={defaultStudioLayoutV2()} responsiveMode="desktop" aiOpen onLayoutChange={vi.fn()} {...panes} />)
     expect(screen.getByRole('separator', { name: 'Resize Media pane' })).toHaveStyle({ width: '8px' })
@@ -71,14 +91,27 @@ describe('StudioLayoutV2', () => {
     expect(screen.getByRole('button', { name: 'Close AI overlay' })).toBeInTheDocument()
   })
 
-  it('applies preset geometry to every mounted nested group', () => {
-    const { container, rerender } = render(<StudioLayoutV2 layout={defaultStudioLayoutV2()} responsiveMode="desktop" aiOpen={false} onLayoutChange={vi.fn()} {...panes} />)
-    rerender(<StudioLayoutV2 layout={{ ...defaultStudioLayoutV2(), mainVerticalLayout: [42, 58], upperLayout: [10, 62, 28] }} responsiveMode="desktop" aiOpen={false} onLayoutChange={vi.fn()} {...panes} />)
-    expect(container.querySelector('#studio-upper-pane')).toHaveStyle({ flexGrow: '42' })
-    expect(container.querySelector('#studio-timeline-pane')).toHaveStyle({ flexGrow: '58' })
-    expect(container.querySelector('#studio-media-pane')).toHaveStyle({ flexGrow: '10' })
-    expect(container.querySelector('#studio-preview-pane')).toHaveStyle({ flexGrow: '62' })
-    expect(container.querySelector('#studio-tool-pane')).toHaveStyle({ flexGrow: '28' })
+  it('uses an AI overlay on laptop widths before panel minimums can conflict', () => {
+    render(<StudioLayoutV2 layout={defaultStudioLayoutV2()} responsiveMode="laptop" aiOpen={false} onLayoutChange={vi.fn()} {...panes} />)
+
+    expect(screen.getByRole('button', { name: 'Open AI overlay' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'AI editor' }).querySelector('[data-mode="overlay"]')).not.toBeNull()
+  })
+
+  it('keeps compact Media and Tool controls outside the panels they reveal', () => {
+    render(<StudioLayoutV2 layout={defaultStudioLayoutV2()} responsiveMode="tablet" aiOpen={false} compactControls={<button type="button">Show Media</button>} onLayoutChange={vi.fn()} {...panes} />)
+
+    expect(screen.getByRole('button', { name: 'Show Media' }).closest('[data-panel]')).toBeNull()
+    expect(screen.getByText('Media body')).toBeInTheDocument()
+    expect(screen.getByText('Tool body')).toBeInTheDocument()
+  })
+
+  it('does not treat programmatic preset geometry as a user-authored layout change', () => {
+    const onLayoutChange = vi.fn()
+    const { rerender } = render(<StudioLayoutV2 layout={defaultStudioLayoutV2()} responsiveMode="desktop" aiOpen={false} onLayoutChange={onLayoutChange} {...panes} />)
+    rerender(<StudioLayoutV2 layout={{ ...defaultStudioLayoutV2(), mainVerticalLayout: [42, 58], upperLayout: [10, 62, 28] }} responsiveMode="desktop" aiOpen={false} onLayoutChange={onLayoutChange} {...panes} />)
+
+    expect(onLayoutChange).not.toHaveBeenCalled()
   })
 
   it('keeps persisted user intent unchanged across responsive adaptation', () => {

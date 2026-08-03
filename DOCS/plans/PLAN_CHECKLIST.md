@@ -326,6 +326,10 @@ no button offers it yet — the owner cannot get to it from the screen.
 - [x] Verify real edit, Undo, Redo, export, and download
 - [x] Pass 1,158 tests and production build
 - [x] Record evidence and nonblocking failures
+- [x] P1-F.0.2.1 stabilize nested height, scroll, rail, and responsive panel behavior
+- [x] P1-F.0.2.1 real-user E2E: draft continuity, 10 collapse cycles, keyboard resize, edit, Undo, Redo, export
+- [x] P1-F.0.2.1 pass 1,164 tests and production build
+- [ ] Owner visual acceptance of P1-F.0.2.1
 - [ ] Begin P1-F.1 only after a new approved contract
 
 - [ ] Representative users finish acceptable videos in measured minutes

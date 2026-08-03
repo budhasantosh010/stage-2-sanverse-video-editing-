@@ -1,6 +1,11 @@
 .editor-shell {
-  min-height: 100vh;
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  flex-direction: column;
   background: var(--color-workspace);
+  overflow: hidden;
 }
 
 .editor-shell__topbar {
@@ -16,6 +21,7 @@
   padding: 8px 20px;
   background: rgb(247 247 245 / 94%);
   backdrop-filter: blur(14px);
+  flex: 0 0 auto;
 }
 
 .editor-shell__start,
@@ -86,22 +92,34 @@
 }
 
 .editor-shell__workspace {
-  min-height: calc(100vh - 64px);
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
-.editor-shell[data-workspace="studio"] .editor-shell__workspace {
-  min-height: calc(100vh - 110px);
+.editor-shell[data-workspace="assist"] .editor-shell__workspace {
+  overflow-y: auto;
 }
 
 .editor-shell__workspace > .studio-screen {
-  min-height: calc(100vh - 64px);
-}
-
-.editor-shell[data-workspace="studio"] .editor-shell__workspace > .studio-screen {
-  min-height: calc(100vh - 110px);
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
 }
 
 @media (max-width: 980px) {
+  .editor-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .editor-shell__workspace {
+    overflow: visible;
+  }
+
   .editor-shell__topbar {
     grid-template-columns: minmax(220px, 1fr) auto;
   }

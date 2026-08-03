@@ -4,14 +4,17 @@ Last updated: 2026-08-03
 
 ## Active goal
 
-**P1-F.0.2 — Nested Studio Layout Engine V2 is complete.** Studio now uses
-`react-resizable-panels@4.12.2` through a typed, versioned presentation adapter.
-The nested AI/main, upper/timeline, and media/preview/tool layout preserves one
-existing editor authority and adds validated migration, persistence, live presets,
-responsive overlays, keyboard separators, and draft/focus continuity. No new
-domain operation, renderer, project, history, proposal, preview, or export path
-was created. Final suites pass 1,158/1,158 and the production build passes.
-Evidence: `DOCS/evidence/2026-08-03-p1f02-nested-studio-layout-v2/`.
+**P1-F.0.2.1 — Nested Layout Stabilization and Panel-Responsive Components is
+technically complete; owner visual acceptance is open.** Desktop now has one
+viewport-height authority, AI collapses to a real full-height 52 px rail,
+Preview and Timeline retain protected minimum geometry, panel content responds
+to named containers, and screens below 981 px use one reachable natural-flow
+document. The same editor authority, ChatComposer, native video, playhead,
+proposal, history, preview path, and export path remain mounted. Real-browser
+editing, Undo, Redo, responsive geometry, ten stable 1440×900 AI expand/collapse cycles, keyboard resize,
+and a 1080p export passed. Final suites pass 1,164/1,164 and the production
+build passes. Evidence:
+`DOCS/evidence/2026-08-03-p1f021-layout-stabilization/`.
 
 **Stop boundary:** P1-F.1 has not started.
 

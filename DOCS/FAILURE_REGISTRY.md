@@ -47,6 +47,8 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | INFRA-004 | P3 | Dev-process cleanup | Stopping the Harness dev parent left Sanverse Vite/API children listening on ports 2000/2001 | RESOLVED | P1-B |
 | [x] | FAIL-036 | P1 | React continuity | Re-parenting the AI panel between Assist and Studio remounted ChatComposer and cleared unsent text | RESOLVED | P1-F.0.1 |
 | [x] | FAIL-037 | P1 | Interaction routing | Selecting a proposed Timeline item forced the AI tab instead of revealing authoritative Inspector actions | RESOLVED | P1-F.0.1 |
+| [x] | FAIL-038 | P0 | Layout authority | AI toggle state could say collapsed while Reset left the panel physically expanded | RESOLVED | P1-F.0.2.1 |
+| [x] | FAIL-039 | P0 | Responsive layout | Nested Preview and Timeline panels inherited zero-height ancestors at tablet/mobile breakpoints | RESOLVED | P1-F.0.2.1 |
 
 ## P1-F.0.1 validation-found issue details
 
@@ -1340,9 +1342,12 @@ scaling class previously recorded as INFRA-003, not an editor-layout failure.
 
 ### What was tried?
 
-Viewport calibration and recapture were attempted. The application DOM,
-keyboard resizing, state continuity, real edit, Undo/Redo, export, and download
-were verified independently; invalid PNGs were retained only as failure evidence.
+Viewport calibration and recapture were attempted again during P1-F.0.2.1.
+The in-app browser reported DPR 0.67 and tiled captures even when the video and
+parent DOM rectangles were identical and bounded. Chrome control was not
+available. Application geometry, keyboard resizing, state continuity, ten
+collapse cycles, real edit, Undo/Redo, export, and ffprobe were verified
+independently. Invalid PNGs are not presented as product evidence.
 
 ### One-line solution
 
@@ -1399,6 +1404,65 @@ verified. No broad audit fix was attempted.
 ### One-line solution
 
 Run a bounded advisory attribution and upgrade review before production release.
+
+## FAIL-038 — Reset could visually re-expand a collapsed AI rail
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P0
+- **Found:** 2026-08-03
+- **Target milestone:** P1-F.0.2.1
+
+### What / where / when / how / why?
+
+In the real Studio browser, Reset followed by collapse changed the action to
+`Expand AI`, but a later persisted percentage layout effect restored the panel
+to roughly 320 px. Competing effects both believed they owned root geometry.
+
+### What was tried?
+
+The initial default layout was stabilized for the mounted group. Percentage
+geometry now applies only while AI is expanded, and the presentation-mode
+effect is the final authority.
+
+### One-line solution
+
+Give collapsed pixel geometry final authority over persisted expanded percentages.
+
+### Evidence and status
+
+Ten browser collapse cycles ended identically at 52 px; regression tests pass.
+
+## FAIL-039 — responsive nested panels had zero-height ancestors
+
+- **Done:** [x]
+- **Status:** RESOLVED
+- **Severity:** P0
+- **Found:** 2026-08-03
+- **Target milestone:** P1-F.0.2.1
+
+### What / where / when / how / why?
+
+At 1024×768 and 390×843, the old 1100 px natural-flow breakpoint removed the
+height authority while resizable panels still used percentage flex geometry and
+size containment. Preview and Timeline wrappers measured zero height even though
+their children overflowed.
+
+### What was tried?
+
+Tablet desktops retain the bounded panel authority through 981 px. Below that,
+groups and required panels explicitly leave flex sizing, hidden docks are
+removed, size containment becomes inline-size containment, and root height
+becomes natural.
+
+### One-line solution
+
+Use one bounded tablet authority and one explicit intrinsic-height mobile authority.
+
+### Evidence and status
+
+1024: Preview 940×309, Timeline 940×258. Mobile: Preview 339×425, Timeline
+339×492, reachable through document scroll, with zero horizontal overflow.
 
 ## Entry rules
 

@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Group, Panel, useGroupRef, type LayoutChangedMeta } from 'react-resizable-panels'
 import type { StudioLayoutV2State } from './studio-layout-contract'
 import type { StudioResponsiveMode } from './studio-layout-responsive'
@@ -17,16 +17,17 @@ export function StudioMainEditorPane({ layout, responsiveMode, media, preview, t
   onUpperLayoutChanged(layout: readonly [number, number, number], meta: LayoutChangedMeta): void
 }>) {
   const groupRef = useGroupRef()
+  const initialLayoutRef = useRef(layout.mainVerticalLayout)
   const compact = responsiveMode === 'mobile'
   useEffect(() => {
     try { groupRef.current?.setLayout({ 'studio-upper-pane': layout.mainVerticalLayout[0], 'studio-timeline-pane': layout.mainVerticalLayout[1] }) }
     catch { /* stale handle from an unmounted responsive group */ }
   }, [groupRef, layout.mainVerticalLayout])
   return (
-    <Group id="studio-main-vertical-group" groupRef={groupRef} orientation="vertical" disabled={compact} className="studio-layout-v2__main" defaultLayout={{ 'studio-upper-pane': layout.mainVerticalLayout[0], 'studio-timeline-pane': layout.mainVerticalLayout[1] }} onLayoutChanged={(next, meta) => onMainLayoutChanged([next['studio-upper-pane'], next['studio-timeline-pane']], meta)}>
-      <Panel id="studio-upper-pane" defaultSize={`${layout.mainVerticalLayout[0]}%`} minSize={300}><StudioUpperWorkspace layout={layout} responsiveMode={responsiveMode} media={media} preview={preview} tool={tool} onLayoutChanged={onUpperLayoutChanged} /></Panel>
+    <Group id="studio-main-vertical-group" groupRef={groupRef} orientation="vertical" disabled={compact} className="studio-layout-v2__main" defaultLayout={{ 'studio-upper-pane': initialLayoutRef.current[0], 'studio-timeline-pane': initialLayoutRef.current[1] }} onLayoutChanged={(next, meta) => onMainLayoutChanged([next['studio-upper-pane'], next['studio-timeline-pane']], meta)}>
+      <Panel id="studio-upper-pane" defaultSize={`${initialLayoutRef.current[0]}%`} minSize={300}><StudioUpperWorkspace layout={layout} responsiveMode={responsiveMode} media={media} preview={preview} tool={tool} onLayoutChanged={onUpperLayoutChanged} /></Panel>
       <StudioSeparator id="studio-timeline-separator" label="Resize Timeline pane" orientation="horizontal" disabled={compact} />
-      <Panel id="studio-timeline-pane" defaultSize={`${layout.mainVerticalLayout[1]}%`} minSize={240} maxSize="65%"><StudioPanelFrame label="Timeline pane" kind="timeline">{timeline}</StudioPanelFrame></Panel>
+      <Panel id="studio-timeline-pane" defaultSize={`${initialLayoutRef.current[1]}%`} minSize={240} maxSize="65%"><StudioPanelFrame label="Timeline pane" kind="timeline">{timeline}</StudioPanelFrame></Panel>
     </Group>
   )
 }
