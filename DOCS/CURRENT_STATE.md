@@ -4,41 +4,41 @@ Last updated: 2026-08-04
 
 ## Active goal
 
-**P1-F.1A Gate C2 — Multi-asset Primary Sequence is COMPLETE.**
+**P1-F.1A Gate D is PARTIAL — the derived-media authority and long-form bounds
+are in. No frames or audio are decoded yet.**
 
-You can drop a second recording onto the main video track. It plays after the
-first, in one finished video, and exports as one file. The refusal sentence is
-gone.
+`MediaAnalysisKeyV1` names one thumbnail or block of waveform by **which file,
+which moment of it, and how big** — and by nothing about the timeline. That is
+what lets a clip be dragged, trimmed or split without throwing away a single
+thumbnail. Both the moment and the width are snapped to a grid, so zooming and
+resizing reuse what is already there instead of asking for moments nothing has
+ever asked for.
 
-**It was small because the data model already allowed it.** A clip already
-carried its own `assetId`, and `validateComposition` never had a rule that a
-track's clips come from the same file. What was missing was an operation that
-could ADD to the main track, and two renderers that could open more than one
-file. A parallel `PrimarySequenceV1` structure was rejected: two things both
-describing "what is this video made of" is the parallel copy the program's rules
-forbid. `DOCS/decisions/ADR-MULTI-ASSET-PRIMARY-SEQUENCE-V1.md`.
+The bounded cache holds a fixed COUNT (bytes cannot be measured honestly in a
+browser) and passes everything it drops to `dispose`, because an `ImageBitmap`
+is not reclaimed by garbage collection alone.
 
-Added: `place-primary-clip` and `move-primary-clip`. Split, trim, remove, hide
-and loudness already worked on any clip from any file, and still do.
+The filmstrip planner maps each thumbnail to the moment of the recording
+actually on screen — a clip trimmed four seconds off its head and sitting at ten
+seconds shows second **six** at twelve seconds, not second twelve. Getting that
+wrong looks plausible and is wrong by exactly the amount trimmed.
 
-**No migration. No render-plan bump.** A one-recording project is already a
-valid multi-asset sequence containing one. The plan already carried `assetId` on
-every segment, so its shape did not change — moving the version would have
-thrown away every cached export to produce identical files.
+Waveform peaks take the **loudest** sample per bucket, so a snare drum can never
+vanish; blocks are named by their moment in the file and sliced afterwards, so
+trimmed music draws its own shape.
 
-**The real browser found a bug no test had.** Every piece of footage was measured
-against the FIRST recording's length, so a valid 60-second second recording was
-refused for being longer than the 30-second first one. Each recording is now
-measured against itself.
+Every plan has a ceiling and **says** when the ceiling bites.
 
-**Real export proof:** 90.066 s = 30.033 + 60.033, with real picture at 80
-seconds — 50 seconds past the end of the first file, so it can only have come
-from the second. One `<video>` element throughout.
+**Proved on a 60-minute / 250-clip / 100-overlay fixture:** scrolling the whole
+hour never exceeds the cache ceiling and leaks nothing; one window asks for tens
+of thumbnails, not tens of thousands; a split costs at most one extra decode; a
+missing recording costs only its own thumbnails.
 
-**Gate D (filmstrips, waveforms, long-form bounds) has NOT started.**
+**NOT done in Gate D:** no frames decoded, no audio decoded, no decoder pool, no
+AudioContext, nothing drawn on the timeline, no image thumbnails, no 38-step
+browser workflow. The timeline still draws labelled rectangles.
 
-**Tests 1,510 → 1,535.** Build exit 0.
-`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/gate-c2-multi-asset-primary-sequence.md`
+**Tests 1,535 → 1,559.** Build exit 0.
 
 ---
 

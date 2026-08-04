@@ -2,7 +2,34 @@
 
 ## Current checkpoint
 
-**P1-F.1A Gates C0, C1 and C2 are all COMPLETE. Gate D has NOT started.**
+**P1-F.1A Gates C0, C1 and C2 are COMPLETE. Gate D is PARTIAL.**
+
+### Gate D — PARTIAL: the derived-media authority and long-form bounds
+
+In `apps/web/src/features/media-analysis/`:
+
+```
+   media-analysis-key.ts   names a thumbnail / waveform block by FILE +
+                           MOMENT + SIZE, and by nothing about the timeline
+   bounded-cache.ts        LRU with a hard COUNT ceiling and explicit dispose
+   filmstrip-plan.ts       which thumbnails a visible range needs, mapped to
+                           the moment of the recording actually on screen
+   waveform-peaks.ts       loudest-per-bucket peaks, block planning, slicing
+   long-form-fixture.ts    60 min · 250 clips · 12 recordings · 100 overlays
+```
+
+- The key excludes timeline position **on purpose**: a name that included it
+  would change on every drag and re-decode everything.
+- The cache limit is a COUNT because an `ImageBitmap`'s bytes are not observable
+  from script. Everything dropped goes through `dispose` — bitmaps are not
+  reclaimed by GC alone.
+- The filmstrip mapping is the thing filmstrips usually get wrong: a clip
+  trimmed 4 s off its head, sitting at 10 s, shows second **6** at 12 s.
+- Every plan has a ceiling and reports `truncated` when it bites.
+
+**NOT DONE:** no frames decoded, no audio decoded, no bounded decoder pool, no
+AudioContext, nothing drawn on the timeline, no image thumbnails, no 38-step
+browser workflow. **The next agent starts here.**
 
 ### Gate C2 — Multi-asset Primary Sequence
 
