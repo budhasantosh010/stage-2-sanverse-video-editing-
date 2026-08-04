@@ -46,6 +46,7 @@ import {
 import {
   advancePlayback,
   isUncutPassthrough,
+  assetAt,
   nextVisibleTick,
   playbackSegments,
   sourceTimeFor,
@@ -943,6 +944,27 @@ export function StudioScreen({
     () => (footagePlan ? playbackSegments(footagePlan) : []),
     [footagePlan],
   )
+
+  /**
+   * Which file the ONE video element is currently pointed at.
+   *
+   * The main sequence can hold more than one recording, so the element has to
+   * be pointed at the right file before it can be pointed at the right moment
+   * inside it. It is swapped only when the recording under the playhead is a
+   * DIFFERENT one from the one already loaded — swapping inside a recording
+   * would throw away everything the browser had buffered and make the picture
+   * stutter every few seconds for no reason.
+   *
+   * Still one element. Never one per clip.
+   */
+  const playheadAssetId = assetAt(previewSegments, millisecondsToTicks(playheadMs))
+  const [loadedAssetId, setLoadedAssetId] = useState<string | null>(null)
+  useEffect(() => {
+    if (playheadAssetId !== null && playheadAssetId !== loadedAssetId) setLoadedAssetId(playheadAssetId)
+  }, [playheadAssetId, loadedAssetId])
+  const previewMediaUrl = loadedAssetId !== null && loadedAssetId !== editProject.assets[0]?.assetId
+    ? assetUrl(loadedAssetId)
+    : project.mediaUrl
 
   const previewProposalOperation = proposal && proposalCanvasPoint
     ? Object.freeze({
@@ -2359,7 +2381,7 @@ export function StudioScreen({
                 ref={videoRef}
                 className="studio-screen__video"
                 preload="metadata"
-                src={project.mediaUrl}
+                src={previewMediaUrl}
                 aria-label={`Preview of ${project.name}`}
                 style={{ opacity: transitionOpacity }}
                 onError={() => setHasPreviewError(true)}

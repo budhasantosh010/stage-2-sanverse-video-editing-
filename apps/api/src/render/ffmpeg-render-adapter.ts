@@ -752,6 +752,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
   const { width, height } = plan.value
   const rate = `${input.frameRate.numerator}/${input.frameRate.denominator}`
   const pieces = layOutTimeline(plan.value)
+  const segmentInputIndex = new Map(planInputs(plan.value).map((source) => [source.assetId, source.index]))
   const graph: string[] = []
   const concatInputs: string[] = []
 
@@ -773,6 +774,19 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
       const to = ticksToSeconds(piece.segment.sourceStartTicks + piece.durationTicks)
       const sourceVideoLabel = `source_video_${index}`
       const motionVideoLabel = `motion_video_${index}`
+      /**
+       * Which of FFmpeg's inputs holds THIS piece of footage.
+       *
+       * It used to be input zero, always, because the main sequence could only
+       * ever be made of one recording. Now that it can hold several, the piece
+       * says which recording it came from and this looks up the input that was
+       * opened for it. Every file the plan needs is already listed in
+       * `plan.sources` and already opened; the exporter simply never asked.
+       */
+      const segmentInput = segmentInputIndex.get(piece.segment.assetId)
+      if (segmentInput === undefined) {
+        throw renderError('RENDER_INPUT_INVALID', 'A piece of footage names a file the plan does not open.')
+      }
 
       if (!piece.segment.videoEnabled) {
         // A hidden picture is black for exactly as long, produced without
@@ -785,7 +799,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
         )
       } else {
         graph.push(
-          `[0:v]trim=start=${from}:end=${to},setpts=PTS-STARTPTS,fps=${rate}[${sourceVideoLabel}]`,
+          `[${segmentInput}:v]trim=start=${from}:end=${to},setpts=PTS-STARTPTS,fps=${rate}[${sourceVideoLabel}]`,
         )
         graph.push(...primaryFootageMotionFilters(
           piece.segment,
@@ -821,7 +835,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
         )
       } else if (input.hasAudio) {
         const steps = [
-          `[0:a]atrim=start=${from}:end=${to}`,
+          `[${segmentInput}:a]atrim=start=${from}:end=${to}`,
           'asetpts=PTS-STARTPTS',
           `aresample=${AUDIO_SAMPLE_RATE}`,
           `aformat=sample_fmts=fltp:channel_layouts=${AUDIO_CHANNEL_LAYOUT}`,
@@ -1279,16 +1293,6 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
       if (frameRate === null) {
         throw renderError('RENDER_INPUT_INVALID', 'The source media frame rate could not be read.')
       }
-      // Every piece of footage must actually exist inside the file on disk.
-      // Overlays no longer need this check: they are positioned from the
-      // segments, so a segment that fits guarantees an overlay that fits.
-      for (const segment of plan.value.segments) {
-        const endTicks = segment.sourceStartTicks + segment.interval.duration.ticks
-        if (endTicks > sourceProbe.duration.ticks) {
-          throw renderError('RENDER_INPUT_INVALID', 'An accepted edit extends beyond the source duration.')
-        }
-      }
-
       // Every extra file the plan names must exist and be a real file before a
       // single frame is encoded. Checking here rather than letting FFmpeg fail
       // means a missing B-roll clip produces a sentence about a missing clip,
@@ -1306,6 +1310,44 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
           throw renderError('RENDER_PATH_INVALID', 'A file this export needs is not a file.')
         }
         extraPaths[source.assetId] = canonical
+      }
+
+      /**
+       * Every piece of footage must exist inside ITS OWN file on disk.
+       *
+       * This used to measure every piece against the FIRST recording, which was
+       * right while the main sequence could only be made of one. The moment it
+       * could hold two, a perfectly valid forty-second second recording was
+       * refused for being longer than the thirty-second first one, and the user
+       * was told their edit "extends beyond the source duration" — about an edit
+       * that fitted perfectly.
+       *
+       * Each recording is now measured against itself.
+       */
+      const sourceDurationTicks = new Map<string, number>()
+      sourceDurationTicks.set(plan.value.sources[0].assetId, sourceProbe.duration.ticks)
+      for (const source of planInputs(plan.value).slice(1)) {
+        // Only footage is laid out as segments; a picture has no length of its
+        // own and music is measured on the finished video, not on itself.
+        if (source.mediaKind !== 'video') continue
+        const probe = await mediaProbe.probe({
+          path: extraPaths[source.assetId],
+          cwd: paths.work,
+          signal: request.signal,
+        })
+        sourceDurationTicks.set(source.assetId, probe.duration.ticks)
+      }
+      // Overlays no longer need this check: they are positioned from the
+      // segments, so a segment that fits guarantees an overlay that fits.
+      for (const segment of plan.value.segments) {
+        const available = sourceDurationTicks.get(segment.assetId)
+        if (available === undefined) {
+          throw renderError('RENDER_INPUT_INVALID', 'A piece of footage names a file this export did not open.')
+        }
+        const endTicks = segment.sourceStartTicks + segment.interval.duration.ticks
+        if (endTicks > available) {
+          throw renderError('RENDER_INPUT_INVALID', 'An accepted edit extends beyond the source duration.')
+        }
       }
 
       const renderTempDir = resolve(paths.work, `.render-${randomUUID()}`)

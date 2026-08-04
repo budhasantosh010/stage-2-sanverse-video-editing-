@@ -13,24 +13,24 @@ const S = 1_440_000
 
 /** The recording is 30 s. The finished video below keeps 0-10 s and 20-30 s. */
 const withHole: readonly PlaybackSegment[] = [
-  { startTicks: 0, durationTicks: 10 * S, sourceStartTicks: 0, videoEnabled: true, audioEnabled: true },
-  { startTicks: 15 * S, durationTicks: 10 * S, sourceStartTicks: 20 * S, videoEnabled: true, audioEnabled: true },
+  { startTicks: 0, durationTicks: 10 * S, sourceStartTicks: 0, assetId: 'asset_aaaaaaaa', videoEnabled: true, audioEnabled: true },
+  { startTicks: 15 * S, durationTicks: 10 * S, sourceStartTicks: 20 * S, assetId: 'asset_aaaaaaaa', videoEnabled: true, audioEnabled: true },
 ]
 
 /** The same two stretches, but the gap was closed. */
 const rippled: readonly PlaybackSegment[] = [
-  { startTicks: 0, durationTicks: 10 * S, sourceStartTicks: 0, videoEnabled: true, audioEnabled: true },
-  { startTicks: 10 * S, durationTicks: 10 * S, sourceStartTicks: 20 * S, videoEnabled: true, audioEnabled: true },
+  { startTicks: 0, durationTicks: 10 * S, sourceStartTicks: 0, assetId: 'asset_aaaaaaaa', videoEnabled: true, audioEnabled: true },
+  { startTicks: 10 * S, durationTicks: 10 * S, sourceStartTicks: 20 * S, assetId: 'asset_aaaaaaaa', videoEnabled: true, audioEnabled: true },
 ]
 
 /** The second half of the recording placed first. */
 const reordered: readonly PlaybackSegment[] = [
-  { startTicks: 0, durationTicks: 20 * S, sourceStartTicks: 10 * S, videoEnabled: true, audioEnabled: true },
-  { startTicks: 20 * S, durationTicks: 10 * S, sourceStartTicks: 0, videoEnabled: true, audioEnabled: true },
+  { startTicks: 0, durationTicks: 20 * S, sourceStartTicks: 10 * S, assetId: 'asset_aaaaaaaa', videoEnabled: true, audioEnabled: true },
+  { startTicks: 20 * S, durationTicks: 10 * S, sourceStartTicks: 0, assetId: 'asset_aaaaaaaa', videoEnabled: true, audioEnabled: true },
 ]
 
 const uncut: readonly PlaybackSegment[] = [
-  { startTicks: 0, durationTicks: 30 * S, sourceStartTicks: 0, videoEnabled: true, audioEnabled: true },
+  { startTicks: 0, durationTicks: 30 * S, sourceStartTicks: 0, assetId: 'asset_aaaaaaaa', videoEnabled: true, audioEnabled: true },
 ]
 
 describe('finding a moment of the finished video in the recording', () => {
@@ -106,7 +106,7 @@ describe('deciding what to do next while playing', () => {
     // the recording parked at a moment the finished video no longer contains.
     // Reporting that as "ended" froze the preview on the old frame.
     const afterOpeningRemoved: readonly PlaybackSegment[] = [
-      { startTicks: 0, durationTicks: 10 * S, sourceStartTicks: 4 * S, videoEnabled: true, audioEnabled: true },
+      { startTicks: 0, durationTicks: 10 * S, sourceStartTicks: 4 * S, assetId: 'asset_aaaaaaaa', videoEnabled: true, audioEnabled: true },
     ]
     expect(advancePlayback(afterOpeningRemoved, 0, 2 * S, 10 * S)).toEqual({
       kind: 'seek',

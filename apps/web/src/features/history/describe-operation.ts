@@ -97,6 +97,10 @@ export const describeOperation = (operation: EditOperation): string => {
     }
     case 'set-music':
       return 'Changed the music'
+    case 'place-primary-clip':
+      return 'Added footage to the main video'
+    case 'move-primary-clip':
+      return 'Moved a piece of the main video'
     case 'remove-overlay':
       // One sentence for all four families. The user pressed Delete on a
       // rectangle; which family it belonged to is not what they remember.

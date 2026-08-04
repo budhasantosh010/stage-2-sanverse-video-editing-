@@ -23,6 +23,16 @@ export type PlaybackSegment = Readonly<{
   /** Where this stretch begins in the original recording. */
   sourceStartTicks: number
   /**
+   * WHICH recording. The main sequence can hold more than one, and the single
+   * `<video>` element has to be pointed at the right file before it can be
+   * pointed at the right moment inside it.
+   *
+   * Still ONE element. Never one per clip: twenty clips would be twenty
+   * decoders, twenty buffers, and a browser tab that runs out of memory on a
+   * long video.
+   */
+  assetId: string
+  /**
    * Whether the picture is drawn and the sound is heard, copied straight from
    * the plan the export also reads. The preview never decides this for itself:
    * a second opinion here is exactly how the screen and the file start
@@ -40,10 +50,31 @@ export const playbackSegments = (plan: RenderPlan): readonly PlaybackSegment[] =
         startTicks: segment.interval.start.ticks,
         durationTicks: segment.interval.duration.ticks,
         sourceStartTicks: segment.sourceStartTicks,
+        assetId: segment.assetId,
         videoEnabled: segment.videoEnabled,
         audioEnabled: segment.audioEnabled,
       })),
   )
+
+/**
+ * Which recording is on screen at one moment, and whether that is a change.
+ *
+ * The `<video>` element's file is only swapped when the answer is a DIFFERENT
+ * recording from the one already loaded. Swapping it inside one recording would
+ * make the picture stutter every few seconds for no reason, because every swap
+ * throws away what the browser had already buffered.
+ */
+export const assetAt = (
+  segments: readonly PlaybackSegment[],
+  compositionTicks: number,
+): string | null => {
+  const index = segmentIndexAt(segments, compositionTicks)
+  return index === -1 ? null : segments[index].assetId
+}
+
+/** Every recording the finished video is made of, in the order they first appear. */
+export const playbackAssetIds = (segments: readonly PlaybackSegment[]): readonly string[] =>
+  Object.freeze([...new Set(segments.map((segment) => segment.assetId))])
 
 const endOf = (segment: PlaybackSegment): number => segment.startTicks + segment.durationTicks
 

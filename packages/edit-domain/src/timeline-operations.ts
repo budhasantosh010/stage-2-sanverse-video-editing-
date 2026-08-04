@@ -4,6 +4,7 @@ import {
   CLIP_ID_PATTERN,
   MAX_CLIP_GAIN_DB,
   MIN_CLIP_GAIN_DB,
+  TRACK_ID_PATTERN,
   validateComposition,
   type Clip,
   type Composition,
@@ -15,7 +16,9 @@ import {
   ZERO_TIME,
   mediaTime,
   validateMediaTime,
+  validateTimeRange,
   type MediaTime,
+  type TimeRange,
 } from './time.ts'
 
 /**
@@ -122,6 +125,52 @@ export type SetClipTransitionOperation = Common &
     audio: 'cut' | 'fade-through-silence'
   }>
 
+/**
+ * Put a NEW piece of footage into the main sequence.
+ *
+ * This is the one operation Multi-asset Primary Sequence needed that did not
+ * already exist. Everything else — splitting, trimming, removing, hiding,
+ * loudness — was already written against a clip and already worked whatever
+ * file that clip came from. The main track could only ever be made SMALLER,
+ * because nothing could add to it.
+ *
+ * The identifier is carried in the operation rather than invented while
+ * applying it, so replaying the same history always produces the same file.
+ *
+ * `assetId` may be a recording the sequence already uses. The same file placed
+ * twice is simply two clips with different `sourceRange`s, which is what "show
+ * that bit again" means.
+ */
+export type PlacePrimaryClipOperation = Common &
+  Readonly<{
+    kind: 'place-primary-clip'
+    /** The new piece's name. Must not already be in use. */
+    clipId: string
+    /** Which track it joins. It must be a video track that already exists. */
+    trackId: string
+    assetId: string
+    /** Which stretch of that recording. */
+    sourceRange: TimeRange
+    /** Where it goes in the FINISHED video. */
+    compositionStart: MediaTime
+  }>
+
+/**
+ * Move one piece of the main sequence to a chosen moment.
+ *
+ * Different from `reorder-clip`, which puts a piece at position N in the running
+ * order and refuses outright on a track with holes. Dragging a clip does not
+ * mean "make this the third one"; it means "put this here". Both exist because
+ * both are real intentions, and one pretending to be the other would move
+ * things the user did not ask to move.
+ */
+export type MovePrimaryClipOperation = Common &
+  Readonly<{
+    kind: 'move-primary-clip'
+    clipId: string
+    compositionStart: MediaTime
+  }>
+
 export type TimelineOperation =
   | SplitClipOperation
   | TrimClipOperation
@@ -130,6 +179,8 @@ export type TimelineOperation =
   | SetClipEnabledOperation
   | SetClipAudioOperation
   | SetClipTransitionOperation
+  | PlacePrimaryClipOperation
+  | MovePrimaryClipOperation
 
 export const TIMELINE_OPERATION_KINDS: readonly string[] = Object.freeze([
   'split-clip',
@@ -139,6 +190,8 @@ export const TIMELINE_OPERATION_KINDS: readonly string[] = Object.freeze([
   'set-clip-enabled',
   'set-clip-audio',
   'set-clip-transition',
+  'place-primary-clip',
+  'move-primary-clip',
 ])
 
 export const isTimelineOperationKind = (kind: unknown): boolean =>
@@ -174,6 +227,10 @@ const KEYS_BY_KIND: Readonly<Record<string, readonly string[]>> = Object.freeze(
     'duration',
     'audio',
   ]),
+  'place-primary-clip': Object.freeze([
+    ...COMMON_KEYS, 'clipId', 'trackId', 'assetId', 'sourceRange', 'compositionStart',
+  ]),
+  'move-primary-clip': Object.freeze([...COMMON_KEYS, 'clipId', 'compositionStart']),
 })
 
 export const OPERATION_ID_PATTERN = /^operation_[a-z0-9]{8,64}$/
@@ -289,6 +346,32 @@ export const validateTimelineOperation = (
       const fadeIn = time(input.fadeIn, 'fadeIn')
       const fadeOut = time(input.fadeOut, 'fadeOut')
       extra = { gainDb, fadeIn, fadeOut }
+      break
+    }
+    case 'place-primary-clip': {
+      if (typeof input.trackId !== 'string' || !TRACK_ID_PATTERN.test(input.trackId)) {
+        issues.push({ path: `${path}.trackId`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      if (typeof input.assetId !== 'string' || input.assetId.trim().length === 0) {
+        issues.push({ path: `${path}.assetId`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      const sourceRange = validateTimeRange(input.sourceRange, `${path}.sourceRange`)
+      if (!sourceRange.ok || sourceRange.value.duration.ticks <= 0) {
+        // A piece of no length would be a thing on the timeline nobody can see.
+        issues.push({ path: `${path}.sourceRange`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      const compositionStart = time(input.compositionStart, 'compositionStart')
+      extra = {
+        trackId: input.trackId,
+        assetId: input.assetId,
+        sourceRange: sourceRange.ok ? sourceRange.value : null,
+        compositionStart,
+      }
+      break
+    }
+    case 'move-primary-clip': {
+      const compositionStart = time(input.compositionStart, 'compositionStart')
+      extra = { compositionStart }
       break
     }
     case 'set-clip-transition': {
@@ -419,6 +502,40 @@ export const applyTimelineOperation = (
   operation: TimelineOperation,
   assets: readonly MediaAsset[],
 ): Result<Composition, TimelineApplyError> => {
+  // Placing a NEW piece is the one operation whose clip does not exist yet, so
+  // it is answered before the lookup that every other operation begins with.
+  if (operation.kind === 'place-primary-clip') {
+    const target = composition.tracks.find((candidate) => candidate.trackId === operation.trackId)
+    if (!target || target.kind !== 'video') return err(fail('CLIP_UNKNOWN'))
+    const idInUse = composition.tracks.some((candidate) =>
+      candidate.clips.some((existing) => existing.clipId === operation.clipId),
+    )
+    if (idInUse) return err(fail('CLIP_ID_IN_USE'))
+    if (target.clips.length + 1 > MAX_CLIPS_PER_TRACK) return err(fail('TOO_MANY_CLIPS'))
+
+    const placed: Clip = {
+      clipId: operation.clipId,
+      assetId: operation.assetId,
+      sourceRange: operation.sourceRange,
+      compositionStart: operation.compositionStart,
+      enabled: true,
+      gainDb: 0,
+      fadeIn: ZERO_TIME,
+      fadeOut: ZERO_TIME,
+    }
+    // Whether the new piece overlaps something, and whether the stretch asked
+    // for exists inside that recording, are both decided by the composition
+    // validator at the bottom of this function. There is no second copy of
+    // those rules here to disagree with it.
+    const rebuiltPlacement = validateComposition(
+      replaceTrack(composition, target.trackId, [...target.clips, placed]),
+      assets,
+      'composition',
+    )
+    if (!rebuiltPlacement.ok) return err(fail('RESULT_INVALID'))
+    return ok(rebuiltPlacement.value)
+  }
+
   const track = findTrackOf(composition, operation.clipId)
   if (!track) return err(fail('CLIP_UNKNOWN'))
   const clip = track.clips.find((candidate) => candidate.clipId === operation.clipId)
@@ -542,6 +659,18 @@ export const applyTimelineOperation = (
               fadeIn: operation.fadeIn,
               fadeOut: operation.fadeOut,
             }
+          : candidate,
+      )
+      break
+    }
+
+    case 'move-primary-clip': {
+      // Only this piece moves. Nothing else on the track is touched, because
+      // "put this here" is not "make room for this" — the second is Insert, and
+      // a user who wanted Insert would have chosen it.
+      nextClips = track.clips.map((candidate) =>
+        candidate.clipId === clip.clipId
+          ? { ...candidate, compositionStart: operation.compositionStart }
           : candidate,
       )
       break

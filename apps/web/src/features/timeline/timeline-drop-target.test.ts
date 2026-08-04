@@ -39,8 +39,24 @@ describe('what a lane says before the drop, and what it does on the drop', () =>
           includeLinkedAudio: false,
           idFactory: createIdFactory('changeset_droptest1'),
         })
-        if (highlighted !== planned.ok) {
-          disagreements.push(`${laneId} + ${mediaKind}: highlight=${highlighted} plan=${planned.ok}`)
+        /**
+         * The highlight answers about the KIND of file only, and a drop can
+         * still be refused on release for a reason no highlight could know —
+         * a padlock, a running export, or something already sitting in that
+         * spot. Those refusals always explain themselves, so they are allowed.
+         *
+         * What is NOT allowed is the other direction, and the KIND direction:
+         *   - a lane that does not light up but would have accepted the file
+         *   - a lane that lights up and then refuses because of the KIND
+         * Either would be the product changing its mind about something it
+         * already knew before the user let go.
+         */
+        const refusedOnKind = !planned.ok && planned.error.code === 'TRACK_INCOMPATIBLE'
+        if (highlighted && refusedOnKind) {
+          disagreements.push(`${laneId} + ${mediaKind}: lit up, then refused the KIND`)
+        }
+        if (!highlighted && planned.ok) {
+          disagreements.push(`${laneId} + ${mediaKind}: did not light up, but accepted the drop`)
         }
       }
     }
@@ -49,19 +65,25 @@ describe('what a lane says before the drop, and what it does on the drop', () =>
   })
 
   it('never highlights a lane that has no drop of its own', () => {
+    // Dialogue is the sound of the main video and captions are written from
+    // words, so neither can take a file. The main sequence CAN, since Gate C2.
     for (const mediaKind of MEDIA_DRAG_KINDS) {
-      expect(acceptsMediaKind('lane:video', mediaKind)).toBe(false)
       expect(acceptsMediaKind('lane:dialogue', mediaKind)).toBe(false)
       expect(acceptsMediaKind('lane:caption', mediaKind)).toBe(false)
     }
   })
 
-  it('highlights exactly the two lanes that can take something', () => {
+  it('highlights exactly the lanes that can take something, and only for the right kind', () => {
     expect(acceptsMediaKind('lane:overlay', 'video')).toBe(true)
     expect(acceptsMediaKind('lane:overlay', 'image')).toBe(true)
     expect(acceptsMediaKind('lane:overlay', 'audio')).toBe(false)
     expect(acceptsMediaKind('lane:music', 'audio')).toBe(true)
     expect(acceptsMediaKind('lane:music', 'video')).toBe(false)
+    // The main sequence takes video and nothing else: a picture has no sound
+    // and no length of its own, and music has no picture.
+    expect(acceptsMediaKind('lane:video', 'video')).toBe(true)
+    expect(acceptsMediaKind('lane:video', 'image')).toBe(false)
+    expect(acceptsMediaKind('lane:video', 'audio')).toBe(false)
   })
 
   it('does not highlight a lane that does not exist', () => {

@@ -82,6 +82,19 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     return true
   }
 
+  /**
+   * The recording this project was made from always takes position zero.
+   *
+   * The exporter opens that file as its first input and every other file after
+   * it, in this list's order. Once the main sequence can hold more than one
+   * recording, the first SEGMENT is no longer necessarily the original — so if
+   * the list were built purely in segment order, position zero could name one
+   * file while the exporter opened another, and the finished video would show
+   * the wrong footage without a single error.
+   */
+  const primaryAsset = project.assets.find((asset) => asset.mediaKind === 'video')
+  if (primaryAsset) useSource(primaryAsset.assetId)
+
   const segments: SourceSegmentNode[] = []
   for (const track of composition.tracks) {
     for (const clip of track.clips) {

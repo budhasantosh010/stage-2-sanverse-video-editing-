@@ -2,13 +2,62 @@
 
 ## Current checkpoint
 
-**P1-F.1A Gate C1 — Creator Timeline Core V2 is COMPLETE.
-Gates C0 and C1 are both done. Gate C2 and Gate D have NOT started.**
+**P1-F.1A Gates C0, C1 and C2 are all COMPLETE. Gate D has NOT started.**
 
-### What Gate C1 added
+### Gate C2 — Multi-asset Primary Sequence
 
-Three capabilities did not exist anywhere in the system and had to be built
-before any of the timeline work was possible:
+The main video track holds more than one recording. It was small because **the
+data model already allowed it**: a clip already carried its own `assetId`, and
+`validateComposition` never required a track's clips to share a file.
+
+```
+   ADDED    place-primary-clip { clipId, trackId, assetId, sourceRange,
+                                 compositionStart }
+            move-primary-clip  { clipId, compositionStart }
+
+   ALREADY  split · trim · remove · reorder · hide · loudness
+   WORKED   — all written against a clip, all work on any file
+```
+
+- **A parallel `PrimarySequenceV1` was rejected.** Two things both describing
+  "what is this video made of" is the parallel copy the rules forbid; every cut
+  would have to be applied to both. See
+  `DOCS/decisions/ADR-MULTI-ASSET-PRIMARY-SEQUENCE-V1.md`.
+- **No migration, no render-plan bump.** A one-recording project is already a
+  valid multi-asset sequence. The plan already carried `assetId` per segment.
+- **The exporter now maps each segment to its own FFmpeg input.** It used to
+  read `[0:v]` always. `plan.sources[0]` is now always the project's original
+  recording, because the exporter opens it as input zero — building that list in
+  segment order would let position zero name one file while input zero opened
+  another.
+- **The preview switches the ONE `<video>` element's file at asset boundaries,
+  and only there.** Swapping inside a recording throws away the buffer.
+- **Overlays needed no new code.** A title is anchored to a moment of a NAMED
+  recording, so `placeSourceSpan` matches on the name, not on time.
+
+**Bug the real browser found:** every segment was bounds-checked against the
+FIRST recording's length, so a valid 60 s second recording was refused for being
+longer than the 30 s first one. Each is now measured against itself.
+
+**Also learned:** a failed export is cached by its idempotency key
+`sha256(projectId : revision : renderPlanSchemaVersion)`. Pressing Export again
+returns the cached failure instantly — a fix is not exercised until something
+moves the revision.
+
+**Real proof:** exported 90.066 s = 30.033 + 60.033, real picture at 80 s.
+`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/gate-c2-multi-asset-primary-sequence.md`
+
+**Tests 1,510 → 1,535.** Build exit 0.
+
+### What is next
+
+**Gate D — filmstrips, waveforms and long-form bounds.** Nothing of it exists.
+
+---
+
+## Gate C1 — Creator Timeline Core V2, complete
+
+Three capabilities did not exist anywhere and had to be built:
 
 ```
    1  nothing could be deleted        →  remove-overlay      { overlayId }
@@ -17,71 +66,24 @@ before any of the timeline work was possible:
    3  music had no length at all      →  durationTicks on music
 ```
 
-- **`remove-overlay` is one operation for all four kinds** — title, callout,
-  B-roll, music — because the four identifier shapes are already distinct, so
-  the target is never ambiguous. Four near-identical operations would have been
-  four places for the same rule to drift. A later `set-` naming something that
-  was deleted finds nothing to repair: **only Undo brings it back.**
-- **Music's `durationTicks` is a known key that may be omitted.** The contract
-  stays closed; a project saved earlier reads back as `null`, meaning "play
-  until the video ends or the song ends", which is exactly how it behaved.
-  **No migration. No file rewritten. Nothing sounds different.**
-- **Lock and output are two switches and must never be merged.** Padlock =
-  presentation, no revision, no Undo, stored in `localStorage` per project.
-  Output = an accepted operation, one revision, one Undo, part of the project.
-  Full reasoning: `DOCS/decisions/ADR-TRACK-LOCK-AND-OUTPUT-V1.md`.
-- **Render plan v6 → v7.** Each segment now carries `videoEnabled` and
-  `audioEnabled`. The version HAD to move because the export key is
-  `sha256(projectId : revision : renderPlanSchemaVersion)` — without it a user
-  who muted the dialogue would be handed the cached pre-mute file.
-- **Insert and Overwrite are real now.** The rearrangement goes in the SAME
-  change set as the new item, so pushing four clips along is one Undo. Insert
-  into the middle of a clip still refuses (it would move that clip's first half
-  too). **Ripple delete on V2 still refuses** and says why: B-roll is anchored
-  to a moment of the ORIGINAL RECORDING (ADR-005), so closing a gap would re-pin
-  later clips onto different footage. Ripple on music is exact and works.
+- **Lock ≠ output.** Padlock is presentation (`localStorage`, per project, no
+  revision, no Undo). Output is an accepted operation (one revision, one Undo,
+  new export key). `DOCS/decisions/ADR-TRACK-LOCK-AND-OUTPUT-V1.md`.
+- **Render plan v6 → v7**: segments carry `videoEnabled` / `audioEnabled`. The
+  bump was required because the export key is built from the version.
+- **Music's `durationTicks` is a known key that may be omitted** — absent reads
+  as `null`, exactly how every saved project already behaved. No migration.
+- **Insert and Overwrite are real**, and their rearrangement goes in the SAME
+  change set. Ripple delete on V2 refuses on purpose (B-roll is anchored to the
+  original recording, so closing a gap would re-pin later clips).
+- **Plain `S` toggles snapping; `Ctrl/Cmd+B` splits.**
 - **One gesture = one change set = one Undo.** Pointer movement creates nothing.
-  Measured in the browser: twelve pointer moves, revision unchanged throughout,
-  one edit on release.
-- **Plain `S` now toggles snapping; `Ctrl/Cmd+B` splits.** `S` had two possible
-  meanings and now has one.
-- **No inert controls.** Every disabled control carries its reason in words, in
-  both `title` and `aria-label`.
-
-### Where the C1 code lives
-
-```
-   packages/edit-domain/src/track-output.ts          the five tracks, closed
-   packages/edit-domain/src/overlay-operations.ts    remove-overlay, music length
-   apps/web/src/features/timeline/
-      timeline-item-operations.ts    move · trim · split · delete · lane edits
-      timeline-item-drag-session.ts  the drag session contract
-      timeline-lock-state.ts         padlocks (browser, per project)
-      timeline-placement-planner.ts  drops, and Insert/Overwrite/Append
-   apps/web/src/editor/timeline/
-      TimelineToolbar.tsx            real actions, truthful disabled reasons
-      TimelineTrackHeader.tsx        padlock + eye/speaker
-      TimelineItem.tsx               pointer drag, trim handles
-```
-
-### Browser and export proof
-
-Real project, real media. With V1 hidden and V2 on, the exported picture reads
-16.0 (pure black) at 5 s and 32.3 where the B-roll is drawn. With the dialogue
-muted and the music on, the music window is −43.9 dB and the silent window is
-−91.0 dB — 47 dB apart, so the dialogue is genuinely gone rather than turned
-down. Length unchanged at 30.033 s. Exactly one `<video>` element throughout.
-`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/gate-c1-creator-timeline-core.md`
-
-**Tests 1,389 → 1,510.** Build exit 0. Four existing tests were rewritten to
-assert the new truth (the S key, the Delete confirmation, and the old behaviour
-where a second piece of music silently REPLACED the first) — none deleted.
-
-### What is next
-
-**Gate C2 — Multi-asset Primary Sequence.** Nothing of it exists. It must begin
-with `DOCS/decisions/ADR-MULTI-ASSET-PRIMARY-SEQUENCE-V1.md` and no code before
-that ADR is accepted. Then Gate D — filmstrips, waveforms and long-form bounds.
+- Code: `packages/edit-domain/src/track-output.ts`,
+  `apps/web/src/features/timeline/{timeline-item-operations,timeline-item-drag-session,timeline-lock-state}.ts`,
+  `apps/web/src/editor/timeline/{TimelineToolbar,TimelineTrackHeader}.tsx`.
+- `onApplyOperations(operations, changeSetId)` on `StudioScreen` is the ONE path
+  for a multi-operation change set.
+  `DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/gate-c1-creator-timeline-core.md`
 
 ---
 

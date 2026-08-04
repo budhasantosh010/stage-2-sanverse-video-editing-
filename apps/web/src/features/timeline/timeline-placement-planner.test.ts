@@ -115,25 +115,53 @@ describe('the placement planner', () => {
     })
   })
 
-  describe('the V1 refusal, which is the whole point of the ADR', () => {
-    it('refuses a second video on the main sequence', () => {
-      const result = planTimelinePlacement(request({ targetLaneId: 'lane:video', assetId: assetOfKind('video') }))
-      expect(refusalOf(result)).toBe('OPERATION_UNSUPPORTED')
+  describe('the main sequence, now that it takes more than one recording', () => {
+    // Gate C2. V1 used to refuse every video with "Sanverse cannot add a second
+    // video to the main sequence yet". It accepts them now, and the tests below
+    // assert the new truth rather than being deleted.
+    it('takes a second recording on the main sequence, after what is already there', () => {
+      const subject = testMultiAssetProject()
+      // The fixture footage fills 0-30 s, so the free space starts at its end.
+      const result = planTimelinePlacement(request({
+        project: subject,
+        targetLaneId: 'lane:video',
+        assetId: assetOfKind('video'),
+        atTicks: 30 * T,
+      }))
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      expect(result.value.operations).toHaveLength(1)
+      expect(result.value.operations[0].kind).toBe('place-primary-clip')
     })
 
-    it('says what cannot happen AND what can, in one sentence', () => {
-      const result = planTimelinePlacement(request({ targetLaneId: 'lane:video' }))
-      const message = result.ok ? '' : result.error.message
+    it('refuses to lay a recording on top of footage already there, and says what to do', () => {
+      const result = planTimelinePlacement(request({
+        targetLaneId: 'lane:video',
+        assetId: assetOfKind('video'),
+        atTicks: 2 * T,
+      }))
+      expect(refusalOf(result)).toBe('COLLISION')
+      expect(!result.ok && result.error.message).toContain('drop this after it')
+    })
 
-      expect(message).toContain('cannot add a second video to the main sequence yet')
-      expect(message).toContain('B-roll lane')
+    it('still refuses a picture and music on the main sequence, and says where they go', () => {
+      const picture = planTimelinePlacement(request({ targetLaneId: 'lane:video', assetId: assetOfKind('image') }))
+      expect(refusalOf(picture)).toBe('TRACK_INCOMPATIBLE')
+      expect(!picture.ok && picture.error.message).toContain('B-roll lane')
+
+      const music = planTimelinePlacement(request({ targetLaneId: 'lane:video', assetId: assetOfKind('audio') }))
+      expect(refusalOf(music)).toBe('TRACK_INCOMPATIBLE')
+      expect(!music.ok && music.error.message).toContain('A2 lane')
     })
 
     it('never quietly routes a V1 drop to V2', () => {
-      const result = planTimelinePlacement(request({ targetLaneId: 'lane:video' }))
+      const subject = testMultiAssetProject()
+      const result = planTimelinePlacement(request({
+        project: subject, targetLaneId: 'lane:video', assetId: assetOfKind('video'), atTicks: 30 * T,
+      }))
       // A plan on a different lane than the one dropped on would be the product
       // putting the user's video somewhere they did not put it.
-      expect(result.ok).toBe(false)
+      expect(result.ok && result.value.targetLaneId).toBe('lane:video')
     })
 
     it('refuses the dialogue lane too, and not with a generic message', () => {

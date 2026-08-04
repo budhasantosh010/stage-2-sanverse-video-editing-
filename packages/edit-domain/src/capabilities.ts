@@ -27,6 +27,9 @@ export const SPLIT_PRIMITIVE_ID = 'sanverse.timeline.split.primitive/v1'
 export const TRIM_PRIMITIVE_ID = 'sanverse.timeline.trim.primitive/v1'
 export const REMOVE_PRIMITIVE_ID = 'sanverse.timeline.remove.primitive/v1'
 export const REORDER_PRIMITIVE_ID = 'sanverse.timeline.reorder.primitive/v1'
+/** "Put this recording into the main sequence." */
+export const PLACE_PRIMARY_CLIP_PRIMITIVE_ID = 'sanverse.timeline.place-primary.primitive/v1'
+export const MOVE_PRIMARY_CLIP_PRIMITIVE_ID = 'sanverse.timeline.move-primary.primitive/v1'
 export const CLIP_ENABLED_PRIMITIVE_ID = 'sanverse.timeline.enabled.primitive/v1'
 export const CLIP_AUDIO_PRIMITIVE_ID = 'sanverse.timeline.audio.primitive/v1'
 export const CLIP_TRANSITION_PRIMITIVE_ID = 'sanverse.timeline.transition.primitive/v1'
@@ -113,6 +116,22 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     level: 'primitive' as const,
     accepts: 'One piece of footage and the position it should take in the running order.',
     produces: Object.freeze(['reorder-clip']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: PLACE_PRIMARY_CLIP_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One recording, the stretch of it to use, and where it goes in the finished video.',
+    produces: Object.freeze(['place-primary-clip']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: MOVE_PRIMARY_CLIP_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One piece of the main sequence and the moment it should start at.',
+    produces: Object.freeze(['move-primary-clip']),
     requires: Object.freeze([]),
   }),
   Object.freeze({

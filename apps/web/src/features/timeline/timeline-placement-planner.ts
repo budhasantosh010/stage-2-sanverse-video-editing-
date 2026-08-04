@@ -1,14 +1,19 @@
 import {
+  OPERATION_SCHEMA_VERSION,
   PROJECT_TIMESCALE,
+  applyTimelineOperation,
+  effectiveComposition,
   findAsset,
   isAudioAsset,
   isImageAsset,
   isVideoAsset,
+  validateOperation,
   type EditOperation,
   type EditProject,
   type IdFactory,
   type MediaAsset,
 } from '@sanverse/edit-domain'
+import { PLACE_PRIMARY_CLIP_PRIMITIVE_ID } from '@sanverse/edit-domain/capabilities'
 
 import { buildAddAsBrollOperation, buildAddAsMusicOperation } from '../media/media-actions'
 import { applyLaneEdits, type LaneEdit } from './timeline-item-operations'
@@ -220,9 +225,13 @@ const compatibility = (laneId: TimelineLaneId, asset: MediaAsset): TimelinePlace
     })
   }
   if (laneId === 'lane:video') {
-    return Object.freeze({
-      code: 'OPERATION_UNSUPPORTED' as const,
-      message: 'Sanverse cannot add a second video to the main sequence yet. Drop it on the B-roll lane above, or wait for Multi-asset Primary Sequence.',
+    // Multi-asset Primary Sequence. The main track takes video and nothing
+    // else: a picture has no sound and no length of its own, so a still on the
+    // main sequence would be a silent gap the user did not ask for, and music
+    // there has no picture at all.
+    return isVideoAsset(asset) ? null : Object.freeze({
+      code: 'TRACK_INCOMPATIBLE' as const,
+      message: 'The main video track takes video. Drop a picture on the B-roll lane above, or music on the A2 lane.',
     })
   }
   if (laneId === 'lane:dialogue') {
@@ -254,6 +263,9 @@ export const acceptsMediaKind = (laneId: string, mediaKind: 'video' | 'image' | 
   if (!isLaneId(laneId)) return false
   if (laneId === 'lane:overlay') return mediaKind === 'video' || mediaKind === 'image'
   if (laneId === 'lane:music') return mediaKind === 'audio'
+  // The main sequence takes video and nothing else: a picture has no sound and
+  // no length of its own, and music has no picture.
+  if (laneId === 'lane:video') return mediaKind === 'video'
   return false
 }
 
@@ -311,6 +323,86 @@ const resolvePlacement = (
 
 const isRefusal = (value: Resolved | TimelinePlacementRefusal): value is TimelinePlacementRefusal =>
   'code' in value
+
+/**
+ * A piece of footage joining the MAIN sequence.
+ *
+ * Built here rather than in `media-actions`, and the difference is not
+ * arbitrary: everything `media-actions` builds is ANCHORED to a moment of the
+ * footage — B-roll sits on the bit where you held up the product, music sits
+ * under the finished piece. A piece of the main sequence is anchored to
+ * nothing. It IS the footage. It says which recording, which stretch of it, and
+ * where it goes, and there is no third thing to be pinned to.
+ *
+ * See DOCS/decisions/ADR-MULTI-ASSET-PRIMARY-SEQUENCE-V1.md.
+ */
+const planPrimaryPlacement = (input: Readonly<{
+  project: EditProject
+  asset: MediaAsset
+  atTicks: number
+  durationTicks: number
+  placementMode: PlacementMode
+  idFactory: IdFactory
+}>): PlacementResult => {
+  const { project, asset, atTicks, durationTicks, placementMode, idFactory } = input
+
+  // The main sequence is a video track that already exists. A project always
+  // has one, because that is what importing a video creates.
+  const track = project.composition.tracks.find((candidate) => candidate.kind === 'video')
+  if (!track) {
+    return refuse('OPERATION_UNSUPPORTED', 'This project has no main video track to add to.')
+  }
+
+  const operation = Object.freeze({
+    schemaVersion: OPERATION_SCHEMA_VERSION,
+    operationId: idFactory.operation(0),
+    kind: 'place-primary-clip' as const,
+    capabilityId: PLACE_PRIMARY_CLIP_PRIMITIVE_ID,
+    clipId: idFactory.entity('clip', 0),
+    trackId: track.trackId,
+    assetId: asset.assetId,
+    // The whole recording, from its beginning. Trimming it afterwards is one
+    // gesture the user can see; guessing a shorter stretch at drop time would
+    // silently discard footage they had not looked at yet.
+    sourceRange: Object.freeze({
+      start: Object.freeze({ ticks: 0, timescale: PROJECT_TIMESCALE }),
+      duration: Object.freeze({ ticks: durationTicks, timescale: PROJECT_TIMESCALE }),
+    }),
+    compositionStart: Object.freeze({ ticks: atTicks, timescale: PROJECT_TIMESCALE }),
+    extensions: Object.freeze({}),
+  }) as unknown as EditOperation
+
+  const validated = validateOperation(operation)
+  if (!validated.ok) {
+    return refuse('OPERATION_UNSUPPORTED', 'That footage cannot be added to the main video.')
+  }
+  // The dry run answers whether it actually fits: whether the stretch exists
+  // inside that recording, and whether it would overlap what is already there.
+  // Those rules live in the composition validator and are not copied here.
+  const applied = applyTimelineOperation(
+    effectiveComposition(project),
+    validated.value as never,
+    project.assets,
+  )
+  if (!applied.ok) {
+    return refuse(
+      'COLLISION',
+      'Something is already on the main video track at that moment. Move it first, or drop this after it.',
+    )
+  }
+
+  return Object.freeze({
+    ok: true as const,
+    value: Object.freeze({
+      targetLaneId: 'lane:video' as const,
+      placementMode,
+      atTicks,
+      durationTicks,
+      operations: Object.freeze([validated.value]) as readonly EditOperation[],
+      summary: 'Added footage to the main video',
+    }),
+  })
+}
 
 const TICKS_PER_MS = PROJECT_TIMESCALE / 1000
 
@@ -445,6 +537,15 @@ export const planTimelinePlacement = (
       // Covered end to end. Nothing of it would ever be seen or heard again.
       laneEdits.push(Object.freeze({ kind: 'remove' as const, targetId: span.targetId }))
     }
+  }
+
+  // The main sequence is built here rather than in `media-actions`, because a
+  // piece of the main video is not anchored to anything: it IS the footage. It
+  // says which recording, which stretch of it, and where it goes.
+  if (targetLaneId === 'lane:video') {
+    return planPrimaryPlacement({
+      project, asset, atTicks: resolved.atTicks, durationTicks: natural, placementMode, idFactory,
+    })
   }
 
   // Construction is delegated: `media-actions` is the one authority on how a

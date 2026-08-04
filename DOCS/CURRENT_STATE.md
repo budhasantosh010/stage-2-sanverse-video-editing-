@@ -4,59 +4,41 @@ Last updated: 2026-08-04
 
 ## Active goal
 
-**P1-F.1A Gate C1 — Creator Timeline Core V2 is COMPLETE.**
+**P1-F.1A Gate C2 — Multi-asset Primary Sequence is COMPLETE.**
 
-You can now drag a piece of B-roll onto the timeline, move it, pull either end
-in, cut it in half, and delete it. You can drop a second piece of music, trim
-it, and split it. You can padlock a track so nothing on it moves by accident,
-and separately keep a track out of the finished video. Insert really pushes the
-rest along, and Overwrite really cuts back what it lands on.
+You can drop a second recording onto the main video track. It plays after the
+first, in one finished video, and exports as one file. The refusal sentence is
+gone.
 
-Three things had to be built first, because they did not exist anywhere:
+**It was small because the data model already allowed it.** A clip already
+carried its own `assetId`, and `validateComposition` never had a rule that a
+track's clips come from the same file. What was missing was an operation that
+could ADD to the main track, and two renderers that could open more than one
+file. A parallel `PrimarySequenceV1` structure was rejected: two things both
+describing "what is this video made of" is the parallel copy the program's rules
+forbid. `DOCS/decisions/ADR-MULTI-ASSET-PRIMARY-SEQUENCE-V1.md`.
 
-```
-   1  nothing could be deleted           →  added  remove-overlay
-   2  no track could be kept out of      →  added  set-track-output
-      the finished video
-   3  music had no length at all         →  added  durationTicks to music
-```
+Added: `place-primary-clip` and `move-primary-clip`. Split, trim, remove, hide
+and loudness already worked on any clip from any file, and still do.
 
-The music length is a **known key that may be omitted**. The contract stays
-closed, but a project saved before this reads back as `null`, meaning "play
-until the video ends or the song ends" — exactly how it already behaved. No
-migration, no file rewritten, not one project sounds different.
+**No migration. No render-plan bump.** A one-recording project is already a
+valid multi-asset sequence containing one. The plan already carried `assetId` on
+every segment, so its shape did not change — moving the version would have
+thrown away every cached export to produce identical files.
 
-**Lock and output are two switches and can never be one.** A padlock changes
-nothing about the exported file, so it takes no revision and no Undo and lives
-in the browser. Keeping a track out of the video DOES change the file, so it is
-an ordinary accepted operation with one Undo. Proved on the owner's project:
-locking and unlocking A2 left the revision at 19; muting A2 moved it to 20.
-See `DOCS/decisions/ADR-TRACK-LOCK-AND-OUTPUT-V1.md`.
+**The real browser found a bug no test had.** Every piece of footage was measured
+against the FIRST recording's length, so a valid 60-second second recording was
+refused for being longer than the 30-second first one. Each recording is now
+measured against itself.
 
-**The render plan moved v6 → v7** so each piece of footage says whether its
-picture is drawn and its sound heard. The version had to move because the export
-key is built from it — otherwise somebody who muted the dialogue and pressed
-Export would get the cached file from before the mute.
+**Real export proof:** 90.066 s = 30.033 + 60.033, with real picture at 80
+seconds — 50 seconds past the end of the first file, so it can only have come
+from the second. One `<video>` element throughout.
 
-**One gesture is one change set is one Undo.** Measured during a real twelve-move
-drag: the revision did not move once while the hand was moving; the release
-produced exactly one edit, or one truthful refusal.
+**Gate D (filmstrips, waveforms, long-form bounds) has NOT started.**
 
-**Plain `S` now toggles snapping and `Ctrl/Cmd+B` splits.** `S` had two possible
-meanings and now has one.
-
-**Real export proof.** With V1 hidden and V2 on, the picture reads 16.0
-(pure black) at 5 s and 32.3 where the B-roll is drawn. With the dialogue muted
-and the music on, the music window is −43.9 dB and the silent window is
-−91.0 dB — 47 dB apart, so the dialogue is genuinely gone rather than turned
-down. Length unchanged at 30.033 s in every case. Exactly one `<video>` element
-throughout, at every viewport size.
-
-**Gate C2 (Multi-asset Primary Sequence) and Gate D (filmstrips, waveforms,
-long-form bounds) have NOT started.**
-
-**Tests 1,389 → 1,510.** Build exit 0. No assertion weakened, nothing skipped.
-`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/gate-c1-creator-timeline-core.md`
+**Tests 1,510 → 1,535.** Build exit 0.
+`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/gate-c2-multi-asset-primary-sequence.md`
 
 ---
 

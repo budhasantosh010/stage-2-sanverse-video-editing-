@@ -462,6 +462,19 @@ export const validateOperationAgainstComposition = (
   }
 
   if (isTimelineOperation(operation)) {
+    if (operation.kind === 'place-primary-clip') {
+      // This is the one timeline operation whose clip does not exist yet — it
+      // is the operation that creates it. What IS checked here is that the
+      // recording is in the project and is footage, because a piece of music
+      // dropped on the main sequence has no picture to show.
+      const asset = findAsset(assets, operation.assetId)
+      if (!asset) return fail('assetId', 'OVERLAY_ASSET_UNKNOWN')
+      if (asset.mediaKind !== 'video') return fail('assetId', 'OVERLAY_ASSET_WRONG_KIND')
+      if (!rangeWithin(operation.sourceRange, { start: ZERO_TIME, duration: asset.duration })) {
+        return fail('sourceRange', 'OVERLAY_SPAN_OUTSIDE_ASSET')
+      }
+      return ok(operation)
+    }
     if (!findClip(composition, operation.clipId)) {
       return err({ code: 'OPERATION_INVALID', issues: [{ path: `${path}.clipId`, code: 'CLIP_UNKNOWN' }] })
     }
