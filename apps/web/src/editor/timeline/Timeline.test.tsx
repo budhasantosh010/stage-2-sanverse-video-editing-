@@ -34,6 +34,13 @@ const renderTimeline = (input: Readonly<{
   onSelect?: (value: string | null) => void
   onGesture?: (value: TimelineGesture) => void
   onOpenProposal?: () => void
+  lockedTrackIds?: readonly string[]
+  trackOutputs?: Readonly<Record<'V2' | 'V1' | 'C1' | 'A1' | 'A2', boolean>>
+  onToggleTrackLock?: (trackId: string) => void
+  onToggleTrackOutput?: (trackId: string) => void
+  onPlacementMode?: (mode: string) => void
+  onToggleSnapping?: () => void
+  onItemAction?: (itemId: string, action: unknown) => void
 }> = {}) => {
   const model = input.model ?? buildTimelineViewModel({
     project: projectWithAllTimelineFamilies(),
@@ -51,6 +58,15 @@ const renderTimeline = (input: Readonly<{
     fadeInTicks: 0,
     fadeOutTicks: 0,
     advancedControls: <button type="button">Legacy fallback</button>,
+    lockedTrackIds: input.lockedTrackIds ?? [],
+    trackOutputs: input.trackOutputs ?? { V2: true, V1: true, C1: true, A1: true, A2: true },
+    placementMode: 'normal' as const,
+    snappingEnabled: true,
+    onToggleTrackLock: input.onToggleTrackLock ?? vi.fn(),
+    onToggleTrackOutput: input.onToggleTrackOutput ?? vi.fn(),
+    onPlacementMode: input.onPlacementMode ?? vi.fn(),
+    onToggleSnapping: input.onToggleSnapping ?? vi.fn(),
+    onItemAction: input.onItemAction ?? vi.fn(),
     onViewportChange: input.onViewportChange ?? vi.fn(),
     onSeek: input.onSeek ?? vi.fn(),
     onSelect: input.onSelect ?? vi.fn(),
@@ -105,11 +121,31 @@ describe('Timeline V1', () => {
     expect(onSelect).toHaveBeenCalledWith(selectedItemId)
     expect(onSeek).toHaveBeenCalled()
 
-    fireEvent.keyDown(screen.getByRole('region', { name: 'Project timeline' }), { key: 's' })
+    // Split moved from plain `S` to Ctrl+B, because `S` now toggles snapping
+    // and one key with two meanings makes a user distrust their own hands.
+    fireEvent.keyDown(screen.getByRole('region', { name: 'Project timeline' }), { key: 'b', ctrlKey: true })
     expect(onGesture).toHaveBeenCalledWith({ type: 'split', atTicks: ticks(5) })
   })
 
-  it('moves Delete focus to the removal decision and never deletes immediately', () => {
+  it('leaves plain S for snapping, and never splits with it', () => {
+    const base = projectWithAllTimelineFamilies()
+    const firstClipId = base.composition.tracks[0].clips[0].clipId
+    const selectedItemId = `clip:${firstClipId}`
+    const model = buildTimelineViewModel({ project: base, selectedItemId, pending: null })
+    const onGesture = vi.fn()
+    const onToggleSnapping = vi.fn()
+    renderTimeline({ model, selectedItemId, playheadTicks: ticks(5), onGesture, onToggleSnapping })
+
+    fireEvent.keyDown(screen.getByRole('region', { name: 'Project timeline' }), { key: 's' })
+    expect(onToggleSnapping).toHaveBeenCalledOnce()
+    expect(onGesture).not.toHaveBeenCalled()
+  })
+
+  it('deletes with Delete and closes the gap with Shift+Delete, as two distinct actions', () => {
+    // The old design focused a confirmation button because "remove" and
+    // "remove and close the gap" were one control with two outcomes. They are
+    // now two keys and two toolbar buttons, so there is nothing left to confirm
+    // — and every delete here is one Undo away from being back.
     const base = projectWithAllTimelineFamilies()
     const firstClipId = base.composition.tracks[0].clips[0].clipId
     const selectedItemId = `clip:${firstClipId}`
@@ -120,9 +156,11 @@ describe('Timeline V1', () => {
 
     const timeline = screen.getByRole('region', { name: 'Project timeline' })
     fireEvent.keyDown(timeline, { key: 'Delete' })
+    expect(onGesture).toHaveBeenCalledWith(expect.objectContaining({ type: 'remove-gap' }))
 
-    expect(screen.getByRole('button', { name: /remove \+ close gap/i })).toHaveFocus()
-    expect(onGesture).not.toHaveBeenCalled()
+    onGesture.mockClear()
+    fireEvent.keyDown(timeline, { key: 'Delete', shiftKey: true })
+    expect(onGesture).toHaveBeenCalledWith(expect.objectContaining({ type: 'remove-ripple' }))
 
     fireEvent.keyDown(timeline, { key: 'Escape' })
     expect(onSelect).toHaveBeenCalledWith(null)

@@ -2,41 +2,105 @@
 
 ## Current checkpoint
 
-**P1-F.1A Gate C1 is PARTIAL: C1.1 (planner) and C1.2 (media drag) are done.
-Gate C0 before it is complete.**
+**P1-F.1A Gate C1 — Creator Timeline Core V2 is COMPLETE.
+Gates C0 and C1 are both done. Gate C2 and Gate D have NOT started.**
 
-### Gate C1 so far — you can now drag media onto the timeline
+### What Gate C1 added
+
+Three capabilities did not exist anywhere in the system and had to be built
+before any of the timeline work was possible:
+
+```
+   1  nothing could be deleted        →  remove-overlay      { overlayId }
+   2  no track could be kept out of   →  set-track-output    { trackId,
+      the finished video                                       outputEnabled }
+   3  music had no length at all      →  durationTicks on music
+```
+
+- **`remove-overlay` is one operation for all four kinds** — title, callout,
+  B-roll, music — because the four identifier shapes are already distinct, so
+  the target is never ambiguous. Four near-identical operations would have been
+  four places for the same rule to drift. A later `set-` naming something that
+  was deleted finds nothing to repair: **only Undo brings it back.**
+- **Music's `durationTicks` is a known key that may be omitted.** The contract
+  stays closed; a project saved earlier reads back as `null`, meaning "play
+  until the video ends or the song ends", which is exactly how it behaved.
+  **No migration. No file rewritten. Nothing sounds different.**
+- **Lock and output are two switches and must never be merged.** Padlock =
+  presentation, no revision, no Undo, stored in `localStorage` per project.
+  Output = an accepted operation, one revision, one Undo, part of the project.
+  Full reasoning: `DOCS/decisions/ADR-TRACK-LOCK-AND-OUTPUT-V1.md`.
+- **Render plan v6 → v7.** Each segment now carries `videoEnabled` and
+  `audioEnabled`. The version HAD to move because the export key is
+  `sha256(projectId : revision : renderPlanSchemaVersion)` — without it a user
+  who muted the dialogue would be handed the cached pre-mute file.
+- **Insert and Overwrite are real now.** The rearrangement goes in the SAME
+  change set as the new item, so pushing four clips along is one Undo. Insert
+  into the middle of a clip still refuses (it would move that clip's first half
+  too). **Ripple delete on V2 still refuses** and says why: B-roll is anchored
+  to a moment of the ORIGINAL RECORDING (ADR-005), so closing a gap would re-pin
+  later clips onto different footage. Ripple on music is exact and works.
+- **One gesture = one change set = one Undo.** Pointer movement creates nothing.
+  Measured in the browser: twelve pointer moves, revision unchanged throughout,
+  one edit on release.
+- **Plain `S` now toggles snapping; `Ctrl/Cmd+B` splits.** `S` had two possible
+  meanings and now has one.
+- **No inert controls.** Every disabled control carries its reason in words, in
+  both `title` and `aria-label`.
+
+### Where the C1 code lives
+
+```
+   packages/edit-domain/src/track-output.ts          the five tracks, closed
+   packages/edit-domain/src/overlay-operations.ts    remove-overlay, music length
+   apps/web/src/features/timeline/
+      timeline-item-operations.ts    move · trim · split · delete · lane edits
+      timeline-item-drag-session.ts  the drag session contract
+      timeline-lock-state.ts         padlocks (browser, per project)
+      timeline-placement-planner.ts  drops, and Insert/Overwrite/Append
+   apps/web/src/editor/timeline/
+      TimelineToolbar.tsx            real actions, truthful disabled reasons
+      TimelineTrackHeader.tsx        padlock + eye/speaker
+      TimelineItem.tsx               pointer drag, trim handles
+```
+
+### Browser and export proof
+
+Real project, real media. With V1 hidden and V2 on, the exported picture reads
+16.0 (pure black) at 5 s and 32.3 where the B-roll is drawn. With the dialogue
+muted and the music on, the music window is −43.9 dB and the silent window is
+−91.0 dB — 47 dB apart, so the dialogue is genuinely gone rather than turned
+down. Length unchanged at 30.033 s. Exactly one `<video>` element throughout.
+`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/gate-c1-creator-timeline-core.md`
+
+**Tests 1,389 → 1,510.** Build exit 0. Four existing tests were rewritten to
+assert the new truth (the S key, the Delete confirmation, and the old behaviour
+where a second piece of music silently REPLACED the first) — none deleted.
+
+### What is next
+
+**Gate C2 — Multi-asset Primary Sequence.** Nothing of it exists. It must begin
+with `DOCS/decisions/ADR-MULTI-ASSET-PRIMARY-SEQUENCE-V1.md` and no code before
+that ADR is accepted. Then Gate D — filmstrips, waveforms and long-form bounds.
+
+---
+
+## Gate C1.1 / C1.2 — the planner and media drag
 
 - **`planTimelinePlacement` is the only place placement policy lives.** Pure —
-  no React, no fetch, no mutation — so a drag and a future typed AI request
-  produce the same operation instead of two rulebooks that drift.
-- It owns policy and **delegates construction to `features/media/media-actions`**,
-  which already knew how to anchor B-roll to the original footage (ADR-005) and
-  music to the finished video (ADR-007). A second builder would have been a
-  second set of rules about where things land.
+  no React, no fetch, no mutation — so a drag and a typed AI request produce the
+  same operation instead of two rulebooks that drift.
+- It owns policy and **delegates construction to `features/media/media-actions`**
+  (ADR-005 anchoring for B-roll, ADR-007 for music).
 - **V2 takes video and pictures. A2 takes sound. V1, A1 and C1 refuse** with a
   sentence saying what to do instead. V1's refusal is the ADR's, verbatim.
 - **The lane highlight and the outcome are one decision** — a test walks every
-  lane × every kind of file and fails on any disagreement. Not colour alone, and
-  present ONLY while a drag is in the air, so hovering can never trigger it.
-- **`MEDIA_DRAG_ENABLED` is now `true`**, because every lane finishes the
-  gesture. A refusal is a finish; swallowing the drop silently is not.
-- **Insert and Overwrite are honest stubs**: they refuse when they would have to
-  move or replace something, because no operation can do that yet. An "Insert"
-  that behaved like "Normal" would lose what it was meant to push along.
-- Browser-proved: a video dropped on V2 gave revision 8→9 and one
-  `add-media-overlay`; the same video on V1 gave revision 9→9 and the refusal on
-  screen; an abandoned drag created nothing; music on A2 gave 9→10.
+  lane × every kind of file. Not colour alone, and present ONLY while a drag is
+  in the air.
+- `dataTransfer.getData` is forbidden during `dragover`, which is exactly when a
+  lane needs to know what is coming — hence a document-level `dragstart`
+  listener. The drag MIME is `application/vnd.sanverse.media-drag+json`.
   `DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/placement-planner.md`.
-
-**NOT done in C1:** drag session for existing items (C1.3), Timeline
-presentation (C1.4), toolbar (C1.5), lock/output UI and contracts (C1.6/C1.7),
-working Insert/Overwrite (C1.9), item move (C1.10), trim (C1.11), split (C1.12),
-delete and ripple (C1.13), snapping on drop (C1.14), playhead and selection work
-(C1.15/16), keyboard (C1.17), output parity (C1.18). **Gate C2 (multi-asset V1)
-and Gate D have not started.**
-
-**Tests 1,319 → 1,389.** Build exit 0.
 
 ---
 

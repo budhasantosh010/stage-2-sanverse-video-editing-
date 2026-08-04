@@ -24,7 +24,7 @@ const node = {
   useOverlayAudio: false,
 }
 const plan = {
-  schemaVersion: 'sanverse.render-plan/v6',
+  schemaVersion: 'sanverse.render-plan/v7',
   projectId: 'project_aaaaaaaa',
   projectRevision: 1,
   compositionId: 'composition_aaaaaaaa',
@@ -68,6 +68,8 @@ describe('motion preview timing', () => {
       interval: { start: at(0), duration: at(10) },
       assetId: 'asset_aaaaaaaa',
       sourceStartTicks: 0,
+      videoEnabled: true,
+      audioEnabled: true,
       footageMotions: [],
       gainDb: 0,
       fadeInTicks: 0,

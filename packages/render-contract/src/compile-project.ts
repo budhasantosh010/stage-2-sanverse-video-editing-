@@ -2,6 +2,7 @@ import {
   activeCaptionSets,
   activeOverlayOperations,
   activeOperations,
+  activeTrackOutputs,
   activeVisualProperties,
   compositionDuration,
   effectiveComposition,
@@ -50,6 +51,14 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
   }
   const operations = activeOperations(project)
   const footageMotions = effectiveFootageMotions(project)
+  /**
+   * Which of the five tracks reach the finished video.
+   *
+   * Read once, here, and applied in exactly one place per track below. A
+   * renderer never sees this state and never has to reapply it: what it gets is
+   * a plan that already describes the video the user asked for.
+   */
+  const trackOutputs = activeTrackOutputs(project)
   const transitionIn = new Map<string, { video: number; audio: number }>()
   const transitionOut = new Map<string, { video: number; audio: number }>()
   for (const operation of operations) {
@@ -91,6 +100,11 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
         }),
         assetId: clip.assetId,
         sourceStartTicks: clip.sourceRange.start.ticks,
+        // V1 carries the picture, A1 the sound that came with it. Turning one
+        // off leaves the other exactly as it was, and leaves the piece the same
+        // length so nothing after it moves.
+        videoEnabled: trackOutputs.V1,
+        audioEnabled: trackOutputs.A1,
         footageMotions: Object.freeze(
           footageMotions
             .filter((motion) =>
@@ -147,7 +161,12 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     }
   }
 
-  for (const operation of operations) {
+  // V2 holds everything laid on top of the picture: B-roll, pictures, titles,
+  // callouts, and nameplates. Switching it off draws none of them. They are
+  // left out of the plan rather than drawn transparent, because a renderer that
+  // still opens a B-roll file to draw nothing wastes the time of an export the
+  // user is waiting on.
+  for (const operation of trackOutputs.V2 ? operations : []) {
     if (isNameplateOperation(operation)) {
       placeAnchored(operation.assetId, operation.sourceInterval, (suffix, interval) => Object.freeze({
         nodeId: `${operation.operationId}${suffix}`,
@@ -162,6 +181,11 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
   }
 
   for (const operation of activeOverlayOperations(project)) {
+    // Music sits on A2 and everything else in this family sits on V2, so each
+    // is asked about its own track rather than sharing one answer.
+    const onTrack = operation.kind === 'add-music' ? trackOutputs.A2 : trackOutputs.V2
+    if (!onTrack) continue
+
     if (operation.kind === 'add-title') {
       placeAnchored(operation.assetId, operation.sourceInterval, (suffix, interval) => Object.freeze({
         nodeId: `${operation.titleId}${suffix}`,
@@ -224,9 +248,14 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
       // not cut the middle out of the song. It plays for as long as there is
       // both video left to cover and song left to play, whichever runs out
       // first — never looped, because a loop point nobody chose is audible.
+      //
+      // A length the user set is a third limit alongside those two, never an
+      // override of them: asking for thirty seconds of a song with two seconds
+      // left gets two seconds, not thirty seconds padded with silence.
       const videoLeft = duration.ticks - operation.compositionStart.ticks
       const songLeft = asset.duration.ticks - operation.sourceStart.ticks
-      const playable = Math.min(videoLeft, songLeft)
+      const asked = operation.durationTicks === null ? Number.MAX_SAFE_INTEGER : operation.durationTicks.ticks
+      const playable = Math.min(videoLeft, songLeft, asked)
       if (playable <= 0) continue
       if (!useSource(operation.assetId)) continue
       const fadeIn = Math.min(operation.fadeIn.ticks, playable)
@@ -254,7 +283,7 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
   // deleted simply produces no node — it is not an error, and the rest of the
   // captions are unaffected. See `validateOperationAgainstComposition` for why
   // that differs from a nameplate.
-  for (const set of activeCaptionSets(project)) {
+  for (const set of trackOutputs.C1 ? activeCaptionSets(project) : []) {
     for (const cue of set.cues) {
       placeAnchored(set.assetId, cue.sourceInterval, (suffix, interval) => Object.freeze({
         nodeId: `${set.captionSetId}.${cue.cueId}${suffix}`,
@@ -275,8 +304,12 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     left.interval.start.ticks - right.interval.start.ticks || drawRank(left) - drawRank(right),
   )
 
+  // A visual adjustment always names something drawn on V2. With V2 switched
+  // off there is nothing on screen for it to adjust — which is the expected
+  // outcome, not a broken project, so the list is simply empty. Failing here
+  // would mean that hiding a track made Export stop working altogether.
   const visuals: VisualPropertiesNode[] = []
-  for (const operation of activeVisualProperties(project)) {
+  for (const operation of trackOutputs.V2 ? activeVisualProperties(project) : []) {
     const nodeIds = overlays
       .filter((node) => node.nodeId === operation.visualId || node.nodeId.startsWith(`${operation.visualId}.`))
       .map((node) => node.nodeId)

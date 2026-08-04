@@ -216,6 +216,7 @@ export const music = (operationId: string, startSeconds = 0): AddMusicOperation 
   assetId: 'asset_music0001',
   compositionStart: time(startSeconds),
   sourceStart: time(0),
+  durationTicks: null,
   gainDb: -18,
   fadeIn: time(1),
   fadeOut: time(1),

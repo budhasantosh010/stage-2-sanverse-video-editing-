@@ -41,6 +41,9 @@ export const TITLE_PRIMITIVE_ID = 'sanverse.title.primitive/v1'
 export const CALLOUT_PRIMITIVE_ID = 'sanverse.callout.primitive/v1'
 export const MEDIA_OVERLAY_PRIMITIVE_ID = 'sanverse.broll.primitive/v1'
 export const MUSIC_PRIMITIVE_ID = 'sanverse.music.primitive/v1'
+export const OVERLAY_REMOVE_PRIMITIVE_ID = 'sanverse.overlay.remove.primitive/v1'
+/** Which lanes are heard and seen in the finished video. */
+export const TRACK_OUTPUT_PRIMITIVE_ID = 'sanverse.timeline.track-output.primitive/v1'
 export const VISUAL_PROPERTIES_PRIMITIVE_ID = 'sanverse.visual.properties.primitive/v1'
 export const FOOTAGE_MOTION_PRIMITIVE_ID = 'sanverse.footage.motion.primitive/v1'
 
@@ -198,6 +201,22 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     level: 'primitive' as const,
     accepts: 'Two adjacent clips, a bounded transition duration, and explicit audio behavior.',
     produces: Object.freeze(['set-clip-transition']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: OVERLAY_REMOVE_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One title, callout, piece of B-roll, or music bed to take off the video.',
+    produces: Object.freeze(['remove-overlay']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: TRACK_OUTPUT_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One of the five tracks, and whether it reaches the finished video.',
+    produces: Object.freeze(['set-track-output']),
     requires: Object.freeze([]),
   }),
   Object.freeze({

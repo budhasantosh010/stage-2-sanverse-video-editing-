@@ -13,7 +13,7 @@ describe('safe local diagnostics', () => {
     expect(diagnostics).toMatchObject({
       schemaVersion: 'sanverse.local-diagnostics/v1',
       projectSchemaVersion: 'sanverse.project/v4',
-      renderPlanSchemaVersion: 'sanverse.render-plan/v6',
+      renderPlanSchemaVersion: 'sanverse.render-plan/v7',
       renderer: { configured: true, kind: 'ffmpeg' },
       intentProvider: 'fake-local',
       jobs: { queued: 1, running: 0, failed: 1 },

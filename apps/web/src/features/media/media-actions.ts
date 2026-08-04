@@ -108,20 +108,51 @@ export const buildAddAsMusicOperation = (input: Readonly<{
   if (!input.project.assets.some((asset) => asset.assetId === input.asset.assetId)) return Object.freeze({ ok: false, message: 'That audio is no longer in this project.' })
   const durationTicks = compositionDuration(effectiveComposition(input.project)).ticks
   const startTicks = Math.max(0, Math.min(durationTicks - 1, Math.round(input.playheadMs * PROJECT_TIMESCALE / 1000)))
-  const current = activeOverlayOperations(input.project).find((operation) => operation.kind === 'add-music')
-  const shared = {
+
+  // A2 holds music AND anything else added underneath, so a second piece is a
+  // second item, not a replacement for the first. Silently overwriting the bed
+  // somebody chose ten minutes ago is a loss they cannot see happening.
+  //
+  // What it must not do is stack two pieces on top of each other, because the
+  // user would hear both at once and see one rectangle hiding another.
+  const songLeft = input.asset.duration.ticks
+  const wanted = Math.min(durationTicks - startTicks, songLeft)
+  const clash = activeOverlayOperations(input.project).some((operation) => {
+    if (operation.kind !== 'add-music') return false
+    const asset = input.project.assets.find((candidate) => candidate.assetId === operation.assetId)
+    if (!asset || asset.mediaKind !== 'audio') return false
+    const asked = operation.durationTicks === null ? Number.MAX_SAFE_INTEGER : operation.durationTicks.ticks
+    const length = Math.min(
+      durationTicks - operation.compositionStart.ticks,
+      asset.duration.ticks - operation.sourceStart.ticks,
+      asked,
+    )
+    if (length <= 0) return false
+    return startTicks < operation.compositionStart.ticks + length && operation.compositionStart.ticks < startTicks + wanted
+  })
+  if (clash) {
+    return Object.freeze({
+      ok: false,
+      message: 'There is already music playing at that moment. Move the playhead past it, or move the music that is there.',
+    })
+  }
+
+  const operation: AddMusicOperation = Object.freeze({
     schemaVersion: OPERATION_SCHEMA_VERSION,
     operationId: input.ids.operationId,
+    kind: 'add-music',
+    capabilityId: MUSIC_COMPONENT_ID,
+    musicId: input.ids.musicId,
     assetId: input.asset.assetId,
     compositionStart: time(startTicks),
     sourceStart: time(0),
+    // A bed under whatever is left of the video, which is what adding music
+    // means to somebody who has not asked for a length.
+    durationTicks: null,
     gainDb: DEFAULT_MUSIC_GAIN_DB,
     fadeIn: time(PROJECT_TIMESCALE),
     fadeOut: time(2 * PROJECT_TIMESCALE),
     extensions: Object.freeze({}),
-  } as const
-  const operation: AddMusicOperation | SetMusicOperation = current
-    ? Object.freeze({ ...shared, kind: 'set-music', capabilityId: MUSIC_PRIMITIVE_ID, musicId: current.musicId })
-    : Object.freeze({ ...shared, kind: 'add-music', capabilityId: MUSIC_COMPONENT_ID, musicId: input.ids.musicId })
+  })
   return finish(input.project, operation, `music:${operation.musicId}:0`)
 }

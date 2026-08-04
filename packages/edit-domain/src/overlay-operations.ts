@@ -49,6 +49,7 @@ export const OVERLAY_OPERATION_KINDS = [
   'set-media-overlay',
   'add-music',
   'set-music',
+  'remove-overlay',
 ] as const
 
 export type OverlayOperationKind = (typeof OVERLAY_OPERATION_KINDS)[number]
@@ -232,9 +233,47 @@ export type AddMusicOperation = Readonly<{
   compositionStart: MediaTime
   /** Where in the song to begin. */
   sourceStart: MediaTime
+  /**
+   * How long the music is held for, measured on the finished video.
+   *
+   * `null` means "until there is no video left or no song left, whichever comes
+   * first". That is not a missing value: an unbounded bed under the whole piece
+   * is what most people mean by adding music, and it is the only behaviour that
+   * existed before a length could be given, so every project saved earlier reads
+   * back as `null` and sounds exactly as it did.
+   *
+   * A number is a deliberate limit — the user dragged the end of the music in,
+   * or dropped a second piece after it. The renderer holds it for the SHORTER of
+   * the three: this length, the video that is left, and the song that is left.
+   * It is never padded with silence to reach a length that was asked for.
+   */
+  durationTicks: MediaTime | null
   gainDb: number
   fadeIn: MediaTime
   fadeOut: MediaTime
+  extensions: Extensions
+}>
+
+/**
+ * Take one title, callout, piece of B-roll, or music bed off the video.
+ *
+ * One operation covers all four because the four identifier shapes are already
+ * distinct (`title_`, `callout_`, `broll_`, `music_`), so the target is never
+ * ambiguous, and a user pressing Delete on a timeline item does not care which
+ * family it belonged to. Four near-identical operations would have been four
+ * places for the same rule to drift.
+ *
+ * This is a removal, not a hiding. What is hidden is a track output, which is a
+ * separate operation, because "I do not want this here" and "do not show this
+ * lane while I work" are different intentions and each needs its own Undo.
+ */
+export type RemoveOverlayOperation = Readonly<{
+  schemaVersion: typeof OPERATION_SCHEMA_VERSION
+  operationId: string
+  kind: 'remove-overlay'
+  capabilityId: string
+  /** One of the four identifier shapes above. */
+  overlayId: string
   extensions: Extensions
 }>
 
@@ -257,6 +296,7 @@ export type OverlayOperation =
   | SetMediaOverlayOperation
   | AddMusicOperation
   | SetMusicOperation
+  | RemoveOverlayOperation
 
 export type ResolvedOverlayOperation =
   | AddTitleOperation
@@ -310,19 +350,38 @@ const KEYS: Readonly<Record<OverlayOperationKind, readonly string[]>> = Object.f
   ]),
   'add-music': Object.freeze([
     'schemaVersion', 'operationId', 'kind', 'capabilityId', 'musicId', 'assetId',
-    'compositionStart', 'sourceStart', 'gainDb', 'fadeIn', 'fadeOut', 'extensions',
+    'compositionStart', 'sourceStart', 'durationTicks', 'gainDb', 'fadeIn', 'fadeOut', 'extensions',
   ]),
   'set-music': Object.freeze([
     'schemaVersion', 'operationId', 'kind', 'capabilityId', 'musicId', 'assetId',
-    'compositionStart', 'sourceStart', 'gainDb', 'fadeIn', 'fadeOut', 'extensions',
+    'compositionStart', 'sourceStart', 'durationTicks', 'gainDb', 'fadeIn', 'fadeOut', 'extensions',
   ]),
+  'remove-overlay': Object.freeze([
+    'schemaVersion', 'operationId', 'kind', 'capabilityId', 'overlayId', 'extensions',
+  ]),
+})
+
+/**
+ * Keys the contract knows but does not demand.
+ *
+ * The key set stays closed — anything not listed above is still refused — but a
+ * project saved before music could be given a length has no `durationTicks`, and
+ * refusing to open it would destroy work the user already approved. Absent means
+ * `null`, which is the exact behaviour those projects already had.
+ */
+const OPTIONAL_KEYS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  'add-music': Object.freeze(['durationTicks']),
+  'set-music': Object.freeze(['durationTicks']),
 })
 
 const OPERATION_ID_PATTERN = /^operation_[a-z0-9]{8,64}$/
 
 const checkShared = (input: Record<string, unknown>, kind: OverlayOperationKind, path: string, issues: Issue[]): void => {
+  const optional = OPTIONAL_KEYS[kind] ?? []
   for (const key of KEYS[kind]) {
-    if (!Object.hasOwn(input, key)) issues.push({ path: `${path}.${key}`, code: 'FIELD_REQUIRED' })
+    if (!Object.hasOwn(input, key) && !optional.includes(key)) {
+      issues.push({ path: `${path}.${key}`, code: 'FIELD_REQUIRED' })
+    }
   }
   for (const key of Object.keys(input)) {
     if (!KEYS[kind].includes(key)) issues.push({ path: `${path}.${key}`, code: 'FIELD_UNKNOWN' })
@@ -336,10 +395,23 @@ const checkShared = (input: Record<string, unknown>, kind: OverlayOperationKind,
   if (typeof input.capabilityId !== 'string' || !capabilityProduces(input.capabilityId, kind)) {
     issues.push({ path: `${path}.capabilityId`, code: 'CAPABILITY_UNKNOWN' })
   }
+  // A removal names the thing it removes, not the footage underneath it.
+  if (kind === 'remove-overlay') return
   if (typeof input.assetId !== 'string' || input.assetId.trim().length === 0) {
     issues.push({ path: `${path}.assetId`, code: 'VALUE_OUT_OF_RANGE' })
   }
 }
+
+/** The four things that can be taken off the video, by the shape of their id. */
+export const OVERLAY_TARGET_PATTERNS: readonly RegExp[] = Object.freeze([
+  TITLE_ID_PATTERN,
+  CALLOUT_ID_PATTERN,
+  MEDIA_OVERLAY_ID_PATTERN,
+  MUSIC_ID_PATTERN,
+])
+
+export const isRemovableOverlayId = (value: unknown): value is string =>
+  typeof value === 'string' && OVERLAY_TARGET_PATTERNS.some((pattern) => pattern.test(value))
 
 const readText = (
   value: unknown,
@@ -391,6 +463,21 @@ export const validateOverlayOperation = (
   }
   const readExtensions = () => (extensions.ok ? extensions.value : emptyExtensions())
 
+  if (kind === 'remove-overlay') {
+    if (!isRemovableOverlayId(input.overlayId)) {
+      issues.push({ path: `${path}.overlayId`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    if (issues.length > 0) return err({ code: 'OPERATION_INVALID', issues })
+    return ok(Object.freeze({
+      schemaVersion: OPERATION_SCHEMA_VERSION,
+      operationId: input.operationId as string,
+      kind,
+      capabilityId: input.capabilityId as string,
+      overlayId: input.overlayId as string,
+      extensions: readExtensions(),
+    }))
+  }
+
   if (kind === 'add-music' || kind === 'set-music') {
     // Music is the one kind with no source interval, because it is not pinned
     // to a moment of footage at all.
@@ -412,6 +499,18 @@ export const validateOverlayOperation = (
     ) {
       issues.push({ path: `${path}.gainDb`, code: 'GAIN_OUT_OF_RANGE' })
     }
+    // Absent and null both mean "hold it until something runs out". A number
+    // must be a real span: a zero-length music item is not a shorter bed, it is
+    // an item the user can see on the timeline and never hear.
+    let durationTicks: MediaTime | null = null
+    if (Object.hasOwn(input, 'durationTicks') && input.durationTicks !== null) {
+      const parsed = validateMediaTime(input.durationTicks, `${path}.durationTicks`)
+      if (!parsed.ok || parsed.value.ticks <= 0) {
+        issues.push({ path: `${path}.durationTicks`, code: 'VALUE_OUT_OF_RANGE' })
+      } else {
+        durationTicks = parsed.value
+      }
+    }
     if (issues.length > 0) return err({ code: 'OPERATION_INVALID', issues })
     return ok(Object.freeze({
       schemaVersion: OPERATION_SCHEMA_VERSION,
@@ -422,6 +521,7 @@ export const validateOverlayOperation = (
       assetId: input.assetId as string,
       compositionStart: (compositionStart as { ok: true; value: MediaTime }).value,
       sourceStart: (sourceStart as { ok: true; value: MediaTime }).value,
+      durationTicks,
       gainDb: gainDb as number,
       fadeIn: (fadeIn as { ok: true; value: MediaTime }).value,
       fadeOut: (fadeOut as { ok: true; value: MediaTime }).value,
@@ -584,6 +684,16 @@ export const foldOverlayOperations = (
         }
         break
       }
+      case 'remove-overlay':
+        // Deleting something that is not there is not an error and not a
+        // no-op worth reporting: replaying history after an earlier change set
+        // was switched off legitimately reaches this. It simply removes nothing.
+        //
+        // A later `set-` naming the same id finds nothing to repair and is
+        // ignored, so a removal cannot be undone by a repair that happened to
+        // come after it. Only Undo brings it back.
+        items.delete(operation.overlayId)
+        break
     }
   }
 

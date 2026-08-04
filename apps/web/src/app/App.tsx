@@ -509,6 +509,37 @@ export function App() {
           return error instanceof Error && error.message ? error.message : 'That could not be added.'
         }
       }}
+      onApplyOperations={async (operations, changeSetId) => {
+        if (appState.screen !== 'studio' || appState.proposal) return 'Finish the pending edit first.'
+        const currentProject = latestEditProjectRef.current
+        if (!currentProject) return 'Open a project first.'
+        if (operations.length === 0) return null
+        resetExport()
+        try {
+          // ONE change set holding every operation the gesture produced. The
+          // server accepts all of them or none, so an Insert that pushes four
+          // clips along can never leave three moved and one behind.
+          const next = await acceptChangeSet(
+            appState.project.id,
+            {
+              schemaVersion: 'sanverse.change-set/v1' as const,
+              changeSetId,
+              baseRevision: currentProject.revision,
+              operations: [...operations],
+              provenance: { source: 'direct' as const, requestId: null },
+              extensions: {},
+            },
+            fetch,
+          )
+          latestEditProjectRef.current = next
+          setAppState((current) =>
+            current.screen === 'studio' ? { ...current, editProject: next, editError: null } : current,
+          )
+          return null
+        } catch (error) {
+          return error instanceof Error && error.message ? error.message : 'That change could not be made.'
+        }
+      }}
       onUploadAsset={async (file) => {
         if (appState.screen !== 'studio') return 'Open a project first.'
         try {

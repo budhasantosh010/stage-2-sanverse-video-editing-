@@ -214,16 +214,25 @@
 
 .studio-screen__canvas-heading,
 .studio-screen__panel-heading,
+/*
+  The Timeline's own label.
+  It used to be a numbered section title with a slogan under it, which reads as
+  a progress report rather than as an editor and took roughly 60px of vertical
+  space away from the thing the user actually came here to use. It is now one
+  quiet line: still announced to a screen reader, no longer competing with the
+  toolbar underneath it.
+*/
 .studio-screen__time-strip-heading {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-  justify-content: space-between;
+  margin: 0 0 2px;
+  color: var(--color-text-muted);
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .studio-screen__canvas-heading h1,
-.studio-screen__panel-heading h2,
-.studio-screen__time-strip-heading h2 {
+.studio-screen__panel-heading h2 {
   margin: 4px 0 0;
   font-size: 1rem;
   letter-spacing: -0.025em;

@@ -4,38 +4,72 @@ Last updated: 2026-08-04
 
 ## Active goal
 
-**P1-F.1A Gate C1 is PARTIAL — you can now drag media onto the Timeline.**
+**P1-F.1A Gate C1 — Creator Timeline Core V2 is COMPLETE.**
+
+You can now drag a piece of B-roll onto the timeline, move it, pull either end
+in, cut it in half, and delete it. You can drop a second piece of music, trim
+it, and split it. You can padlock a track so nothing on it moves by accident,
+and separately keep a track out of the finished video. Insert really pushes the
+rest along, and Overwrite really cuts back what it lands on.
+
+Three things had to be built first, because they did not exist anywhere:
+
+```
+   1  nothing could be deleted           →  added  remove-overlay
+   2  no track could be kept out of      →  added  set-track-output
+      the finished video
+   3  music had no length at all         →  added  durationTicks to music
+```
+
+The music length is a **known key that may be omitted**. The contract stays
+closed, but a project saved before this reads back as `null`, meaning "play
+until the video ends or the song ends" — exactly how it already behaved. No
+migration, no file rewritten, not one project sounds different.
+
+**Lock and output are two switches and can never be one.** A padlock changes
+nothing about the exported file, so it takes no revision and no Undo and lives
+in the browser. Keeping a track out of the video DOES change the file, so it is
+an ordinary accepted operation with one Undo. Proved on the owner's project:
+locking and unlocking A2 left the revision at 19; muting A2 moved it to 20.
+See `DOCS/decisions/ADR-TRACK-LOCK-AND-OUTPUT-V1.md`.
+
+**The render plan moved v6 → v7** so each piece of footage says whether its
+picture is drawn and its sound heard. The version had to move because the export
+key is built from it — otherwise somebody who muted the dialogue and pressed
+Export would get the cached file from before the mute.
+
+**One gesture is one change set is one Undo.** Measured during a real twelve-move
+drag: the revision did not move once while the hand was moving; the release
+produced exactly one edit, or one truthful refusal.
+
+**Plain `S` now toggles snapping and `Ctrl/Cmd+B` splits.** `S` had two possible
+meanings and now has one.
+
+**Real export proof.** With V1 hidden and V2 on, the picture reads 16.0
+(pure black) at 5 s and 32.3 where the B-roll is drawn. With the dialogue muted
+and the music on, the music window is −43.9 dB and the silent window is
+−91.0 dB — 47 dB apart, so the dialogue is genuinely gone rather than turned
+down. Length unchanged at 30.033 s in every case. Exactly one `<video>` element
+throughout, at every viewport size.
+
+**Gate C2 (Multi-asset Primary Sequence) and Gate D (filmstrips, waveforms,
+long-form bounds) have NOT started.**
+
+**Tests 1,389 → 1,510.** Build exit 0. No assertion weakened, nothing skipped.
+`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/gate-c1-creator-timeline-core.md`
+
+---
+
+## Previous goal
+
+**P1-F.1A Gate C1.1 / C1.2 — the placement planner and media drag.**
 
 `planTimelinePlacement` is the single home of placement policy: a pure function
 with no React, no network and no mutation, so dragging a logo onto the intro and
 typing "put the logo over the intro" produce the same operation rather than two
 rulebooks that drift apart. It owns policy only and hands construction to
-`features/media/media-actions`, which already knew how to anchor B-roll to the
-original footage and music to the finished video.
-
-The B-roll lane (V2) takes video and pictures. The music lane (A2) takes sound.
-V1, A1 and C1 refuse, each with a sentence saying what to do instead — V1's is
-the ADR's, word for word, because there is no `append-clip` operation and a
-second video dropped there has no operation to become. It is refused rather than
-quietly placed on V2, because a product that puts your video somewhere other
-than where you dropped it has lied in a way you cannot recover from.
-
-The lane highlight and the outcome are one decision, held by a test that walks
-every lane against every kind of file. `MEDIA_DRAG_ENABLED` is `true` now
-because every lane finishes the gesture — a refusal is a finish. Insert and
-Overwrite are honest stubs that refuse when they would have to move or replace
-something, because no operation can do that yet.
-
-Browser-proved: video on V2 gave revision 8→9 and one `add-media-overlay`; the
-same video on V1 gave 9→9 with the refusal on screen; an abandoned drag created
-nothing; music on A2 gave 9→10.
-
-**Still to do in C1:** drag session for existing items, Timeline presentation and
-toolbar, lock/output UI and contracts, working Insert/Overwrite, item move, trim,
-split, delete and ripple, snapping on drop, playhead and selection work,
-keyboard, output parity. **Gate C2 and Gate D have not started.**
-
-**Tests 1,319 → 1,389.** Build exit 0.
+`features/media/media-actions`. The lane highlight and the outcome are one
+decision, held by a test that walks every lane against every kind of file.
 `DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/placement-planner.md`.
 
 ---

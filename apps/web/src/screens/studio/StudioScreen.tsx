@@ -16,8 +16,11 @@ import {
   mediaTime,
   toMilliseconds,
   createIdFactory,
+  activeTrackOutputs,
+  OPERATION_SCHEMA_VERSION,
   type SetFootageMotionOperation,
 } from '@sanverse/edit-domain'
+import { TRACK_OUTPUT_PRIMITIVE_ID } from '@sanverse/edit-domain/capabilities'
 import { proposalPlacement } from '../../app/app-state'
 import type { ConversationState, PendingProposal, ProposalRepair, StudioState } from '../../app/app-state'
 import { ChatComposer } from '../../features/conversation/ChatComposer'
@@ -25,10 +28,18 @@ import type { IntentContextInput } from '../../features/conversation/conversatio
 import { NameplateRepair } from '../../features/proposal-repair/NameplateRepair'
 import { describeOperation } from '../../features/history/describe-operation'
 import {
+  TIMELINE_LOCK_SCHEMA_VERSION,
   adaptTimelineGesture,
   buildTimelineViewModel,
+  laneSpans,
+  planTimelineItemAction,
   planTimelinePlacement,
+  readTimelineLockState,
+  trackIdForLane,
+  writeTimelineLockState,
+  type PlacementMode,
   type TimelineGesture,
+  type TimelineItemAction,
   type TimelineTrackId,
   type TimelineViewportState,
 } from '../../features/timeline'
@@ -186,6 +197,15 @@ export type StudioScreenProps = {
    * Resolves to a plain sentence when it could not be used, or null on success.
    */
   onCreateOverlay(operation: EditOperation): Promise<string | null>
+  /**
+   * Several operations as ONE change set, and therefore one Undo.
+   *
+   * Inserting a clip and pushing four others along is one thing the user did,
+   * so it is one thing the server accepts and one thing Undo takes back. Sending
+   * five separate change sets would leave four of them applied if the fifth
+   * were refused, which is the exact half-finished state Gate C0 removed.
+   */
+  onApplyOperations(operations: readonly EditOperation[], changeSetId: string): Promise<string | null>
   /** Put one file on the project's shelf, and say what it turned out to be. */
   onUploadAsset(file: File): Promise<MediaAsset | string>
   /** Where each extra file can be fetched from, for the preview. */
@@ -340,6 +360,7 @@ export function StudioScreen({
   onTimelineEdit,
   onAddCaptions: onAddCaptionsText,
   onCreateOverlay,
+  onApplyOperations,
   onUploadAsset,
   assetUrl,
   probeAssetSource,
@@ -401,6 +422,28 @@ export function StudioScreen({
    * half. Hiding a track is the opposite and belongs in the project.
    */
   const [lockedTrackIds, setLockedTrackIds] = useState<readonly TimelineTrackId[]>([])
+
+  /**
+   * How a drop lands, and whether edges snap. Both are workspace preferences,
+   * not project data: they change what the NEXT gesture does and nothing about
+   * the video as it stands.
+   */
+  const [timelinePlacementMode, setTimelinePlacementMode] = useState<PlacementMode>('normal')
+  const [snappingEnabled, setSnappingEnabled] = useState(true)
+
+  /**
+   * Which tracks reach the finished video. Read from the project rather than
+   * held separately, so the switch on screen and the switch the exporter obeys
+   * are the same fact.
+   */
+  const trackOutputs = useMemo(() => activeTrackOutputs(editProject), [editProject])
+
+  // Padlocks are remembered per project in this browser. They are read once
+  // when a project opens, and never sent to the server: they are about this
+  // person's mouse, not about the video.
+  useEffect(() => {
+    setLockedTrackIds(readTimelineLockState(editProject.projectId).lockedTrackIds)
+  }, [editProject.projectId])
 
   const [videoLayoutRevision, setVideoLayoutRevision] = useState(0)
   /** The same number, readable from inside the decoder's frame callback. */
@@ -1472,18 +1515,23 @@ export function StudioScreen({
    * creates exactly one change set, or one refusal that says why.
    */
   function handleMediaDrop(laneId: string, assetId: string, atTicks: number) {
+    const changeSetId = createChangeSetId()
     const plan = planTimelinePlacement({
       project: editProject,
       assetId,
       targetLaneId: laneId,
       atTicks,
-      placementMode: 'normal',
+      placementMode: timelinePlacementMode,
       includeLinkedAudio: false,
       trackState: { lockedTrackIds: lockedTrackIds },
       proposalPending: Boolean(proposal),
       exportInProgress: isRendering,
       expectedRevision: editProject.revision,
-      idFactory: createIdFactory(createChangeSetId()),
+      idFactory: createIdFactory(changeSetId),
+    }, {
+      // What is already on the target lane, named, so Insert knows which clips
+      // to push along and Overwrite knows which to cut back.
+      spans: laneSpans(editProject, trackIdForLane(laneId) === 'A2' ? 'A2' : 'V2'),
     })
     if (!plan.ok) {
       setTimelineNotice(plan.error.message)
@@ -1491,7 +1539,77 @@ export function StudioScreen({
     }
     setTimelineNotice(null)
     void (async () => {
-      const failure = await onCreateOverlay(plan.value.operations[0] as never)
+      const failure = await onApplyOperations(plan.value.operations, changeSetId)
+      if (failure) setTimelineNotice(failure)
+    })()
+  }
+
+  /**
+   * One whole gesture on one item already on the timeline.
+   *
+   * Called exactly once, when the user lets go or presses the key — never while
+   * a pointer is moving. Everything it produces goes into one change set, so a
+   * split that becomes two operations is still one Undo.
+   */
+  function handleTimelineItemAction(itemId: string, action: TimelineItemAction) {
+    const changeSetId = createChangeSetId()
+    const plan = planTimelineItemAction({
+      project: editProject,
+      itemId,
+      action,
+      lockedTrackIds,
+      pendingProposalExists: Boolean(proposal),
+      exportInProgress: isRendering,
+      expectedRevision: editProject.revision,
+      ids: createIdFactory(changeSetId),
+    })
+    if (!plan.ok) {
+      setTimelineNotice(plan.refusal.message)
+      return
+    }
+    setTimelineNotice(null)
+    void (async () => {
+      const failure = await onApplyOperations(plan.operations, changeSetId)
+      if (failure) setTimelineNotice(failure)
+    })()
+  }
+
+  /**
+   * A padlock. Presentation only: no operation, no revision, no Undo entry, and
+   * the exported file is byte-for-byte what it would have been without it.
+   */
+  function handleToggleTrackLock(trackId: TimelineTrackId) {
+    setLockedTrackIds((current) => {
+      const next = current.includes(trackId)
+        ? current.filter((id) => id !== trackId)
+        : [...current, trackId]
+      writeTimelineLockState(editProject.projectId, Object.freeze({
+        schemaVersion: TIMELINE_LOCK_SCHEMA_VERSION,
+        lockedTrackIds: Object.freeze(next),
+      }))
+      return Object.freeze(next)
+    })
+  }
+
+  /**
+   * Keeping a track out of the finished video. The opposite of a padlock: this
+   * IS an edit, so it takes a revision, a slot in Undo, and a new export.
+   */
+  function handleToggleTrackOutput(trackId: TimelineTrackId) {
+    const changeSetId = createChangeSetId()
+    const factory = createIdFactory(changeSetId)
+    const operation = {
+      schemaVersion: OPERATION_SCHEMA_VERSION,
+      operationId: factory.operation(0),
+      kind: 'set-track-output' as const,
+      capabilityId: TRACK_OUTPUT_PRIMITIVE_ID,
+      trackId,
+      outputEnabled: !trackOutputs[trackId],
+      extensions: {},
+    }
+    setTimelineNotice(null)
+    void (async () => {
+      const failure = await onApplyOperations([operation as never], changeSetId)
       if (failure) setTimelineNotice(failure)
     })()
   }
@@ -2558,13 +2676,15 @@ export function StudioScreen({
           className="studio-screen__time-strip"
           aria-label="Timeline workspace"
         >
-        <div className="studio-screen__time-strip-heading">
-          <div>
-            <span className="studio-screen__section-index">05</span>
-            <h2>Production timeline</h2>
-          </div>
-          <p>One project · one playhead · server-authoritative edits</p>
-        </div>
+        {/*
+          The heading used to be a numbered section title with a slogan under
+          it, which is how a progress report looks rather than how an editor
+          looks. The Timeline is the thing the user came here to use, so it now
+          starts with its own controls and the label is small enough to read
+          past. It is kept for screen readers, which still need to be told which
+          region they have landed in.
+        */}
+        <h2 className="studio-screen__time-strip-heading">Timeline</h2>
         <Timeline
           model={timelineModel}
           playheadTicks={playheadTicks}
@@ -2578,6 +2698,15 @@ export function StudioScreen({
           advancedControls={advancedTimelineControls}
           dragPreview={mediaDragInFlight}
           onMediaDrop={MEDIA_DRAG_ENABLED ? handleMediaDrop : null}
+          lockedTrackIds={lockedTrackIds}
+          trackOutputs={trackOutputs}
+          placementMode={timelinePlacementMode}
+          snappingEnabled={snappingEnabled}
+          onToggleTrackLock={handleToggleTrackLock}
+          onToggleTrackOutput={handleToggleTrackOutput}
+          onPlacementMode={setTimelinePlacementMode}
+          onToggleSnapping={() => setSnappingEnabled((current) => !current)}
+          onItemAction={handleTimelineItemAction}
           onViewportChange={setTimelineViewport}
           onSeek={seekCompositionTicks}
           onSelect={requestTimelineSelection}

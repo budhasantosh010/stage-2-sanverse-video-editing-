@@ -81,6 +81,7 @@ function MediaStudioHarness({
       onRepairProposal={vi.fn()}
       onTimelineEdit={vi.fn()}
       onAddCaptions={vi.fn(async () => null)}
+      onApplyOperations={async () => null}
       onCreateOverlay={async (operation) => {
         adopt(accept(projectRef.current, operation))
         return null

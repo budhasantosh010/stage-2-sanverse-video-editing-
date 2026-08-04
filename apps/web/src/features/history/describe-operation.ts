@@ -97,6 +97,14 @@ export const describeOperation = (operation: EditOperation): string => {
     }
     case 'set-music':
       return 'Changed the music'
+    case 'remove-overlay':
+      // One sentence for all four families. The user pressed Delete on a
+      // rectangle; which family it belonged to is not what they remember.
+      return 'Took something off the timeline'
+    case 'set-track-output':
+      return operation.outputEnabled
+        ? `Put ${operation.trackId} back in the video`
+        : `Kept ${operation.trackId} out of the video`
     case 'set-visual-properties':
       return operation.tracks.length > 0
         ? 'Changed how something moves'

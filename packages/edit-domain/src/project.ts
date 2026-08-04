@@ -18,6 +18,7 @@ import {
   isFootageMotionOperation,
   isOverlayFamilyOperation,
   isTimelineOperation,
+  isTrackOutputOperation,
   isVisualPropertiesOperation,
   validateOperationAgainstComposition,
   type EditOperation,
@@ -28,6 +29,10 @@ import {
   type OverlayOperation,
   type ResolvedOverlayOperation,
 } from './overlay-operations.ts'
+import {
+  foldTrackOutputOperations,
+  type TrackOutputState,
+} from './track-output.ts'
 import { foldCaptionOperations, type CaptionSet } from './caption-operations.ts'
 import { applyTimelineOperation } from './timeline-operations.ts'
 import { PROJECT_TIMESCALE } from './time.ts'
@@ -794,6 +799,15 @@ export const activeOverlayOperations = (project: EditProject): readonly Resolved
 export const activeVisualProperties = (project: EditProject): readonly SetVisualPropertiesOperation[] =>
   foldVisualPropertiesOperations(activeOperations(project).filter(isVisualPropertiesOperation))
 
+/**
+ * Which of the five tracks reach the finished video right now.
+ *
+ * Every track is on until an accepted operation says otherwise, so a project
+ * that has never been touched here behaves exactly as it always did.
+ */
+export const activeTrackOutputs = (project: EditProject): TrackOutputState =>
+  foldTrackOutputOperations(activeOperations(project).filter(isTrackOutputOperation))
+
 /** Latest accepted non-overlapping primary-footage motion per stable motion ID. */
 export const effectiveFootageMotions = (project: EditProject): readonly SetFootageMotionOperation[] =>
   evaluateProject(project).footageMotions
@@ -868,9 +882,12 @@ export {
   TITLE_ID_PATTERN,
   TITLE_PLACEMENTS,
   TITLE_STYLE_IDS,
+  OVERLAY_TARGET_PATTERNS,
   foldOverlayOperations,
   isOverlayOperationKind,
+  isRemovableOverlayId,
   validateOverlayOperation,
+  type RemoveOverlayOperation,
   type AddCalloutOperation,
   type AddMediaOverlayOperation,
   type AddMusicOperation,
@@ -918,11 +935,23 @@ export {
   isOverlayFamilyOperation,
   isSourceAnchoredOperation,
   isTimelineOperation,
+  isTrackOutputOperation,
   isVisualPropertiesOperation,
   validateOperation,
   validateOperationAgainstComposition,
   type AddNameplateOperation,
 } from './operations.ts'
+export {
+  DEFAULT_TRACK_OUTPUTS,
+  TIMELINE_TRACK_IDS,
+  TRACK_OUTPUT_OPERATION_KIND,
+  foldTrackOutputOperations,
+  isTimelineTrackId,
+  validateTrackOutputOperation,
+  type SetTrackOutputOperation,
+  type TimelineTrackId,
+  type TrackOutputState,
+} from './track-output.ts'
 export {
   DEFAULT_VISUAL_PROPERTIES,
   MAX_KEYFRAMES_PER_TRACK,
@@ -1093,10 +1122,12 @@ export {
   NAMEPLATE_PRIMITIVE_ID,
   TITLE_COMPONENT_ID,
   TITLE_PRIMITIVE_ID,
+  OVERLAY_REMOVE_PRIMITIVE_ID,
   REMOVE_PRIMITIVE_ID,
   REMOVE_RANGE_COMPONENT_ID,
   REORDER_PRIMITIVE_ID,
   SPLIT_PRIMITIVE_ID,
+  TRACK_OUTPUT_PRIMITIVE_ID,
   TRIM_PRIMITIVE_ID,
   VISUAL_PROPERTIES_PRIMITIVE_ID,
   capabilityProduces,

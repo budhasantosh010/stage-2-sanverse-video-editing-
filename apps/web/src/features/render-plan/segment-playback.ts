@@ -22,6 +22,14 @@ export type PlaybackSegment = Readonly<{
   durationTicks: number
   /** Where this stretch begins in the original recording. */
   sourceStartTicks: number
+  /**
+   * Whether the picture is drawn and the sound is heard, copied straight from
+   * the plan the export also reads. The preview never decides this for itself:
+   * a second opinion here is exactly how the screen and the file start
+   * disagreeing.
+   */
+  videoEnabled: boolean
+  audioEnabled: boolean
 }>
 
 export const playbackSegments = (plan: RenderPlan): readonly PlaybackSegment[] =>
@@ -32,6 +40,8 @@ export const playbackSegments = (plan: RenderPlan): readonly PlaybackSegment[] =
         startTicks: segment.interval.start.ticks,
         durationTicks: segment.interval.duration.ticks,
         sourceStartTicks: segment.sourceStartTicks,
+        videoEnabled: segment.videoEnabled,
+        audioEnabled: segment.audioEnabled,
       })),
   )
 
@@ -57,6 +67,25 @@ export const sourceTimeFor = (
   return Object.freeze({
     segmentIndex: index,
     sourceTicks: segment.sourceStartTicks + (compositionTicks - segment.startTicks),
+  })
+}
+
+/**
+ * Whether the picture is drawn and the sound is heard at one moment.
+ *
+ * Read from the plan the exporter also reads, never from the project, so the
+ * screen and the file cannot form separate opinions. A hole shows black and
+ * plays nothing anyway, so it answers no to both.
+ */
+export const outputStateAt = (
+  segments: readonly PlaybackSegment[],
+  compositionTicks: number,
+): Readonly<{ videoEnabled: boolean; audioEnabled: boolean }> => {
+  const index = segmentIndexAt(segments, compositionTicks)
+  if (index === -1) return Object.freeze({ videoEnabled: false, audioEnabled: false })
+  return Object.freeze({
+    videoEnabled: segments[index].videoEnabled,
+    audioEnabled: segments[index].audioEnabled,
   })
 }
 

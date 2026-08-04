@@ -36,13 +36,22 @@ describe('Media Bin placement builders', () => {
     expect(buildAddAsBrollOperation({ project, expectedRevision: project.revision - 1, asset: testImageAsset(), playheadMs: 1_000, ids })).toMatchObject({ ok: false, message: expect.stringContaining('changed') })
   })
 
-  it('adds first music and replaces existing music with one set-music operation', () => {
+  it('adds a bed under the rest of the video, with no length asked for', () => {
     const project = testMultiAssetProject()
     const first = buildAddAsMusicOperation({ project, expectedRevision: project.revision, asset: testMusicAsset(), playheadMs: 2_000, ids })
-    expect(first).toMatchObject({ ok: true, operation: { kind: 'add-music', compositionStart: { ticks: 2_880_000 } } })
-    const withMusic = accept(project, testMusic())
-    const replacement = buildAddAsMusicOperation({ project: withMusic, expectedRevision: withMusic.revision, asset: testMusicAsset(), playheadMs: 3_000, ids })
-    expect(replacement).toMatchObject({ ok: true, operation: { kind: 'set-music', musicId: testMusic().musicId } })
+    expect(first).toMatchObject({
+      ok: true,
+      operation: { kind: 'add-music', compositionStart: { ticks: 2_880_000 }, durationTicks: null },
+    })
+  })
+
+  it('refuses to stack a second piece of music on top of one already playing', () => {
+    // The old behaviour replaced the existing bed with a `set-music`. That was
+    // silent loss: the music somebody chose ten minutes ago simply vanished and
+    // there was nothing on screen to say so. Refusing names the clash instead.
+    const withMusic = accept(testMultiAssetProject(), testMusic())
+    const second = buildAddAsMusicOperation({ project: withMusic, expectedRevision: withMusic.revision, asset: testMusicAsset(), playheadMs: 3_000, ids })
+    expect(second).toMatchObject({ ok: false, message: expect.stringContaining('already music playing') })
   })
 
   it('refuses wrong media kind without project mutation', () => {

@@ -33,6 +33,7 @@ const createProps = (
   onTimelineEdit,
   onAddCaptions: vi.fn(async () => null),
   onCreateOverlay,
+  onApplyOperations: vi.fn(async () => null),
   onUploadAsset: vi.fn(async () => 'Not used.'),
   assetUrl: () => '/api/projects/p/assets/asset_aaaaaaaa/media',
   probeAssetSource: vi.fn(async () => 'available' as const),

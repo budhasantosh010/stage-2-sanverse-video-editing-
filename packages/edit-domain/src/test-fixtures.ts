@@ -339,6 +339,8 @@ export const testMusic = (overrides: Partial<AddMusicOperation> = {}): AddMusicO
   assetId: TEST_MUSIC_ASSET_ID,
   compositionStart: ms(0),
   sourceStart: ms(0),
+  /** Unbounded by default: a bed under the whole finished video. */
+  durationTicks: null,
   gainDb: DEFAULT_MUSIC_GAIN_DB,
   fadeIn: ms(1_000),
   fadeOut: ms(2_000),

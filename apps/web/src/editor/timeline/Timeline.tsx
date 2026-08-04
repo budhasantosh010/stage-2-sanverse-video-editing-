@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type WheelEvent } from 'react'
 
+import type { TimelineTrackId, TrackOutputState } from '@sanverse/edit-domain'
 import {
   fitTimelineToViewport,
   timelineContentWidthPx,
   ticksToPixels,
+  trackIdForLane,
   visibleTickRange,
   zoomTimelineAtAnchor,
+  type PlacementMode,
   type TimelineGesture,
+  type TimelineItemAction,
   type TimelineItemView,
   type TimelineViewModel,
   type TimelineViewportState,
@@ -17,9 +21,10 @@ import { TimelineContextMenu } from './TimelineContextMenu'
 import { TimelineLane } from './TimelineLane'
 import { TimelinePlayhead } from './TimelinePlayhead'
 import { TimelineRuler } from './TimelineRuler'
+import { TimelineTrackHeader } from './TimelineTrackHeader'
 import { timelinePointerToTicks } from './timeline-ruler-model'
 import { snapTimelineTicks, timelineSnapCandidates, type TimelineSnapResult } from './timeline-snap'
-import { TimelineToolbar } from './TimelineToolbar'
+import { TimelineToolbar, type TimelineToolbarAction } from './TimelineToolbar'
 import './Timeline.css'
 
 export type TimelineProps = Readonly<{
@@ -37,6 +42,18 @@ export type TimelineProps = Readonly<{
   dragPreview?: MediaDragPayloadV1 | null
   /** Absent while media drag is switched off, which removes the drop target. */
   onMediaDrop?: ((laneId: string, assetId: string, atTicks: number) => void) | null
+  /** Padlocks. Presentation state: they never change the finished video. */
+  lockedTrackIds: readonly string[]
+  /** Which tracks reach the finished video. Part of the project; one Undo each. */
+  trackOutputs: TrackOutputState
+  placementMode: PlacementMode
+  snappingEnabled: boolean
+  onToggleTrackLock(trackId: TimelineTrackId): void
+  onToggleTrackOutput(trackId: TimelineTrackId): void
+  onPlacementMode(mode: PlacementMode): void
+  onToggleSnapping(): void
+  /** One whole gesture on one item. Never called while a pointer is moving. */
+  onItemAction(itemId: string, action: TimelineItemAction): void
   onViewportChange(viewport: TimelineViewportState): void
   onSeek(ticks: number): void
   onSelect(itemId: string | null): void
@@ -44,10 +61,23 @@ export type TimelineProps = Readonly<{
   onOpenProposal(): void
 }>
 
+/**
+ * Whether a key press belongs to something the user is typing into.
+ *
+ * If this is wrong, typing the letter "s" into a caption or into the chat box
+ * splits the video instead of writing a letter. So it names every kind of field
+ * the app has, including the ones marked as such by the components that own
+ * them, rather than only the three obvious HTML tags.
+ */
 const isTypingTarget = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false
-  return target.matches('input, textarea, select, [contenteditable="true"]')
+  return target.matches(
+    'input, textarea, select, [contenteditable="true"], [data-text-entry], [role="textbox"], [role="combobox"]',
+  )
 }
+
+/** One frame at 30 per second, in ticks. Used by the arrow keys. */
+const FRAME_TICKS = 48_000
 
 export function Timeline({
   model,
@@ -62,6 +92,15 @@ export function Timeline({
   advancedControls,
   dragPreview,
   onMediaDrop,
+  lockedTrackIds,
+  trackOutputs,
+  placementMode,
+  snappingEnabled,
+  onToggleTrackLock,
+  onToggleTrackOutput,
+  onPlacementMode,
+  onToggleSnapping,
+  onItemAction,
   onViewportChange,
   onSeek,
   onSelect,
@@ -112,15 +151,96 @@ export function Timeline({
     })
   }
 
-  const pointerTime = (clientX: number, excludedTicks: readonly number[] = []): TimelineSnapResult =>
+  /**
+   * Where the pointer is, after snapping — unless snapping is switched off, or
+   * the user is holding Shift to ignore it for one gesture.
+   *
+   * The result is still a whole tick. Snapping never rounds canonical state to
+   * whole pixels: a clip that landed on a pixel boundary would sit a fraction
+   * of a frame away from the edge the user aimed at, and the export would show
+   * it even though the screen did not.
+   */
+  const pointerTime = (
+    clientX: number,
+    excludedTicks: readonly number[] = [],
+    bypassSnapping = false,
+  ): TimelineSnapResult =>
     snapTimelineTicks({
       ticks: pointerTicks(clientX),
-      candidateTicks: snapCandidates,
+      candidateTicks: snappingEnabled && !bypassSnapping ? snapCandidates : [],
       excludedTicks,
       durationTicks: model.durationTicks,
       timescale: model.timescale,
       pixelsPerSecond: viewport.pixelsPerSecond,
     })
+
+  /**
+   * Why each toolbar action cannot be used right now, in words.
+   *
+   * Worked out once, here, so the button, its tooltip, its screen-reader label
+   * and the keyboard shortcut all agree. A greyed-out button with no reason is
+   * the product refusing to explain itself.
+   */
+  const selectedTrackId = selectedItem ? trackIdForLane(selectedItem.laneId) : null
+  const selectedLocked = selectedTrackId !== null && lockedTrackIds.includes(selectedTrackId)
+  const playheadInsideSelection = selectedItem !== null
+    && playheadTicks > selectedItem.startTicks
+    && playheadTicks < selectedItem.startTicks + selectedItem.durationTicks
+
+  const disabledReasons: Readonly<Record<TimelineToolbarAction, string | null>> = {
+    split: !selectedItem
+      ? 'Choose something on the timeline first.'
+      : selectedLocked
+        ? `${selectedTrackId} is locked. Unlock it to change anything on it.`
+        : !playheadInsideSelection
+          ? 'Move the playhead inside the selected item first.'
+          : null,
+    lift: !selectedItem
+      ? 'Choose something on the timeline first.'
+      : selectedLocked
+        ? `${selectedTrackId} is locked. Unlock it to change anything on it.`
+        : null,
+    'ripple-delete': !selectedItem
+      ? 'Choose something on the timeline first.'
+      : selectedLocked
+        ? `${selectedTrackId} is locked. Unlock it to change anything on it.`
+        : selectedItem.laneId === 'lane:overlay'
+          // Closing the gap would re-pin every later clip to earlier footage,
+          // which moves them onto different moments of the recording.
+          ? 'B-roll is pinned to a moment of your footage, so closing the gap would move later clips. Use Delete.'
+          : null,
+  }
+
+  /**
+   * Do the thing, on whichever family the selected item belongs to.
+   *
+   * Pieces of the main recording go through the gesture adapter, which already
+   * knows how cutting works and has done since Gate A. Everything laid on top —
+   * B-roll, pictures, music — goes through the item planner. Two families, two
+   * authorities, one button: the alternative was two Delete buttons that looked
+   * identical and behaved differently.
+   */
+  const runToolbarAction = (action: TimelineToolbarAction) => {
+    if (!selectedItem || disabledReasons[action] !== null || busy) return
+    const isPrimaryFootage = selectedItem.kind === 'clip'
+
+    if (action === 'split') {
+      if (isPrimaryFootage) onGesture({ type: 'split', atTicks: playheadTicks })
+      else onItemAction(selectedItem.id, { type: 'split', atTicks: playheadTicks })
+      return
+    }
+    if (isPrimaryFootage) {
+      onGesture({
+        type: action === 'ripple-delete' ? 'remove-ripple' : 'remove-gap',
+        atTicks: Math.max(selectedItem.startTicks, Math.min(
+          playheadTicks,
+          selectedItem.startTicks + selectedItem.durationTicks - 1,
+        )),
+      })
+      return
+    }
+    onItemAction(selectedItem.id, { type: 'delete', ripple: action === 'ripple-delete' })
+  }
 
   const openContextMenu = (item: TimelineItemView, clientX: number, clientY: number) => {
     const root = timelineRef.current
@@ -201,25 +321,45 @@ export function Timeline({
     }
   }
 
+  /**
+   * The keyboard.
+   *
+   * ## The one deliberate change from before
+   *
+   * Plain `S` used to mean Split. It now means Snapping, and Split is
+   * `Ctrl/Cmd+B`. Two meanings for one key is the kind of thing that makes a
+   * user distrust their own hands, and every other editor on the planet uses
+   * Ctrl+B for a cut, so the surprise is smaller this way round.
+   *
+   * Nothing here fires while the user is typing — see `isTypingTarget`.
+   */
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (isTypingTarget(event.target)) return
+    const plain = !event.ctrlKey && !event.metaKey && !event.altKey
+    const command = event.ctrlKey || event.metaKey
+
     if (event.key === 'Escape') {
       event.preventDefault()
-      if (contextMenu) {
-        setContextMenu(null)
-      } else {
-        onSelect(null)
-      }
+      // In order: cancel what is happening, then close what is open, then let
+      // go of what is chosen. Escape never creates anything and never undoes.
+      if (contextMenu) setContextMenu(null)
+      else onSelect(null)
       return
     }
-    if ((event.key === 'Delete' || event.key === 'Backspace') && selectedItem && !busy) {
-      const removalAction = event.currentTarget.querySelector<HTMLButtonElement>('[data-timeline-removal-action]')
-      if (removalAction) {
-        event.preventDefault()
-        removalAction.focus()
-        return
-      }
+
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      if (!selectedItem || busy) return
+      event.preventDefault()
+      runToolbarAction(event.shiftKey ? 'ripple-delete' : 'lift')
+      return
     }
+
+    if (command && event.key.toLowerCase() === 'b') {
+      event.preventDefault()
+      runToolbarAction('split')
+      return
+    }
+
     if (event.key === 'Home') {
       event.preventDefault()
       onSeek(0)
@@ -230,6 +370,22 @@ export function Timeline({
       onSeek(model.durationTicks)
       return
     }
+
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      const direction = event.key === 'ArrowLeft' ? -1 : 1
+      event.preventDefault()
+      if (event.altKey && selectedItem && !busy) {
+        // Alt nudges the selected item; without it the playhead steps.
+        onItemAction(selectedItem.id, {
+          type: 'move',
+          toStartTicks: Math.max(0, selectedItem.startTicks + direction * FRAME_TICKS),
+        })
+        return
+      }
+      onSeek(Math.min(model.durationTicks, Math.max(0, playheadTicks + direction * FRAME_TICKS)))
+      return
+    }
+
     if (event.key === '+' || event.key === '=') {
       event.preventDefault()
       changeZoom(viewport.pixelsPerSecond * 1.25)
@@ -240,15 +396,17 @@ export function Timeline({
       changeZoom(viewport.pixelsPerSecond / 1.25)
       return
     }
-    if (event.key.toLowerCase() === 's' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-      const canSplit = selectedItem?.kind === 'clip'
-        && selectedItem.state === 'committed'
-        && playheadTicks > selectedItem.startTicks
-        && playheadTicks < selectedItem.startTicks + selectedItem.durationTicks
-      if (canSplit && !busy) {
-        event.preventDefault()
-        onGesture({ type: 'split', atTicks: playheadTicks })
-      }
+
+    if (plain && event.key.toLowerCase() === 's') {
+      event.preventDefault()
+      onToggleSnapping()
+      return
+    }
+    if (plain && event.key.toLowerCase() === 'v') {
+      // The Select tool is the only tool, so this confirms rather than switches.
+      // It exists because every editor has it and reaching for it must not
+      // silently do something else.
+      event.preventDefault()
     }
   }
 
@@ -270,21 +428,41 @@ export function Timeline({
         timescale={model.timescale}
         viewport={viewport}
         selectedSummary={selectedItem ? `${selectedItem.label} · ${selectedItem.kind}` : null}
+        disabledReasons={disabledReasons}
+        snappingEnabled={snappingEnabled}
+        placementMode={placementMode}
         busy={busy}
+        onAction={runToolbarAction}
+        onToggleSnapping={onToggleSnapping}
+        onPlacementMode={onPlacementMode}
         onZoomOut={() => changeZoom(viewport.pixelsPerSecond / 1.25)}
         onZoomIn={() => changeZoom(viewport.pixelsPerSecond * 1.25)}
         onFit={fit}
       />
 
       <div className="timeline-v1__viewport-grid">
-        <div className="timeline-v1__headers" aria-hidden="true">
-          <div className="timeline-v1__ruler-header">Time</div>
-          {model.lanes.map((lane) => (
-            <div key={lane.id} className={`timeline-v1__lane-header timeline-v1__lane-header--${lane.kind}`}>
-              <strong>{lane.label}</strong>
-              <span>{lane.kind}</span>
-            </div>
-          ))}
+        {/*
+          The track headers are real controls, so this column can no longer be
+          hidden from screen readers the way a decorative label column was.
+        */}
+        <div className="timeline-v1__headers">
+          <div className="timeline-v1__ruler-header" aria-hidden="true">Time</div>
+          {model.lanes.map((lane) => {
+            const trackId = trackIdForLane(lane.id)
+            return (
+              <TimelineTrackHeader
+                key={lane.id}
+                trackId={trackId}
+                label={lane.label}
+                kind={lane.kind}
+                locked={lockedTrackIds.includes(trackId)}
+                outputEnabled={trackOutputs[trackId]}
+                outputDisabledReason={busy ? 'Project edits are paused right now.' : null}
+                onToggleLock={() => onToggleTrackLock(trackId)}
+                onToggleOutput={() => onToggleTrackOutput(trackId)}
+              />
+            )
+          })}
         </div>
 
         <div
@@ -327,6 +505,7 @@ export function Timeline({
                   onClearSelection={() => onSelect(null)}
                   onSeek={onSeek}
                   onGesture={onGesture}
+                  onItemAction={onItemAction}
                   onOpenProposal={onOpenProposal}
                   onContextMenu={openContextMenu}
                 />

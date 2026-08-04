@@ -1,6 +1,7 @@
 import {
   itemIntersectsVisibleRange,
   type TimelineGesture,
+  type TimelineItemAction,
   type TimelineItemView,
   type TimelineLaneView,
   type TimelineViewportState,
@@ -28,12 +29,13 @@ export type TimelineLaneProps = Readonly<{
   overscanTicks: number
   busy: boolean
   pointerTicks(clientX: number): number
-  pointerTime(clientX: number, excludedTicks?: readonly number[]): TimelineSnapResult
+  pointerTime(clientX: number, excludedTicks?: readonly number[], bypassSnapping?: boolean): TimelineSnapResult
   onSnapGuide(ticks: number | null): void
   onSelect(itemId: string): void
   onClearSelection(): void
   onSeek(ticks: number): void
   onGesture(gesture: TimelineGesture): void
+  onItemAction(itemId: string, action: TimelineItemAction): void
   onOpenProposal(): void
   onContextMenu(item: TimelineItemView, clientX: number, clientY: number): void
 }>
@@ -54,6 +56,7 @@ export function TimelineLane({
   onClearSelection,
   onSeek,
   onGesture,
+  onItemAction,
   onOpenProposal,
   onContextMenu,
 }: TimelineLaneProps) {
@@ -121,6 +124,7 @@ export function TimelineLane({
           onSelect={onSelect}
           onSeek={onSeek}
           onGesture={onGesture}
+          onItemAction={onItemAction}
           onOpenProposal={onOpenProposal}
           onContextMenu={onContextMenu}
         />

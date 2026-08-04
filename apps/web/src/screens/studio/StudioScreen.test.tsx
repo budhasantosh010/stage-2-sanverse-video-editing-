@@ -140,6 +140,7 @@ function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = 
     onAcceptProposal: vi.fn(),
     onRepairProposal: vi.fn(),
     onTimelineEdit: vi.fn(),
+    onApplyOperations: vi.fn(async () => null),
     onCreateOverlay: vi.fn(async () => null),
     onUploadAsset: vi.fn(async () => 'not used'),
     assetUrl: (assetId: string) => `/api/projects/p/assets/${assetId}/media`,
@@ -889,6 +890,7 @@ describe('StudioScreen', () => {
         conversation={{ status: 'ready', lastMessage: '', question: null, notice: null }}
         onRepairProposal={vi.fn()}
         onTimelineEdit={vi.fn()}
+        onApplyOperations={async () => null}
         onCreateOverlay={async () => null}
         onUploadAsset={async () => 'not used'}
         assetUrl={(assetId: string) => `/api/projects/p/assets/${assetId}/media`}
@@ -955,6 +957,7 @@ describe('StudioScreen', () => {
         conversation={{ status: 'ready', lastMessage: '', question: null, notice: null }}
         onRepairProposal={vi.fn()}
         onTimelineEdit={vi.fn()}
+        onApplyOperations={async () => null}
         onCreateOverlay={async () => null}
         onUploadAsset={async () => 'not used'}
         assetUrl={(assetId: string) => `/api/projects/p/assets/${assetId}/media`}

@@ -38,6 +38,7 @@ const props = (project: EditProject, onTimelineEdit: (operation: EditOperation) 
   onRepairProposal: vi.fn(),
   onTimelineEdit,
   onAddCaptions: vi.fn(async () => null),
+  onApplyOperations: vi.fn(async () => null),
   onCreateOverlay: vi.fn(async () => null),
   onUploadAsset: vi.fn(async () => 'Not used.'),
   assetUrl: () => '/api/projects/p/assets/asset_aaaaaaaa/media',

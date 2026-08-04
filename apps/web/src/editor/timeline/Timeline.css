@@ -19,11 +19,60 @@
   font: inherit;
 }
 
+/*
+  One compact row of real controls.
+  Wraps rather than overflows, because a control that scrolled off the side of
+  the screen would be a control the user cannot reach and cannot see is there.
+*/
 .timeline-v1__toolbar {
-  display: grid;
-  grid-template-columns: minmax(120px, auto) auto minmax(180px, 1fr);
-  gap: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   align-items: center;
+}
+
+.timeline-v1__toolbar-group {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 7px;
+  padding: 2px;
+}
+
+.timeline-v1__toolbar-button {
+  min-height: 28px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  padding: 0 9px;
+  color: var(--color-text);
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.timeline-v1__toolbar-button:hover:not(:disabled) {
+  background: var(--color-surface-raised, rgb(127 127 127 / 12%));
+}
+
+/*
+  The chosen mode is marked by weight and a filled background, not by colour
+  alone: somebody who cannot tell the two greens apart must still be able to
+  see which mode a drop will use.
+*/
+.timeline-v1__toolbar-button[aria-pressed='true'] {
+  background: var(--color-accent-soft, rgb(64 128 255 / 18%));
+  box-shadow: inset 0 0 0 1px var(--color-accent, rgb(64 128 255 / 65%));
+  font-weight: 700;
+}
+
+.timeline-v1__toolbar-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.timeline-v1__toolbar-duration {
+  font-variant-numeric: tabular-nums;
 }
 
 @container studio-timeline (max-width: 760px) {
@@ -159,6 +208,53 @@
   text-transform: uppercase;
 }
 
+/* The name on the left, the two switches on the right. */
+.timeline-v1__lane-header-name {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.timeline-v1__lane-header-controls {
+  display: flex;
+  gap: 1px;
+}
+
+.timeline-v1__track-switch {
+  display: grid;
+  min-width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.62rem;
+  place-items: center;
+}
+
+.timeline-v1__track-switch:hover:not(:disabled) {
+  background: var(--color-surface-raised, rgb(127 127 127 / 14%));
+}
+
+.timeline-v1__track-switch:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/*
+  A locked or hidden track is marked in the header AND on the lane itself, so
+  the reason an edit was refused is visible where the edit was attempted.
+*/
+.timeline-v1__lane-header[data-track-locked='yes'] {
+  background: var(--color-surface-sunken, rgb(127 127 127 / 9%));
+}
+
+.timeline-v1__lane-header[data-track-output='off'] .timeline-v1__lane-header-name {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
 .timeline-v1__lane-header strong {
   font-size: 0.7rem;
 }
@@ -189,6 +285,21 @@
 .timeline-v1__lane-header--music,
 .timeline-v1__lane--music {
   height: 34px;
+}
+
+/*
+  A clip being dragged. It follows the pointer and nothing is decided until the
+  pointer is released, so it is drawn as a ghost rather than as the real thing.
+*/
+.timeline-v1__item-shell--dragging {
+  z-index: 6;
+  opacity: 0.7;
+  cursor: grabbing;
+}
+
+.timeline-v1__item-shell--dragging .timeline-v1__item {
+  outline: 2px solid var(--color-accent, rgb(64 128 255 / 85%));
+  outline-offset: -2px;
 }
 
 .timeline-v1__viewport {

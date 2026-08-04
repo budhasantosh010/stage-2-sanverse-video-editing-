@@ -11,6 +11,7 @@ import {
 } from '@sanverse/edit-domain'
 
 import { buildAddAsBrollOperation, buildAddAsMusicOperation } from '../media/media-actions'
+import { applyLaneEdits, type LaneEdit } from './timeline-item-operations'
 
 /**
  * Where a drop is allowed to become an edit — and the ONLY place that decides.
@@ -63,7 +64,23 @@ const TRACK_TO_LANE = Object.freeze({
   A1: 'lane:dialogue', A2: 'lane:music',
 } as const)
 
-export const trackIdForLane = (laneId: TimelineLaneId): TimelineTrackId => LANE_TO_TRACK[laneId]
+/**
+ * Which track a lane belongs to.
+ *
+ * A project with more than one video track names its lanes
+ * `lane:video:track_…`, so the lookup falls back to the lane's family rather
+ * than returning nothing. A header with no track id would be a padlock and an
+ * eye that silently did nothing.
+ */
+export const trackIdForLane = (laneId: string): TimelineTrackId => {
+  const known = LANE_TO_TRACK[laneId as TimelineLaneId]
+  if (known) return known
+  if (laneId.startsWith('lane:video')) return 'V1'
+  if (laneId.startsWith('lane:dialogue')) return 'A1'
+  if (laneId.startsWith('lane:music')) return 'A2'
+  if (laneId.startsWith('lane:caption')) return 'C1'
+  return 'V2'
+}
 export const laneIdForTrack = (trackId: TimelineTrackId): TimelineLaneId => TRACK_TO_LANE[trackId]
 
 export const PLACEMENT_MODES = Object.freeze(['normal', 'insert', 'overwrite', 'append'] as const)
@@ -124,7 +141,19 @@ export type TrackStateSnapshot = Readonly<{
   lockedTrackIds: readonly TimelineTrackId[]
 }>
 
-export type OccupiedSpan = Readonly<{ startTicks: number; durationTicks: number }>
+/**
+ * One thing already on the lane.
+ *
+ * `targetId` names it — `broll_…` or `music_…`. Without a name, Insert and
+ * Overwrite cannot say WHICH clip they are pushing along or cutting into, so a
+ * span with no name is treated as immovable and those modes refuse rather than
+ * quietly leaving it where it was.
+ */
+export type OccupiedSpan = Readonly<{
+  startTicks: number
+  durationTicks: number
+  targetId?: string
+}>
 
 /**
  * What already sits on the target lane, in finished-video time.
@@ -348,16 +377,74 @@ export const planTimelinePlacement = (
   const resolved = resolvePlacement(placementMode, atTicks, durationTicks, occupancy)
   if (isRefusal(resolved)) return refuse(resolved.code, resolved.message)
 
-  // Insert and overwrite need operations this model does not have: nothing can
-  // move or shorten an existing overlay as part of another placement. Refused
-  // rather than approximated, because "Insert" that quietly behaved like
-  // "Normal" would lose the thing it was supposed to push along.
-  if (resolved.shiftFromTicks !== null && occupancy.spans.some((span) =>
-    span.startTicks + span.durationTicks > resolved.shiftFromTicks!)) {
-    return refuse('OPERATION_UNSUPPORTED', 'Insert cannot push these along yet. Use Normal and place it where there is room.')
+  /**
+   * What Insert and Overwrite have to do to the things already on this lane.
+   *
+   * Both are rearrangements, and both go in the SAME change set as the new
+   * item, so the whole gesture is one Undo. If the rearrangement cannot be
+   * expressed, nothing is placed at all — an "Insert" that quietly behaved like
+   * "Normal" would lose the very thing it was supposed to push along, and the
+   * user would not find out until export.
+   */
+  const trackId = trackIdForLane(targetLaneId)
+  const laneEdits: LaneEdit[] = []
+
+  if (resolved.shiftFromTicks !== null) {
+    const from = resolved.shiftFromTicks
+    for (const span of occupancy.spans) {
+      if (span.startTicks + span.durationTicks <= from) continue
+      if (span.startTicks < from) {
+        // The insertion point falls INSIDE this clip. Pushing it along whole
+        // would move its first half too, which is not what "insert here" means.
+        return refuse(
+          'COLLISION',
+          'Insert would cut into the middle of a clip. Move the playhead to a gap or to the start of a clip.',
+        )
+      }
+      if (!span.targetId) {
+        return refuse('OPERATION_UNSUPPORTED', 'Something on this lane cannot be pushed along. Use Normal instead.')
+      }
+      laneEdits.push(Object.freeze({
+        kind: 'move' as const,
+        targetId: span.targetId,
+        toStartTicks: span.startTicks + durationTicks,
+      }))
+    }
   }
-  if (resolved.replacedSpans.length > 0) {
-    return refuse('OPERATION_UNSUPPORTED', 'Overwrite cannot replace what is already there yet. Remove it first, then place this.')
+
+  for (const span of resolved.replacedSpans) {
+    if (!span.targetId) {
+      return refuse('OPERATION_UNSUPPORTED', 'Something on this lane cannot be replaced. Remove it first, then place this.')
+    }
+    const spanEnd = span.startTicks + span.durationTicks
+    const newEnd = resolved.atTicks + durationTicks
+    const keepsLeft = span.startTicks < resolved.atTicks
+    const keepsRight = spanEnd > newEnd
+    if (keepsLeft && keepsRight) {
+      laneEdits.push(Object.freeze({
+        kind: 'fragment' as const,
+        targetId: span.targetId,
+        keepLeftEndTicks: resolved.atTicks,
+        keepRightStartTicks: newEnd,
+      }))
+    } else if (keepsLeft) {
+      laneEdits.push(Object.freeze({
+        kind: 'trim' as const,
+        targetId: span.targetId,
+        toStartTicks: span.startTicks,
+        toEndTicks: resolved.atTicks,
+      }))
+    } else if (keepsRight) {
+      laneEdits.push(Object.freeze({
+        kind: 'trim' as const,
+        targetId: span.targetId,
+        toStartTicks: newEnd,
+        toEndTicks: spanEnd,
+      }))
+    } else {
+      // Covered end to end. Nothing of it would ever be seen or heard again.
+      laneEdits.push(Object.freeze({ kind: 'remove' as const, targetId: span.targetId }))
+    }
   }
 
   // Construction is delegated: `media-actions` is the one authority on how a
@@ -385,6 +472,30 @@ export const planTimelinePlacement = (
     return refuse('SOURCE_UNAVAILABLE', built.message)
   }
 
+  // The rearrangement is planned LAST, so that a placement that cannot happen
+  // never produces operations that move other people's clips. Slot 0 is the new
+  // item, so the rearrangement starts at slot 1 and the names never collide.
+  let rearrangement: readonly EditOperation[] = Object.freeze([])
+  if (laneEdits.length > 0) {
+    if (trackId !== 'V2' && trackId !== 'A2') {
+      return refuse('OPERATION_UNSUPPORTED', 'That lane cannot be rearranged.')
+    }
+    const edited = applyLaneEdits({ project, trackId, edits: laneEdits, ids: idFactory, slotOffset: 1 })
+    if (!edited.ok) return refuse('OPERATION_UNSUPPORTED', edited.refusal.message)
+    rearrangement = edited.operations
+  }
+
+  const modeSummary = placementMode === 'insert'
+    ? 'and pushed the rest along'
+    : placementMode === 'overwrite'
+      ? 'over what was there'
+      : placementMode === 'append'
+        ? 'at the end'
+        : ''
+  const what = targetLaneId === 'lane:music'
+    ? 'Added music'
+    : isImageAsset(asset) ? 'Added a picture over your video' : 'Added B-roll over your video'
+
   return Object.freeze({
     ok: true as const,
     value: Object.freeze({
@@ -392,10 +503,8 @@ export const planTimelinePlacement = (
       placementMode,
       atTicks: resolved.atTicks,
       durationTicks,
-      operations: Object.freeze([built.operation]) as readonly EditOperation[],
-      summary: targetLaneId === 'lane:music'
-        ? 'Added music'
-        : isImageAsset(asset) ? 'Added a picture over your video' : 'Added B-roll over your video',
+      operations: Object.freeze([built.operation, ...rearrangement]) as readonly EditOperation[],
+      summary: modeSummary ? `${what} ${modeSummary}` : what,
     }),
   })
 }

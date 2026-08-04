@@ -773,33 +773,53 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
       const to = ticksToSeconds(piece.segment.sourceStartTicks + piece.durationTicks)
       const sourceVideoLabel = `source_video_${index}`
       const motionVideoLabel = `motion_video_${index}`
-      graph.push(
-        `[0:v]trim=start=${from}:end=${to},setpts=PTS-STARTPTS,fps=${rate}[${sourceVideoLabel}]`,
-      )
-      graph.push(...primaryFootageMotionFilters(
-        piece.segment,
-        sourceVideoLabel,
-        motionVideoLabel,
-        index,
-        width,
-        height,
-        rate,
-        input.frameRate,
-        piece.durationTicks,
-      ))
-      const videoSteps: string[] = []
-      if (piece.segment.videoFadeInTicks > 0) {
-        videoSteps.push(`fade=t=in:st=0:d=${ticksToSeconds(piece.segment.videoFadeInTicks)}:color=black`)
-      }
-      if (piece.segment.videoFadeOutTicks > 0) {
-        videoSteps.push(
-          `fade=t=out:st=${ticksToSeconds(piece.durationTicks - piece.segment.videoFadeOutTicks)}` +
-            `:d=${ticksToSeconds(piece.segment.videoFadeOutTicks)}:color=black`,
+
+      if (!piece.segment.videoEnabled) {
+        // A hidden picture is black for exactly as long, produced without
+        // decoding the footage at all — an export the user is waiting on should
+        // not spend time drawing something they asked not to see. The piece
+        // keeps its full length, so switching V1 back on restores the same
+        // video rather than a differently-timed one.
+        graph.push(
+          `color=c=black:s=${width}x${height}:r=${rate}:d=${seconds},format=pix_fmts=yuv420p,setsar=1[${videoLabel}]`,
         )
+      } else {
+        graph.push(
+          `[0:v]trim=start=${from}:end=${to},setpts=PTS-STARTPTS,fps=${rate}[${sourceVideoLabel}]`,
+        )
+        graph.push(...primaryFootageMotionFilters(
+          piece.segment,
+          sourceVideoLabel,
+          motionVideoLabel,
+          index,
+          width,
+          height,
+          rate,
+          input.frameRate,
+          piece.durationTicks,
+        ))
+        const videoSteps: string[] = []
+        if (piece.segment.videoFadeInTicks > 0) {
+          videoSteps.push(`fade=t=in:st=0:d=${ticksToSeconds(piece.segment.videoFadeInTicks)}:color=black`)
+        }
+        if (piece.segment.videoFadeOutTicks > 0) {
+          videoSteps.push(
+            `fade=t=out:st=${ticksToSeconds(piece.durationTicks - piece.segment.videoFadeOutTicks)}` +
+              `:d=${ticksToSeconds(piece.segment.videoFadeOutTicks)}:color=black`,
+          )
+        }
+        videoSteps.push('format=pix_fmts=yuv420p', 'setsar=1')
+        graph.push(`[${motionVideoLabel}]${videoSteps.join(',')}[${videoLabel}]`)
       }
-      videoSteps.push('format=pix_fmts=yuv420p', 'setsar=1')
-      graph.push(`[${motionVideoLabel}]${videoSteps.join(',')}[${videoLabel}]`)
-      if (input.hasAudio) {
+
+      if (input.hasAudio && !piece.segment.audioEnabled) {
+        // Muted dialogue is real silence of the same length, not the clip at a
+        // very low volume. Very low is still audible on headphones.
+        graph.push(
+          `anullsrc=channel_layout=${AUDIO_CHANNEL_LAYOUT}:sample_rate=${AUDIO_SAMPLE_RATE}:d=${seconds}` +
+            `,asetpts=PTS-STARTPTS[${audioLabel}]`,
+        )
+      } else if (input.hasAudio) {
         const steps = [
           `[0:a]atrim=start=${from}:end=${to}`,
           'asetpts=PTS-STARTPTS',

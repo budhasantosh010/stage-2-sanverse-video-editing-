@@ -47,6 +47,22 @@ export type SourceSegmentNode = Readonly<{
   assetId: string
   /** Where this piece starts inside the original footage. */
   sourceStartTicks: number
+  /**
+   * Whether the picture of this piece is drawn, and whether its sound is heard.
+   *
+   * These are two switches rather than one because a user turning off the V1
+   * track wants black where the picture was, WITHOUT losing the voice, and a
+   * user muting A1 wants the picture to carry on. The piece keeps its place on
+   * the timeline either way: a switched-off picture leaves black for exactly as
+   * long as the footage lasted, so switching it back on restores the same video
+   * frame for frame rather than shifting everything after it.
+   *
+   * A piece with both switched off is still listed. Removing it here would let
+   * the plan's own duration shrink, and the finished video would get shorter
+   * every time somebody toggled a track.
+   */
+  videoEnabled: boolean
+  audioEnabled: boolean
   /** Source-anchored primary-footage motion that intersects this piece. */
   footageMotions: readonly FootageMotionNode[]
   /** Loudness change in decibels. 0 means untouched. */
@@ -179,7 +195,7 @@ export type VisualPropertiesNode = VisualProperties & Readonly<{
 }>
 
 export type RenderPlan = Readonly<{
-  schemaVersion: 'sanverse.render-plan/v6'
+  schemaVersion: typeof RENDER_PLAN_SCHEMA_VERSION
   projectId: string
   /**
    * The revision this plan was compiled from. An export carries it, so a file
@@ -226,7 +242,16 @@ export type RenderPlanError = {
   readonly issues: readonly { readonly path: string; readonly code: RenderPlanIssueCode }[]
 }
 
-export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v6'
+/**
+ * v6 to v7: every piece of footage now says whether its picture is drawn and
+ * whether its sound is heard, so that switching a track off changes the file
+ * that comes out.
+ *
+ * The version moves because the export key is built from it. Without that, a
+ * user who muted the dialogue and pressed Export would be handed the cached
+ * file from before the mute, and would have no way to tell.
+ */
+export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v7'
 /**
  * Raised from 512 because captions produce one node per line of speech. A
  * ten-minute talk is roughly 200 cues before cutting, and a cut through a cue
@@ -378,6 +403,14 @@ const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]
     }
     if (typeof segment.gainDb !== 'number' || !Number.isFinite(segment.gainDb)) {
       issues.push({ path: `${path}.gainDb`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    // Stated, never assumed. A missing switch would let a renderer guess, and
+    // the two renderers would eventually guess differently.
+    if (typeof segment.videoEnabled !== 'boolean') {
+      issues.push({ path: `${path}.videoEnabled`, code: 'TYPE_INVALID' })
+    }
+    if (typeof segment.audioEnabled !== 'boolean') {
+      issues.push({ path: `${path}.audioEnabled`, code: 'TYPE_INVALID' })
     }
 
     const interval = readInterval(segment.interval)

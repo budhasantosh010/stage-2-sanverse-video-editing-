@@ -52,6 +52,7 @@ function renderCanvasStudio(overrides: Partial<ComponentProps<typeof StudioScree
     onRepairProposal: vi.fn(),
     onTimelineEdit: vi.fn(),
     onCreateOverlay: vi.fn(async (_operation: EditOperation): Promise<string | null> => null),
+    onApplyOperations: vi.fn(async (): Promise<string | null> => null),
     onUploadAsset: vi.fn(async () => 'not used'),
     assetUrl: (assetId: string) => `/api/projects/p/assets/${assetId}/media`,
     onAddCaptions: vi.fn(async () => null),

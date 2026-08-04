@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createIdFactory, serializeProject, type EditProject } from '@sanverse/edit-domain'
+import { acceptChangeSet, createIdFactory, serializeProject, type EditProject } from '@sanverse/edit-domain'
 import {
   PLACEMENT_REFUSAL_CODES,
   TIMELINE_LANE_IDS,
@@ -10,10 +10,14 @@ import {
   type PlacementMode,
   type PlacementRequest,
 } from './timeline-placement-planner'
+import { laneSpans } from './timeline-item-operations'
 import {
   TEST_BROLL_ASSET_ID,
   TEST_IMAGE_ASSET_ID,
   TEST_MUSIC_ASSET_ID,
+  changeSetOf,
+  ms,
+  testMediaOverlay,
   testMultiAssetProject,
 } from '@sanverse/edit-domain/test-fixtures'
 
@@ -243,7 +247,9 @@ describe('the placement planner', () => {
       expect(result.ok && result.value.atTicks).toBe(3 * T)
     })
 
-    it('refuses Insert when it would have to push something along, rather than losing it', () => {
+    it('refuses to push along something it cannot name, rather than leaving it behind', () => {
+      // A span with no identity cannot be moved, and an Insert that quietly
+      // left it where it was would lose exactly what it was meant to push.
       const result = planTimelinePlacement(
         request({ atTicks: 1 * T, placementMode: 'insert' }),
         { spans: [{ startTicks: 3 * T, durationTicks: 2 * T }] },
@@ -252,12 +258,20 @@ describe('the placement planner', () => {
       expect(!result.ok && result.error.message).toContain('Normal')
     })
 
-    it('refuses Overwrite when it would have to replace something, rather than losing it', () => {
+    it('refuses to replace something it cannot name', () => {
       const result = planTimelinePlacement(
         request({ atTicks: 1 * T, placementMode: 'overwrite' }),
         { spans: [{ startTicks: 0, durationTicks: 4 * T }] },
       )
       expect(refusalOf(result)).toBe('OPERATION_UNSUPPORTED')
+    })
+
+    it('refuses to Insert into the middle of a clip, which would move its first half too', () => {
+      const result = planTimelinePlacement(
+        request({ atTicks: 2 * T, placementMode: 'insert' }),
+        { spans: [{ startTicks: 1 * T, durationTicks: 4 * T, targetId: 'broll_0001' }] },
+      )
+      expect(refusalOf(result)).toBe('COLLISION')
     })
 
     it('allows Overwrite where there is nothing to overwrite', () => {
@@ -289,5 +303,162 @@ describe('the placement planner', () => {
         expect(laneIdForTrack(trackIdForLane(laneId))).toBe(laneId)
       }
     })
+  })
+})
+
+/**
+ * Gate C1.9 — Insert, Overwrite and Append doing the real thing.
+ *
+ * These run against a live project rather than made-up spans, because the whole
+ * point of the three modes is what happens to the clips ALREADY there, and that
+ * cannot be proved with numbers alone.
+ */
+describe('placement modes rearrange what is already on the lane', () => {
+  const withBroll = (start = 8_000, duration = 4_000, overlayId = 'broll_0001', operationId = 'operation_broll001'): EditProject => {
+    const base = testMultiAssetProject()
+    const result = acceptChangeSet(base, changeSetOf('changeset_setup000001', base.revision, [{
+      ...testMediaOverlay(),
+      operationId,
+      overlayId,
+      sourceInterval: { start: ms(start), duration: ms(duration) },
+    }] as never))
+    if (!result.ok) throw new Error(JSON.stringify(result.error))
+    return result.value
+  }
+
+  const apply = (subject: EditProject, operations: readonly unknown[]): EditProject => {
+    const result = acceptChangeSet(subject, changeSetOf('changeset_applied00001', subject.revision, operations as never))
+    if (!result.ok) throw new Error(JSON.stringify(result.error))
+    return result.value
+  }
+
+  it('Insert pushes the clips after it along by exactly the new length', () => {
+    const subject = withBroll(8_000, 4_000)
+    const result = planTimelinePlacement(
+      request({
+        project: subject,
+        assetId: TEST_IMAGE_ASSET_ID,
+        atTicks: ms(4_000).ticks,
+        placementMode: 'insert',
+      }),
+      { spans: laneSpans(subject, 'V2') },
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const after = laneSpans(apply(subject, result.value.operations), 'V2')
+    expect(after).toHaveLength(2)
+    // The picture lands at 4 s and is 4 s long, so the B-roll moves 8 s -> 12 s.
+    expect(after[0]).toMatchObject({ startTicks: ms(4_000).ticks, durationTicks: ms(4_000).ticks })
+    expect(after[1]).toMatchObject({ startTicks: ms(12_000).ticks, durationTicks: ms(4_000).ticks })
+  })
+
+  it('Insert is one change set, so pushing four clips along is still one Undo', () => {
+    const subject = withBroll(8_000, 4_000)
+    const result = planTimelinePlacement(
+      request({ project: subject, assetId: TEST_IMAGE_ASSET_ID, atTicks: ms(4_000).ticks, placementMode: 'insert' }),
+      { spans: laneSpans(subject, 'V2') },
+    )
+    expect(result.ok && result.value.operations.length).toBe(2)
+  })
+
+  it('Overwrite trims back what it lands on top of, keeping the part it does not cover', () => {
+    const subject = withBroll(8_000, 8_000)
+    const result = planTimelinePlacement(
+      request({
+        project: subject,
+        assetId: TEST_IMAGE_ASSET_ID,
+        atTicks: ms(12_000).ticks,
+        placementMode: 'overwrite',
+      }),
+      { spans: laneSpans(subject, 'V2') },
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const after = laneSpans(apply(subject, result.value.operations), 'V2')
+    expect(after).toHaveLength(2)
+    expect(after[0]).toMatchObject({ startTicks: ms(8_000).ticks, durationTicks: ms(4_000).ticks })
+    expect(after[1]).toMatchObject({ startTicks: ms(12_000).ticks, durationTicks: ms(4_000).ticks })
+  })
+
+  it('Overwrite across the middle leaves the two ends and cuts the middle out', () => {
+    // The B-roll clip is 12 s long and already starts 1 s in, so an 8 s span is
+    // the most of it that can be shown.
+    const subject = withBroll(6_000, 8_000)
+    const result = planTimelinePlacement(
+      request({
+        project: subject,
+        assetId: TEST_IMAGE_ASSET_ID,
+        atTicks: ms(8_000).ticks,
+        placementMode: 'overwrite',
+      }),
+      { spans: laneSpans(subject, 'V2') },
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const after = laneSpans(apply(subject, result.value.operations), 'V2')
+    expect(after).toHaveLength(3)
+    expect(after[0]).toMatchObject({ startTicks: ms(6_000).ticks, durationTicks: ms(2_000).ticks })
+    expect(after[1]).toMatchObject({ startTicks: ms(8_000).ticks, durationTicks: ms(4_000).ticks })
+    expect(after[2]).toMatchObject({ startTicks: ms(12_000).ticks, durationTicks: ms(2_000).ticks })
+  })
+
+  it('Overwrite removes outright anything it covers end to end', () => {
+    const subject = withBroll(10_000, 2_000)
+    const result = planTimelinePlacement(
+      request({
+        project: subject,
+        assetId: TEST_IMAGE_ASSET_ID,
+        atTicks: ms(9_000).ticks,
+        placementMode: 'overwrite',
+      }),
+      { spans: laneSpans(subject, 'V2') },
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const after = laneSpans(apply(subject, result.value.operations), 'V2')
+    expect(after).toHaveLength(1)
+    expect(after[0].startTicks).toBe(ms(9_000).ticks)
+  })
+
+  it('Append lands after the last thing on the lane, whatever the pointer said', () => {
+    const subject = withBroll(8_000, 4_000)
+    const result = planTimelinePlacement(
+      request({
+        project: subject,
+        assetId: TEST_IMAGE_ASSET_ID,
+        atTicks: ms(1_000).ticks,
+        placementMode: 'append',
+      }),
+      { spans: laneSpans(subject, 'V2') },
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.atTicks).toBe(ms(12_000).ticks)
+
+    const after = laneSpans(apply(subject, result.value.operations), 'V2')
+    expect(after.map((span) => span.startTicks)).toEqual([ms(8_000).ticks, ms(12_000).ticks])
+  })
+
+  it('says in the history what it actually did, not just what was added', () => {
+    const subject = withBroll(8_000, 4_000)
+    const insert = planTimelinePlacement(
+      request({ project: subject, assetId: TEST_IMAGE_ASSET_ID, atTicks: ms(4_000).ticks, placementMode: 'insert' }),
+      { spans: laneSpans(subject, 'V2') },
+    )
+    expect(insert.ok && insert.value.summary).toContain('pushed the rest along')
+  })
+
+  it('changes nothing at all when the rearrangement cannot be expressed', () => {
+    const subject = withBroll(8_000, 4_000)
+    const before = serializeProject(subject)
+    planTimelinePlacement(
+      request({ project: subject, assetId: TEST_IMAGE_ASSET_ID, atTicks: ms(9_000).ticks, placementMode: 'insert' }),
+      { spans: laneSpans(subject, 'V2') },
+    )
+    expect(serializeProject(subject)).toEqual(before)
   })
 })

@@ -36,6 +36,11 @@ import {
   validateFootageMotionOperation,
   type SetFootageMotionOperation,
 } from './footage-motion.ts'
+import {
+  TRACK_OUTPUT_OPERATION_KIND,
+  validateTrackOutputOperation,
+  type SetTrackOutputOperation,
+} from './track-output.ts'
 import { findAsset, type MediaAsset } from './assets.ts'
 import {
   ZERO_TIME,
@@ -100,6 +105,7 @@ export type EditOperation =
   | OverlayOperation
   | SetVisualPropertiesOperation
   | SetFootageMotionOperation
+  | SetTrackOutputOperation
 
 /** Every operation kind this build can execute. Unknown kinds are rejected. */
 export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze([
@@ -109,7 +115,12 @@ export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze([
   ...OVERLAY_OPERATION_KINDS,
   VISUAL_PROPERTIES_OPERATION_KIND,
   FOOTAGE_MOTION_OPERATION_KIND,
+  TRACK_OUTPUT_OPERATION_KIND,
 ])
+
+export const isTrackOutputOperation = (
+  operation: EditOperation,
+): operation is SetTrackOutputOperation => operation.kind === TRACK_OUTPUT_OPERATION_KIND
 
 /** True for the operations that change which footage the finished video is made of. */
 export const isTimelineOperation = (operation: EditOperation): operation is TimelineOperation =>
@@ -327,6 +338,20 @@ export const validateOperation = (input: unknown, path = '$'): Result<EditOperat
     return ok(visual.value)
   }
 
+  if (input.kind === TRACK_OUTPUT_OPERATION_KIND) {
+    const output = validateTrackOutputOperation(input, path)
+    if (!output.ok) {
+      return err({
+        code: 'OPERATION_INVALID',
+        issues: output.error.issues.map((issue) => ({
+          path: issue.path,
+          code: issue.code as OperationIssueCode,
+        })),
+      })
+    }
+    return ok(output.value)
+  }
+
   if (input.kind === FOOTAGE_MOTION_OPERATION_KIND) {
     const motion = validateFootageMotionOperation(input, path)
     if (!motion.ok) {
@@ -381,6 +406,16 @@ export const validateOperationAgainstComposition = (
   // Whether the named visual exists is history-dependent and is checked in the
   // project replay, where earlier accepted operations are available.
   if (isVisualPropertiesOperation(operation)) return ok(operation)
+
+  // Which tracks are switched on is a statement about the finished video as a
+  // whole. No amount of cutting can invalidate it, so there is nothing here to
+  // check against the footage.
+  if (isTrackOutputOperation(operation)) return ok(operation)
+
+  // A removal names a title, callout, B-roll clip, or music bed — never a
+  // moment of footage. Whether that item is still there is history-dependent
+  // for the same reason a repair is, and is answered by the replay.
+  if (operation.kind === 'remove-overlay') return ok(operation)
 
   if (isFootageMotionOperation(operation)) {
     const asset = findAsset(assets, operation.assetId)
