@@ -103,13 +103,20 @@ describe('media drag contract', () => {
 })
 
 describe('media drag source', () => {
-  it('is switched OFF for production until a Timeline can accept a drop', () => {
-    // A gesture that can start and can never finish teaches the user the
-    // product is broken. Gate C flips this, and only this.
-    expect(MEDIA_DRAG_ENABLED).toBe(false)
-    expect(mediaDragSourceProps(asset())).toEqual({})
-    expect(mediaDragSourceProps(asset()).draggable).toBeUndefined()
-    expect(mediaDragSourceProps(asset()).onDragStart).toBeUndefined()
+  it('is switched ON now that the Timeline can finish the gesture', () => {
+    // It was off until real drop targets existed, because a gesture that can
+    // start and can never finish teaches the user the product is broken.
+    // Gate C1 gave V2 and A2 real drops, and gave every other lane a refusal
+    // that says what to do instead — a refusal is a finish.
+    expect(MEDIA_DRAG_ENABLED).toBe(true)
+    expect(mediaDragSourceProps(asset()).draggable).toBe(true)
+    expect(mediaDragSourceProps(asset()).onDragStart).toBeTypeOf('function')
+  })
+
+  it('still refuses to make unplaceable media draggable', () => {
+    // Missing local media cannot be placed, so it must not offer the gesture
+    // even now that the gesture works in general.
+    expect(mediaDragSourceProps({ ...asset(), status: 'missing' })).toEqual({})
   })
 
   it('is ready to work the moment it is enabled, and puts only the contract on the wire', () => {

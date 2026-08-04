@@ -4,6 +4,44 @@ Last updated: 2026-08-04
 
 ## Active goal
 
+**P1-F.1A Gate C1 is PARTIAL — you can now drag media onto the Timeline.**
+
+`planTimelinePlacement` is the single home of placement policy: a pure function
+with no React, no network and no mutation, so dragging a logo onto the intro and
+typing "put the logo over the intro" produce the same operation rather than two
+rulebooks that drift apart. It owns policy only and hands construction to
+`features/media/media-actions`, which already knew how to anchor B-roll to the
+original footage and music to the finished video.
+
+The B-roll lane (V2) takes video and pictures. The music lane (A2) takes sound.
+V1, A1 and C1 refuse, each with a sentence saying what to do instead — V1's is
+the ADR's, word for word, because there is no `append-clip` operation and a
+second video dropped there has no operation to become. It is refused rather than
+quietly placed on V2, because a product that puts your video somewhere other
+than where you dropped it has lied in a way you cannot recover from.
+
+The lane highlight and the outcome are one decision, held by a test that walks
+every lane against every kind of file. `MEDIA_DRAG_ENABLED` is `true` now
+because every lane finishes the gesture — a refusal is a finish. Insert and
+Overwrite are honest stubs that refuse when they would have to move or replace
+something, because no operation can do that yet.
+
+Browser-proved: video on V2 gave revision 8→9 and one `add-media-overlay`; the
+same video on V1 gave 9→9 with the refusal on screen; an abandoned drag created
+nothing; music on A2 gave 9→10.
+
+**Still to do in C1:** drag session for existing items, Timeline presentation and
+toolbar, lock/output UI and contracts, working Insert/Overwrite, item move, trim,
+split, delete and ripple, snapping on drop, playhead and selection work,
+keyboard, output parity. **Gate C2 and Gate D have not started.**
+
+**Tests 1,319 → 1,389.** Build exit 0.
+`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/placement-planner.md`.
+
+---
+
+## Previous goal
+
 **P1-F.1A Gate C0 — Atomic compound change sets is complete.**
 
 One approved request is one change set is one Undo — and now that holds for the

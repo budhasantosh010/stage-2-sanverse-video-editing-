@@ -2,6 +2,46 @@
 
 ## Current checkpoint
 
+**P1-F.1A Gate C1 is PARTIAL: C1.1 (planner) and C1.2 (media drag) are done.
+Gate C0 before it is complete.**
+
+### Gate C1 so far — you can now drag media onto the timeline
+
+- **`planTimelinePlacement` is the only place placement policy lives.** Pure —
+  no React, no fetch, no mutation — so a drag and a future typed AI request
+  produce the same operation instead of two rulebooks that drift.
+- It owns policy and **delegates construction to `features/media/media-actions`**,
+  which already knew how to anchor B-roll to the original footage (ADR-005) and
+  music to the finished video (ADR-007). A second builder would have been a
+  second set of rules about where things land.
+- **V2 takes video and pictures. A2 takes sound. V1, A1 and C1 refuse** with a
+  sentence saying what to do instead. V1's refusal is the ADR's, verbatim.
+- **The lane highlight and the outcome are one decision** — a test walks every
+  lane × every kind of file and fails on any disagreement. Not colour alone, and
+  present ONLY while a drag is in the air, so hovering can never trigger it.
+- **`MEDIA_DRAG_ENABLED` is now `true`**, because every lane finishes the
+  gesture. A refusal is a finish; swallowing the drop silently is not.
+- **Insert and Overwrite are honest stubs**: they refuse when they would have to
+  move or replace something, because no operation can do that yet. An "Insert"
+  that behaved like "Normal" would lose what it was meant to push along.
+- Browser-proved: a video dropped on V2 gave revision 8→9 and one
+  `add-media-overlay`; the same video on V1 gave revision 9→9 and the refusal on
+  screen; an abandoned drag created nothing; music on A2 gave 9→10.
+  `DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/placement-planner.md`.
+
+**NOT done in C1:** drag session for existing items (C1.3), Timeline
+presentation (C1.4), toolbar (C1.5), lock/output UI and contracts (C1.6/C1.7),
+working Insert/Overwrite (C1.9), item move (C1.10), trim (C1.11), split (C1.12),
+delete and ripple (C1.13), snapping on drop (C1.14), playhead and selection work
+(C1.15/16), keyboard (C1.17), output parity (C1.18). **Gate C2 (multi-asset V1)
+and Gate D have not started.**
+
+**Tests 1,319 → 1,389.** Build exit 0.
+
+---
+
+## Gate C0 — complete
+
 **P1-F.1A Gate C0 — Atomic compound change sets is complete.**
 
 A change set is now all of it or none of it, including its cuts.

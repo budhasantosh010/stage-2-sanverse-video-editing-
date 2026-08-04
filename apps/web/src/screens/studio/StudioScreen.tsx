@@ -15,6 +15,7 @@ import {
   isTimelineOperation,
   mediaTime,
   toMilliseconds,
+  createIdFactory,
   type SetFootageMotionOperation,
 } from '@sanverse/edit-domain'
 import { proposalPlacement } from '../../app/app-state'
@@ -26,7 +27,9 @@ import { describeOperation } from '../../features/history/describe-operation'
 import {
   adaptTimelineGesture,
   buildTimelineViewModel,
+  planTimelinePlacement,
   type TimelineGesture,
+  type TimelineTrackId,
   type TimelineViewportState,
 } from '../../features/timeline'
 import {
@@ -140,6 +143,10 @@ import {
   type MediaPresentationState,
   type MediaSourceProbe,
   type MediaStatus,
+  MEDIA_DRAG_ENABLED,
+  MEDIA_DRAG_MIME,
+  parseMediaDragPayload,
+  type MediaDragPayloadV1,
 } from '../../features/media'
 import { useMediaOrganization } from '../../features/media/use-media-organization'
 import {
@@ -234,6 +241,12 @@ function createOperationId() {
   const bytes = new Uint32Array(4)
   globalThis.crypto.getRandomValues(bytes)
   return `operation_${Array.from(bytes, (value) => value.toString(16).padStart(8, '0')).join('')}`.slice(0, 42)
+}
+
+function createChangeSetId() {
+  const bytes = new Uint32Array(4)
+  globalThis.crypto.getRandomValues(bytes)
+  return `changeset_${Array.from(bytes, (value) => value.toString(16).padStart(8, '0')).join('')}`.slice(0, 42)
 }
 
 function createMotionId() {
@@ -348,6 +361,47 @@ export function StudioScreen({
   const [isMovingProposalPoint, setIsMovingProposalPoint] = useState(false)
   const [pointTarget, setPointTarget] = useState<CapturedPointTarget | null>(null)
   const [draftPoint, setDraftPoint] = useState<NormalizedPoint>({ x: 0.5, y: 0.5 })
+  /**
+   * The media drag currently in the air, so lanes can show whether they will
+   * take it BEFORE the user lets go.
+   *
+   * Read from a document-level `dragstart` in the bubble phase: the row that
+   * started the drag has already written the payload by then, and `getData` is
+   * only permitted during `dragstart` and `drop` — never during `dragover`,
+   * which is exactly when a lane needs to know. So it is captured once, here.
+   *
+   * This is presentation state and nothing else. It creates no operation, no
+   * request, and no history entry, and it is cleared whether the drag ends in
+   * a drop or is abandoned.
+   */
+  const [mediaDragInFlight, setMediaDragInFlight] = useState<MediaDragPayloadV1 | null>(null)
+
+  useEffect(() => {
+    if (!MEDIA_DRAG_ENABLED) return
+    const begin = (event: DragEvent) => {
+      const payload = parseMediaDragPayload(event.dataTransfer?.getData(MEDIA_DRAG_MIME))
+      if (payload) setMediaDragInFlight(payload)
+    }
+    const end = () => setMediaDragInFlight(null)
+    document.addEventListener('dragstart', begin)
+    document.addEventListener('dragend', end)
+    document.addEventListener('drop', end)
+    return () => {
+      document.removeEventListener('dragstart', begin)
+      document.removeEventListener('dragend', end)
+      document.removeEventListener('drop', end)
+    }
+  }, [])
+
+  /**
+   * Locked lanes. Presentation state on purpose: a padlock protects the track
+   * from you and changes nothing about the exported file, so it must not move
+   * the revision. If it did, clicking a padlock would be an Undo step and would
+   * change the export key, re-encoding an identical video for a minute and a
+   * half. Hiding a track is the opposite and belongs in the project.
+   */
+  const [lockedTrackIds, setLockedTrackIds] = useState<readonly TimelineTrackId[]>([])
+
   const [videoLayoutRevision, setVideoLayoutRevision] = useState(0)
   /** The same number, readable from inside the decoder's frame callback. */
   const videoLayoutRevisionRef = useRef(0)
@@ -1406,6 +1460,40 @@ export function StudioScreen({
       default:
         return fallback || 'That timeline edit could not be applied. Nothing changed.'
     }
+  }
+
+  /**
+   * A file was let go over a lane.
+   *
+   * The planner decides — the same function a future AI request will call — so
+   * dragging a logo onto the intro and typing "put the logo over the intro"
+   * cannot produce different results. Pointer movement up to this moment
+   * created nothing: no operation, no request, no history. This one release
+   * creates exactly one change set, or one refusal that says why.
+   */
+  function handleMediaDrop(laneId: string, assetId: string, atTicks: number) {
+    const plan = planTimelinePlacement({
+      project: editProject,
+      assetId,
+      targetLaneId: laneId,
+      atTicks,
+      placementMode: 'normal',
+      includeLinkedAudio: false,
+      trackState: { lockedTrackIds: lockedTrackIds },
+      proposalPending: Boolean(proposal),
+      exportInProgress: isRendering,
+      expectedRevision: editProject.revision,
+      idFactory: createIdFactory(createChangeSetId()),
+    })
+    if (!plan.ok) {
+      setTimelineNotice(plan.error.message)
+      return
+    }
+    setTimelineNotice(null)
+    void (async () => {
+      const failure = await onCreateOverlay(plan.value.operations[0] as never)
+      if (failure) setTimelineNotice(failure)
+    })()
   }
 
   function handleTimelineGesture(gesture: TimelineGesture) {
@@ -2488,6 +2576,8 @@ export function StudioScreen({
           fadeInTicks={Math.max(0, Math.round(fadeInSeconds * PROJECT_TIMESCALE))}
           fadeOutTicks={Math.max(0, Math.round(fadeOutSeconds * PROJECT_TIMESCALE))}
           advancedControls={advancedTimelineControls}
+          dragPreview={mediaDragInFlight}
+          onMediaDrop={MEDIA_DRAG_ENABLED ? handleMediaDrop : null}
           onViewportChange={setTimelineViewport}
           onSeek={seekCompositionTicks}
           onSelect={requestTimelineSelection}

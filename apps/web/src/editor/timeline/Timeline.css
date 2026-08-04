@@ -249,6 +249,26 @@
   overflow: hidden;
 }
 
+/*
+ * While a file is being dragged, every lane says whether it will take it.
+ *
+ * Not colour alone: the accepting lane gets an inset outline and the refusing
+ * lane gets reduced contrast plus a "no entry" cursor, so the answer survives
+ * colour blindness and a dim screen. These appear ONLY while a drag is in the
+ * air — `data-drop-target` is absent at every other moment — so nothing here
+ * can be triggered by hovering, which is the fault Gate B1 existed to remove.
+ */
+.timeline-v1__lane[data-drop-target='accepts'] {
+  outline: 2px solid var(--color-accent, #4f8cff);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--color-accent, #4f8cff) 12%, var(--color-track));
+}
+
+.timeline-v1__lane[data-drop-target='refuses'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .timeline-v1__lane:has(.timeline-v1__item-shell--trimming) {
   z-index: 6;
   overflow: visible;

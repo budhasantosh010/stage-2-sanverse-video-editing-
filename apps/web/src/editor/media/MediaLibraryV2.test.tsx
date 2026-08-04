@@ -421,13 +421,15 @@ describe('Media Library V2 — asset rows', () => {
     expect(screen.getByTestId('media-panel').textContent).not.toContain('asset_00000001')
   })
 
-  it('offers no visible drag affordance while the Timeline cannot accept one', async () => {
+  it('offers a real drag affordance now that the Timeline can accept one', async () => {
     render(<Harness fetcher={vi.fn(async () => json(200, { organization: emptyOrganization })) as unknown as typeof fetch} />)
     await settled()
-    for (const row of screen.getAllByRole('option')) {
-      expect(row).not.toHaveAttribute('draggable')
-      expect(row).not.toHaveAttribute('aria-grabbed')
-    }
+    const rows = screen.getAllByRole('option')
+    expect(rows.length).toBeGreaterThan(0)
+    // Every row that can be placed says so. A row that offered the gesture and
+    // could never finish it would teach the user the product is broken.
+    const draggable = rows.filter((row) => row.getAttribute('draggable') === 'true')
+    expect(draggable.length).toBeGreaterThan(0)
   })
 
   it('offers only actions that do something, and explains the one that cannot', async () => {

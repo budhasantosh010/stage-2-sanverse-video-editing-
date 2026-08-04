@@ -1,4 +1,5 @@
 export * from './timeline-contract'
+export * from './timeline-placement-planner'
 export * from './timeline-gesture-adapter'
 export * from './timeline-view-model'
 export * from './timeline-viewport-state'

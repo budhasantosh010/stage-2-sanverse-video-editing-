@@ -33,12 +33,16 @@ export const MEDIA_DRAG_MIME = 'application/vnd.sanverse.media-drag+json'
 /**
  * Whether asset rows offer a visible drag gesture in the shipped product.
  *
- * FALSE until Gate C. The contract, the parser and the drag-source adapter all
- * exist and are tested, but nothing in the Timeline can yet accept a drop. A
+ * TRUE since Gate C1. It was false until real drop targets existed, because a
  * gesture that can start and can never finish is worse than no gesture at all:
  * the user learns the product is broken, and they are right.
+ *
+ * What "finishes" means now: the B-roll lane (V2) takes video and pictures, the
+ * music lane (A2) takes sound, and every other lane REFUSES with a sentence
+ * saying what it cannot do and what to do instead. A refusal is a finish. What
+ * would not be a finish is a lane that swallows the drop and shows nothing.
  */
-export const MEDIA_DRAG_ENABLED = false
+export const MEDIA_DRAG_ENABLED = true
 
 export const MEDIA_DRAG_KINDS = Object.freeze(['video', 'image', 'audio'] as const)
 export type MediaDragKind = (typeof MEDIA_DRAG_KINDS)[number]

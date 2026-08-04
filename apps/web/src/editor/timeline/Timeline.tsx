@@ -11,6 +11,7 @@ import {
   type TimelineViewModel,
   type TimelineViewportState,
 } from '../../features/timeline'
+import type { MediaDragPayloadV1 } from '../../features/media'
 import { TimelineContextActions } from './TimelineContextActions'
 import { TimelineContextMenu } from './TimelineContextMenu'
 import { TimelineLane } from './TimelineLane'
@@ -32,6 +33,10 @@ export type TimelineProps = Readonly<{
   fadeInTicks: number
   fadeOutTicks: number
   advancedControls: ReactNode
+  /** The media drag in flight, so lanes can show whether they will take it. */
+  dragPreview?: MediaDragPayloadV1 | null
+  /** Absent while media drag is switched off, which removes the drop target. */
+  onMediaDrop?: ((laneId: string, assetId: string, atTicks: number) => void) | null
   onViewportChange(viewport: TimelineViewportState): void
   onSeek(ticks: number): void
   onSelect(itemId: string | null): void
@@ -55,6 +60,8 @@ export function Timeline({
   fadeInTicks,
   fadeOutTicks,
   advancedControls,
+  dragPreview,
+  onMediaDrop,
   onViewportChange,
   onSeek,
   onSelect,
@@ -306,6 +313,8 @@ export function Timeline({
                 <TimelineLane
                   key={lane.id}
                   lane={lane}
+                  dragPreview={dragPreview}
+                  onMediaDrop={onMediaDrop}
                   timescale={model.timescale}
                   viewport={viewport}
                   visibleRange={visibleRange}
