@@ -1,5 +1,5 @@
 import {
-  acceptChangeSet,
+  acceptChangeSetAtomic,
   addAsset,
   createProject,
   redoChangeSet,
@@ -138,7 +138,7 @@ export function createProjectStateService(options: {
     return upgraded.value.project
   }
 
-  const failFromDomain = (error: { code?: string }): never => {
+  const failFromDomain = (error: { code?: string; failedOperationIndex?: number }): never => {
     if (error.code === 'REVISION_CONFLICT') {
       throw new ProjectStateError('REVISION_CONFLICT', 'The project changed while this edit was being prepared.', error)
     }
@@ -168,9 +168,17 @@ export function createProjectStateService(options: {
      */
     async accept(projectId: string, changeSet: unknown): Promise<EditProject> {
       const current = await load(projectId)
-      const next = acceptChangeSet(current, changeSet)
-      if (!next.ok) failFromDomain(next.error as { code?: string })
-      return persist(projectId, (next as { ok: true; value: EditProject }).value)
+      const result = acceptChangeSetAtomic(current, changeSet)
+      if (result.status === 'blocked') {
+        // Nothing is written. The project on disk is still exactly the project
+        // that was loaded, so a refused compound edit cannot leave half of
+        // itself behind for the next load to find.
+        failFromDomain({
+          ...(result.refusal as { code?: string }),
+          failedOperationIndex: result.failedOperationIndex,
+        })
+      }
+      return persist(projectId, (result as { status: 'accepted'; project: EditProject }).project)
     },
 
     /**

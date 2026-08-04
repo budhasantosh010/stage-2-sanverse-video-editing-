@@ -1,8 +1,45 @@
 # Current State
 
-Last updated: 2026-08-03
+Last updated: 2026-08-04
 
 ## Active goal
+
+**P1-F.1A Gate C0 — Atomic compound change sets is complete.**
+
+One approved request is one change set is one Undo — and now that holds for the
+**cuts** inside it too, not only the overlays.
+
+The replay used to apply a change set's cuts first and judge its overlays
+second, with no way for the second verdict to reach back. A set holding a cut
+and an overlay could therefore leave the cut in the finished video while
+reporting itself blocked. The user would see an error message and a shortened
+video at the same time, and pressing Undo would not remove the cut, because the
+project never recorded it as something that happened.
+
+Refusing a change set now **retracts** its cuts and re-runs the whole replay.
+This ends, because a refused set is never revived — the loop the original code
+warned about needs un-refusing to start, and nothing here un-refuses. Today's
+projects finish in one round, so nothing got slower.
+
+The accept path was already safe; the broken path was replaying already-accepted
+history after a later edit invalidated an earlier set. Disabling the fix fails
+exactly 2 of the 24 new tests, which is the honest size of the defect.
+
+Also landed: `AtomicChangeSetResult` (accepted, or blocked with the **original**
+project and the index of the operation that refused) and
+`createIdFactory(changeSetId)`, whose names are derived by hash so a refused
+draft burns no ID and a retry is recognised as the same edit.
+
+Browser-proved on real 30-second media: a mixed request returned 400 with the
+timeline unmoved at `00:00:28:01`; a valid two-operation request gave one
+revision, one history entry, one Undo for both, one Redo for both, and survived
+a reload. `DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/gate-c0-atomicity.md`.
+
+**Tests 1,319 → 1,350.** Build exit 0. **Next: Gate C1.**
+
+---
+
+## Previous goal
 
 **P1-F.1A Gate B1 — Preview and responsive owner repair is complete.**
 

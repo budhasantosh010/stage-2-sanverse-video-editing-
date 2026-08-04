@@ -303,6 +303,18 @@ const withRevision = (
   return Object.freeze({ ...next, changeSets: evaluateProject(next).records })
 }
 
+/**
+ * Why one change set contributes nothing, and which operation inside it decided.
+ *
+ * `operationIndex` is a position in that change set's own `operations` array, so
+ * a caller can say "the second thing you asked for is what refused" instead of
+ * "something in there failed".
+ */
+export type ChangeSetFailure = Readonly<{
+  reason: string
+  operationIndex: number
+}>
+
 export type ProjectEvaluation = Readonly<{
   /** The footage as it now stands: the imported arrangement plus every cut. */
   composition: Composition
@@ -310,52 +322,47 @@ export type ProjectEvaluation = Readonly<{
   records: readonly ChangeSetRecord[]
   /** Latest active, valid full-state primary-footage motion per stable motion identity. */
   footageMotions: readonly SetFootageMotionOperation[]
+  /** Keyed by position in `project.changeSets`. Empty when everything still fits. */
+  failures: ReadonlyMap<number, ChangeSetFailure>
 }>
 
 /**
- * Replay the accepted history over the imported footage, once.
- *
- * This is the only place in the system that decides two things — what the
- * finished video is made of, and which change sets no longer fit. Computing
- * them together in one pass is deliberate: two passes could disagree, and a
- * disagreement here would mean the screen shows one video and the export
- * produces another.
- *
- * A change set is all-or-nothing. If any operation inside it fails, the whole
- * change set is marked blocked and none of its operations touch the footage,
- * because the user approved the request as one thing and half of it is a state
- * they never agreed to.
+ * One full replay of the history. `retracted` holds change sets already refused
+ * by an earlier round, which contribute nothing here — not even their cuts.
  *
  * A blocked change set is shown to the user and never quietly adjusted to make
  * it fit, because an edit the user did not ask for is worse than an edit that
  * visibly needs attention.
  */
-export const evaluateProject = (project: EditProject): ProjectEvaluation => {
-  const cleared = (record: ChangeSetRecord): ChangeSetRecord =>
-    record.blockedReason === null ? record : Object.freeze({ ...record, blockedReason: null })
+const evaluateRound = (
+  project: EditProject,
+  retracted: ReadonlyMap<number, ChangeSetFailure>,
+): ProjectEvaluation => {
+  const failures = new Map<number, ChangeSetFailure>(retracted)
+  /** Active, not yet refused: the only records allowed to change anything. */
+  const contributes = (index: number): boolean =>
+    project.changeSets[index].active && !failures.has(index)
 
   // Pass one — what the finished video is MADE OF.
   //
   // Cuts are replayed in the order they were approved, each against the result
   // of the ones before it, because that is the order the user made them in.
   let composition = project.composition
-  const cutFailures = new Map<number, string>()
-
   project.changeSets.forEach((record, index) => {
-    if (!record.active) return
+    if (!contributes(index)) return
     let trial = composition
-    let reason: string | null = null
-    for (const operation of record.changeSet.operations) {
-      if (!isTimelineOperation(operation)) continue
+    let failure: ChangeSetFailure | null = null
+    record.changeSet.operations.forEach((operation, position) => {
+      if (failure !== null || !isTimelineOperation(operation)) return
       const applied = applyTimelineOperation(trial, operation, project.assets)
       if (!applied.ok) {
-        reason = applied.error.reason
-        break
+        failure = Object.freeze({ reason: applied.error.reason, operationIndex: position })
+        return
       }
       trial = applied.value
-    }
-    if (reason !== null) {
-      cutFailures.set(index, reason)
+    })
+    if (failure !== null) {
+      failures.set(index, failure)
       return
     }
     composition = trial
@@ -367,29 +374,23 @@ export const evaluateProject = (project: EditProject): ProjectEvaluation => {
   // as it stood when they were approved. A nameplate approved before a cut, on
   // a face the cut later removed, must be reported as no longer showing. Judging
   // it at its own point in the history would leave it silently invisible.
-  //
-  // The two passes are deliberately one-way: an overlay can never change what
-  // the video is made of. Letting it do so would mean removing a cut could make
-  // an overlay valid again, which could re-apply the cut, which could invalidate
-  // the overlay — a loop with no settled answer.
-  const compositionCheckedRecords = project.changeSets.map((record, index) => {
-    if (!record.active) return cleared(record)
-    const cutFailure = cutFailures.get(index)
-    if (cutFailure !== undefined) return Object.freeze({ ...record, blockedReason: cutFailure })
-
-    for (const operation of record.changeSet.operations) {
-      if (isTimelineOperation(operation)) continue
+  project.changeSets.forEach((record, index) => {
+    if (!contributes(index)) return
+    record.changeSet.operations.forEach((operation, position) => {
+      if (failures.has(index) || isTimelineOperation(operation)) return
       const checked = validateOperationAgainstComposition(operation, composition, project.assets)
       if (!checked.ok) {
-        return Object.freeze({ ...record, blockedReason: checked.error.issues[0]?.code ?? 'OPERATION_INVALID' })
+        failures.set(index, Object.freeze({
+          reason: checked.error.issues[0]?.code ?? 'OPERATION_INVALID',
+          operationIndex: position,
+        }))
       }
-    }
-    return cleared(record)
+    })
   })
 
   const availableVisualIds = new Set<string>()
-  for (const record of compositionCheckedRecords) {
-    if (!record.active || record.blockedReason !== null) continue
+  project.changeSets.forEach((record, index) => {
+    if (!contributes(index)) return
     for (const operation of record.changeSet.operations) {
       if (operation.kind === 'add-nameplate') availableVisualIds.add(operation.operationId)
       if (operation.kind === 'add-captions') availableVisualIds.add(operation.captionSetId)
@@ -397,16 +398,16 @@ export const evaluateProject = (project: EditProject): ProjectEvaluation => {
       if (operation.kind === 'add-callout') availableVisualIds.add(operation.calloutId)
       if (operation.kind === 'add-media-overlay') availableVisualIds.add(operation.overlayId)
     }
-  }
+  })
 
-  const visualCheckedRecords = compositionCheckedRecords.map((record) => {
-    if (!record.active || record.blockedReason !== null) return record
-    const missingTarget = record.changeSet.operations.find(
+  project.changeSets.forEach((record, index) => {
+    if (!contributes(index)) return
+    const position = record.changeSet.operations.findIndex(
       (operation) => isVisualPropertiesOperation(operation) && !availableVisualIds.has(operation.visualId),
     )
-    return missingTarget
-      ? Object.freeze({ ...record, blockedReason: 'VISUAL_TARGET_UNKNOWN' })
-      : record
+    if (position !== -1) {
+      failures.set(index, Object.freeze({ reason: 'VISUAL_TARGET_UNKNOWN', operationIndex: position }))
+    }
   })
 
   // One source moment may have one effective primary-footage motion. Repairs of
@@ -414,30 +415,38 @@ export const evaluateProject = (project: EditProject): ProjectEvaluation => {
   // A refused record contributes nothing to the effective map, so a later edit
   // is never composed against motion the project did not accept.
   const effectiveByMotionId = new Map<string, SetFootageMotionOperation>()
-  const records = visualCheckedRecords.map((record) => {
-    if (!record.active || record.blockedReason !== null) return record
-    const motions = record.changeSet.operations.filter(isFootageMotionOperation)
-    if (motions.length === 0) return record
-
+  project.changeSets.forEach((record, index) => {
+    if (!contributes(index)) return
     const trial = new Map(effectiveByMotionId)
-    for (const motion of motions) {
-      trial.delete(motion.motionId)
+    let failure: ChangeSetFailure | null = null
+    record.changeSet.operations.forEach((operation, position) => {
+      if (failure !== null || !isFootageMotionOperation(operation)) return
+      trial.delete(operation.motionId)
       // A default full-state repair truthfully removes the effective motion. It
       // cannot overlap another motion because it draws no motion at all.
-      if (isDefaultFootageMotion(motion)) continue
-      if ([...trial.values()].some((existing) => footageMotionsOverlap(existing, motion))) {
-        return Object.freeze({ ...record, blockedReason: 'FOOTAGE_MOTION_OVERLAP' })
+      if (isDefaultFootageMotion(operation)) return
+      if ([...trial.values()].some((existing) => footageMotionsOverlap(existing, operation))) {
+        failure = Object.freeze({ reason: 'FOOTAGE_MOTION_OVERLAP', operationIndex: position })
+        return
       }
-      trial.set(motion.motionId, motion)
+      trial.set(operation.motionId, operation)
+    })
+    if (failure !== null) {
+      failures.set(index, failure)
+      return
     }
     effectiveByMotionId.clear()
     trial.forEach((motion, motionId) => effectiveByMotionId.set(motionId, motion))
-    return record
+  })
+
+  const records = project.changeSets.map((record, index) => {
+    const blockedReason = record.active ? (failures.get(index)?.reason ?? null) : null
+    return record.blockedReason === blockedReason ? record : Object.freeze({ ...record, blockedReason })
   })
 
   const footageMotions = foldFootageMotionOperations(
-    records
-      .filter((record) => record.active && record.blockedReason === null)
+    project.changeSets
+      .filter((_, index) => contributes(index))
       .flatMap((record) => record.changeSet.operations)
       .filter(isFootageMotionOperation),
   )
@@ -446,7 +455,58 @@ export const evaluateProject = (project: EditProject): ProjectEvaluation => {
     composition,
     records: Object.freeze(records),
     footageMotions,
+    failures: failures as ReadonlyMap<number, ChangeSetFailure>,
   })
+}
+
+/**
+ * Replay the accepted history over the imported footage.
+ *
+ * This is the only place in the system that decides two things — what the
+ * finished video is made of, and which change sets no longer fit. Computing
+ * them together is deliberate: two passes could disagree, and a disagreement
+ * here would mean the screen shows one video and the export produces another.
+ *
+ * A change set is all-or-nothing. If ANY operation inside it fails, the whole
+ * change set contributes nothing — including its cuts. The user approved the
+ * request as one thing, and half of it is a state they never agreed to.
+ *
+ * ## Why this loops
+ *
+ * Overlays are judged against the FINISHED footage, so a change set holding a
+ * cut AND an overlay can have its cut applied in the first pass and then be
+ * refused in the second. That left the cut in the video while the change set
+ * reported failure — a user seeing an error message and a changed video at the
+ * same time, with no Undo that removes it.
+ *
+ * So refusing a change set that contributed cuts RETRACTS those cuts and the
+ * whole evaluation runs again on the larger footage. This terminates because
+ * refusal only ever grows: a change set refused in one round is never revived
+ * in a later one, and there are finitely many change sets. The oscillation this
+ * once guarded against — remove a cut, an overlay becomes valid, re-apply the
+ * cut, the overlay breaks again — cannot start, because nothing is ever
+ * un-refused.
+ *
+ * The one case that conservatism decides: a change set whose own cut removes
+ * the footage its own overlay sits on. That set is self-contradictory and stays
+ * refused, rather than being accepted with its cut silently dropped.
+ */
+export const evaluateProject = (project: EditProject): ProjectEvaluation => {
+  const retracted = new Map<number, ChangeSetFailure>()
+  // Bounded by the number of change sets: every extra round refuses at least
+  // one more, and a round that refuses nothing new is the answer.
+  for (let round = 0; round < project.changeSets.length; round += 1) {
+    const evaluated = evaluateRound(project, retracted)
+    let retractedThisRound = false
+    evaluated.failures.forEach((failure, index) => {
+      if (retracted.has(index)) return
+      if (!project.changeSets[index].changeSet.operations.some(isTimelineOperation)) return
+      retracted.set(index, failure)
+      retractedThisRound = true
+    })
+    if (!retractedThisRound) return evaluated
+  }
+  return evaluateRound(project, retracted)
 }
 
 /**
@@ -517,6 +577,129 @@ export const acceptChangeSet = (
   }
   return ok(next)
 }
+
+/**
+ * The closed answer to "apply this change set".
+ *
+ * There is no third case. Either the project moved forward by exactly one
+ * revision with exactly one new history entry, or nothing about the project
+ * changed at all and the caller is told which operation refused and why.
+ */
+export type AtomicChangeSetResult =
+  | Readonly<{
+      status: 'accepted'
+      project: EditProject
+      revision: number
+      acceptedChangeSet: ChangeSetRecord
+    }>
+  | Readonly<{
+      status: 'blocked'
+      project: EditProject
+      revision: number
+      /** Position in the submitted change set's own `operations` array. */
+      failedOperationIndex: number
+      refusal: ProjectError
+    }>
+
+/**
+ * Accept one change set, all of it or none of it.
+ *
+ * `acceptChangeSet` above answers the same question in the older
+ * `Result<EditProject, ProjectError>` shape. This one additionally reports the
+ * ORIGINAL project on refusal and names the operation that refused, which is
+ * what a compound Timeline gesture needs to say "the audio could not go there"
+ * rather than "that did not work".
+ */
+export const acceptChangeSetAtomic = (
+  project: EditProject,
+  candidate: unknown,
+): AtomicChangeSetResult => {
+  const blocked = (failedOperationIndex: number, refusal: ProjectError): AtomicChangeSetResult =>
+    Object.freeze({
+      status: 'blocked' as const,
+      project,
+      revision: (project as EditProject)?.revision ?? 0,
+      failedOperationIndex,
+      refusal,
+    })
+
+  const accepted = acceptChangeSet(project, candidate)
+  if (accepted.ok) {
+    const record = accepted.value.changeSets.at(-1)
+    // `acceptChangeSet` only returns ok after the replay proved the record
+    // applies, so the record is always present and never blocked here.
+    return Object.freeze({
+      status: 'accepted' as const,
+      project: accepted.value,
+      revision: accepted.value.revision,
+      acceptedChangeSet: record as ChangeSetRecord,
+    })
+  }
+
+  // Which operation refused? Replay the candidate against the unchanged project
+  // to find out. This is a read-only probe: `evaluateProject` mutates nothing.
+  const validatedProject = validateProject(project)
+  const validatedChangeSet = validateChangeSet(candidate)
+  if (!validatedProject.ok || !validatedChangeSet.ok) return blocked(0, accepted.error)
+
+  const probe = Object.freeze({
+    ...validatedProject.value,
+    changeSets: Object.freeze([
+      ...validatedProject.value.changeSets,
+      Object.freeze({ changeSet: validatedChangeSet.value, active: true, blockedReason: null }),
+    ]),
+  })
+  const failure = evaluateProject(probe).failures.get(validatedProject.value.changeSets.length)
+  return blocked(failure?.operationIndex ?? 0, accepted.error)
+}
+
+/**
+ * Names for things a change set is about to create, derived from what the
+ * change set already is rather than from a random number.
+ *
+ * Two reasons this is not `crypto.randomUUID()`:
+ *
+ * 1. A refused draft must not burn an ID. With random IDs, validating a plan
+ *    and then committing it produce different IDs, so the thing the user was
+ *    shown is not the thing that got saved.
+ * 2. The same gesture on the same project must produce the same project. That
+ *    is what lets a test assert an exact result, and what lets a retry after a
+ *    dropped connection be recognised as the same edit rather than a second one.
+ */
+export type IdFactory = Readonly<{
+  /** `operation_…` for the nth operation this change set creates. */
+  operation: (slot: number) => string
+  /** A stable name for a created clip, fragment, overlay or link group. */
+  entity: (namespace: string, slot: number) => string
+}>
+
+const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789'
+
+/** A 32-bit FNV-1a hash, rendered in the lower-case alphanumeric IDs use. */
+const stableToken = (seed: string, length: number): string => {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  let token = ''
+  let state = hash
+  for (let index = 0; index < length; index += 1) {
+    token += ID_ALPHABET[state % ID_ALPHABET.length]
+    state = (Math.imul(state, 0x01000193) + 0x9e3779b9) >>> 0
+  }
+  return token
+}
+
+/**
+ * @param changeSetId the ID of the change set being built — different gestures
+ * therefore never collide, while the same gesture always agrees with itself.
+ */
+export const createIdFactory = (changeSetId: string): IdFactory =>
+  Object.freeze({
+    operation: (slot: number) => `operation_${stableToken(`${changeSetId}:op:${slot}`, 12)}`,
+    entity: (namespace: string, slot: number) => `${namespace}_${stableToken(`${changeSetId}:${namespace}:${slot}`, 12)}`,
+  })
 
 /** Reverse the most recent accepted change set as one step. */
 export const undoChangeSet = (project: EditProject): Result<EditProject, ProjectError> => {

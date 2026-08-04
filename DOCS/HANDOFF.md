@@ -2,6 +2,51 @@
 
 ## Current checkpoint
 
+**P1-F.1A Gate C0 — Atomic compound change sets is complete.**
+
+A change set is now all of it or none of it, including its cuts.
+
+The hole: the replay applied a change set's cuts in pass one, then judged its
+overlays in pass two, and pass two's refusal could not reach back. A set holding
+a cut **and** an overlay could have the cut baked into the footage while the set
+itself reported "blocked" — an error message and a changed video at the same
+time, with no Undo that removes it, because the project never recorded the cut
+as something that happened.
+
+- **Accepting** a new change set was already safe: the replay saw the refusal
+  and the caller kept the old project. **Replaying accepted history was not.**
+  Proved by disabling the fix: 2 of 24 new tests fail, the other 22 pass either
+  way. That is the true size of it.
+- **The fix is retraction.** Refusing a set that contributed cuts removes those
+  cuts and the whole replay runs again. It terminates because refusal only ever
+  grows — nothing is ever un-refused, so the oscillation the old code warned
+  about cannot start. Ends in one round for every project that exists today.
+- **Nothing creates a mixed set yet. Gate C1 creates them by design** — an
+  insert is a placement plus a ripple, a linked placement is a picture plus its
+  sound. This had to land first.
+- `AtomicChangeSetResult` is a closed two-case answer: accepted with a project
+  and revision, or blocked with the **original** project and
+  `failedOperationIndex` naming the operation that refused.
+- `createIdFactory(changeSetId)` gives deterministic names by hash, so a refused
+  draft burns no ID and a retry is the same edit rather than a second one.
+- **Browser-proved on real media:** a mixed request returned 400 and left the
+  timeline at `00:00:28:01`, revision 7→7, 1 change set, 2 operations — the
+  5-second cut in it did not land. A valid two-operation request gave one
+  revision, one history entry, one Undo removing both, one Redo restoring both,
+  and survived a full reload. Full detail in
+  `DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/gate-c0-atomicity.md`.
+
+**Tests 1,319 → 1,350.** Build exit 0.
+
+**Next: Gate C1 — Creator Timeline Core on the current model.** The planner
+(`planTimelinePlacement`) first, per ADR-CREATOR-TIMELINE-PLACEMENT-V1; then the
+V2/A2 drop targets; then `MEDIA_DRAG_ENABLED = true`. No clip-body dragging
+before the planner exists.
+
+---
+
+## Previous checkpoint
+
 **P1-F.1A Gate B — Media Library V2 Essentials is complete.**
 
 The Media panel is now a compact, responsive shelf with import by kind, drop
