@@ -43,34 +43,34 @@ describe('naming a piece of derived media', () => {
   it('names it by the file and the moment, and by nothing about the timeline', () => {
     // This is what lets a clip be dragged, trimmed or split without throwing
     // away a single thumbnail.
-    const a = filmstripFrameKey({ assetId: 'asset_a', sourceTicks: 5 * T, widthPx: 64 })
-    const b = filmstripFrameKey({ assetId: 'asset_a', sourceTicks: 5 * T, widthPx: 64 })
+    const a = filmstripFrameKey({ assetId: 'asset_a', assetVersion: 'aaaaaaaaaaaaaaaa', sourceTicks: 5 * T, widthPx: 64 })
+    const b = filmstripFrameKey({ assetId: 'asset_a', assetVersion: 'aaaaaaaaaaaaaaaa', sourceTicks: 5 * T, widthPx: 64 })
     expect(mediaAnalysisKeyId(a)).toBe(mediaAnalysisKeyId(b))
     expect(Object.keys(a).sort()).toEqual(
-      ['assetId', 'kind', 'resolution', 'schemaVersion', 'sourceTicks', 'spanTicks'],
+      ['assetId', 'assetVersion', 'kind', 'resolution', 'schemaVersion', 'sourceTicks', 'spanTicks'],
     )
   })
 
   it('snaps the moment to a grid, so zooming reuses what is already decoded', () => {
-    const first = filmstripFrameKey({ assetId: 'asset_a', sourceTicks: 5 * T + 17, widthPx: 64 })
-    const second = filmstripFrameKey({ assetId: 'asset_a', sourceTicks: 5 * T + 9_000, widthPx: 64 })
+    const first = filmstripFrameKey({ assetId: 'asset_a', assetVersion: 'aaaaaaaaaaaaaaaa', sourceTicks: 5 * T + 17, widthPx: 64 })
+    const second = filmstripFrameKey({ assetId: 'asset_a', assetVersion: 'aaaaaaaaaaaaaaaa', sourceTicks: 5 * T + 9_000, widthPx: 64 })
     expect(first.sourceTicks % FILMSTRIP_GRID_TICKS).toBe(0)
     expect(mediaAnalysisKeyId(first)).toBe(mediaAnalysisKeyId(second))
   })
 
   it('snaps the width too, so resizing the window is not a full re-decode', () => {
-    expect(filmstripFrameKey({ assetId: 'a', sourceTicks: 0, widthPx: 61 }).resolution)
-      .toBe(filmstripFrameKey({ assetId: 'a', sourceTicks: 0, widthPx: 66 }).resolution)
+    expect(filmstripFrameKey({ assetId: 'a', assetVersion: 'aaaaaaaaaaaaaaaa', sourceTicks: 0, widthPx: 61 }).resolution)
+      .toBe(filmstripFrameKey({ assetId: 'a', assetVersion: 'aaaaaaaaaaaaaaaa', sourceTicks: 0, widthPx: 66 }).resolution)
   })
 
   it('keeps two different recordings apart even at the same moment', () => {
-    expect(mediaAnalysisKeyId(filmstripFrameKey({ assetId: 'asset_a', sourceTicks: T, widthPx: 64 })))
-      .not.toBe(mediaAnalysisKeyId(filmstripFrameKey({ assetId: 'asset_b', sourceTicks: T, widthPx: 64 })))
+    expect(mediaAnalysisKeyId(filmstripFrameKey({ assetId: 'asset_a', assetVersion: 'aaaaaaaaaaaaaaaa', sourceTicks: T, widthPx: 64 })))
+      .not.toBe(mediaAnalysisKeyId(filmstripFrameKey({ assetId: 'asset_b', assetVersion: 'bbbbbbbbbbbbbbbb', sourceTicks: T, widthPx: 64 })))
   })
 
   it('gives waveform blocks a length, and frames none', () => {
-    expect(waveformBlockKey({ assetId: 'a', sourceTicks: 3 * T + 5, peaksPerBlock: 64 }).spanTicks).toBe(T)
-    expect(filmstripFrameKey({ assetId: 'a', sourceTicks: 0, widthPx: 64 }).spanTicks).toBe(0)
+    expect(waveformBlockKey({ assetId: 'a', assetVersion: 'aaaaaaaaaaaaaaaa', sourceTicks: 3 * T + 5, peaksPerBlock: 64 }).spanTicks).toBe(T)
+    expect(filmstripFrameKey({ assetId: 'a', assetVersion: 'aaaaaaaaaaaaaaaa', sourceTicks: 0, widthPx: 64 }).spanTicks).toBe(0)
   })
 })
 
@@ -157,7 +157,7 @@ describe('planning a filmstrip for a sixty-minute project', () => {
     // The failure this catches looks plausible: every thumbnail in a cut
     // project is off by however much was trimmed, and nobody notices until
     // they cut using it.
-    const clip = { clipId: 'clip_x', assetId: 'asset_x', startTicks: 10 * T, durationTicks: 6 * T, sourceStartTicks: 4 * T }
+    const clip = { clipId: 'clip_x', assetId: 'asset_x', assetVersion: 'xxxxxxxxxxxxxxxx', startTicks: 10 * T, durationTicks: 6 * T, sourceStartTicks: 4 * T }
     expect(sourceTicksWithinClip(clip, 12 * T)).toBe(6 * T)
     expect(sourceTicksWithinClip(clip, 9 * T)).toBeNull()
     expect(sourceTicksWithinClip(clip, 16 * T)).toBeNull()
@@ -186,9 +186,9 @@ describe('planning a filmstrip for a sixty-minute project', () => {
   })
 
   it('shares one piece of work between two halves of a split', () => {
-    const whole = { clipId: 'c1', assetId: 'asset_x', startTicks: 0, durationTicks: 8 * T, sourceStartTicks: 0 }
+    const whole = { clipId: 'c1', assetId: 'asset_x', assetVersion: 'xxxxxxxxxxxxxxxx', startTicks: 0, durationTicks: 8 * T, sourceStartTicks: 0 }
     const left = { ...whole, durationTicks: 4 * T }
-    const right = { clipId: 'c2', assetId: 'asset_x', startTicks: 4 * T, durationTicks: 4 * T, sourceStartTicks: 4 * T }
+    const right = { clipId: 'c2', assetId: 'asset_x', assetVersion: 'xxxxxxxxxxxxxxxx', startTicks: 4 * T, durationTicks: 4 * T, sourceStartTicks: 4 * T }
     const window = { visibleStartTicks: 0, visibleEndTicks: 8 * T, thumbnailWidthPx: 48, pixelsPerSecond: 100, timescale: T }
 
     const before = planFilmstrip({ clips: [whole], ...window })

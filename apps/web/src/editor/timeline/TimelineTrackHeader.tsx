@@ -26,6 +26,14 @@ export type TimelineTrackHeaderProps = Readonly<{
   outputEnabled: boolean
   /** Null when the output switch is available; otherwise why it is not. */
   outputDisabledReason: string | null
+  /**
+   * How tall this row is, from `timeline-lane-metrics.ts`.
+   *
+   * The header and its lane MUST be the same height or every label drifts away
+   * from the clips it names. Passing the one number to both is what stops that
+   * happening the day somebody changes a row height.
+   */
+  heightPx: number
   onToggleLock(): void
   onToggleOutput(): void
 }>
@@ -48,6 +56,7 @@ export function TimelineTrackHeader({
   locked,
   outputEnabled,
   outputDisabledReason,
+  heightPx,
   onToggleLock,
   onToggleOutput,
 }: TimelineTrackHeaderProps) {
@@ -65,6 +74,7 @@ export function TimelineTrackHeader({
       data-track-id={trackId}
       data-track-locked={locked ? 'yes' : 'no'}
       data-track-output={outputEnabled ? 'on' : 'off'}
+      style={{ ['--timeline-lane-height' as string]: `${heightPx}px` }}
     >
       <span className="timeline-v1__lane-header-name">
         <strong>{label}</strong>

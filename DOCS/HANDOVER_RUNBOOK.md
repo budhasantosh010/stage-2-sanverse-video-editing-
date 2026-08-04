@@ -72,3 +72,25 @@ Stop and ask the owner when:
 - A renderer/provider choice lacks the evidence required by its decision gate.
 - A semantic operation cannot distinguish safe execution from a plausible wrong edit.
 - Existing user changes conflict with the planned edit.
+
+## Preview pictures and sound shapes (Gate D, 2026-08-04)
+
+If the timeline shows rectangles with no pictures in them:
+
+1. **Is FFmpeg on the path?** The refusal will say
+   `DECODER_UNAVAILABLE — "The tool that makes preview pictures is not installed."`
+2. **Did the file change?** `ANALYSIS_KEY_INVALID — "That file has changed since
+   this preview was asked for."` means the bytes behind that slot are not the
+   ones the picture was asked for. Reload the project.
+3. **Is the machine busy?** `/api/diagnostics` reports
+   `mediaAnalysis: { activeFrames, activeWaveforms, queued, sharedJobs }`.
+   Ceilings are 2, 1 and 64. If `queued` sits at 64, raise the limits with
+   `SANVERSE_ANALYSIS_MAX_FRAMES` / `_MAX_WAVEFORMS` / `_MAX_QUEUED` /
+   `_TIMEOUT_MS`. A bad value refuses at startup rather than being ignored.
+4. **Is something stale?** Delete
+   `.sanverse-data/projects/<projectId>/derived-media/` — it is a throwaway
+   folder and removing it costs only a few seconds of re-decoding. **Do this
+   after any change to HOW a picture or a number is produced**, or bump the `v1`
+   in that path, because the stored name describes the request, not the method.
+5. **Nothing here can damage a project.** Preview pictures create no operation,
+   no change set, no revision and no Undo entry.

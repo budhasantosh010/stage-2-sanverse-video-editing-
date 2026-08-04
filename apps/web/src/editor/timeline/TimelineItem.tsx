@@ -1,4 +1,4 @@
-import { useRef, useState, type MouseEvent, type PointerEvent } from 'react'
+import { useCallback, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 
 import {
   ticksToPixels,
@@ -7,13 +7,22 @@ import {
   type TimelineItemView,
   type TimelineLaneKind,
 } from '../../features/timeline'
+import type { ClipDerivedMedia } from '../../features/media-analysis'
 import { formatTimelineTime } from './timeline-ruler-model'
 import type { TimelineSnapResult } from './timeline-snap'
 import { TimelineTrimHandle } from './TimelineTrimHandle'
+import { TimelineFilmstrip } from './TimelineFilmstrip'
+import { TimelineWaveform } from './TimelineWaveform'
 
 export type TimelineItemProps = Readonly<{
   item: TimelineItemView
   laneKind: TimelineLaneKind
+  /** The pictures or sound shape this clip should draw. `none` means neither. */
+  derivedMedia: ClipDerivedMedia
+  /** How tall those are drawn, leaving room for the name and the handles. */
+  decorationHeightPx: number
+  /** A silenced track still shows its shape, drawn faintly. */
+  muted: boolean
   timescale: number
   pixelsPerSecond: number
   busy: boolean
@@ -57,9 +66,18 @@ const itemAccessibleLabel = (item: TimelineItemView, timescale: number): string 
   return `${kind}, ${item.label}${detail}, starts ${start}, duration ${duration}, ${itemStateLabel(item)}`
 }
 
+/** What the small mark in the corner says, when there is anything to say. */
+const DECORATION_STATE_LABEL: Readonly<Record<string, string>> = Object.freeze({
+  missing: 'File missing',
+  error: 'No preview',
+})
+
 export function TimelineItem({
   item,
   laneKind,
+  derivedMedia,
+  decorationHeightPx,
+  muted,
   timescale,
   pixelsPerSecond,
   busy,
@@ -74,6 +92,20 @@ export function TimelineItem({
   onContextMenu,
 }: TimelineItemProps) {
   const [trimPreview, setTrimPreview] = useState<Readonly<{ edge: 'start' | 'end'; deltaTicks: number }> | null>(null)
+  /**
+   * Whether the pictures or the sound shape arrived.
+   *
+   * Held here rather than read from the controller so that a clip re-renders
+   * once when its decoration state changes, instead of every clip re-rendering
+   * every time any picture anywhere arrives.
+   */
+  const [decorationState, setDecorationState] = useState<'loading' | 'ready' | 'missing' | 'error' | 'none'>('none')
+  const onDecorationState = useCallback(
+    (next: 'loading' | 'ready' | 'missing' | 'error' | 'none') => {
+      setDecorationState((current) => (current === next ? current : next))
+    },
+    [],
+  )
   /**
    * The drag in progress.
    *
@@ -188,7 +220,9 @@ export function TimelineItem({
           `timeline-v1__item--${item.state}`,
           item.selected ? 'timeline-v1__item--selected' : '',
           item.enabled ? '' : 'timeline-v1__item--disabled',
+          decorationState === 'loading' ? 'timeline-v1__item--loading-decoration' : '',
         ].filter(Boolean).join(' ')}
+        data-decoration-state={decorationState}
         aria-label={itemAccessibleLabel(item, timescale)}
         aria-selected={item.selected}
         title={itemAccessibleLabel(item, timescale)}
@@ -233,9 +267,37 @@ export function TimelineItem({
           }
         }}
       >
+        {/*
+          The pictures and the sound shape sit BEHIND the words and in front of
+          the clip's own colour. They never take a click: see the note in
+          `TimelineFilmstrip`.
+        */}
+        <TimelineFilmstrip
+          media={derivedMedia}
+          widthPx={Math.max(2, widthPx)}
+          heightPx={decorationHeightPx}
+          onStateChange={onDecorationState}
+        />
+        <TimelineWaveform
+          media={derivedMedia}
+          widthPx={Math.max(2, widthPx)}
+          heightPx={decorationHeightPx}
+          muted={muted}
+          selected={item.selected}
+          onStateChange={onDecorationState}
+        />
         <span className="timeline-v1__item-label">{item.label}</span>
         <span className="timeline-v1__item-state">{itemStateLabel(item)}</span>
         {item.blockedReason ? <span className="timeline-v1__item-warning">Needs attention</span> : null}
+        {/*
+          A preview that could not be made is SAID, not left as a blank. A blank
+          reads as a successful frame of black, which is a lie about the footage.
+        */}
+        {decorationState === 'missing' || decorationState === 'error' ? (
+          <span className="timeline-v1__decoration-state" data-state={decorationState}>
+            {DECORATION_STATE_LABEL[decorationState]}
+          </span>
+        ) : null}
       </button>
 
       {canTrim ? (

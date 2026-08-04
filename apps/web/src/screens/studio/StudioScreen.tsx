@@ -162,6 +162,13 @@ import {
 } from '../../features/media'
 import { useMediaOrganization } from '../../features/media/use-media-organization'
 import {
+  assetVersionFromSha256,
+  createMediaAnalysisClient,
+  createMediaAnalysisController,
+  MediaAnalysisContext,
+  type AssetFacts,
+} from '../../features/media-analysis'
+import {
   formatPointTargetTime,
   type CapturedPointTarget,
 } from '../../features/point-target/point-target'
@@ -982,6 +989,40 @@ export function StudioScreen({
   const previewCallouts = previewPlan ? visibleCallouts(previewPlan, playheadPreviewTicks) : []
   const previewMedia = previewPlan ? visibleMediaOverlays(previewPlan, playheadPreviewTicks) : []
   const assetKinds = new Map(editProject.assets.map((asset) => [asset.assetId, asset.mediaKind]))
+
+  /**
+   * What the timeline is allowed to know about each file, for drawing purposes.
+   *
+   * Deliberately three facts and no more: what kind of thing it is, whether it
+   * has any sound, and a fingerprint of its bytes. No path, no URL, and not the
+   * asset object itself — the same rule the media drag payload lives under, for
+   * the same reason: the less that travels, the less can leak.
+   */
+  const assetFacts = useMemo<Readonly<Record<string, AssetFacts>>>(() => {
+    const facts: Record<string, AssetFacts> = {}
+    for (const asset of editProject.assets) {
+      const assetVersion = assetVersionFromSha256(asset.sha256)
+      if (assetVersion.length === 0) continue
+      facts[asset.assetId] = Object.freeze({
+        assetVersion,
+        mediaKind: asset.mediaKind,
+        hasAudio: asset.hasAudio,
+      })
+    }
+    return Object.freeze(facts)
+  }, [editProject.assets])
+
+  /**
+   * The one fetcher of preview pictures and sound shapes for this screen.
+   *
+   * Built once and torn down when the screen goes away, which closes every
+   * decoded picture and stops every request in flight. A controller rebuilt on
+   * each render would throw away the whole cache every time anything changed.
+   */
+  const mediaAnalysis = useMemo(() => createMediaAnalysisController({
+    client: createMediaAnalysisClient(),
+  }), [])
+  useEffect(() => () => mediaAnalysis.dispose(), [mediaAnalysis])
   const contentBox = video ? monitorGeometry(video, monitorFitMode)?.displayedContentRect ?? null : null
   const previewScale = contentBox && composition.width > 0 ? contentBox.width / composition.width : 0
   const reducedMotion =
@@ -2707,8 +2748,15 @@ export function StudioScreen({
           region they have landed in.
         */}
         <h2 className="studio-screen__time-strip-heading">Timeline</h2>
+        {/*
+          Everything under here shares ONE fetcher of preview pictures. See the
+          note at the top of `media-analysis-controller.ts` for what happens
+          when each clip fetches for itself.
+        */}
+        <MediaAnalysisContext.Provider value={mediaAnalysis}>
         <Timeline
           model={timelineModel}
+          assetFacts={assetFacts}
           playheadTicks={playheadTicks}
           viewport={timelineViewport}
           selectedItemId={selectedTimelineItemId}
@@ -2738,6 +2786,7 @@ export function StudioScreen({
             requestAnimationFrame(() => inspectorRegionRef.current?.focus())
           }}
         />
+        </MediaAnalysisContext.Provider>
         {timelineNotice ? (
           <p className="studio-screen__track-notice" role="status">
             {timelineNotice}

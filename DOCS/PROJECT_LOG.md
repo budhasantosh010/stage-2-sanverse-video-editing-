@@ -539,3 +539,29 @@ fullscreen fallback, and shared geometry survived responsive browser checks
 with exactly one video. A real nameplate edit, Undo, and Redo passed. Real export
 remained rendering beyond 90 seconds and is recorded without renderer drift.
 Media V2 was not started.
+
+## 2026-08-04 — Gate D: the timeline shows real pictures and real sound
+
+Replaced coloured rectangles with the actual frames of the actual recording and
+the actual shape of the actual sound. The browser decides what is needed because
+it is the only thing that knows what is on screen; the local server makes it with
+the same FFmpeg that produces the finished video, so a preview frame can never
+differ from the exported one.
+
+Each piece is named by which file, which BYTES of it, which moment and how big —
+never by where it sits on the timeline. Moving a clip therefore costs nothing,
+trimming costs one picture and splitting costs at most one. Bounds are measured,
+not hoped for: two frame decodes and one sound decode at once on the server, six
+requests in flight in the browser, and on a real project scrolled end to end and
+back, never more than two clips mounted, three drawing surfaces, one video
+element and zero object URLs.
+
+Running it in a real browser found two faults no test had: the original recording
+reported itself missing because one storage reference is spelled two ways, and
+every row shrank on a large monitor because row heights were read from the width
+of the timeline instead of the width of the window. Both fixed and now held by
+test. A third fault was found and recorded rather than fixed: portrait footage
+cannot be exported into a landscape project (FAIL-051).
+
+Tests 1,559 → 1,723. Build exit 0. Inspector expansion and AI execution were not
+started.

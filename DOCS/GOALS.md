@@ -101,3 +101,6 @@ Never publish one invented percentage-complete number. A box closes only when it
 - [x] Media V2 sorting and one-level bins — done in Gate B
 - [ ] Media V2 multiselect, batch actions, visible Timeline drag/drop — deferred;
       the drag payload and parser exist and are tested, the gesture is off
+- [x] Timeline shows real frames and real sound shapes — Gate D, 2026-08-04.
+      A creator can find a moment by looking at it, not by reading filenames.
+- [ ] Portrait footage in a landscape project can be exported — FAIL-051

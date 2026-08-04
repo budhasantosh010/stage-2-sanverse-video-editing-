@@ -4,43 +4,45 @@ Last updated: 2026-08-04
 
 ## Active goal
 
-**P1-F.1A Gate D is PARTIAL — the derived-media authority and long-form bounds
-are in. No frames or audio are decoded yet.**
+**P1-F.1A Gate D is COMPLETE. The timeline now shows real pictures and real
+sound.**
 
-`MediaAnalysisKeyV1` names one thumbnail or block of waveform by **which file,
-which moment of it, and how big** — and by nothing about the timeline. That is
-what lets a clip be dragged, trimmed or split without throwing away a single
-thumbnail. Both the moment and the width are snapped to a grid, so zooming and
-resizing reuse what is already there instead of asking for moments nothing has
-ever asked for.
+Before this, every piece of your video was a coloured rectangle with a filename
+on it, and you could not find anything — because you know your video by what it
+looks like and what it sounds like. Now each piece of footage shows a row of its
+own real frames, and each piece of sound shows its own real shape.
 
-The bounded cache holds a fixed COUNT (bytes cannot be measured honestly in a
-browser) and passes everything it drops to `dispose`, because an `ImageBitmap`
-is not reclaimed by garbage collection alone.
+```
+  the browser decides WHAT is needed   it is the only thing that knows what
+                                       is on screen right now
+  the server MAKES it                  with the SAME FFmpeg that produces the
+                                       finished video, so a preview frame can
+                                       never differ from the exported one
+```
 
-The filmstrip planner maps each thumbnail to the moment of the recording
-actually on screen — a clip trimmed four seconds off its head and sitting at ten
-seconds shows second **six** at twelve seconds, not second twelve. Getting that
-wrong looks plausible and is wrong by exactly the amount trimmed.
+Each piece is named by **which file, WHICH BYTES it holds, which moment, how
+big** — never by where it sits on the timeline. That is why moving a clip costs
+nothing, trimming costs one picture, and splitting costs at most one. The bytes
+are named by a checksum, so a replaced file cannot serve a picture of the file it
+replaced.
 
-Waveform peaks take the **loudest** sample per bucket, so a snare drum can never
-vanish; blocks are named by their moment in the file and sliced afterwards, so
-trimmed music draws its own shape.
+Bounds that are measured rather than hoped for: two frame decodes and one sound
+decode at once on the server; six requests in flight in the browser; a fixed
+number of finished pictures held, each explicitly closed when dropped; and, on a
+real project scrolled end to end and back, never more than two clips mounted,
+three drawing surfaces, 199 timeline DOM nodes, one `<video>` element and zero
+object URLs.
 
-Every plan has a ceiling and **says** when the ceiling bites.
+Two real bugs were found by running it in a browser that no test had caught: the
+original recording reported itself missing (two spellings of one storage
+reference), and every row shrank on a large monitor (row heights were read from
+the width of the timeline instead of the width of the window). Both fixed, both
+now held by test.
 
-**Proved on a 60-minute / 250-clip / 100-overlay fixture:** scrolling the whole
-hour never exceeds the cache ceiling and leaks nothing; one window asks for tens
-of thumbnails, not tens of thousands; a split costs at most one extra decode; a
-missing recording costs only its own thumbnails.
+Tests **1,559 → 1,723**. Build exit 0.
 
-**NOT done in Gate D:** no frames decoded, no audio decoded, no decoder pool, no
-AudioContext, nothing drawn on the timeline, no image thumbnails, no 38-step
-browser workflow. The timeline still draws labelled rectangles.
+Evidence: `DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/gate-d-*.md`.
 
-**Tests 1,535 → 1,559.** Build exit 0.
-
----
 
 ## Previous goal
 

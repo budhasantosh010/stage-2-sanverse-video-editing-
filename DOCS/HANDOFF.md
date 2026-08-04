@@ -2,34 +2,70 @@
 
 ## Current checkpoint
 
-**P1-F.1A Gates C0, C1 and C2 are COMPLETE. Gate D is PARTIAL.**
+**P1-F.1A Gates C0, C1, C2 and D are COMPLETE.**
 
-### Gate D — PARTIAL: the derived-media authority and long-form bounds
+### Gate D — COMPLETE: real filmstrips, image thumbnails and waveforms
 
-In `apps/web/src/features/media-analysis/`:
+The timeline used to draw every piece of your video as a coloured rectangle with
+a filename on it. It now draws the actual frames of the actual recording and the
+actual shape of the actual sound.
+
+**The decision, written before any code:**
+`DOCS/decisions/ADR-DERIVED-MEDIA-EXECUTION-V1.md`. A **hybrid** — the browser
+decides WHAT is needed (it is the only thing that knows what is on screen); the
+local server MAKES it with the same FFmpeg that produces the finished video (it
+is the only thing that can decode every format a user might bring).
+
+Server, `apps/api/src/media-analysis/`:
 
 ```
-   media-analysis-key.ts   names a thumbnail / waveform block by FILE +
-                           MOMENT + SIZE, and by nothing about the timeline
-   bounded-cache.ts        LRU with a hard COUNT ceiling and explicit dispose
-   filmstrip-plan.ts       which thumbnails a visible range needs, mapped to
-                           the moment of the recording actually on screen
-   waveform-peaks.ts       loudest-per-bucket peaks, block planning, slicing
-   long-form-fixture.ts    60 min · 250 clips · 12 recordings · 100 overlays
+   analysis-request.ts      closed parsing of the three query shapes;
+                            11 refusal codes; unknown/missing/out of range
+                            is REFUSED, never repaired
+   derived-media-cache.ts   throwaway sidecar at
+                            .sanverse-data/projects/<id>/derived-media/v1/
+                            hashed filenames, atomic write, corrupt-entry
+                            regeneration, 4,000-file ceiling per project
+   analysis-coordinator.ts  2 frames / 1 sound at once, queue 64, 20 s
+                            timeout, in-flight dedup, abort when the last
+                            waiter leaves
+   media-analysis-service.ts  FFmpeg frame + image + bounded PCM waveform
 ```
 
-- The key excludes timeline position **on purpose**: a name that included it
-  would change on every drag and re-decode everything.
-- The cache limit is a COUNT because an `ImageBitmap`'s bytes are not observable
-  from script. Everything dropped goes through `dispose` — bitmaps are not
-  reclaimed by GC alone.
-- The filmstrip mapping is the thing filmstrips usually get wrong: a clip
-  trimmed 4 s off its head, sitting at 10 s, shows second **6** at 12 s.
-- Every plan has a ceiling and reports `truncated` when it bites.
+Browser, `apps/web/src/features/media-analysis/`:
 
-**NOT DONE:** no frames decoded, no audio decoded, no bounded decoder pool, no
-AudioContext, nothing drawn on the timeline, no image thumbnails, no 38-step
-browser workflow. **The next agent starts here.**
+```
+   media-analysis-key.ts        + assetVersion (16 chars of the file's sha256)
+                                + image-thumbnail as its own closed kind
+   media-analysis-client.ts     one address per kind; closed refusals
+   media-analysis-controller.ts ONE per screen: 6 in flight, priority order,
+                                abort on scroll-away, bounded caches, explicit
+                                ImageBitmap disposal, diagnostics counters
+   timeline-derived-media.ts    the pure plan used by BOTH the shopping list
+                                and the drawing, so they cannot disagree
+   timeline-item-clip.ts        one timeline row → that plain question
+```
+
+Editor: `TimelineFilmstrip.tsx` and `TimelineWaveform.tsx` — one canvas each,
+`pointer-events: none`. `timeline-lane-metrics.ts` owns row heights and pushes
+them to CSS as `--timeline-lane-height`, so code and layout cannot disagree.
+
+**Three rules that will be broken if they are not read:**
+
+1. `assetVersion` is what makes a stale picture impossible. `assetId` names a
+   SLOT; the version names the BYTES. Never remove it.
+2. Filmstrip moments sit on a ladder measured from the START OF THE RECORDING,
+   plus one at the clip's own start. That is why a move costs nothing, a trim
+   costs one picture and a split costs at most one.
+3. The `v1` in `derived-media/v1/` is the invalidation mechanism. If the WAY a
+   picture or a number is produced ever changes, bump it — the name describes
+   the request, not the method, so old answers survive a code change otherwise.
+
+**Never:** no operation, no change set, no revision, no Undo entry. Derived
+media is deleted at any moment with no consequence but re-decoding.
+
+Evidence: `DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/gate-d-*.md`
+and `screenshots/gate-d/`.
 
 ### Gate C2 — Multi-asset Primary Sequence
 
@@ -78,7 +114,9 @@ moves the revision.
 
 ### What is next
 
-**Gate D — filmstrips, waveforms and long-form bounds.** Nothing of it exists.
+**Gate D is now complete** — see the checkpoint at the top of this file. What
+follows P1-F.1A is Inspector expansion, Effects, Color, Audio depth and real AI
+execution, none of which has started.
 
 ---
 
@@ -221,8 +259,9 @@ Evidence: `DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/` —
 `media-responsive-matrix.md`, `media-browser-walkthrough.md`,
 `test-results-gate-b.md`.
 
-**Gate C (Creator Timeline Core) has NOT started. Gate D has not started.
-P1-F.2 has not started.**
+*(Historic note from the Gate B write-up.)* Gates C0, C1, C2 and D have all
+since been completed — see the checkpoint at the top of this file. P1-F.2 has
+not started.
 
 Two pre-existing defects were found while testing Gate B and are recorded but
 NOT fixed here, because this gate fixes only Gate B blockers:

@@ -265,26 +265,91 @@
   text-transform: capitalize;
 }
 
-.timeline-v1__lane-header--overlay,
-.timeline-v1__lane--overlay {
-  height: 32px;
+/*
+  Row heights come from the CODE, not from here.
+
+  Two things need the same number: this stylesheet, to lay the row out, and the
+  drawing code, to know whether there is room for a row of pictures and how tall
+  to draw them. Written in both places they would eventually disagree, and the
+  filmstrips would overflow their row or leave a gap with nothing to explain it.
+
+  So `timeline-lane-metrics.ts` owns the number and sets it here as
+  `--timeline-lane-height`. The fallbacks below are what a row would be if that
+  ever failed to arrive — never the source of truth.
+*/
+.timeline-v1__lane-header,
+.timeline-v1__lane {
+  height: var(--timeline-lane-height, 42px);
 }
 
-.timeline-v1__lane-header--video,
-.timeline-v1__lane--video {
-  height: 42px;
+/*
+  The pictures and the sound shape drawn inside a clip.
+
+  Behind everything and deaf to the pointer. Every click, drag and trim belongs
+  to the clip itself; a decoration that swallowed a drag would produce a clip
+  that simply refuses to move with nothing on screen saying why.
+*/
+.timeline-v1__filmstrip,
+.timeline-v1__waveform {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 3px;
+  opacity: 0.95;
 }
 
-.timeline-v1__lane-header--caption,
-.timeline-v1__lane--caption {
-  height: 32px;
+/*
+  A clip whose picture or sound could not be made.
+
+  Deliberately not colour alone: a small mark and a word, so it survives a
+  colour-blind reader and a black-and-white screenshot.
+*/
+.timeline-v1__decoration-state {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  z-index: 3;
+  pointer-events: none;
+  font-size: 0.5rem;
+  letter-spacing: 0.02em;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.28);
 }
 
-.timeline-v1__lane-header--dialogue,
-.timeline-v1__lane--dialogue,
-.timeline-v1__lane-header--music,
-.timeline-v1__lane--music {
-  height: 34px;
+.timeline-v1__decoration-state[data-state='missing'] {
+  border-style: dashed;
+  color: rgb(255, 214, 214);
+}
+
+/*
+  While pictures are still being made the clip must not look like it already
+  has them. A faint moving sheen says "working", which an empty grey box does
+  not — an empty grey box looks like a successful frame of black.
+*/
+.timeline-v1__filmstrip[data-loading='true']::after {
+  content: '';
+}
+
+.timeline-v1__item--loading-decoration {
+  background-image: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0) 70%
+  );
+  background-size: 200% 100%;
+  animation: timeline-decoration-sheen 1.4s linear infinite;
+}
+
+@keyframes timeline-decoration-sheen {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
 }
 
 /*

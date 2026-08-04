@@ -43,6 +43,13 @@ import {
   buildPortableProjectArchive,
   restorePortableProject,
 } from './projects/portable-project.ts'
+import { AnalysisError, parseAnalysisRequest } from './media-analysis/analysis-request.ts'
+import {
+  createMediaAnalysisService,
+  isOriginalRecording,
+  type MediaAnalysisService,
+} from './media-analysis/media-analysis-service.ts'
+import { resolveAnalysisLimits } from './media-analysis/analysis-coordinator.ts'
 
 type ServerOptions = {
   dataRoot: string
@@ -60,6 +67,8 @@ type ServerOptions = {
   /** Swaps only the provider; the safety pipeline around it is unchanged. */
   intentProvider?: IntentProviderPort
   intentService?: IntentService
+  /** Swappable so tests can drive the decoder without running FFmpeg. */
+  mediaAnalysisService?: MediaAnalysisService
 }
 
 const CHANGE_SET_ID_ROUTE_PATTERN = /^changeset_[a-z0-9]{8,64}$/
@@ -200,6 +209,17 @@ export function createSanverseServer(options: ServerOptions) {
   // until a real provider is deliberately configured and the owner has approved
   // what the outbound allowlist sends.
   const intentProvider = options.intentProvider ?? createFakeIntentAdapter()
+  /**
+   * The maker of preview pictures and sound shapes.
+   *
+   * It has its own bounded process pool and its own throwaway cache, entirely
+   * separate from exporting. See DOCS/decisions/ADR-DERIVED-MEDIA-EXECUTION-V1.md.
+   */
+  const mediaAnalysis = options.mediaAnalysisService ?? createMediaAnalysisService({
+    repository,
+    loadProject: (projectId) => projectState.load(projectId),
+    limits: resolveAnalysisLimits(process.env),
+  })
   const intentService = options.intentService ?? createIntentService({
     provider: intentProvider,
     loadProject: (projectId) => projectState.load(projectId),
@@ -243,7 +263,13 @@ export function createSanverseServer(options: ServerOptions) {
       const paths = await repository.allocateExport(job.projectId, job.exportId)
       const extraSourcePaths: Record<string, string> = {}
       for (const asset of job.projectSnapshot.assets) {
-        if (asset.storageRef === `project/${job.projectId}/source`) continue
+        // The original recording is handed to the renderer separately as
+        // `sourcePath`. This test used to spell the reference with a slash and
+        // therefore never matched anything on disk, which spelled it with a
+        // colon — the primary then fell through to the assets folder, failed to
+        // resolve there, and was dropped by the `catch` below. Right outcome,
+        // wrong reason, and one bad day away from being a real fault.
+        if (isOriginalRecording(job.projectId, asset)) continue
         const path = await repository.resolveAssetPath(job.projectId, asset.assetId).catch(() => null)
         if (path !== null) extraSourcePaths[asset.assetId] = path
       }
@@ -325,7 +351,74 @@ export function createSanverseServer(options: ServerOptions) {
             running: jobs.filter((job) => job.status === 'running').length,
             failed: jobs.filter((job) => job.status === 'failed').length,
           },
+          mediaAnalysis: mediaAnalysis.diagnostics(),
         }))
+        return
+      }
+
+      /*
+       * The pictures and sound shapes the timeline draws inside each clip.
+       *
+       * These routes NEVER change the project. They make no operation, no
+       * change set, no revision and no undo entry — a thumbnail is not an edit.
+       * Everything they produce can be deleted at any moment and made again.
+       *
+       * The address carries which file, WHICH BYTES of it, which moment and
+       * what size, and nothing else. There is no path in it and no path may
+       * ever be put in it: a path from a browser is how a server is talked into
+       * reading somebody else's files.
+       */
+      const analysisMatch = /^\/api\/projects\/([^/]+)\/media-analysis\/(frame|image-thumbnail|waveform)$/
+        .exec(requestUrl.pathname)
+      if (request.method === 'GET' && analysisMatch) {
+        const [projectId, route] = analysisMatch.slice(1)
+        request.resume()
+        if (!PROJECT_ID_PATTERN.test(projectId)) {
+          json(response, 404, { error: 'Project was not found.', code: 'PROJECT_NOT_FOUND' })
+          return
+        }
+        const kind = route === 'frame'
+          ? 'filmstrip-frame'
+          : route === 'waveform' ? 'waveform-block' : 'image-thumbnail'
+        // A browser that scrolls away closes the connection. That is the signal
+        // to stop decoding, so work nobody will look at does not finish.
+        const abandoned = new AbortController()
+        const onClose = () => abandoned.abort()
+        request.once('aborted', onClose)
+        response.once('close', onClose)
+        try {
+          const analysisRequest = parseAnalysisRequest(kind, requestUrl.searchParams)
+          const artifact = await mediaAnalysis.produce({
+            projectId,
+            request: analysisRequest,
+            signal: abandoned.signal,
+          })
+          if (response.destroyed) return
+          response.writeHead(200, {
+            'content-type': artifact.contentType,
+            'content-length': artifact.bytes.byteLength,
+            // The address already names the exact bytes it describes, so the
+            // answer can never change under the same address. That is what
+            // makes `immutable` truthful rather than a gamble.
+            'cache-control': 'private, max-age=86400, immutable',
+            'x-content-type-options': 'nosniff',
+            'content-disposition': 'inline',
+          })
+          response.end(artifact.bytes)
+        } catch (error) {
+          if (response.headersSent || response.destroyed) return
+          if (error instanceof AnalysisError) {
+            // 499 is "the browser went away". Nobody is listening, so there is
+            // nothing honest to say and nothing to say it to.
+            if (error.status === 499) { response.destroy(); return }
+            json(response, error.status, { error: error.message, code: error.code })
+            return
+          }
+          throw error
+        } finally {
+          request.off('aborted', onClose)
+          response.off('close', onClose)
+        }
         return
       }
       if (request.method === 'POST' && requestUrl.pathname === '/api/projects') {

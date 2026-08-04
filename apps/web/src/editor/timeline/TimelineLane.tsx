@@ -14,10 +14,25 @@ import {
   type MediaDragPayloadV1,
 } from '../../features/media'
 import { acceptsMediaKind } from '../../features/timeline'
+import {
+  clipDerivedMedia,
+  derivedMediaClipFor,
+  type AssetFacts,
+  type ClipDerivedMedia,
+} from '../../features/media-analysis'
 import { TimelineItem } from './TimelineItem'
+import { decorationHeightPx, laneDensity, laneHeightPx } from './timeline-lane-metrics'
 import type { TimelineSnapResult } from './timeline-snap'
 
+const NO_MEDIA: ClipDerivedMedia = Object.freeze({ kind: 'none' as const })
+
 export type TimelineLaneProps = Readonly<{
+  /** What each file is and which bytes it holds. Never a path, never a URL. */
+  assetFacts: Readonly<Record<string, AssetFacts>>
+  /** True when this row has been silenced, so its shape is drawn faintly. */
+  muted: boolean
+  /** How wide the window is, which decides how tall rows are. */
+  layoutWidthPx: number
   /** The drag in flight, so a lane can say yes or no before the user lets go. */
   dragPreview?: MediaDragPayloadV1 | null
   /** Absent while media drag is switched off, which removes the drop target entirely. */
@@ -42,6 +57,9 @@ export type TimelineLaneProps = Readonly<{
 
 export function TimelineLane({
   lane,
+  assetFacts,
+  muted,
+  layoutWidthPx,
   dragPreview,
   onMediaDrop,
   timescale,
@@ -81,6 +99,25 @@ export function TimelineLane({
   const dragKind = dragPreview?.mediaKind ?? null
   const accepts = dragKind !== null && acceptsMediaKind(lane.id, dragKind)
 
+  // How much detail this row has room for, decided ONCE for the row rather than
+  // by each clip, so two clips in the same row can never disagree about it.
+  const density = laneDensity(lane.kind, layoutWidthPx)
+  const rowHeightPx = laneHeightPx(lane.kind, layoutWidthPx)
+  const decorationPx = decorationHeightPx(lane.kind, layoutWidthPx)
+
+  const mediaFor = (item: TimelineItemView): ClipDerivedMedia => {
+    const clip = derivedMediaClipFor(item, lane.kind, assetFacts)
+    if (clip === null) return NO_MEDIA
+    // The SAME pure function the timeline uses to build its shopping list. One
+    // function, two callers: the list and the drawing can never disagree.
+    return clipDerivedMedia({
+      clip,
+      timescale,
+      pixelsPerSecond: viewport.pixelsPerSecond,
+      density,
+    })
+  }
+
   return (
     <div
       className={`timeline-v1__lane timeline-v1__lane--${lane.kind}`}
@@ -88,6 +125,8 @@ export function TimelineLane({
       aria-label={`${lane.label} ${lane.kind} lane`}
       data-lane-id={lane.id}
       data-testid="timeline-lane"
+      data-lane-density={density}
+      style={{ ['--timeline-lane-height' as string]: `${rowHeightPx}px` }}
       data-drop-target={dragKind === null ? undefined : accepts ? 'accepts' : 'refuses'}
       onDragOver={(event) => {
         if (!onMediaDrop || dragKind === null) return
@@ -115,6 +154,9 @@ export function TimelineLane({
           key={item.id}
           item={item}
           laneKind={lane.kind}
+          derivedMedia={mediaFor(item)}
+          decorationHeightPx={decorationPx}
+          muted={muted}
           timescale={timescale}
           pixelsPerSecond={viewport.pixelsPerSecond}
           busy={busy}

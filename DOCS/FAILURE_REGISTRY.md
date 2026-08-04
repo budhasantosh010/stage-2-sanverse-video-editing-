@@ -1899,3 +1899,80 @@ brightness never below 105 out of 255. Full evidence:
 If a workaround is needed to make something look right, the thing it works
 around is the bug — and two mechanisms fighting over whether a layer is visible
 means neither of them is the authority.
+
+---
+
+## FAIL-049 — the original recording reported itself missing to the preview maker
+
+**Found:** 2026-08-04, first real browser run of Gate D. No test had caught it.
+
+The one file that is certainly there — the footage the project was made from —
+answered `ASSET_MISSING` when the timeline asked for a preview frame of it.
+
+It lives beside the project as `source.mp4`; everything the user adds afterwards
+lives in `assets/`. The check that tells the two apart compared the asset's
+storage reference against `project/<id>/source` with a **slash**, while every
+saved project on disk writes `project:<id>/source` with a **colon**. The check
+never matched, so the original recording was looked for in the added-files folder
+and was truthfully not there.
+
+The same mistaken comparison existed in the export path
+(`server.ts`, building `extraSourcePaths`). There it was harmless by luck: the
+lookup failed and the entry was dropped by the surrounding `catch`, which is the
+right outcome for the wrong reason.
+
+**Fixed.** `isOriginalRecording` accepts both spellings, is used in both places,
+and is held by two tests — one that the assets folder is never even asked, and
+one that the older spelling still works so nothing on disk has to be rewritten.
+
+### One-line solution
+
+A comparison that never matches is indistinguishable from a comparison that
+always fails — write the check once, use it everywhere, and test that the branch
+is actually taken.
+
+---
+
+## FAIL-050 — every timeline row shrank on a large monitor
+
+**Found:** 2026-08-04, same browser run.
+
+Row heights step down on a small screen so a phone can show more than one row.
+The step was decided from the width of the TIMELINE. On a 1440-pixel desktop the
+timeline shares the screen with the preview and the inspector and gets about 700
+pixels — so the editor concluded the user was on a phone and shrank every row,
+including the footage row the filmstrips live in.
+
+**Fixed.** The decision now reads the width of the WINDOW, tracked on resize.
+Held by two tests: one that a narrow timeline pane on a wide window keeps full
+rows, and one that a genuinely small window shrinks them.
+
+### One-line solution
+
+"Is there room on this screen" and "how much room did this panel get" are two
+different questions; measuring the panel to answer the screen question is how a
+desktop gets treated like a phone.
+
+---
+
+## FAIL-051 — portrait footage cannot be exported into a landscape project
+
+**Found:** 2026-08-04, while probing the export for Gate D. **NOT FIXED.**
+
+A project whose main video track holds a 1920×1080 recording followed by a
+714×1280 portrait recording fails to export:
+
+```
+  RENDER_FAILED — "The local renderer could not produce a verified MP4."
+```
+
+Switching that one clip off and exporting the same project at the same moment
+succeeds. So the fault is specific to a portrait source inside a landscape
+composition, in the render graph.
+
+Gate D changed nothing in the render graph, and the program for that gate says to
+fix Gate D blockers only and record everything else. Recorded here.
+
+**This is a real gap for real users.** Somebody filming on a phone in portrait
+and adding that clip to a landscape project cannot export at all, and the message
+they get says nothing about why. It should be the next render task.

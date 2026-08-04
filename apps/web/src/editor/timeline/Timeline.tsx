@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNod
 import type { TimelineTrackId, TrackOutputState } from '@sanverse/edit-domain'
 import {
   fitTimelineToViewport,
+  itemIntersectsVisibleRange,
   timelineContentWidthPx,
   ticksToPixels,
   trackIdForLane,
@@ -16,6 +17,14 @@ import {
   type TimelineViewportState,
 } from '../../features/timeline'
 import type { MediaDragPayloadV1 } from '../../features/media'
+import {
+  ANALYSIS_PRIORITY,
+  derivedMediaClipFor,
+  planTimelineAnalysis,
+  useMediaAnalysisController,
+  type AssetFacts,
+} from '../../features/media-analysis'
+import { currentWindowWidthPx, laneDensity, laneHeightPx } from './timeline-lane-metrics'
 import { TimelineContextActions } from './TimelineContextActions'
 import { TimelineContextMenu } from './TimelineContextMenu'
 import { TimelineLane } from './TimelineLane'
@@ -42,6 +51,13 @@ export type TimelineProps = Readonly<{
   dragPreview?: MediaDragPayloadV1 | null
   /** Absent while media drag is switched off, which removes the drop target. */
   onMediaDrop?: ((laneId: string, assetId: string, atTicks: number) => void) | null
+  /**
+   * What each file in the project is, and which bytes it holds.
+   *
+   * Only what derived media needs: no path, no URL, no mutable asset object.
+   * Absent for a project still loading, which simply means no decorations yet.
+   */
+  assetFacts?: Readonly<Record<string, AssetFacts>>
   /** Padlocks. Presentation state: they never change the finished video. */
   lockedTrackIds: readonly string[]
   /** Which tracks reach the finished video. Part of the project; one Undo each. */
@@ -79,6 +95,9 @@ const isTypingTarget = (target: EventTarget | null): boolean => {
 /** One frame at 30 per second, in ticks. Used by the arrow keys. */
 const FRAME_TICKS = 48_000
 
+/** A stable empty object, so a project without files does not remount every lane. */
+const EMPTY_ASSET_FACTS: Readonly<Record<string, AssetFacts>> = Object.freeze({})
+
 export function Timeline({
   model,
   playheadTicks,
@@ -92,6 +111,7 @@ export function Timeline({
   advancedControls,
   dragPreview,
   onMediaDrop,
+  assetFacts,
   lockedTrackIds,
   trackOutputs,
   placementMode,
@@ -137,6 +157,107 @@ export function Timeline({
     model.timescale,
     viewport.pixelsPerSecond,
   )
+
+  /*
+   * ────────────────────────────────────────────────────────────────────────
+   *  The ONE place that decides which pictures and sound shapes are fetched.
+   * ────────────────────────────────────────────────────────────────────────
+   *
+   * Every clip could ask for its own. A hundred clips asking would open a
+   * hundred connections, ask for the same moment of the same recording once
+   * per clip that shows it, and be unable to cancel anything — because no
+   * single piece of code would know the user had scrolled away.
+   *
+   * So the whole timeline says, in ONE sentence, what it wants right now, in
+   * order of importance. The controller does the rest. See
+   * `media-analysis-controller.ts`.
+   */
+  const analysis = useMediaAnalysisController()
+
+  /*
+   * How wide the WINDOW is — not how wide the timeline is.
+   *
+   * Row heights answer "is there room on this screen", and on a desktop the
+   * timeline is only part of the screen: at 1440 pixels wide it commonly gets
+   * 700 of them, sharing the rest with the preview and the inspector. Measuring
+   * the timeline would decide the user was on a phone and shrink every row on a
+   * large monitor.
+   */
+  const [windowWidthPx, setWindowWidthPx] = useState(currentWindowWidthPx)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onResize = () => setWindowWidthPx(currentWindowWidthPx())
+    onResize()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  const wanted = useMemo(() => {
+    if (!assetFacts) return null
+    const nearStart = Math.max(0, visibleRange.startTicks - overscanTicks)
+    const nearEnd = visibleRange.endTicks + overscanTicks
+    const clips: { clip: NonNullable<ReturnType<typeof derivedMediaClipFor>>; density: ReturnType<typeof laneDensity>; priority: number }[] = []
+
+    for (const lane of model.lanes) {
+      const density = laneDensity(lane.kind, windowWidthPx)
+      if (density === 'minimal') continue
+      for (const item of lane.items) {
+        const onScreen = itemIntersectsVisibleRange({
+          itemStartTicks: item.startTicks,
+          itemDurationTicks: item.durationTicks,
+          visibleStartTicks: visibleRange.startTicks,
+          visibleEndTicks: visibleRange.endTicks,
+        })
+        const nearby = onScreen || itemIntersectsVisibleRange({
+          itemStartTicks: item.startTicks,
+          itemDurationTicks: item.durationTicks,
+          visibleStartTicks: nearStart,
+          visibleEndTicks: nearEnd,
+        })
+        // Nothing beyond one screen either side is ever asked for. A
+        // sixty-minute project has tens of thousands of possible thumbnails;
+        // asking for all of them would decode for minutes and hold more memory
+        // than the tab has.
+        if (!nearby) continue
+        const clip = derivedMediaClipFor(item, lane.kind, assetFacts)
+        if (clip === null) continue
+        clips.push({
+          clip,
+          density,
+          // The order a person notices things in: what they picked, then what
+          // they can see, then what is about to scroll into view.
+          priority: item.selected
+            ? ANALYSIS_PRIORITY.selected
+            : onScreen ? ANALYSIS_PRIORITY.visible : ANALYSIS_PRIORITY.nearOverscan,
+        })
+      }
+    }
+
+    return planTimelineAnalysis({
+      clips,
+      timescale: model.timescale,
+      pixelsPerSecond: viewport.pixelsPerSecond,
+    })
+  }, [
+    assetFacts,
+    model.lanes,
+    model.timescale,
+    overscanTicks,
+    viewport.pixelsPerSecond,
+    windowWidthPx,
+    visibleRange.startTicks,
+    visibleRange.endTicks,
+  ])
+
+  useEffect(() => {
+    if (analysis === null || wanted === null) return
+    // Planning is what waits during a fast scroll — never the scrolling itself.
+    // Clip edges, names and the playhead move instantly; only the decision about
+    // which NEW pictures to fetch is held for a moment, so a flick through an
+    // hour does not start and cancel thousands of requests on the way.
+    const timer = setTimeout(() => analysis.setWanted(model.projectId, wanted.wanted), 90)
+    return () => clearTimeout(timer)
+  }, [analysis, wanted, model.projectId])
 
   const pointerTicks = (clientX: number): number => {
     const element = viewportRef.current
@@ -458,6 +579,7 @@ export function Timeline({
                 locked={lockedTrackIds.includes(trackId)}
                 outputEnabled={trackOutputs[trackId]}
                 outputDisabledReason={busy ? 'Project edits are paused right now.' : null}
+                heightPx={laneHeightPx(lane.kind, windowWidthPx)}
                 onToggleLock={() => onToggleTrackLock(trackId)}
                 onToggleOutput={() => onToggleTrackOutput(trackId)}
               />
@@ -491,6 +613,9 @@ export function Timeline({
                 <TimelineLane
                   key={lane.id}
                   lane={lane}
+                  assetFacts={assetFacts ?? EMPTY_ASSET_FACTS}
+                  muted={trackOutputs[trackIdForLane(lane.id)] === false}
+                  layoutWidthPx={windowWidthPx}
                   dragPreview={dragPreview}
                   onMediaDrop={onMediaDrop}
                   timescale={model.timescale}

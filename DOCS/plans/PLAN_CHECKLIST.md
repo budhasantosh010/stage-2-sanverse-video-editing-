@@ -371,3 +371,14 @@ no button offers it yet — the owner cannot get to it from the screen.
 - [ ] Source media remains immutable
 - [ ] Projects remain migratable and portable
 - [ ] Repeated workflows reach E5
+
+## P1-F.1A Gate D (2026-08-04)
+
+- [x] Real video frames on the timeline, from the same decoder the export uses
+- [x] Real image thumbnails, contained and orientation-honest
+- [x] Real waveforms, verified against FFmpeg's own measurement
+- [x] Derived media never becomes project state, a revision, or an Undo entry
+- [x] Server processes, browser requests and both caches are bounded and observable
+- [x] A long project stays bounded; a selected clip survives being scrolled away
+- [x] Export proved unchanged by the decorations
+- [ ] Owner visual acceptance of the timeline decorations

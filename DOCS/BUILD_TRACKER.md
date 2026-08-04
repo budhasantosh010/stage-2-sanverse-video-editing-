@@ -85,3 +85,29 @@ Last updated: 2026-08-03
 - [ ] Owner visual acceptance
 - [ ] Media V2 (not started)
 | P1F1A-B | P1-F.1A | Media Library V2 essentials: compact responsive panel, import by kind, OS file drop, sort, filter, durable one-level server folders, closed drag payload (switched off) | Complete | `DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/media-library-contract.md`, `media-folders.md`, `media-drag-contract.md`, `media-responsive-matrix.md`, `media-browser-walkthrough.md`, `test-results-gate-b.md` |
+
+# P1-F.1A Gate D — real filmstrips, image thumbnails and waveforms (2026-08-04)
+
+- [x] Decision written before code (ADR-DERIVED-MEDIA-EXECUTION-V1)
+- [x] Derived-media identity carries the file's content fingerprint
+- [x] `image-thumbnail` added as its own closed kind
+- [x] Server derived-media cache: hashed names, atomic writes, corrupt-entry
+      regeneration, per-project ceiling, safe to delete
+- [x] Three secure endpoints with eleven closed refusal codes
+- [x] Bounded process coordinator: 2 frames / 1 sound, queue, timeout, dedup,
+      cancellation, no detached children
+- [x] Real video frame extraction with exact source mapping and orientation
+- [x] Real image thumbnails, contained not stretched
+- [x] Real waveform peaks, loudest-of-all-channels, measured against FFmpeg
+- [x] One browser request controller: dedup, concurrency, priority, cancel,
+      bounded caches, explicit bitmap disposal, diagnostics
+- [x] Timeline filmstrip, image and waveform rendering
+- [x] Item windowing with offscreen selection continuity
+- [x] Long-form fixture extended (dialogue, music with gaps, images, splits,
+      overwrite fragments, missing source) and bounds asserted
+- [x] Real browser workflow on real media; two real bugs found and fixed
+- [x] Owner-reviewable pictures from the real API answers
+- [x] Real multi-asset export probed; unchanged by the decorations
+- [x] Full suites 1,723 passing; production build exit 0
+- [ ] Owner visual acceptance
+- [ ] FAIL-051 portrait footage in a landscape export (recorded, not fixed)

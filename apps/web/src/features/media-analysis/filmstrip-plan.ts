@@ -38,6 +38,8 @@ import {
 export type FilmstripClip = Readonly<{
   clipId: string
   assetId: string
+  /** The checksum of the recording's bytes. See `media-analysis-key.ts`. */
+  assetVersion: string
   /** Where the clip sits in the finished video. */
   startTicks: number
   durationTicks: number
@@ -131,7 +133,12 @@ export const planFilmstrip = (input: FilmstripPlanInput): FilmstripPlan => {
       const compositionTicks = clip.startTicks + index * stepTicks
       const sourceTicks = sourceTicksWithinClip(clip, compositionTicks)
       if (sourceTicks === null) continue
-      const key = filmstripFrameKey({ assetId: clip.assetId, sourceTicks, widthPx: width })
+      const key = filmstripFrameKey({
+        assetId: clip.assetId,
+        assetVersion: clip.assetVersion,
+        sourceTicks,
+        widthPx: width,
+      })
       const keyId = mediaAnalysisKeyId(key)
       // The same moment of the same recording, shown twice on the timeline, is
       // ONE piece of work. That is what makes a split cost nothing and a shot
