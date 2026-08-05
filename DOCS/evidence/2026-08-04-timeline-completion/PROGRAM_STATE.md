@@ -7,7 +7,10 @@ of a gate.**
 Last updated: 2026-08-05
 Branch: `agent/g6-g8-local-alpha`
 Program start commit: `45c0c981fb869afd236f10cbea829b1859d5beb6`
+Latest pushed commit: `b18d2344ccaa9de967c6d094e64b69742d5c5d70`
 Test baseline at program start: **1,723**
+Tests now: **1,736** — edit-domain 378 · render-contract 82 · intent-domain 27 ·
+api 341 · web 908. `npm run build` exit 0.
 
 ---
 
@@ -18,7 +21,7 @@ Test baseline at program start: **1,723**
   ────   ──────────────────────────────────────────   ──────────   ──────────
   P0     Verify + capability inventory                IN PROGRESS  —
   T0     Correctness: preview truth, mixed export     IN PROGRESS  —
-         └─ false gap SOLVED (T0.1, T0.2)             done
+         └─ false gap SOLVED (T0.1, T0.2)             done         b18d234
          └─ remaining: T0.1b diagnostics, T0.3..T0.9  open
   T1     Creator interaction: selection/clipboard     NOT STARTED  —
   T2     Speed, audio, transitions                    NOT STARTED  —
