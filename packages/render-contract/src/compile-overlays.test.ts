@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { acceptChangeSet, type EditProject } from '@sanverse/edit-domain'
+import { OVERLAY_REMOVE_PRIMITIVE_ID } from '@sanverse/edit-domain/capabilities'
 import {
   changeSetOf,
   ms,
@@ -304,5 +305,94 @@ describe('everything at once', () => {
       expect(node.interval.start.ticks + node.interval.duration.ticks).toBeLessThanOrEqual(plan.durationTicks)
     }
     expect(validateRenderPlan(plan).ok).toBe(true)
+  })
+})
+
+/**
+ * The owner recorded the monitor saying "No media at this time" over footage
+ * that was plainly on screen. The trigger was here.
+ *
+ * The preview asks THIS compiler whether footage exists at a moment. A compile
+ * that refuses returns no plan, the preview reads that as "there are no
+ * segments anywhere", and every second of a healthy project reports a gap.
+ *
+ * So a refusal in this function is never local: it erases the user's entire
+ * video from the preview and blocks Export at the same time. It has to be
+ * reserved for projects that genuinely cannot be rendered.
+ */
+describe('an adjustment left pointing at nothing', () => {
+  const adjustment = (visualId: string, operationId = 'operation_dangling1') => ({
+    schemaVersion: 'sanverse.operation/v3',
+    operationId,
+    kind: 'set-visual-properties',
+    capabilityId: 'sanverse.visual.properties.primitive/v1',
+    visualId,
+    transform: { translateX: 0, translateY: 0, scale: 1.2, rotationDegrees: 0, opacity: 1 },
+    crop: { top: 0, right: 0, bottom: 0, left: 0 },
+    layer: 3,
+    mask: { shape: 'none', feather: 0 },
+    tracks: [],
+    transition: {
+      enter: { kind: 'none', duration: ms(0), easing: { kind: 'linear' } },
+      exit: { kind: 'none', duration: ms(0), easing: { kind: 'linear' } },
+    },
+    effects: [],
+    extensions: {},
+  })
+
+  const removeOverlay = (overlayId: string, operationId = 'operation_removeov1') => ({
+    schemaVersion: 'sanverse.operation/v3',
+    operationId,
+    kind: 'remove-overlay',
+    capabilityId: OVERLAY_REMOVE_PRIMITIVE_ID,
+    overlayId,
+    extensions: {},
+  })
+
+  it('draws nothing, rather than erasing the whole video', () => {
+    let project = testMultiAssetProject()
+    // The owner's exact sequence: add a title, move or scale it, then DELETE it.
+    // The adjustment was perfectly valid when it was accepted, and the domain
+    // still considers the id known, so nothing blocks it. It simply now names
+    // something that is no longer drawn.
+    project = accept(project, 'changeset_title001', [testTitle({ titleId: 'title_deleted01' })])
+    project = accept(project, 'changeset_dangling1', [adjustment('title_deleted01')])
+    project = accept(project, 'changeset_removeov1', [removeOverlay('title_deleted01')])
+
+    const compiled = compileProjectToRenderPlan(project)
+    expect(compiled.ok).toBe(true)
+
+    const plan = compile(project)
+    // The footage is all still there. This is the assertion that matters: one
+    // stale adjustment must not cost the user a single second of their video.
+    expect(plan.segments.length).toBeGreaterThan(0)
+    expect(plan.durationTicks).toBeGreaterThan(0)
+    // And the adjustment itself contributes nothing, because it adjusts nothing.
+    expect(plan.visuals.map((visual) => visual.visualId)).not.toContain('title_deleted01')
+    expect(validateRenderPlan(plan).ok).toBe(true)
+  })
+
+  it('still binds every adjustment that DOES name something on screen', () => {
+    let project = testMultiAssetProject()
+    project = accept(project, 'changeset_title002', [
+      testTitle({ titleId: 'title_present01', operationId: 'operation_title002' }),
+    ])
+    project = accept(project, 'changeset_dangling2', [
+      adjustment('title_present01', 'operation_present01'),
+    ])
+    project = accept(project, 'changeset_title003', [
+      testTitle({ titleId: 'title_deleted02', operationId: 'operation_title003' }),
+    ])
+    project = accept(project, 'changeset_dangling3', [
+      adjustment('title_deleted02', 'operation_deleted02'),
+    ])
+    project = accept(project, 'changeset_removeov2', [
+      removeOverlay('title_deleted02', 'operation_removeov2'),
+    ])
+
+    const plan = compile(project)
+    // The live one survives, the dead one is dropped. Dropping BOTH would be a
+    // different bug wearing the same green test.
+    expect(plan.visuals.map((visual) => visual.visualId)).toEqual(['title_present01'])
   })
 })

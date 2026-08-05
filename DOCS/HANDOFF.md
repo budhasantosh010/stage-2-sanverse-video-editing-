@@ -2,7 +2,29 @@
 
 ## Current checkpoint
 
-**P1-F.1A Gates C0, C1, C2 and D are COMPLETE.**
+**P1-F.1A is COMPLETE (Gates A, B, B1, C0, C1, C2, D — commit `45c0c98`).**
+
+**The active program is P1-F.1E — Complete Timeline Experience**, eight gates
+T0 through T7. Its live state — gate table, per-gate checklist, program rules
+and traps — is in:
+
+```
+DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md
+```
+
+**Read that file before anything else.** It is updated at the end of every
+working block and is the truth about where the work stands. Do not re-derive the
+plan from chat history.
+
+Gate T0 is in progress. Its headline result so far: the preview used to report
+"No media at this time" over footage that was plainly there, across a whole
+project, because "the plan could not be built" and "the timeline is empty" were
+both expressed as `null`. Fixed by `apps/web/src/features/render-plan/
+primary-source.ts` — footage existence is read from the user's edit, never from
+a build that can fail as a whole. Full story in FAIL-052 and in
+`DOCS/evidence/2026-08-04-timeline-completion/OWNER_RECORDING_REPRODUCTION.md`.
+
+## Completed: P1-F.1A
 
 ### Gate D — COMPLETE: real filmstrips, image thumbnails and waveforms
 

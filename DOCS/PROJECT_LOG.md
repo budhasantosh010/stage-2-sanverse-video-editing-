@@ -565,3 +565,40 @@ cannot be exported into a landscape project (FAIL-051).
 
 Tests 1,559 → 1,723. Build exit 0. Inspector expansion and AI execution were not
 started.
+
+## 2026-08-05 — P1-F.1E begins; the preview stops calling real footage a gap
+
+The new program is **P1-F.1E, Complete Timeline Experience**: eight gates, T0
+through T7, taking the timeline from working to something that feels like CapCut
+for everyday work and carries Resolve-level depth where it is asked for. The
+live state lives in `DOCS/evidence/2026-08-04-timeline-completion/
+PROGRAM_STATE.md`, which is the file a new session reads first.
+
+Gate T0 is correctness, and it comes first for a reason: the owner's own
+recording showed the monitor saying "No media at this time" while footage sat
+plainly under the playhead. Adding a Bezier graph editor to an editor that lies
+about whether your footage exists is the wrong order of work.
+
+The cause turned out to be two steps upstream of where it looked. Selecting a
+clip appeared to trigger it; selection was innocent, and so were both monitor
+state machines. The trigger was: add a title or a piece of B-roll, move or scale
+it, then delete it. The adjustment naming it stays behind, the compiler refuses
+the WHOLE project, and the preview — which asks that same compiler whether
+footage exists — read the refusal as "there are no stretches anywhere". Every
+moment of a healthy thirty-second project then answered "no footage here".
+
+`null` was carrying two opposite meanings: "I could not build this" and "there is
+nothing here". Recorded as FAIL-052.
+
+Two fixes. Footage existence is now read from the composition — the user's actual
+edit — so one broken thing costs only its own interval, and the resolver takes a
+project and a number with no third argument, which makes selection structurally
+incapable of changing whether footage exists. And a visual adjustment naming
+something no longer on screen now draws nothing instead of failing the project,
+which is the rule the compiler already applied three lines above for a
+switched-off track.
+
+Black also says which black it is now: no clip at all keeps the plain wording
+because that black IS the finished video, while a switched-off track, a
+switched-off clip and a missing file each say so — and the missing file is
+reported as a fault rather than a gap.

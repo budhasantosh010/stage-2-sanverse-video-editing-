@@ -1,10 +1,48 @@
 # Current State
 
-Last updated: 2026-08-04
+Last updated: 2026-08-05
 
 ## Active goal
 
-**P1-F.1A Gate D is COMPLETE. The timeline now shows real pictures and real
+**P1-F.1E — Complete Timeline Experience.** Eight gates, T0 through T7, taking
+the timeline from "it works" to something that feels like CapCut for everyday
+work and like Resolve when you need depth. The live gate table, the per-gate
+checklist and the rules are in
+`DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md` — **read that
+file first in any new session.**
+
+### The most important thing fixed so far: the preview stopped lying
+
+The monitor used to say **"No media at this time"** while footage was plainly
+under the playhead. It looked like selecting a clip caused it. It did not.
+
+Add a title or a piece of B-roll, move or scale it, then delete it. The
+adjustment that named it stays behind. The part of the program that builds the
+video then refused the *whole project*. The preview asks that same part whether
+footage exists, got back "nothing", and turned that into "there is no footage at
+any moment" — across the entire timeline.
+
+```
+  "I could not build this"   \
+                              >--- both said with the same word
+  "there is nothing here"    /
+```
+
+Those are opposite answers, and the preview could not tell them apart. It also
+blocked Export, with a message that explained nothing.
+
+A gap is a claim about *your* edit — it says you left this stretch empty and the
+exported file will be black here too. Saying that over real footage teaches you
+that your own timeline lies, and after that nothing it shows you can be trusted.
+
+Now: whether footage exists is read from your edit, never from a build that can
+fail as a whole, so one broken thing costs only its own stretch. And black says
+*which* black it is — no clip, track switched off, clip switched off, or file
+missing (which is reported as a fault, not as a gap). Recorded as FAIL-052.
+
+## Previously completed
+
+**P1-F.1A Gate D is COMPLETE. The timeline shows real pictures and real
 sound.**
 
 Before this, every piece of your video was a coloured rectangle with a filename

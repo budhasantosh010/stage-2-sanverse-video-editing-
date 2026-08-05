@@ -53,6 +53,10 @@ import {
   type PlaybackSegment,
 } from '../../features/render-plan/segment-playback'
 import {
+  primaryGapMessage,
+  resolvePrimarySource,
+} from '../../features/render-plan/primary-source'
+import {
   captionCssVariables,
   compilePreviewPlan,
   millisecondsToTicks,
@@ -1293,14 +1297,37 @@ export function StudioScreen({
    * the video and opaque black the moment it left — so moving the mouse away
    * blacked out the footage. See `monitor-base-layer.ts` for the full story.
    */
+  /**
+   * Whether footage exists under the playhead, read from the USER'S EDIT.
+   *
+   * This used to be `isShowingHole`, which was set whenever the COMPILED plan
+   * had no segment at this tick. The compiler refuses a whole project for one
+   * unresolvable clip, so a single missing file turned every other second of a
+   * healthy timeline into a claimed gap — the monitor saying "No media at this
+   * time" over thirty seconds of footage that was plainly there. See
+   * `primary-source.ts` for the full story.
+   *
+   * A gap is a claim about the user's edit, so it is now answered from the
+   * user's edit. A file that cannot be found is a FAULT, not a gap, so it is
+   * reported as an error instead — black that means "something is wrong" must
+   * never wear the same words as black that means "you left this empty".
+   */
+  const primaryDecision = resolvePrimarySource(editProject, playheadTicks)
+  const primaryGapReason = primaryDecision.kind === 'gap' ? primaryDecision.reason : null
+  const primaryAssetMissing = primaryGapReason === 'ASSET_MISSING'
+
   const baseLayer = resolveMonitorBaseLayer({
     hasSource: project.mediaUrl.length > 0,
     readyState: videoReadiness.readyState,
     seeking: videoReadiness.seeking,
-    mediaError: hasPreviewError ? 'Preview unavailable' : null,
-    // The ONLY input allowed to produce 'gap': the canonical composition
-    // mapping reported a stretch with no active source segment.
-    inCanonicalGap: isShowingHole,
+    mediaError: hasPreviewError
+      ? 'Preview unavailable'
+      : primaryAssetMissing
+        ? primaryGapMessage('ASSET_MISSING')
+        : null,
+    // The ONLY input allowed to produce 'gap': the composition itself has no
+    // enabled, resolvable clip at this tick.
+    inCanonicalGap: primaryGapReason !== null && !primaryAssetMissing,
     hasPresentedFrame: videoReadiness.hasPresentedFrame,
     motionActive: activeFootageMotion !== null,
     requestedFrameToken,
@@ -1319,7 +1346,14 @@ export function StudioScreen({
         : baseLayer.kind === 'loading' ? 'loading'
           : videoReadiness.seeking ? 'seeking'
             : 'ready'
-  const baseFrameMessage = monitorBaseFrameMessage(baseFrameState)
+  /**
+   * A gap now says WHICH gap. "No media at this time" is only correct when the
+   * user genuinely left the stretch empty; a switched-off track and a
+   * switched-off clip are both black too, and both have something to press.
+   */
+  const baseFrameMessage = baseLayer.kind === 'gap' && primaryGapReason !== null
+    ? primaryGapMessage(primaryGapReason)
+    : monitorBaseFrameMessage(baseFrameState)
 
   const canvasVisibleNodes = [
     ...previewNodes,
@@ -1491,8 +1525,12 @@ export function StudioScreen({
       return
     }
 
-    const target = sourceTimeFor(previewSegments, nextTicks)
-    if (!target) {
+    // Whether there is footage here is decided by the user's edit, never by
+    // whether the render plan happened to compile. One unresolvable clip
+    // elsewhere in the project used to make this return null at EVERY tick,
+    // which paused the video and declared a hole over healthy footage.
+    const decision = resolvePrimarySource(editProject, nextTicks)
+    if (decision.kind === 'gap') {
       videoElement.pause()
       inHoleRef.current = true
       setIsShowingHole(true)
@@ -1501,8 +1539,11 @@ export function StudioScreen({
 
     inHoleRef.current = false
     setIsShowingHole(false)
-    segmentIndexRef.current = target.segmentIndex
-    videoElement.currentTime = target.sourceTicks / PROJECT_TIMESCALE
+    // The plan supplies only the index the playback state machine counts from.
+    // Its absence is no longer allowed to mean "there is nothing here".
+    const target = sourceTimeFor(previewSegments, nextTicks)
+    if (target) segmentIndexRef.current = target.segmentIndex
+    videoElement.currentTime = decision.sourceTicks / PROJECT_TIMESCALE
   }
 
   function toggleMonitorPlayback() {

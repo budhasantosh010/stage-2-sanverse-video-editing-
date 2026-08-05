@@ -321,17 +321,24 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
   // off there is nothing on screen for it to adjust — which is the expected
   // outcome, not a broken project, so the list is simply empty. Failing here
   // would mean that hiding a track made Export stop working altogether.
+  //
+  // An adjustment that names something no longer on screen is the SAME
+  // situation and gets the same answer. Deleting an overlay you had previously
+  // moved or scaled leaves its adjustment behind with nothing to adjust; that
+  // is an ordinary edit, not a broken project.
+  //
+  // This used to fail the whole compile, and the cost was far worse than a
+  // failed Export. The preview asks this same compiler whether footage exists
+  // at a moment, so one dangling adjustment made the monitor report "No media
+  // at this time" across the ENTIRE project — over footage plainly on screen.
+  // The owner recorded exactly that. An adjustment pointing at nothing now
+  // draws nothing, which is what it already meant.
   const visuals: VisualPropertiesNode[] = []
   for (const operation of trackOutputs.V2 ? activeVisualProperties(project) : []) {
     const nodeIds = overlays
       .filter((node) => node.nodeId === operation.visualId || node.nodeId.startsWith(`${operation.visualId}.`))
       .map((node) => node.nodeId)
-    if (nodeIds.length === 0) {
-      return {
-        ok: false,
-        error: { code: 'COMPILE_FAILED', reason: 'A visual adjustment names something that is not on screen.' },
-      }
-    }
+    if (nodeIds.length === 0) continue
     visuals.push(Object.freeze({
       visualId: operation.visualId,
       nodeIds: Object.freeze(nodeIds),

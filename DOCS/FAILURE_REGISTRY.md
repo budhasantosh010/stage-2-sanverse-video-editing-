@@ -1976,3 +1976,57 @@ fix Gate D blockers only and record everything else. Recorded here.
 **This is a real gap for real users.** Somebody filming on a phone in portrait
 and adding that clip to a landscape project cannot export at all, and the message
 they get says nothing about why. It should be the next render task.
+
+---
+
+## FAIL-052 — the monitor reported "No media at this time" over footage that was there
+
+**Found:** in the owner's own screen recording. **Fixed:** 2026-08-05, Gate T0.
+
+The monitor claimed the timeline was empty while footage was plainly under the
+playhead. It looked like selecting a V1 clip caused it. Selection was innocent,
+and so were both monitor state machines — each already documented that a gap can
+only come from one input. The lie was made two steps earlier, and once it began
+it covered the WHOLE project; selecting a clip only drew attention to it.
+
+The trigger: add a title or B-roll, MOVE or SCALE it, then DELETE it. The
+adjustment naming that overlay stays behind. The compiler then refused the entire
+project — "A visual adjustment names something that is not on screen." The
+preview asks that same compiler whether footage exists, got `null`, and turned
+that into an empty segment list, so every moment answered "no footage here".
+
+```
+  "the plan could not be built"   \
+                                   >--- both expressed as  null
+  "the timeline is empty"         /
+```
+
+Those are different statements. The preview could not tell them apart.
+
+The same refusal also blocked Export, with a message that explained nothing.
+
+### Why it matters more than it looks
+
+A gap is a CLAIM ABOUT THE USER'S EDIT — *you left this empty, and the export
+will be black here too*. Saying that over real footage teaches the user their own
+timeline lies to them. After that every real gap reads as another bug, and every
+real bug reads as probably fine.
+
+### The fix, in two parts
+
+1. `apps/web/src/features/render-plan/primary-source.ts` — whether footage exists
+   at a moment is read from the COMPOSITION, never from a compiled artefact that
+   can fail as a whole. One broken thing now costs only its own interval, and the
+   four gap reasons are distinguished: no clip, track switched off, clip switched
+   off, and file missing (which is reported as an error, not a gap).
+2. `packages/render-contract/src/compile-project.ts` — an adjustment naming
+   something no longer on screen contributes nothing instead of failing the
+   project. The identical rule was already three lines above for a switched-off
+   V2 track: "Failing here would mean that hiding a track made Export stop
+   working altogether."
+
+### One-line solution
+
+`null` must never mean two things; "I could not build this" and "there is nothing
+here" are opposite answers, and a preview that confuses them will call the user's
+own footage missing.
