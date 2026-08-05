@@ -19,7 +19,7 @@ const model = (
   project = testProject(),
   selectedItemId: string | null = null,
   pending: PendingTimelineInput | null = null,
-) => buildTimelineViewModel({ project, selectedItemId, pending, assetLabels: labels })
+) => buildTimelineViewModel({ project, selectedItemIds: selectedItemId === null ? [] : [selectedItemId], pending, assetLabels: labels })
 
 const selection = (
   project = testProject(),

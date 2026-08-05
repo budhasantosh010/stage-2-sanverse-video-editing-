@@ -33,6 +33,10 @@ export type TimelineLaneProps = Readonly<{
   muted: boolean
   /** How wide the window is, which decides how tall rows are. */
   layoutWidthPx: number
+  /** The height the user chose for this row, if they chose one. */
+  heightPx?: number
+  /** True while a box is being dragged, so an empty-space click is not also fired. */
+  marqueeActive?: boolean
   /** The drag in flight, so a lane can say yes or no before the user lets go. */
   dragPreview?: MediaDragPayloadV1 | null
   /** Absent while media drag is switched off, which removes the drop target entirely. */
@@ -46,7 +50,7 @@ export type TimelineLaneProps = Readonly<{
   pointerTicks(clientX: number): number
   pointerTime(clientX: number, excludedTicks?: readonly number[], bypassSnapping?: boolean): TimelineSnapResult
   onSnapGuide(ticks: number | null): void
-  onSelect(itemId: string): void
+  onSelect(itemId: string, modifiers?: Readonly<{ ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }>): void
   onClearSelection(): void
   onSeek(ticks: number): void
   onGesture(gesture: TimelineGesture): void
@@ -60,6 +64,8 @@ export function TimelineLane({
   assetFacts,
   muted,
   layoutWidthPx,
+  heightPx,
+  marqueeActive,
   dragPreview,
   onMediaDrop,
   timescale,
@@ -102,7 +108,10 @@ export function TimelineLane({
   // How much detail this row has room for, decided ONCE for the row rather than
   // by each clip, so two clips in the same row can never disagree about it.
   const density = laneDensity(lane.kind, layoutWidthPx)
-  const rowHeightPx = laneHeightPx(lane.kind, layoutWidthPx)
+  // The height the user asked for, if they asked for one; otherwise the height
+  // the window width decides. A row folded away is a thin strip, not zero: a
+  // row that vanished could not be found again to unfold it.
+  const rowHeightPx = heightPx ?? laneHeightPx(lane.kind, layoutWidthPx)
   const decorationPx = decorationHeightPx(lane.kind, layoutWidthPx)
 
   const mediaFor = (item: TimelineItemView): ClipDerivedMedia => {
@@ -145,6 +154,9 @@ export function TimelineLane({
       }}
       onClick={(event) => {
         if (event.target !== event.currentTarget) return
+        // A drag that drew a box is not also a click on empty space. Without
+        // this, letting go of a marquee would immediately clear what it caught.
+        if (marqueeActive) return
         onClearSelection()
         onSeek(pointerTicks(event.clientX))
       }}

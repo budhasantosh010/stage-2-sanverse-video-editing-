@@ -94,13 +94,13 @@ type TimelineItemInput =
   Omit<TimelineItemView, 'selected' | 'captionSetId' | 'cueId' | 'visualId'> &
   Partial<Pick<TimelineItemView, 'captionSetId' | 'cueId' | 'visualId'>>
 
-const makeItem = (input: TimelineItemInput, selectedItemId: string | null): TimelineItemView =>
+const makeItem = (input: TimelineItemInput, selectedItemIds: ReadonlySet<string>): TimelineItemView =>
   Object.freeze({
     captionSetId: null,
     cueId: null,
     visualId: null,
     ...input,
-    selected: input.id === selectedItemId,
+    selected: selectedItemIds.has(input.id),
   })
 
 const operationTraceMap = (
@@ -245,7 +245,9 @@ export const validateTimelineViewModel = (
 export const buildTimelineViewModel = (
   input: BuildTimelineViewModelInput,
 ): TimelineViewModel => {
-  const { project, pending, selectedItemId } = input
+  const { project, pending } = input
+  // One set, built once, so every item asks the same question the same way.
+  const selectedItemIds: ReadonlySet<string> = new Set(input.selectedItemIds)
   const displayAsset = (assetId: string, fallback: string): string => {
     const supplied = input.assetLabels?.[assetId]?.trim()
     return supplied || fallback
@@ -415,7 +417,7 @@ export const buildTimelineViewModel = (
         fadeOutTicks: clip.fadeOut.ticks,
         proposalId: null,
         proposalBaseRevision: null,
-      }, selectedItemId))
+      }, selectedItemIds))
 
       addItem(dialogueLane, makeItem({
         id: `dialogue:${clip.clipId}`,
@@ -443,7 +445,7 @@ export const buildTimelineViewModel = (
         fadeOutTicks: clip.fadeOut.ticks,
         proposalId: null,
         proposalBaseRevision: null,
-      }, selectedItemId))
+      }, selectedItemIds))
     })
 
     let cursor = 0
@@ -478,7 +480,7 @@ export const buildTimelineViewModel = (
           fadeOutTicks: null,
           proposalId: null,
           proposalBaseRevision: null,
-        }, selectedItemId))
+        }, selectedItemIds))
       }
       cursor = Math.max(cursor, clip.startTicks + clip.durationTicks)
     }
@@ -536,7 +538,7 @@ export const buildTimelineViewModel = (
         fadeOutTicks: null,
         proposalId: null,
         proposalBaseRevision: null,
-      }, selectedItemId))
+      }, selectedItemIds))
     })
   }
 
@@ -582,7 +584,7 @@ export const buildTimelineViewModel = (
           fadeOutTicks: null,
           proposalId: null,
           proposalBaseRevision: null,
-        }, selectedItemId))
+        }, selectedItemIds))
       })
     }
   }
@@ -625,7 +627,7 @@ export const buildTimelineViewModel = (
         fadeOutTicks,
         proposalId: null,
         proposalBaseRevision: null,
-      }, selectedItemId))
+      }, selectedItemIds))
       return
     }
 
@@ -667,7 +669,7 @@ export const buildTimelineViewModel = (
           fadeOutTicks: null,
           proposalId: null,
           proposalBaseRevision: null,
-        }, selectedItemId))
+        }, selectedItemIds))
       } else if (operation.kind === 'add-callout') {
         addItem(overlayLane, makeItem({
           id: `overlay:${operation.calloutId}:${placementIndex}`,
@@ -693,7 +695,7 @@ export const buildTimelineViewModel = (
           fadeOutTicks: null,
           proposalId: null,
           proposalBaseRevision: null,
-        }, selectedItemId))
+        }, selectedItemIds))
       } else {
         const overlayAsset = findAsset(project.assets, operation.overlayAssetId)
         addItem(overlayLane, makeItem({
@@ -723,7 +725,7 @@ export const buildTimelineViewModel = (
           fadeOutTicks: null,
           proposalId: null,
           proposalBaseRevision: null,
-        }, selectedItemId))
+        }, selectedItemIds))
       }
     })
   }
@@ -815,7 +817,7 @@ export const buildTimelineViewModel = (
         fadeOutTicks: null,
         proposalId: proposal.proposalId,
         proposalBaseRevision: proposal.baseRevision,
-      }, selectedItemId))
+      }, selectedItemIds))
     })
   }
 
@@ -940,7 +942,7 @@ export const buildTimelineViewModel = (
           fadeOutTicks,
           proposalId: proposal.proposalId,
           proposalBaseRevision: proposal.baseRevision,
-        }, selectedItemId))
+        }, selectedItemIds))
         return
       }
       if (operation.kind === 'add-captions') {
@@ -983,7 +985,7 @@ export const buildTimelineViewModel = (
               fadeOutTicks: null,
               proposalId: proposal.proposalId,
               proposalBaseRevision: proposal.baseRevision,
-            }, selectedItemId))
+            }, selectedItemIds))
           })
         })
         return
@@ -1012,7 +1014,7 @@ export const buildTimelineViewModel = (
       .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id)),
   )
 
-  const selectedExists = selectedItemId !== null && itemIds.has(selectedItemId)
+  const stillHere = [...selectedItemIds].filter((id) => itemIds.has(id)).sort()
   const publicDiagnostics = Object.freeze(
     diagnostics
       .slice()
@@ -1032,7 +1034,12 @@ export const buildTimelineViewModel = (
     durationTicks,
     lanes,
     diagnostics: publicDiagnostics,
-    selectedItemId: selectedExists ? selectedItemId : null,
+    selectedItemIds: Object.freeze(stillHere),
+    // The ONE item, when exactly one is picked. The panels that can only show
+    // one thing read this rather than the first of four — showing somebody the
+    // settings of a clip they did not choose, and letting them change it, is
+    // worse than showing nothing.
+    selectedItemId: stillHere.length === 1 ? stillHere[0] : null,
   }) satisfies TimelineViewModel
 
   const invariantDiagnostics = validateTimelineViewModel(model)

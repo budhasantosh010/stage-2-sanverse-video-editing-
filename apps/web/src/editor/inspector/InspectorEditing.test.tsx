@@ -20,10 +20,10 @@ const labels = Object.freeze({
 })
 
 const selectionFor = (project: EditProject, kind: string) => {
-  const first = buildTimelineViewModel({ project, selectedItemId: null, pending: null, assetLabels: labels })
+  const first = buildTimelineViewModel({ project, selectedItemIds: [], pending: null, assetLabels: labels })
   const item = first.lanes.flatMap((lane) => lane.items).find((candidate) => candidate.kind === kind)
   if (!item) throw new Error(`missing ${kind}`)
-  const timeline = buildTimelineViewModel({ project, selectedItemId: item.id, pending: null, assetLabels: labels })
+  const timeline = buildTimelineViewModel({ project, selectedItemIds: [item.id], pending: null, assetLabels: labels })
   return resolveInspectorSelection({
     project,
     timeline,

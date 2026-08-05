@@ -43,7 +43,7 @@ const modelFor = (
   pending: PendingTimelineInput | null = null,
 ): TimelineViewModel => buildTimelineViewModel({
   project,
-  selectedItemId,
+  selectedItemIds: selectedItemId === null ? [] : [selectedItemId],
   pending,
   assetLabels: ASSET_LABELS,
 })

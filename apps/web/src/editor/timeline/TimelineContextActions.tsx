@@ -15,6 +15,9 @@ export type TimelineContextActionsProps = Readonly<{
   onGesture(gesture: TimelineGesture): void
   onSeek(ticks: number): void
   onOpenProposal(): void
+  /** Closing a hole. Null when it can be done; otherwise the reason it cannot. */
+  closeGapDisabledReason: string | null
+  onCloseGap(): void
   onOpenAdvancedControls(): void
 }>
 
@@ -30,6 +33,8 @@ export function TimelineContextActions({
   onGesture,
   onSeek,
   onOpenProposal,
+  closeGapDisabledReason,
+  onCloseGap,
   onOpenAdvancedControls,
 }: TimelineContextActionsProps) {
   const firstRemovalButtonRef = useRef<HTMLButtonElement>(null)
@@ -68,7 +73,26 @@ export function TimelineContextActions({
       ) : selectedItem.state === 'blocked' ? (
         <p className="timeline-v1__context-warning">This item needs attention before it can be edited.</p>
       ) : selectedItem.kind === 'gap' ? (
-        <p className="timeline-v1__context-note">This is empty space. It is not a media clip and has no clip actions.</p>
+        /*
+          A hole is nothing, and it says so. It never claims to be a clip and it
+          never shows a filmstrip. But it is now something the user can act on:
+          before this, closing a hole meant hunting for the clip after it and
+          using a control that talked about that clip instead.
+        */
+        <div className="timeline-v1__context-actions">
+          <p className="timeline-v1__context-note">
+            Empty space, {(selectedItem.durationTicks / timescale).toFixed(1)} seconds long. Nothing plays here.
+          </p>
+          <button
+            type="button"
+            data-timeline-close-gap
+            disabled={busy || closeGapDisabledReason !== null}
+            title={closeGapDisabledReason ?? 'Pull everything after this back, so the space is gone.'}
+            onClick={onCloseGap}
+          >
+            Close the empty space
+          </button>
+        </div>
       ) : isEditableClip && clipId ? (
         <div className="timeline-v1__context-actions">
           {isVideoClip ? (

@@ -2,8 +2,11 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  DEFAULT_KEYMAP,
+  DEFAULT_TRACK_PRESENTATION,
   buildTimelineViewModel,
   type TimelineGesture,
+  type TimelineSelectionV2,
   type TimelineViewportState,
 } from '../../features/timeline'
 import {
@@ -31,7 +34,7 @@ const renderTimeline = (input: Readonly<{
   currentViewport?: TimelineViewportState
   onViewportChange?: (value: TimelineViewportState) => void
   onSeek?: (value: number) => void
-  onSelect?: (value: string | null) => void
+  onSelect?: (value: TimelineSelectionV2) => void
   onGesture?: (value: TimelineGesture) => void
   onOpenProposal?: () => void
   lockedTrackIds?: readonly string[]
@@ -41,17 +44,29 @@ const renderTimeline = (input: Readonly<{
   onPlacementMode?: (mode: string) => void
   onToggleSnapping?: () => void
   onItemAction?: (itemId: string, action: unknown) => void
+  onMultiGesture?: (gesture: unknown) => void
+  onAction?: (action: unknown) => void
 }> = {}) => {
+  const selectedIds = input.selectedItemId ? [input.selectedItemId] : []
   const model = input.model ?? buildTimelineViewModel({
     project: projectWithAllTimelineFamilies(),
-    selectedItemId: input.selectedItemId ?? null,
+    selectedItemIds: selectedIds,
     pending: null,
   })
   const props = {
     model,
     playheadTicks: input.playheadTicks ?? 0,
     viewport: input.currentViewport ?? viewport(),
-    selectedItemId: input.selectedItemId ?? null,
+    selection: {
+      itemIds: selectedIds,
+      anchorItemId: input.selectedItemId ?? null,
+    },
+    groups: [],
+    markers: [],
+    selectedMarkerId: null,
+    trackPresentation: DEFAULT_TRACK_PRESENTATION,
+    keymap: DEFAULT_KEYMAP,
+    clipboardHasContent: false,
     busy: false,
     trimAmountTicks: ticks(1),
     gainDb: 0,
@@ -69,7 +84,14 @@ const renderTimeline = (input: Readonly<{
     onItemAction: input.onItemAction ?? vi.fn(),
     onViewportChange: input.onViewportChange ?? vi.fn(),
     onSeek: input.onSeek ?? vi.fn(),
-    onSelect: input.onSelect ?? vi.fn(),
+    onSelectionChange: input.onSelect ?? vi.fn(),
+    onMultiGesture: input.onMultiGesture ?? vi.fn(),
+    onAction: input.onAction ?? vi.fn(),
+    onSelectMarker: vi.fn(),
+    onMoveMarker: vi.fn(),
+    onDeleteMarker: vi.fn(),
+    onEditMarker: vi.fn(),
+    onTrackPresentationChange: vi.fn(),
     onGesture: input.onGesture ?? vi.fn(),
     onOpenProposal: input.onOpenProposal ?? vi.fn(),
   }
@@ -110,7 +132,7 @@ describe('Timeline V1', () => {
     const base = projectWithAllTimelineFamilies()
     const firstClipId = base.composition.tracks[0].clips[0].clipId
     const selectedItemId = `clip:${firstClipId}`
-    const model = buildTimelineViewModel({ project: base, selectedItemId, pending: null })
+    const model = buildTimelineViewModel({ project: base, selectedItemIds: selectedItemId === null ? [] : [selectedItemId], pending: null })
     const onGesture = vi.fn()
     const onSeek = vi.fn()
     const onSelect = vi.fn()
@@ -118,7 +140,17 @@ describe('Timeline V1', () => {
 
     const clip = screen.getByRole('button', { name: /clip, video/i })
     fireEvent.click(clip, { clientX: 200 })
-    expect(onSelect).toHaveBeenCalledWith(selectedItemId)
+    /*
+     * Selection is a LIST now, not one name — and clicking a piece of the main
+     * video also picks the sound that was recorded WITH it. Nobody chose that
+     * link; it is a fact about the recording. Leaving the sound behind would let
+     * somebody silence themselves without ever being told.
+     */
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ anchorItemId: selectedItemId }),
+    )
+    const picked = onSelect.mock.calls[0][0] as { itemIds: readonly string[] }
+    expect(picked.itemIds).toContain(selectedItemId)
     expect(onSeek).toHaveBeenCalled()
 
     // Split moved from plain `S` to Ctrl+B, because `S` now toggles snapping
@@ -131,7 +163,7 @@ describe('Timeline V1', () => {
     const base = projectWithAllTimelineFamilies()
     const firstClipId = base.composition.tracks[0].clips[0].clipId
     const selectedItemId = `clip:${firstClipId}`
-    const model = buildTimelineViewModel({ project: base, selectedItemId, pending: null })
+    const model = buildTimelineViewModel({ project: base, selectedItemIds: selectedItemId === null ? [] : [selectedItemId], pending: null })
     const onGesture = vi.fn()
     const onToggleSnapping = vi.fn()
     renderTimeline({ model, selectedItemId, playheadTicks: ticks(5), onGesture, onToggleSnapping })
@@ -149,7 +181,7 @@ describe('Timeline V1', () => {
     const base = projectWithAllTimelineFamilies()
     const firstClipId = base.composition.tracks[0].clips[0].clipId
     const selectedItemId = `clip:${firstClipId}`
-    const model = buildTimelineViewModel({ project: base, selectedItemId, pending: null })
+    const model = buildTimelineViewModel({ project: base, selectedItemIds: selectedItemId === null ? [] : [selectedItemId], pending: null })
     const onGesture = vi.fn()
     const onSelect = vi.fn()
     renderTimeline({ model, selectedItemId, playheadTicks: ticks(5), onGesture, onSelect })
@@ -163,7 +195,7 @@ describe('Timeline V1', () => {
     expect(onGesture).toHaveBeenCalledWith(expect.objectContaining({ type: 'remove-ripple' }))
 
     fireEvent.keyDown(timeline, { key: 'Escape' })
-    expect(onSelect).toHaveBeenCalledWith(null)
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ itemIds: [] }))
   })
 
   it('moves the playhead by one tenth of a second from the keyboard', () => {
@@ -185,7 +217,9 @@ describe('Timeline V1', () => {
     const clip = screen.getByRole('button', { name: /clip, video/i })
     fireEvent.contextMenu(clip, { clientX: 300, clientY: 220 })
 
-    expect(onSelect).toHaveBeenCalledWith(`clip:${firstClipId}`)
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ anchorItemId: `clip:${firstClipId}` }),
+    )
     const menu = screen.getByRole('menu', { name: /timeline actions/i })
     expect(within(menu).getByRole('menuitem', { name: /remove \+ close gap/i })).toBeInTheDocument()
     fireEvent.click(within(menu).getByRole('menuitem', { name: /hide section/i }))
@@ -207,7 +241,7 @@ describe('Timeline V1', () => {
     const operation = nameplate(createIds(500).operation(), 4, 2, 'Pending founder')
     const model = buildTimelineViewModel({
       project,
-      selectedItemId: null,
+      selectedItemIds: [],
       pending: {
         proposalId: 'proposal_pending_founder',
         baseRevision: project.revision,
@@ -225,7 +259,7 @@ describe('Timeline V1', () => {
 
   it('renders only visible and overscanned items for the representative 171-item project', () => {
     const project = largeTimelineProject()
-    const model = buildTimelineViewModel({ project, selectedItemId: null, pending: null })
+    const model = buildTimelineViewModel({ project, selectedItemIds: [], pending: null })
     const totalItems = model.lanes.reduce((count, lane) => count + lane.items.length, 0)
     renderTimeline({ model, currentViewport: viewport({ viewportWidthPx: 600, pixelsPerSecond: 100 }) })
 

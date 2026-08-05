@@ -36,7 +36,7 @@ const build = (
   project = testProject(),
   pending: PendingTimelineInput | null = null,
   selectedItemId: string | null = null,
-) => buildTimelineViewModel({ project, pending, selectedItemId })
+) => buildTimelineViewModel({ project, pending, selectedItemIds: selectedItemId === null ? [] : [selectedItemId] })
 
 const lane = (model: PresentationModel, id: string): TimelineLaneView => {
   const found = model.lanes.find((candidate) => candidate.id === id)
@@ -350,7 +350,7 @@ describe('identity, selection, immutability, and scale', () => {
       projectRevision: 0,
       timescale: S,
       durationTicks: 10,
-      selectedItemId: null,
+      selectedItemIds: [],
       diagnostics: [],
       lanes: [{
         id: 'lane:video',

@@ -11,7 +11,7 @@ import {
 const build = (selectedItemId: string | null = null) => buildTimelineViewModel({
   project: testProject(),
   pending: null,
-  selectedItemId,
+  selectedItemIds: selectedItemId === null ? [] : [selectedItemId],
 })
 
 describe('timeline selection', () => {

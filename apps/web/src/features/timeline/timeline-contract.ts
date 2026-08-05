@@ -103,7 +103,20 @@ export type TimelineViewModel = Readonly<{
   lanes: readonly TimelineLaneView[]
   diagnostics: readonly TimelineDiagnostic[]
 
-  /** Null when the requested selection does not exist in this projection. */
+  /**
+   * Everything picked, sorted, with anything no longer here already dropped.
+   *
+   * This is the truth. `selectedItemId` below is worked out from it.
+   */
+  selectedItemIds: readonly string[]
+  /**
+   * The ONE item, when exactly one thing is picked. Null otherwise — including
+   * when four things are picked.
+   *
+   * The panels that can only deal with one thing at a time read this. Reading
+   * the first of four instead would show somebody the settings of a clip they
+   * did not choose and let them change it, which is worse than showing nothing.
+   */
   selectedItemId: string | null
 }>
 
@@ -119,7 +132,8 @@ export type PendingTimelineInput = Readonly<{
 
 export type BuildTimelineViewModelInput = Readonly<{
   project: EditProject
-  selectedItemId: string | null
+  /** Everything picked. One item is a list of one; nothing picked is empty. */
+  selectedItemIds: readonly string[]
   pending: PendingTimelineInput | null
   /** Derived display names only. They are never persisted into EditProject. */
   assetLabels?: Readonly<Record<string, string>>

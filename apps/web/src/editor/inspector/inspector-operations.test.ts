@@ -47,10 +47,10 @@ const selected = <T extends Exclude<ReturnType<typeof resolveInspectorSelection>
   project: EditProject,
   predicate: (kind: string) => boolean,
 ): T => {
-  const unselected = buildTimelineViewModel({ project, selectedItemId: null, pending: null, assetLabels: labels })
+  const unselected = buildTimelineViewModel({ project, selectedItemIds: [], pending: null, assetLabels: labels })
   const item = unselected.lanes.flatMap((lane) => lane.items).find((candidate) => predicate(candidate.kind))
   if (!item) throw new Error('selection fixture missing')
-  const timeline = buildTimelineViewModel({ project, selectedItemId: item.id, pending: null, assetLabels: labels })
+  const timeline = buildTimelineViewModel({ project, selectedItemIds: [item.id], pending: null, assetLabels: labels })
   const resolution = resolveInspectorSelection({
     project,
     timeline,

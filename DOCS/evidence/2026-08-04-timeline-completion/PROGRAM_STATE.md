@@ -4,14 +4,14 @@
 new session. It is updated at the end of every working block, not only at the end
 of a gate.**
 
-Last updated: 2026-08-05
+Last updated: 2026-08-06
 Branch: `agent/g6-g8-local-alpha`
 Program start commit: `45c0c981fb869afd236f10cbea829b1859d5beb6`
 Latest pushed commit: see `git rev-parse HEAD` — this file is committed WITH the
 work it describes, so HEAD is always the commit that made these numbers true.
 Test baseline at program start: **1,723**
-Tests now: **1,848** — edit-domain 378 · render-contract 108 · intent-domain 27 ·
-api 352 · web 983. `npm run build` exit 0.
+Tests now: **2,050** — edit-domain 419 · render-contract 108 · intent-domain 27 ·
+api 361 · web 1,135. `npm run build` exit 0.
 
 ---
 
@@ -20,9 +20,9 @@ api 352 · web 983. `npm run build` exit 0.
 ```
   GATE   WHAT IT IS                                   STATE        COMMIT
   ────   ──────────────────────────────────────────   ──────────   ──────────
-  P0     Verify + capability inventory                IN PROGRESS  —
-  T0     Correctness: preview truth, mixed export     DONE         (this commit)
-  T1     Creator interaction: selection/clipboard     NOT STARTED  —
+  P0     Verify + capability inventory                DONE         ad11b07..
+  T0     Correctness: preview truth, mixed export     DONE         ad11b07
+  T1     Creator interaction: selection/clipboard     DONE         (this commit)
   T2     Speed, audio, transitions                    NOT STARTED  —
   T3     Precision trim: ripple/roll/slip/slide       NOT STARTED  —
   T4     Keyframe lanes + graph editor                NOT STARTED  —
@@ -71,7 +71,10 @@ about whether your footage exists is the wrong order.
 
 - [x] git verified: HEAD == origin == `45c0c98`, tree clean
 - [x] baseline suite re-run (web 897 before change, 908 after)
-- [ ] `TIMELINE_CAPABILITY_INVENTORY.md` written
+- [x] `TIMELINE_CAPABILITY_INVENTORY.md` written — 27 built, 8 partial, 31 absent,
+      and **0 features in T1 rewrite a saved project**
+- [x] `OPEN_EDIT_ADOPTION_REPORT.md` written — six ideas adopted, no code copied,
+      **veed-engine-cli refused on licence grounds**, four hard rules recorded
 - [x] `OWNER_RECORDING_REPRODUCTION.md` written — **root cause found and fixed**
 
 ### T0 — CORRECTNESS, TRUST AND EXPORT COMPATIBILITY — **DONE**
@@ -126,15 +129,43 @@ Evidence: `T0_MIXED_FORMAT_EXPORT.md`, `T0_SOURCE_RECONCILIATION.md`,
 - the four screen sizes were not measured this session
 - two pre-existing View-Transition console warnings, unrelated, not fixed
 
-### T1 — CREATOR INTERACTION PARITY
+### T1 — CREATOR INTERACTION PARITY — **DONE**
 
-Commit: `[verified] feat(timeline): add creator selection clipboard grouping and markers`
+Committed as `[verified] feat(timeline): add creator selection clipboard grouping and markers`
 
-- [ ] T1.1 icon toolbar   - [ ] T1.2 selection V2   - [ ] T1.3 marquee
-- [ ] T1.4 multi-move     - [ ] T1.5 multi-trim     - [ ] T1.6 groups
-- [ ] T1.7 link/unlink    - [ ] T1.8 clipboard      - [ ] T1.9 markers
-- [ ] T1.10 track height  - [ ] T1.11 context menus - [ ] T1.12 magnetic feedback
-- [ ] T1.13 gap objects   - [ ] T1.14 keyboard presets
+- [x] T1.1 icon toolbar — 9 symbols, every one named in words and to a screen
+      reader; Speed shown disabled and says why; **Transition wired up for real**
+- [x] T1.2 selection V2 — `timeline-selection-v2.ts`, 26 tests. Found and fixed a
+      real defect: B-roll pinned to a clip was dragging the main clip in with it
+- [x] T1.3 marquee — `timeline-marquee.ts`, 18 tests, edge auto-scroll, Escape
+- [x] T1.4 multi-move   - [x] T1.5 multi-trim — `timeline-multi-plan.ts`, 17
+      tests. ONE planner for the ghost and the edit
+- [x] T1.6 groups — new domain operation `set-timeline-groups`, 19 tests
+- [x] T1.7 link/unlink — links restricted to the picture and its own sound
+- [x] T1.8 clipboard — `timeline-clipboard.ts`, 16 tests, closed field list
+- [x] T1.9 markers — new domain operation `set-timeline-markers`, 22 + 17 tests
+- [x] T1.10 track height and folding — browser setting, no revision
+- [x] T1.11 context menus — only real actions, no inert entries, focus restored
+- [x] T1.12 magnetic feedback — the preview IS the plan
+- [x] T1.13 gap objects — `timeline-gaps.ts`, 12 tests
+- [x] T1.14 keyboard presets — 4 presets, clash detection, 25 tests
+- [x] **the export key now describes the RENDER PLAN, not the revision** —
+      `apps/api/src/render/export-identity.ts`, 9 tests
+- [x] full suites + build — 2,050 passing, build exit 0
+- [x] real browser workflow — `T1_CREATOR_INTERACTION.md`, 20 steps, including
+      the same-export proof and the four screen sizes T0 owed
+- [x] committed, pushed, SHA verified
+
+Evidence: `T1_CREATOR_INTERACTION.md`, `TIMELINE_CAPABILITY_INVENTORY.md`,
+`OPEN_EDIT_ADOPTION_REPORT.md`.
+
+**Known and deliberately left open** (each stated in the evidence file):
+- clicks and drags were dispatched as events, not by a physical mouse
+- the keyboard presets were not switched in the running app (25 tests cover them)
+- multi-item MOVE was not committed on the owner's project — their V1 clips are
+  correctly refused, and they have no two B-roll clips to drag together
+- a group was not proved to survive a reload; markers were, the same way
+- marker drag-to-move was not driven by hand
 
 ### T2 — SPEED, AUDIO, TRANSITIONS
 
@@ -227,7 +258,13 @@ Commit: `[verified] feat(timeline): complete AI-ready transcript timeline contra
   correct fix that appears not to work.
 - Simulated HTML5 drag events do NOT reach the app's drop handler in this
   browser harness. Drive placement through the operation the drop produces and
-  say plainly that you did.
+  say plainly that you did. **Synthetic POINTER events DO work** — the marquee
+  was driven that way in T1 — but `setPointerCapture` throws for them, so any
+  new pointer capture needs a `try`.
+- **The export key changed in T1.** It is now the compiled render plan, not the
+  revision. So the old trick of bumping the revision with a harmless toggle NO
+  LONGER busts a cached failure: the plan is unchanged, so the key is unchanged.
+  To force a genuinely fresh export, change something that reaches the video.
 - The Browser pane here does not composite, so `computer{action:"screenshot"}`
   times out. Build owner-reviewable pictures from real API answers instead.
 - The web suite's global RTL cleanup and the recording canvas stub live in

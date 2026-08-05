@@ -16,7 +16,12 @@ import {
   mediaTime,
   toMilliseconds,
   createIdFactory,
+  CLIP_TRANSITION_PRIMITIVE_ID,
+  OVERLAY_REMOVE_PRIMITIVE_ID,
+  activeTimelineGroups,
+  activeTimelineMarkers,
   activeTrackOutputs,
+  type MarkerColor,
   OPERATION_SCHEMA_VERSION,
   type SetFootageMotionOperation,
 } from '@sanverse/edit-domain'
@@ -28,21 +33,48 @@ import type { IntentContextInput } from '../../features/conversation/conversatio
 import { NameplateRepair } from '../../features/proposal-repair/NameplateRepair'
 import { describeOperation } from '../../features/history/describe-operation'
 import {
+  DEFAULT_KEYMAP,
+  DEFAULT_TRACK_PRESENTATION,
+  EMPTY_CLIPBOARD,
+  EMPTY_SELECTION,
   TIMELINE_LOCK_SCHEMA_VERSION,
   adaptTimelineGesture,
   buildTimelineViewModel,
+  clipboardIsEmpty,
+  copySelectionToClipboard,
   laneSpans,
+  planCloseGap,
+  planCut,
+  planDuplicate,
+  planAddMarker,
+  planDeleteMarker,
+  planGroupItems,
+  planMultiItemGesture,
+  planPaste,
   planTimelineItemAction,
   planTimelinePlacement,
+  planUngroupItem,
+  planUpdateMarker,
+  readKeymap,
   readTimelineLockState,
+  readTrackPresentation,
+  reconcileSelectionV2,
+  primarySelectedItemId,
   trackIdForLane,
   writeTimelineLockState,
+  writeTrackPresentation,
+  type KeymapV1,
+  type MultiItemGesture,
   type PlacementMode,
+  type TimelineClipboardV1,
   type TimelineGesture,
   type TimelineItemAction,
+  type TimelineSelectionV2,
   type TimelineTrackId,
   type TimelineViewportState,
+  type TrackPresentationV1,
 } from '../../features/timeline'
+import type { TimelineToolbarAction } from '../../editor/timeline/TimelineToolbar'
 import {
   advancePlayback,
   isUncutPassthrough,
@@ -465,7 +497,23 @@ export function StudioScreen({
   // person's mouse, not about the video.
   useEffect(() => {
     setLockedTrackIds(readTimelineLockState(editProject.projectId).lockedTrackIds)
+    setTrackPresentation(readTrackPresentation(editProject.projectId))
   }, [editProject.projectId])
+
+  // Shortcuts belong to the PERSON, not to one video, so they are read once and
+  // are not keyed by project. Somebody who set their keys up should not have to
+  // do it again for every new piece of work.
+  useEffect(() => { setKeymap(readKeymap()) }, [])
+
+  /*
+   * The user's own notes, and which things they said move together.
+   *
+   * Both are part of the project — somebody typed them, and losing them on
+   * another computer would be losing work — and neither changes one frame of the
+   * finished video. See `timeline-markers.ts` for how both are true at once.
+   */
+  const timelineMarkers = useMemo(() => activeTimelineMarkers(editProject), [editProject])
+  const timelineGroups = useMemo(() => activeTimelineGroups(editProject), [editProject])
 
   const [videoLayoutRevision, setVideoLayoutRevision] = useState(0)
   /** The same number, readable from inside the decoder's frame callback. */
@@ -507,7 +555,31 @@ export function StudioScreen({
   const conversationDraft = controlledConversationDraft ?? internalConversationDraft
   const setConversationDraft = onConversationDraftChange ?? setInternalConversationDraft
   const [compactSidePanel, setCompactSidePanel] = useState<'media' | 'inspector' | null>(null)
-  const [selectedTimelineItemId, setSelectedTimelineItemId] = useState<string | null>(null)
+  /*
+   * What the user has picked on the timeline.
+   *
+   * A LIST, not one name, since Gate T1. `selectedTimelineItemId` below is
+   * worked out from it and means "the one item, when exactly one is picked" —
+   * which is what the Inspector and the advanced controls need, because showing
+   * somebody the settings of the first of four clips and letting them change it
+   * is worse than showing nothing at all.
+   */
+  const [timelineSelection, setTimelineSelection] = useState<TimelineSelectionV2>(EMPTY_SELECTION)
+  const selectedTimelineItemId = primarySelectedItemId(timelineSelection)
+  const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null)
+  /*
+   * Row heights, folds and keyboard shortcuts. Neither is part of the project:
+   * a row height belongs to a SCREEN and a shortcut belongs to a PERSON, and
+   * neither changes one frame of the exported video.
+   */
+  const [trackPresentation, setTrackPresentation] = useState<TrackPresentationV1>(DEFAULT_TRACK_PRESENTATION)
+  const [keymap, setKeymap] = useState<KeymapV1>(DEFAULT_KEYMAP)
+  /*
+   * The clipboard. Deliberately NOT part of the project and NOT saved: a copy is
+   * something you did a moment ago, not something you own. It holds ids and
+   * numbers only — never a path, never a URL, never a piece of the project.
+   */
+  const [timelineClipboard, setTimelineClipboard] = useState<TimelineClipboardV1>(EMPTY_CLIPBOARD)
   const [selectedMediaAssetId, setSelectedMediaAssetId] = useState<string | null>(null)
   // Media presentation lives HERE, not inside the Media panel, because the panel
   // is unmounted whenever the user switches workspace. Held here it survives —
@@ -1180,11 +1252,11 @@ export function StudioScreen({
   const timelineModel = useMemo(
     () => buildTimelineViewModel({
       project: editProject,
-      selectedItemId: selectedTimelineItemId,
+      selectedItemIds: timelineSelection.itemIds,
       pending: pendingTimelineInput,
       assetLabels,
     }),
-    [assetLabels, editProject, pendingTimelineInput, selectedTimelineItemId],
+    [assetLabels, editProject, pendingTimelineInput, timelineSelection.itemIds],
   )
   const inspectorSelection = useMemo(
     () => resolveInspectorSelection({
@@ -1479,7 +1551,13 @@ export function StudioScreen({
     )
   }
 
-  const requestTimelineSelection = (nextItemId: string | null) => {
+  const selectionOfOne = (itemId: string | null): TimelineSelectionV2 =>
+    itemId === null
+      ? EMPTY_SELECTION
+      : Object.freeze({ itemIds: Object.freeze([itemId]), anchorItemId: itemId })
+
+  const requestTimelineSelection = (next: TimelineSelectionV2) => {
+    const nextItemId = primarySelectedItemId(next)
     const decision = requestInspectorSelectionChange(
       selectedTimelineItemId,
       nextItemId,
@@ -1490,7 +1568,7 @@ export function StudioScreen({
       return
     }
     setPendingTimelineSelection(null)
-    setSelectedTimelineItemId(decision.nextItemId)
+    setTimelineSelection(next)
   }
 
   const discardInspectorDraftAndContinue = () => {
@@ -1499,7 +1577,7 @@ export function StudioScreen({
     setFootageMotionDraft(null)
     setFootageMotionBaseline(null)
     setPendingTimelineSelection(null)
-    setSelectedTimelineItemId(nextItemId)
+    setTimelineSelection(selectionOfOne(nextItemId))
   }
 
   useEffect(() => {
@@ -1512,7 +1590,7 @@ export function StudioScreen({
     if (!pendingPlacedTimelineItemId) return
     const exists = timelineModel.lanes.some((lane) => lane.items.some((item) => item.id === pendingPlacedTimelineItemId))
     if (!exists) return
-    requestTimelineSelection(pendingPlacedTimelineItemId)
+    requestTimelineSelection(selectionOfOne(pendingPlacedTimelineItemId))
     setPendingPlacedTimelineItemId(null)
   }, [pendingPlacedTimelineItemId, timelineModel])
 
@@ -1557,16 +1635,31 @@ export function StudioScreen({
     return failure
   }
 
+  /*
+   * Let go of anything that is no longer on the timeline — and NOTHING else.
+   *
+   * In particular it must not drop something merely because it scrolled out of
+   * view. The projection holds every item in the project; only the drawing is
+   * limited to what is on screen. Dropping the off-screen ones would mean a user
+   * who picked four clips and scrolled came back to fewer, with no idea why.
+   */
   useEffect(() => {
-    const reconciled = reconcileTimelineSelection(timelineModel, selectedTimelineItemId)
-    if (reconciled !== selectedTimelineItemId) {
+    const reconciled = reconcileSelectionV2(timelineModel, timelineSelection)
+    if (reconciled !== timelineSelection) {
       setInspectorSectionDirty(false)
       setFootageMotionDraft(null)
       setFootageMotionBaseline(null)
       setPendingTimelineSelection(null)
-      setSelectedTimelineItemId(reconciled)
+      setTimelineSelection(reconciled)
     }
-  }, [selectedTimelineItemId, timelineModel])
+  }, [timelineSelection, timelineModel])
+
+  /** A note that was deleted, or a project that changed, must not stay picked. */
+  useEffect(() => {
+    if (selectedMarkerId !== null && !timelineMarkers.some((marker) => marker.markerId === selectedMarkerId)) {
+      setSelectedMarkerId(null)
+    }
+  }, [selectedMarkerId, timelineMarkers])
 
   function seekCompositionTicks(requestedTicks: number) {
     const nextTicks = Math.min(
@@ -1736,6 +1829,269 @@ export function StudioScreen({
       const failure = await onApplyOperations(plan.operations, changeSetId)
       if (failure) setTimelineNotice(failure)
     })()
+  }
+
+  /**
+   * Everything picked, moved or trimmed in ONE gesture and ONE change set.
+   *
+   * The whole thing is planned before anything is sent, so it either all happens
+   * or none of it does. Half a drag is worse than a refused drag: the clips end
+   * up at different spacings from each other, which is the exact thing the user
+   * picked several of them to preserve.
+   */
+  function handleMultiGesture(gesture: MultiItemGesture) {
+    const changeSetId = createChangeSetId()
+    const plan = planMultiItemGesture({
+      project: editProject,
+      itemIds: timelineSelection.itemIds,
+      gesture,
+      lockedTrackIds,
+      pendingProposalExists: Boolean(proposal),
+      exportInProgress: isRendering,
+      expectedRevision: editProject.revision,
+      ids: createIdFactory(changeSetId),
+    })
+    if (!plan.ok) {
+      setTimelineNotice(plan.refusal.message)
+      return
+    }
+    setTimelineNotice(null)
+    void (async () => {
+      const failure = await onApplyOperations(plan.operations, changeSetId)
+      if (failure) setTimelineNotice(failure)
+    })()
+  }
+
+  /** Send one already-planned set of operations as one change set. */
+  function applyPlanned(
+    plan:
+      | Readonly<{ ok: true; operations: readonly unknown[] }>
+      | Readonly<{ ok: false; refusal: Readonly<{ message: string }> }>,
+    changeSetId: string,
+  ) {
+    if (!plan.ok) {
+      setTimelineNotice(plan.refusal.message)
+      return
+    }
+    setTimelineNotice(null)
+    void (async () => {
+      const failure = await onApplyOperations(plan.operations as never, changeSetId)
+      if (failure) setTimelineNotice(failure)
+    })()
+  }
+
+  /**
+   * Everything the toolbar, the context menu and the keyboard can ask for.
+   *
+   * ONE function, so a shortcut can never do something the button would have
+   * refused, and a menu entry can never do something slightly different from the
+   * button with the same name.
+   */
+  function handleTimelineToolbarAction(action: TimelineToolbarAction) {
+    const changeSetId = createChangeSetId()
+    const ids = createIdFactory(changeSetId)
+    const common = {
+      project: editProject,
+      lockedTrackIds,
+      pendingProposalExists: Boolean(proposal),
+      exportInProgress: isRendering,
+      expectedRevision: editProject.revision,
+      ids,
+    } as const
+
+    switch (action) {
+      case 'copy': {
+        const copied = copySelectionToClipboard({
+          project: editProject,
+          itemIds: timelineSelection.itemIds,
+        })
+        if (!copied.ok) {
+          setTimelineNotice(copied.refusal.message)
+          return
+        }
+        setTimelineClipboard(copied.clipboard)
+        setTimelineNotice(
+          copied.clipboard.entries.length === 1
+            ? "Copied. Move the playhead and press Paste."
+            : `Copied ${copied.clipboard.entries.length} things. Move the playhead and press Paste.`,
+        )
+        return
+      }
+      case 'cut': {
+        const cut = planCut({ ...common, itemIds: timelineSelection.itemIds })
+        if (!cut.ok) {
+          setTimelineNotice(cut.refusal.message)
+          return
+        }
+        // The clipboard is only replaced once the removal is planned, so a cut
+        // that could not happen leaves an earlier copy untouched.
+        setTimelineClipboard(cut.clipboard)
+        applyPlanned({ ok: true, operations: cut.operations }, changeSetId)
+        return
+      }
+      case 'paste':
+        applyPlanned(planPaste({
+          ...common,
+          clipboard: timelineClipboard,
+          atTicks: playheadTicks,
+          mode: timelinePlacementMode === 'insert' ? 'insert' : 'at-playhead',
+        }), changeSetId)
+        return
+      case 'duplicate':
+        applyPlanned(planDuplicate({ ...common, itemIds: timelineSelection.itemIds }), changeSetId)
+        return
+      case 'group':
+        applyPlanned(planGroupItems({ ...common, itemIds: timelineSelection.itemIds }), changeSetId)
+        return
+      case 'ungroup': {
+        const inGroup = timelineSelection.itemIds.find((itemId) =>
+          timelineGroups.some((group) => group.memberItemIds.includes(itemId)))
+        if (!inGroup) {
+          setTimelineNotice('Nothing you have picked is part of a group.')
+          return
+        }
+        applyPlanned(planUngroupItem({ ...common, itemId: inGroup }), changeSetId)
+        return
+      }
+      case 'add-marker':
+        applyPlanned(planAddMarker({
+          ...common,
+          startTicks: playheadTicks,
+          label: 'Note',
+        }), changeSetId)
+        return
+      case 'close-gap': {
+        const gapId = primarySelectedItemId(timelineSelection)
+        if (!gapId) {
+          setTimelineNotice('Choose an empty space on the video track first.')
+          return
+        }
+        applyPlanned(planCloseGap({ ...common, gapItemId: gapId }), changeSetId)
+        return
+      }
+      case 'lift': {
+        // Several things deleted together, as ONE change set. Deleting them one
+        // at a time would be one Undo each, and the first Undo would leave the
+        // video in a state the user never asked for and never saw.
+        const operations: unknown[] = []
+        let slot = 0
+        const seen = new Set<string>()
+        for (const itemId of timelineSelection.itemIds) {
+          const parsed = /^(?:overlay|music):((?:broll|title|callout|music)_[a-z0-9]+):\d+$/.exec(itemId)
+          if (!parsed || seen.has(parsed[1])) continue
+          seen.add(parsed[1])
+          operations.push({
+            schemaVersion: OPERATION_SCHEMA_VERSION,
+            operationId: ids.operation(slot),
+            kind: 'remove-overlay',
+            capabilityId: OVERLAY_REMOVE_PRIMITIVE_ID,
+            overlayId: parsed[1],
+            extensions: {},
+          })
+          slot += 1
+        }
+        if (operations.length === 0) {
+          setTimelineNotice('Nothing that can be deleted together was picked.')
+          return
+        }
+        applyPlanned({ ok: true, operations }, changeSetId)
+        return
+      }
+      case 'transition': {
+        const itemId = primarySelectedItemId(timelineSelection)
+        const item = itemId
+          ? timelineModel.lanes.flatMap((lane) => lane.items).find((each) => each.id === itemId)
+          : null
+        const clipId = item?.clipId ?? null
+        if (!clipId) {
+          setTimelineNotice('Choose a piece of the main video first.')
+          return
+        }
+        // The clip that comes immediately after this one, in finished-video
+        // order. A fade needs two clips: at the very end there is nothing to
+        // fade INTO, and saying so beats a button that does nothing.
+        const ordered = effectiveComposition(editProject).tracks
+          .flatMap((track) => track.clips)
+          .slice()
+          .sort((left, right) => left.compositionStart.ticks - right.compositionStart.ticks)
+        const index = ordered.findIndex((clip) => clip.clipId === clipId)
+        const next = index >= 0 ? ordered[index + 1] : undefined
+        if (!next) {
+          setTimelineNotice('There is no clip after this one to fade into.')
+          return
+        }
+        applyPlanned({
+          ok: true,
+          operations: [{
+            schemaVersion: OPERATION_SCHEMA_VERSION,
+            operationId: ids.operation(0),
+            kind: 'set-clip-transition',
+            capabilityId: CLIP_TRANSITION_PRIMITIVE_ID,
+            clipId,
+            nextClipId: next.clipId,
+            style: 'dip-to-black',
+            // Half a second each side: long enough to read as a fade, short
+            // enough that it never swallows a whole short clip.
+            duration: { ticks: Math.round(PROJECT_TIMESCALE / 2), timescale: PROJECT_TIMESCALE },
+            audio: 'fade-through-silence',
+            extensions: {},
+          }],
+        }, changeSetId)
+        return
+      }
+      default:
+        return
+    }
+  }
+
+  function handleMoveMarker(markerId: string, toStartTicks: number) {
+    const changeSetId = createChangeSetId()
+    applyPlanned(planUpdateMarker({
+      project: editProject,
+      pendingProposalExists: Boolean(proposal),
+      exportInProgress: isRendering,
+      expectedRevision: editProject.revision,
+      ids: createIdFactory(changeSetId),
+      markerId,
+      changes: { startTicks: toStartTicks },
+    }), changeSetId)
+  }
+
+  function handleEditMarker(
+    markerId: string,
+    changes: Readonly<{ label?: string; note?: string; color?: MarkerColor }>,
+  ) {
+    const changeSetId = createChangeSetId()
+    applyPlanned(planUpdateMarker({
+      project: editProject,
+      pendingProposalExists: Boolean(proposal),
+      exportInProgress: isRendering,
+      expectedRevision: editProject.revision,
+      ids: createIdFactory(changeSetId),
+      markerId,
+      changes,
+    }), changeSetId)
+  }
+
+  function handleDeleteMarker(markerId: string) {
+    const changeSetId = createChangeSetId()
+    applyPlanned(planDeleteMarker({
+      project: editProject,
+      pendingProposalExists: Boolean(proposal),
+      exportInProgress: isRendering,
+      expectedRevision: editProject.revision,
+      ids: createIdFactory(changeSetId),
+      markerId,
+    }), changeSetId)
+  }
+
+  /**
+   * Row heights and folds. A browser setting, exactly like the padlocks: no
+   * operation, no revision, no Undo entry, and the exported file is unchanged.
+   */
+  function handleTrackPresentationChange(next: TrackPresentationV1) {
+    setTrackPresentation(next)
+    writeTrackPresentation(editProject.projectId, next)
   }
 
   /**
@@ -2689,7 +3045,7 @@ export function StudioScreen({
                       narrow={canvasNarrow}
                       cropMode={canvasCropMode}
                       onCropModeChange={setCanvasCropMode}
-                      onSelectTimelineItem={requestTimelineSelection}
+                      onSelectTimelineItem={(itemId) => requestTimelineSelection(selectionOfOne(itemId))}
                       onApply={onCreateOverlay}
                       onProposalPreviewPoint={setProposalCanvasPoint}
                       onProposalPointCommit={(point) => {
@@ -2882,7 +3238,13 @@ export function StudioScreen({
           assetFacts={assetFacts}
           playheadTicks={playheadTicks}
           viewport={timelineViewport}
-          selectedItemId={selectedTimelineItemId}
+          selection={timelineSelection}
+          groups={timelineGroups}
+          markers={timelineMarkers}
+          selectedMarkerId={selectedMarkerId}
+          trackPresentation={trackPresentation}
+          keymap={keymap}
+          clipboardHasContent={!clipboardIsEmpty(timelineClipboard)}
           busy={timelineBusy}
           trimAmountTicks={Math.max(1, Math.round(trimSeconds * PROJECT_TIMESCALE))}
           gainDb={clipGainDb}
@@ -2900,10 +3262,17 @@ export function StudioScreen({
           onPlacementMode={setTimelinePlacementMode}
           onToggleSnapping={() => setSnappingEnabled((current) => !current)}
           onItemAction={handleTimelineItemAction}
+          onMultiGesture={handleMultiGesture}
           onViewportChange={setTimelineViewport}
           onSeek={seekCompositionTicks}
-          onSelect={requestTimelineSelection}
+          onSelectionChange={requestTimelineSelection}
           onGesture={handleTimelineGesture}
+          onAction={handleTimelineToolbarAction}
+          onSelectMarker={setSelectedMarkerId}
+          onMoveMarker={handleMoveMarker}
+          onDeleteMarker={handleDeleteMarker}
+          onEditMarker={handleEditMarker}
+          onTrackPresentationChange={handleTrackPresentationChange}
           onOpenProposal={() => {
             commitLayoutValue({ toolCollapsed: false })
             requestAnimationFrame(() => inspectorRegionRef.current?.focus())

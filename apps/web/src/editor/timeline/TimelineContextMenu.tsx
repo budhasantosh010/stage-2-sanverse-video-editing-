@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 import type { TimelineGesture, TimelineItemView } from '../../features/timeline'
+import type { TimelineToolbarAction } from './TimelineToolbar'
 
 export type TimelineContextMenuProps = Readonly<{
   item: TimelineItemView
@@ -8,11 +9,37 @@ export type TimelineContextMenuProps = Readonly<{
   y: number
   playheadTicks: number
   busy: boolean
+  /**
+   * Why each action cannot be used, in words — the SAME answers the toolbar
+   * uses, passed in rather than worked out again here.
+   *
+   * Two copies of "can this be done right now" is how a menu ends up offering
+   * something the button correctly refuses. The user presses it, nothing
+   * happens, and they conclude the product is broken.
+   */
+  disabledReasons: Readonly<Record<TimelineToolbarAction, string | null>>
+  onAction(action: TimelineToolbarAction): void
   onGesture(gesture: TimelineGesture): void
   onSeek(ticks: number): void
   onOpenProposal(): void
   onClose(): void
 }>
+
+/**
+ * The actions offered on any item, in the order a person reaches for them.
+ *
+ * Deliberately short. A context menu with twenty entries is a menu nobody
+ * reads; the toolbar and the keyboard are where the long list lives.
+ */
+const ITEM_ACTIONS: readonly Readonly<{ action: TimelineToolbarAction; label: string }>[] = Object.freeze([
+  { action: 'copy', label: 'Copy' },
+  { action: 'cut', label: 'Cut' },
+  { action: 'duplicate', label: 'Make another one, right after' },
+  { action: 'group', label: 'Make these move together' },
+  { action: 'ungroup', label: 'Stop these moving together' },
+  { action: 'close-gap', label: 'Close the empty space' },
+  { action: 'transition', label: 'Fade between this clip and the next' },
+])
 
 const safeInteriorTick = (item: TimelineItemView): number =>
   Math.min(
@@ -26,6 +53,8 @@ export function TimelineContextMenu({
   y,
   playheadTicks,
   busy,
+  disabledReasons,
+  onAction,
   onGesture,
   onSeek,
   onOpenProposal,
@@ -70,6 +99,26 @@ export function TimelineContextMenu({
           Open proposal
         </button>
       ) : null}
+      {/*
+        Every entry below is a real action. There are no greyed-out rows that
+        exist only to show what MIGHT be possible one day: an entry appears when
+        it can be used, and carries its reason when it cannot.
+      */}
+      {ITEM_ACTIONS.map(({ action, label }) => {
+        const reason = busy ? 'Project edits are paused right now.' : disabledReasons[action]
+        if (reason !== null) return null
+        return (
+          <button
+            key={action}
+            role="menuitem"
+            type="button"
+            data-context-action={action}
+            onClick={() => run(() => onAction(action))}
+          >
+            {label}
+          </button>
+        )
+      })}
       {editableClip && clipId ? (
         <>
           <button

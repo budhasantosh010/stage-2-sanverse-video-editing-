@@ -104,3 +104,12 @@ Never publish one invented percentage-complete number. A box closes only when it
 - [x] Timeline shows real frames and real sound shapes — Gate D, 2026-08-04.
       A creator can find a moment by looking at it, not by reading filenames.
 - [ ] Portrait footage in a landscape project can be exported — FAIL-051
+- [x] Portrait footage in a landscape project can be exported — FAIL-051 closed
+      in Gate T0, 2026-08-05, proved with a real 714x1280 clip in a real 1920x1080
+      export
+- [x] A creator can pick several things at once and act on them as one — Gate T1,
+      2026-08-06. Copy, paste, duplicate, group, and notes pinned to moments.
+- [x] Writing a note, or grouping clips, does not throw away a finished export —
+      Gate T1. An export is identified by what it will produce, not by how many
+      times the project was touched.
+- [ ] Speed, reverse and freeze frame — Gate T2, not started

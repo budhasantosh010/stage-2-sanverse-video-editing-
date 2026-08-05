@@ -47,6 +47,15 @@ export const MUSIC_PRIMITIVE_ID = 'sanverse.music.primitive/v1'
 export const OVERLAY_REMOVE_PRIMITIVE_ID = 'sanverse.overlay.remove.primitive/v1'
 /** Which lanes are heard and seen in the finished video. */
 export const TRACK_OUTPUT_PRIMITIVE_ID = 'sanverse.timeline.track-output.primitive/v1'
+/**
+ * The user's own notes pinned to moments, and "treat these as one thing".
+ *
+ * Both are the user's work, so both are accepted, undoable operations. Neither
+ * appears in the render plan, so neither changes one frame of the exported
+ * video. See the long note at the top of `timeline-markers.ts`.
+ */
+export const TIMELINE_MARKERS_PRIMITIVE_ID = 'sanverse.timeline.markers.primitive/v1'
+export const TIMELINE_GROUPS_PRIMITIVE_ID = 'sanverse.timeline.groups.primitive/v1'
 export const VISUAL_PROPERTIES_PRIMITIVE_ID = 'sanverse.visual.properties.primitive/v1'
 export const FOOTAGE_MOTION_PRIMITIVE_ID = 'sanverse.footage.motion.primitive/v1'
 
@@ -236,6 +245,22 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     level: 'primitive' as const,
     accepts: 'One of the five tracks, and whether it reaches the finished video.',
     produces: Object.freeze(['set-track-output']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: TIMELINE_MARKERS_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'The complete set of the user\'s markers, each a moment or a stretch with a label, a note and a colour.',
+    produces: Object.freeze(['set-timeline-markers']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: TIMELINE_GROUPS_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'The complete set of groups, each naming two or more things on the timeline that move together.',
+    produces: Object.freeze(['set-timeline-groups']),
     requires: Object.freeze([]),
   }),
   Object.freeze({

@@ -822,3 +822,51 @@ same mounted editor session. Read
 continuing. Owner visual review is next. Do not begin Media V2 until a new
 approved contract defines sorting, bins, multiselect, batch behavior, drag
 initiation, drop targets, and insert/overwrite/append policy.
+
+## Latest handoff — P1-F.1E Gate T1, 2026-08-06
+
+**Read `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md` first.**
+It is the resume point for this programme and it is committed with the work it
+describes, so it is never out of date.
+
+Gates P0, T0 and T1 are DONE. Gates T2 to T7 have NOT started.
+
+### The one thing in T1 that changes how the rest of the system behaves
+
+An export is no longer identified by the project's revision number. It is
+identified by the **compiled render plan** — by what will actually be produced.
+
+```
+  BEFORE:  key = projectId : revision : schemaVersion
+  AFTER:   key = projectId : schemaVersion : the render plan
+                             (projectRevision dropped: FFmpeg never reads it)
+```
+
+Two consequences to carry forward:
+
+1. **Good:** an edit that cannot change one frame — a note, a group, a track
+   muted and unmuted — keeps the finished export. This is what made markers and
+   groups possible as real, undoable, saved edits.
+2. **A trap:** the old trick of bumping the revision with a harmless toggle to
+   bust a cached export failure **no longer works**, because the plan is
+   unchanged and so the key is unchanged. To force a genuinely fresh export,
+   change something that reaches the video.
+
+### What T1 added that a later gate must not duplicate
+
+- One planner for moving or trimming several things — `timeline-multi-plan.ts`.
+  The drag ghost and the committed edit come from it, called with the same
+  inputs. Do not write a second "preview" calculation.
+- One place that expands what is bound to what — `boundPartners` in
+  `timeline-selection-v2.ts`. Groups and picture-plus-its-own-sound links are
+  both expanded there so every command treats them identically.
+- Two new domain operations, `set-timeline-markers` and `set-timeline-groups`,
+  each carrying the WHOLE list rather than a change to it. Same shape as
+  `set-track-output`, same reason: the last one wins outright.
+
+### Still open, and stated rather than implied
+
+Every item is listed at the bottom of `T1_CREATOR_INTERACTION.md`. In short:
+clicks were dispatched as events rather than made with a physical mouse; the
+keyboard presets were not switched in the running app; multi-item move was not
+committed on the owner's project because their footage correctly refuses it.

@@ -18,6 +18,7 @@ import {
   ticks,
 } from '../../features/timeline/timeline-test-fixtures'
 import { drawsOn } from '../../test/setup'
+import { DEFAULT_KEYMAP, DEFAULT_TRACK_PRESENTATION } from '../../features/timeline'
 import { Timeline } from './Timeline'
 import { laneHeightPx, TIMELINE_LANE_HEIGHTS } from './timeline-lane-metrics'
 
@@ -105,7 +106,7 @@ const renderTimeline = async (input: Readonly<{
   })
   const model = buildTimelineViewModel({
     project: input.project ?? projectWithAllTimelineFamilies(),
-    selectedItemId: input.selectedItemId ?? null,
+    selectedItemIds: input.selectedItemId ? [input.selectedItemId] : [],
     pending: null,
   })
   const props = {
@@ -113,7 +114,13 @@ const renderTimeline = async (input: Readonly<{
     assetFacts: input.facts ?? FACTS,
     playheadTicks: 0,
     viewport: input.currentViewport ?? viewport(),
-    selectedItemId: input.selectedItemId ?? null,
+    selection: { itemIds: input.selectedItemId ? [input.selectedItemId] : [], anchorItemId: input.selectedItemId ?? null },
+    groups: [],
+    markers: [],
+    selectedMarkerId: null,
+    trackPresentation: DEFAULT_TRACK_PRESENTATION,
+    keymap: DEFAULT_KEYMAP,
+    clipboardHasContent: false,
     busy: false,
     trimAmountTicks: ticks(1),
     gainDb: 0,
@@ -131,7 +138,14 @@ const renderTimeline = async (input: Readonly<{
     onItemAction: input.onItemAction ?? vi.fn(),
     onViewportChange: vi.fn(),
     onSeek: vi.fn(),
-    onSelect: vi.fn(),
+    onSelectionChange: vi.fn(),
+    onMultiGesture: vi.fn(),
+    onAction: vi.fn(),
+    onSelectMarker: vi.fn(),
+    onMoveMarker: vi.fn(),
+    onDeleteMarker: vi.fn(),
+    onEditMarker: vi.fn(),
+    onTrackPresentationChange: vi.fn(),
     onGesture: input.onGesture ?? vi.fn(),
     onOpenProposal: vi.fn(),
   }
@@ -249,7 +263,7 @@ describe('the decorations stay out of the way', () => {
   it('still shows the trim handles when a clip is selected', async () => {
     const model = buildTimelineViewModel({
       project: projectWithAllTimelineFamilies(),
-      selectedItemId: null,
+      selectedItemIds: [],
       pending: null,
     })
     const firstClip = model.lanes.flatMap((lane) => lane.items).find((item) => item.kind === 'clip')
@@ -319,7 +333,7 @@ describe('only what is on screen', () => {
     // emptied itself whenever the user looked somewhere else.
     const model = buildTimelineViewModel({
       project: largeTimelineProject(),
-      selectedItemId: null,
+      selectedItemIds: [],
       pending: null,
     })
     const firstClip = model.lanes.flatMap((lane) => lane.items)[0]

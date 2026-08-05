@@ -41,6 +41,16 @@ import {
   validateTrackOutputOperation,
   type SetTrackOutputOperation,
 } from './track-output.ts'
+import {
+  MARKERS_OPERATION_KIND,
+  validateSetTimelineMarkersOperation,
+  type SetTimelineMarkersOperation,
+} from './timeline-markers.ts'
+import {
+  GROUPS_OPERATION_KIND,
+  validateSetTimelineGroupsOperation,
+  type SetTimelineGroupsOperation,
+} from './timeline-groups.ts'
 import { findAsset, type MediaAsset } from './assets.ts'
 import {
   ZERO_TIME,
@@ -106,6 +116,8 @@ export type EditOperation =
   | SetVisualPropertiesOperation
   | SetFootageMotionOperation
   | SetTrackOutputOperation
+  | SetTimelineMarkersOperation
+  | SetTimelineGroupsOperation
 
 /** Every operation kind this build can execute. Unknown kinds are rejected. */
 export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze([
@@ -116,11 +128,40 @@ export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze([
   VISUAL_PROPERTIES_OPERATION_KIND,
   FOOTAGE_MOTION_OPERATION_KIND,
   TRACK_OUTPUT_OPERATION_KIND,
+  MARKERS_OPERATION_KIND,
+  GROUPS_OPERATION_KIND,
 ])
 
 export const isTrackOutputOperation = (
   operation: EditOperation,
 ): operation is SetTrackOutputOperation => operation.kind === TRACK_OUTPUT_OPERATION_KIND
+
+/**
+ * The two operations that record what the user thinks, not what the video shows.
+ *
+ * Everything else in this union changes the finished video. These two do not:
+ * strip every marker and every group out of a project and the exported file is
+ * byte-for-byte identical. They are here because they are still the user's work
+ * and still need Undo and saving.
+ */
+export const isTimelineMarkersOperation = (
+  operation: EditOperation,
+): operation is SetTimelineMarkersOperation => operation.kind === MARKERS_OPERATION_KIND
+
+export const isTimelineGroupsOperation = (
+  operation: EditOperation,
+): operation is SetTimelineGroupsOperation => operation.kind === GROUPS_OPERATION_KIND
+
+/**
+ * True when this operation cannot change one frame or one sample of the export.
+ *
+ * Used by the export key so that writing a note does not throw away a finished
+ * video. Anything not named here counts as render-affecting, which is the safe
+ * direction: forgetting to add a new operation kind means an extra export, not a
+ * wrong one.
+ */
+export const isNonRenderOperation = (operation: EditOperation): boolean =>
+  isTimelineMarkersOperation(operation) || isTimelineGroupsOperation(operation)
 
 /** True for the operations that change which footage the finished video is made of. */
 export const isTimelineOperation = (operation: EditOperation): operation is TimelineOperation =>
@@ -193,6 +234,10 @@ export type OperationIssueCode =
   | 'FOOTAGE_MOTION_ASSET_WRONG_KIND'
   | 'FOOTAGE_MOTION_SPAN_OUTSIDE_ASSET'
   | 'FOOTAGE_MOTION_OVERLAP'
+  /** Two markers, or two groups, sent with the same identity in one operation. */
+  | 'DUPLICATE_ID'
+  /** One thing on the timeline named by two different groups at once. */
+  | 'MEMBER_IN_TWO_GROUPS'
 
 export type OperationError = {
   readonly code: 'OPERATION_INVALID'
@@ -338,6 +383,34 @@ export const validateOperation = (input: unknown, path = '$'): Result<EditOperat
     return ok(visual.value)
   }
 
+  if (input.kind === MARKERS_OPERATION_KIND) {
+    const markers = validateSetTimelineMarkersOperation(input, path)
+    if (!markers.ok) {
+      return err({
+        code: 'OPERATION_INVALID',
+        issues: markers.error.issues.map((issue) => ({
+          path: issue.path,
+          code: issue.code as OperationIssueCode,
+        })),
+      })
+    }
+    return ok(markers.value)
+  }
+
+  if (input.kind === GROUPS_OPERATION_KIND) {
+    const groups = validateSetTimelineGroupsOperation(input, path)
+    if (!groups.ok) {
+      return err({
+        code: 'OPERATION_INVALID',
+        issues: groups.error.issues.map((issue) => ({
+          path: issue.path,
+          code: issue.code as OperationIssueCode,
+        })),
+      })
+    }
+    return ok(groups.value)
+  }
+
   if (input.kind === TRACK_OUTPUT_OPERATION_KIND) {
     const output = validateTrackOutputOperation(input, path)
     if (!output.ok) {
@@ -411,6 +484,21 @@ export const validateOperationAgainstComposition = (
   // whole. No amount of cutting can invalidate it, so there is nothing here to
   // check against the footage.
   if (isTrackOutputOperation(operation)) return ok(operation)
+
+  /*
+   * Markers and groups are checked against NOTHING here, on purpose.
+   *
+   * A marker can sit past the end of the video, and a group can name a clip that
+   * was deleted five minutes ago. Both are ordinary: the user trimmed the end
+   * off, or removed a clip, and their note about it is now stale. A stale note
+   * is not a corrupt project.
+   *
+   * Refusing them here would mean a perfectly good cut suddenly fails to apply
+   * because of a note the user forgot they wrote. The screen simply does not
+   * draw a marker past the end, and `resolveGroupMembers` ignores names that are
+   * no longer on the timeline.
+   */
+  if (isTimelineMarkersOperation(operation) || isTimelineGroupsOperation(operation)) return ok(operation)
 
   // A removal names a title, callout, B-roll clip, or music bed — never a
   // moment of footage. Whether that item is still there is history-dependent

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 
 import { buildTimelineViewModel } from '../../features/timeline'
 import { projectWithAllTimelineFamilies } from '../../features/timeline/timeline-test-fixtures'
+import { DEFAULT_KEYMAP, DEFAULT_TRACK_PRESENTATION } from '../../features/timeline'
 import { Timeline } from './Timeline'
 
 /**
@@ -20,14 +21,20 @@ afterEach(cleanup)
 const renderTimeline = (overrides: Record<string, unknown> = {}) => {
   const model = buildTimelineViewModel({
     project: projectWithAllTimelineFamilies(),
-    selectedItemId: null,
+    selectedItemIds: [],
     pending: null,
   })
   const props = {
     model,
     playheadTicks: 0,
     viewport: { pixelsPerSecond: 100, scrollLeftPx: 0, viewportWidthPx: 600 },
-    selectedItemId: null,
+    selection: { itemIds: [] as readonly string[], anchorItemId: null as string | null },
+    groups: [],
+    markers: [],
+    selectedMarkerId: null,
+    trackPresentation: DEFAULT_TRACK_PRESENTATION,
+    keymap: DEFAULT_KEYMAP,
+    clipboardHasContent: false,
     busy: false,
     trimAmountTicks: 1_440_000,
     gainDb: 0,
@@ -45,7 +52,14 @@ const renderTimeline = (overrides: Record<string, unknown> = {}) => {
     onItemAction: vi.fn(),
     onViewportChange: vi.fn(),
     onSeek: vi.fn(),
-    onSelect: vi.fn(),
+    onSelectionChange: vi.fn(),
+    onMultiGesture: vi.fn(),
+    onAction: vi.fn(),
+    onSelectMarker: vi.fn(),
+    onMoveMarker: vi.fn(),
+    onDeleteMarker: vi.fn(),
+    onEditMarker: vi.fn(),
+    onTrackPresentationChange: vi.fn(),
     onGesture: vi.fn(),
     onOpenProposal: vi.fn(),
     ...overrides,
@@ -76,16 +90,16 @@ describe('the Timeline toolbar', () => {
   it('names the locked track in the reason, so the user knows which padlock to open', () => {
     const model = buildTimelineViewModel({
       project: projectWithAllTimelineFamilies(),
-      selectedItemId: null,
+      selectedItemIds: [],
       pending: null,
     })
     const clip = model.lanes.flatMap((lane) => lane.items).find((item) => item.kind === 'clip')
     const selectedItemId = clip?.id ?? null
     renderTimeline({
-      selectedItemId,
+      selection: { itemIds: selectedItemId === null ? [] : [selectedItemId], anchorItemId: selectedItemId },
       model: buildTimelineViewModel({
         project: projectWithAllTimelineFamilies(),
-        selectedItemId,
+        selectedItemIds: selectedItemId === null ? [] : [selectedItemId],
         pending: null,
       }),
       lockedTrackIds: ['V1'],

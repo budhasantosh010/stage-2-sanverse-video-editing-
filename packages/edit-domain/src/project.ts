@@ -17,6 +17,8 @@ import {
   isCaptionOperation,
   isFootageMotionOperation,
   isOverlayFamilyOperation,
+  isTimelineGroupsOperation,
+  isTimelineMarkersOperation,
   isTimelineOperation,
   isTrackOutputOperation,
   isVisualPropertiesOperation,
@@ -33,6 +35,14 @@ import {
   foldTrackOutputOperations,
   type TrackOutputState,
 } from './track-output.ts'
+import {
+  foldTimelineMarkerOperations,
+  type TimelineMarkerV1,
+} from './timeline-markers.ts'
+import {
+  foldTimelineGroupOperations,
+  type TimelineGroupV1,
+} from './timeline-groups.ts'
 import { foldCaptionOperations, type CaptionSet } from './caption-operations.ts'
 import { applyTimelineOperation } from './timeline-operations.ts'
 import { PROJECT_TIMESCALE } from './time.ts'
@@ -808,6 +818,17 @@ export const activeVisualProperties = (project: EditProject): readonly SetVisual
 export const activeTrackOutputs = (project: EditProject): TrackOutputState =>
   foldTrackOutputOperations(activeOperations(project).filter(isTrackOutputOperation))
 
+/**
+ * The user's markers right now. Empty for every project that has never had one,
+ * which is every project saved before this existed. Nothing is rewritten.
+ */
+export const activeTimelineMarkers = (project: EditProject): readonly TimelineMarkerV1[] =>
+  foldTimelineMarkerOperations(activeOperations(project).filter(isTimelineMarkersOperation))
+
+/** The groups right now. Same reasoning as markers above. */
+export const activeTimelineGroups = (project: EditProject): readonly TimelineGroupV1[] =>
+  foldTimelineGroupOperations(activeOperations(project).filter(isTimelineGroupsOperation))
+
 /** Latest accepted non-overlapping primary-footage motion per stable motion ID. */
 export const effectiveFootageMotions = (project: EditProject): readonly SetFootageMotionOperation[] =>
   evaluateProject(project).footageMotions
@@ -932,8 +953,11 @@ export {
   isCaptionOperation,
   isFootageMotionOperation,
   isNameplateOperation,
+  isNonRenderOperation,
   isOverlayFamilyOperation,
   isSourceAnchoredOperation,
+  isTimelineGroupsOperation,
+  isTimelineMarkersOperation,
   isTimelineOperation,
   isTrackOutputOperation,
   isVisualPropertiesOperation,
@@ -952,6 +976,36 @@ export {
   type TimelineTrackId,
   type TrackOutputState,
 } from './track-output.ts'
+export {
+  MARKERS_OPERATION_KIND,
+  MARKER_COLORS,
+  MARKER_ID_PATTERN,
+  MAX_MARKERS,
+  MAX_MARKER_LABEL_LENGTH,
+  MAX_MARKER_NOTE_LENGTH,
+  foldTimelineMarkerOperations,
+  isMarkerColor,
+  markerAfter,
+  markerBefore,
+  searchMarkers,
+  sortMarkers,
+  validateSetTimelineMarkersOperation,
+  type MarkerColor,
+  type SetTimelineMarkersOperation,
+  type TimelineMarkerV1,
+} from './timeline-markers.ts'
+export {
+  GROUPS_OPERATION_KIND,
+  GROUP_ID_PATTERN,
+  MAX_GROUPS,
+  MAX_GROUP_MEMBERS,
+  foldTimelineGroupOperations,
+  groupForItem,
+  resolveGroupMembers,
+  validateSetTimelineGroupsOperation,
+  type SetTimelineGroupsOperation,
+  type TimelineGroupV1,
+} from './timeline-groups.ts'
 export {
   DEFAULT_VISUAL_PROPERTIES,
   MAX_KEYFRAMES_PER_TRACK,
@@ -1131,6 +1185,8 @@ export {
   REMOVE_RANGE_COMPONENT_ID,
   REORDER_PRIMITIVE_ID,
   SPLIT_PRIMITIVE_ID,
+  TIMELINE_GROUPS_PRIMITIVE_ID,
+  TIMELINE_MARKERS_PRIMITIVE_ID,
   TRACK_OUTPUT_PRIMITIVE_ID,
   TRIM_PRIMITIVE_ID,
   VISUAL_PROPERTIES_PRIMITIVE_ID,

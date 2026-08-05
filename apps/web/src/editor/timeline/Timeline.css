@@ -921,3 +921,298 @@
   max-width: 100%;
   overflow-x: auto;
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Gate T1 — creator interaction
+   ────────────────────────────────────────────────────────────────────────────
+
+   Everything below is INSIDE the timeline. No panel moved, the five semantic
+   rows are unchanged, and nothing here can push the page sideways.
+
+   Colour is never the only signal in any of it. Roughly one man in twelve
+   cannot reliably separate red from green, so every state also carries a shape,
+   an outline style, a word, or a position.
+*/
+
+/* The icon toolbar. Symbols fit where nine words do not, and every one of them
+   carries its name in a tooltip and to a screen reader. */
+.timeline-v1__icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* A real 32px target. Smaller than this and a symbol becomes a guess. */
+  min-width: 32px;
+  min-height: 32px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.timeline-v1__icon-button:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+}
+
+/* Chosen tools and switched-on helpers get a filled box AND a border, so the
+   state survives a laptop screen in daylight where a tint alone would not. */
+.timeline-v1__icon-button[aria-pressed='true'],
+.timeline-v1__icon-button[aria-checked='true'] {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-raised, rgba(127, 127, 127, 0.18));
+}
+
+.timeline-v1__icon-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.timeline-v1__icon-button:focus-visible {
+  outline: 2px solid var(--color-focus, currentColor);
+  outline-offset: 2px;
+}
+
+.timeline-v1__icon {
+  display: block;
+}
+
+/* The overflow menu. It is a menu, not a second toolbar: the words come back
+   here, because there is room for them. */
+.timeline-v1__more {
+  position: relative;
+  display: inline-flex;
+}
+
+.timeline-v1__more-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 260px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-surface, Canvas);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
+.timeline-v1__more-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.timeline-v1__more-item:hover:not(:disabled) {
+  background: var(--color-surface-raised, rgba(127, 127, 127, 0.18));
+}
+
+.timeline-v1__more-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.timeline-v1__more-label {
+  flex: 1 1 auto;
+}
+
+.timeline-v1__more-key {
+  flex: 0 0 auto;
+  opacity: 0.7;
+  font-size: 0.85em;
+}
+
+/* The box drawn round several things at once.
+
+   A dashed outline and a very light fill, so whatever is inside stays readable
+   while the box is over it. A solid fill would hide the very clips the user is
+   trying to decide about. */
+.timeline-v1__marquee {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  border: 1px dashed var(--color-border-strong, currentColor);
+  border-radius: 3px;
+  background: rgba(127, 127, 127, 0.12);
+}
+
+/* What the box has caught, said in words too. A rectangle on screen tells a
+   screen-reader user nothing at all. */
+.timeline-v1__marquee-status {
+  min-height: 1.2em;
+  margin: 2px 0 0;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.timeline-v1__lanes {
+  position: relative;
+}
+
+/* The strip of the user's own notes, above the ruler.
+
+   Not one of the five rows on purpose: a note has no sound, no picture and no
+   place in the export, so it must not take a row that has real work to do. */
+.timeline-v1__marker-strip {
+  position: relative;
+  height: 20px;
+  margin-bottom: 2px;
+}
+
+.timeline-v1__marker {
+  position: absolute;
+  top: 0;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  height: 20px;
+  min-width: 10px;
+  padding: 0 4px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.75em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* The flag itself. A note about a STRETCH gets a bar underneath as well, so a
+   point and a range are told apart without reading anything. */
+.timeline-v1__marker-flag {
+  display: block;
+  width: 8px;
+  height: 12px;
+  border-radius: 1px 3px 3px 1px;
+  background: currentColor;
+}
+
+.timeline-v1__marker[data-marker-range='true'] {
+  border-bottom: 3px solid currentColor;
+}
+
+.timeline-v1__marker[data-marker-color='red'] { color: #d93a3a; }
+.timeline-v1__marker[data-marker-color='amber'] { color: #c07a10; }
+.timeline-v1__marker[data-marker-color='green'] { color: #2c8a4b; }
+.timeline-v1__marker[data-marker-color='blue'] { color: #2b6cb0; }
+.timeline-v1__marker[data-marker-color='violet'] { color: #6b46c1; }
+
+/* The picked note gets a ring, not just a colour — see the note about colour
+   at the top of this section. */
+.timeline-v1__marker[aria-pressed='true'] {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+  border-radius: 3px;
+}
+
+.timeline-v1__marker:focus-visible {
+  outline: 2px solid var(--color-focus, currentColor);
+  outline-offset: 2px;
+}
+
+.timeline-v1__marker-label {
+  overflow: hidden;
+  max-width: 160px;
+  text-overflow: ellipsis;
+  color: var(--color-text);
+}
+
+.timeline-v1__marker-list {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.timeline-v1__marker-items {
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline-v1__marker-items li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.timeline-v1__marker-goto {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.timeline-v1__marker-time {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.timeline-v1__marker-note {
+  opacity: 0.7;
+}
+
+.timeline-v1__marker-colors {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  border: 0;
+  padding: 0;
+}
+
+.timeline-v1__marker-colors button {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* The chosen colour is marked with a thicker ring as well as being that
+   colour, so somebody who cannot separate two of them can still see which. */
+.timeline-v1__marker-colors button[aria-pressed='true'] {
+  outline: 2px solid var(--color-text);
+  outline-offset: 1px;
+}
+
+.timeline-v1__marker-colors button[data-marker-color-choice='neutral'] { background: #8a8a8a; }
+.timeline-v1__marker-colors button[data-marker-color-choice='red'] { background: #d93a3a; }
+.timeline-v1__marker-colors button[data-marker-color-choice='amber'] { background: #c07a10; }
+.timeline-v1__marker-colors button[data-marker-color-choice='green'] { background: #2c8a4b; }
+.timeline-v1__marker-colors button[data-marker-color-choice='blue'] { background: #2b6cb0; }
+.timeline-v1__marker-colors button[data-marker-color-choice='violet'] { background: #6b46c1; }
+
+/* Row heights. A folded row keeps a thin strip rather than vanishing: a row
+   that disappeared could not be found again to unfold it. */
+.timeline-v1__track-height select {
+  max-width: 92px;
+  font-size: 0.8em;
+}
+
+[data-track-collapsed='yes'] .timeline-v1__lane-header-name span {
+  display: none;
+}
+
+.timeline-v1__visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

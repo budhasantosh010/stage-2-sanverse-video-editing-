@@ -631,3 +631,46 @@ own vocabulary — "P1-A timeline lane", operation names, reason codes, COMMITTE
 on every clip — taken off the user's screen.
 
 Tests 1,736 → 1,848. Build exit 0. FAIL-051 and FAIL-052 closed.
+
+## 2026-08-06 — Gate P0 and Gate T1: picking, copying, grouping and noting
+
+**What a person could not do before.** The Timeline could hold exactly one thing
+at a time. Enough to click a clip and delete it; not enough for anything a
+creator actually does. There was no way to box several things, no copy, no
+paste, no duplicate, no way to say "these go together", and nowhere to write
+"fix this bit".
+
+**All of that now exists**, and every one of them is one gesture, one change set
+and one Undo. Four clips dragged and one Undo puts all four back — not the fourth
+back and three still moved. If any one of them cannot make the move, none of them
+move, because moving the ones that fit would change the very spacing the user
+picked several of them to preserve.
+
+**The ghost shown while dragging comes from the same planner that makes the
+edit.** There is no second "roughly what will happen" calculation. Gate T0 existed
+because two pieces of code answered the same question separately; this is that
+lesson applied before the bug.
+
+**An export is now identified by what it will produce, not by how many times the
+project was touched.** It used to be the revision number, which goes up on every
+accepted edit — so writing a note to yourself, or grouping three clips, or
+switching a track off and straight back on, threw away a finished video and made
+the user wait again for a byte-identical file. The key is now the compiled render
+plan. Proved in the running app: a real note moved the revision from 25 to 26,
+and pressing Export returned the same finished job instantly.
+
+**A real defect was found while writing the tests.** Clicking a piece of B-roll
+silently picked up the whole piece of main footage underneath it, because B-roll
+is pinned to a clip and so carries that clip's identity. The next Delete would
+have taken both. The link between a picture and its own sound is now matched only
+where that link can actually exist.
+
+**Transition became reachable.** Its operation, its preview support and its export
+support all already existed with no way for a user to press it — which the new
+capability inventory records as the most misleading kind of "partial".
+
+Also written: an inventory of every requested Timeline feature judged on seven
+separate questions, and a written refusal of veed-engine-cli on licence grounds
+with four hard rules so nobody has to work it out again.
+
+Tests 1,848 → 2,050. Build exit 0.

@@ -34,8 +34,14 @@ export type TimelineTrackHeaderProps = Readonly<{
    * happening the day somebody changes a row height.
    */
   heightPx: number
+  /** Folded away to a thin strip. Never to nothing: a row that vanished could
+   *  not be found again to unfold it. */
+  collapsed: boolean
   onToggleLock(): void
   onToggleOutput(): void
+  onToggleCollapsed(): void
+  /** A named size, or an exact number of pixels from dragging the edge. */
+  onHeight(height: 'compact' | 'standard' | 'tall' | number): void
 }>
 
 /** What each track is, in the user's words rather than an editor's. */
@@ -57,8 +63,11 @@ export function TimelineTrackHeader({
   outputEnabled,
   outputDisabledReason,
   heightPx,
+  collapsed,
   onToggleLock,
   onToggleOutput,
+  onToggleCollapsed,
+  onHeight,
 }: TimelineTrackHeaderProps) {
   const sound = isSoundTrack(trackId)
   const outputVerb = sound
@@ -74,6 +83,7 @@ export function TimelineTrackHeader({
       data-track-id={trackId}
       data-track-locked={locked ? 'yes' : 'no'}
       data-track-output={outputEnabled ? 'on' : 'off'}
+      data-track-collapsed={collapsed ? 'yes' : 'no'}
       style={{ ['--timeline-lane-height' as string]: `${heightPx}px` }}
     >
       <span className="timeline-v1__lane-header-name">
@@ -81,6 +91,39 @@ export function TimelineTrackHeader({
         <span>{TRACK_MEANING[trackId]}</span>
       </span>
       <span className="timeline-v1__lane-header-controls">
+        {/*
+          Folding a row away, and choosing how tall it is.
+
+          Both are about the SCREEN, not the video. Neither takes a revision,
+          neither takes a slot in Undo, and the exported file is byte-for-byte
+          what it would have been. See `timeline-track-presentation.ts`.
+        */}
+        <button
+          type="button"
+          className="timeline-v1__track-switch"
+          aria-pressed={collapsed}
+          aria-label={collapsed ? `Unfold ${label}` : `Fold ${label} away`}
+          title={collapsed
+            ? `${label} is folded away. Unfold it to see what is on it. Your video is unaffected.`
+            : `Fold ${label} away to make room. Your video is unaffected.`}
+          data-track-collapse
+          onClick={onToggleCollapsed}
+        >
+          <span aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+        </button>
+        <label className="timeline-v1__track-height">
+          <span className="timeline-v1__visually-hidden">How tall {label} is</span>
+          <select
+            value={heightPx <= 40 ? 'compact' : heightPx >= 80 ? 'tall' : 'standard'}
+            data-track-height
+            title={`How tall ${label} is drawn. Your video is unaffected.`}
+            onChange={(event) => onHeight(event.target.value as 'compact' | 'standard' | 'tall')}
+          >
+            <option value="compact">Short</option>
+            <option value="standard">Normal</option>
+            <option value="tall">Tall</option>
+          </select>
+        </label>
         <button
           type="button"
           className="timeline-v1__track-switch"

@@ -11,6 +11,7 @@ import { createProjectIntakeService, EXPORT_ID_PATTERN, PROJECT_ID_PATTERN, Proj
 import { createProjectStateService, type ProjectStateService } from './projects/project-state-service.ts'
 import { ASSET_SCHEMA_VERSION, NAMEPLATE_COMPONENT_ID } from '@sanverse/edit-domain'
 import { RENDER_PLAN_SCHEMA_VERSION } from '@sanverse/render-contract'
+import { exportIdempotencyKey } from './render/export-identity.ts'
 import {
   contentTypeFor,
   createFfprobeMediaDescriber,
@@ -634,9 +635,10 @@ export function createSanverseServer(options: ServerOptions) {
         const jobId = generateExportJobId()
         if (!EXPORT_ID_PATTERN.test(exportId)) throw new Error('exportIdGenerator returned an invalid opaque export ID.')
         if (!EXPORT_JOB_ID_PATTERN.test(jobId)) throw new Error('exportJobIdGenerator returned an invalid opaque job ID.')
-        const idempotencyKey = createHash('sha256')
-          .update(`${project.projectId}:${project.revision}:${RENDER_PLAN_SCHEMA_VERSION}`)
-          .digest('hex')
+        // Identified by what it will PRODUCE, not by how many times the project
+        // was touched — so writing a note or grouping clips does not throw away
+        // a finished video. See `export-identity.ts`.
+        const idempotencyKey = exportIdempotencyKey(project)
         const created = await exportJobs.create({ jobId, project, exportId, idempotencyKey })
         json(response, 202, exportJobs.publicJob(created.job))
         void startExportJob(created.job.jobId)

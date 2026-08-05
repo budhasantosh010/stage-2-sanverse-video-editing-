@@ -653,3 +653,27 @@ history, preview, and export path remain authoritative. Media V2 capabilities,
 Timeline V2, Inspector expansion, AI expansion, and renderer work have not
 started. Owner visual approval remains open. Evidence:
 `DOCS/evidence/2026-08-03-p1f022-media-monitor/`.
+
+## Gate T1 checkpoint — 2026-08-06
+
+Gate P0 and Gate T1 of the P1-F.1E Timeline programme are complete, tested,
+proven in the running app on the owner's own project, committed and pushed.
+
+The Timeline can now hold more than one thing at a time: click, Ctrl-click,
+Shift-range, Select All, and a box dragged round several. Everything picked can
+be moved or trimmed together as ONE change set and ONE Undo, all-or-nothing.
+Copy, cut, paste and duplicate work and hold ids and numbers only — never a path
+or a URL. Things can be grouped so they move together, and notes can be pinned to
+moments with a label, a longer note and a colour. Rows can be made short, normal
+or tall, or folded away. Keyboard shortcuts follow one of four presets or the
+user's own. Empty space is now something that can be selected and closed.
+
+Groups and notes are part of the project and are undoable, and neither changes
+one frame of the exported video — which required fixing how an export is
+identified: it is now the compiled render plan, not the revision number.
+
+Studio layout, the five semantic tracks, one playhead, one video element, integer
+ticks and preview/export parity are all unchanged.
+
+Tests 2,050. Build exit 0. Gates T2 to T7 have NOT started.
+Evidence: `DOCS/evidence/2026-08-04-timeline-completion/T1_CREATOR_INTERACTION.md`.

@@ -113,6 +113,21 @@ export const describeOperation = (operation: EditOperation): string => {
       return operation.tracks.length > 0
         ? 'Changed how something moves'
         : 'Changed its position or appearance'
+    case 'set-timeline-markers':
+      // The whole list is sent every time, so "how many are there now" is the
+      // only honest thing to say. Saying "added a note" would be a guess, and it
+      // would be wrong for a deletion.
+      return operation.markers.length === 0
+        ? 'Cleared your notes'
+        : operation.markers.length === 1
+          ? 'Changed your note'
+          : `Changed your notes (${operation.markers.length} now)`
+    case 'set-timeline-groups':
+      return operation.groups.length === 0
+        ? 'Stopped things moving together'
+        : operation.groups.length === 1
+          ? 'Made some things move together'
+          : `Changed which things move together (${operation.groups.length} groups)`
     case 'set-footage-motion':
       return operation.tracks.length > 0
         ? 'Changed how the main footage moves'

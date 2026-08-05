@@ -29,7 +29,14 @@ export type TimelineItemProps = Readonly<{
   pointerTicks(clientX: number): number
   pointerTime(clientX: number, excludedTicks?: readonly number[], bypassSnapping?: boolean): TimelineSnapResult
   onSnapGuide(ticks: number | null): void
-  onSelect(itemId: string): void
+  /**
+   * Picking this item, and which keys were held while doing it.
+   *
+   * The modifiers travel WITH the click rather than being read from somewhere
+   * else, because "was Ctrl down" is only true for the instant of that press.
+   * Reading it later would sometimes answer about a different key press.
+   */
+  onSelect(itemId: string, modifiers?: Readonly<{ ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }>): void
   onSeek(ticks: number): void
   onGesture(gesture: TimelineGesture): void
   /** One whole gesture on something laid on top of the footage. */
@@ -155,7 +162,14 @@ export function TimelineItem({
   const canDragBody = isOverlayFamily && item.state === 'committed' && !busy
 
   const selectAndSeek = (event?: MouseEvent<HTMLButtonElement>) => {
-    onSelect(item.id)
+    const modifiers = event
+      ? { ctrlKey: event.ctrlKey, metaKey: event.metaKey, shiftKey: event.shiftKey }
+      : undefined
+    onSelect(item.id, modifiers)
+    // Adding something to a selection must NOT move the playhead. The user is
+    // building up a group of things to act on; jumping the picture about while
+    // they do it makes them lose their place in their own video.
+    if (modifiers && (modifiers.ctrlKey || modifiers.metaKey || modifiers.shiftKey)) return
     if (event) {
       onSeek(pointerTicks(event.clientX))
     } else {
@@ -249,6 +263,7 @@ export function TimelineItem({
         aria-selected={item.selected}
         title={itemAccessibleLabel(item, timescale)}
         data-testid="timeline-item"
+        data-timeline-item-id={item.id}
         data-state={item.state}
         data-kind={item.kind}
         data-lane-kind={laneKind}

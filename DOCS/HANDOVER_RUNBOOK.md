@@ -94,3 +94,19 @@ If the timeline shows rectangles with no pictures in them:
    in that path, because the stored name describes the request, not the method.
 5. **Nothing here can damage a project.** Preview pictures create no operation,
    no change set, no revision and no Undo entry.
+
+## Resuming the Timeline programme — 2026-08-06
+
+1. `git log --oneline -1` and `git status --short`. The tree should be clean and
+   HEAD should equal `origin/agent/g6-g8-local-alpha`.
+2. Open `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md`. Find the
+   first gate that is not DONE and continue at its first unticked box. **Do not
+   reconstruct state from chat history.**
+3. Expect 2,050 tests and `npm run build` exit 0 before changing anything. If the
+   numbers differ, find out why before starting.
+4. Heavy suites on Windows:
+   `npx vitest run --root apps/web --pool=forks --poolOptions.forks.singleFork=true`
+5. The API loads TypeScript at boot. After changing anything under `apps/api`,
+   stop and restart the preview server or you will test the old code.
+6. Since Gate T1, bumping the revision no longer busts a cached export. See the
+   handoff note above.

@@ -111,3 +111,22 @@ Last updated: 2026-08-03
 - [x] Full suites 1,723 passing; production build exit 0
 - [ ] Owner visual acceptance
 - [ ] FAIL-051 portrait footage in a landscape export (recorded, not fixed)
+
+## P1-F.1E Gate P0 + Gate T1 — 2026-08-06
+
+- [x] Capability inventory written — every requested feature judged on seven
+      questions; 27 built, 8 partial, 31 absent, 0 that rewrite a saved project
+- [x] OpenEdit adoption report written; veed-engine-cli refused on licence grounds
+- [x] Selection V2: click, Ctrl, Shift range, Select All, per-row, before/after
+- [x] Marquee with edge auto-scroll and Escape; no revision, no Undo entry
+- [x] Multi-move and multi-trim through ONE planner; all-or-nothing; one Undo
+- [x] Groups and markers as new domain operations; undoable; no render effect
+- [x] Export key now describes the render plan, so a note keeps a finished export
+- [x] Clipboard holds ids and numbers only — closed field list, asserted
+- [x] Icon toolbar with tooltips, aria labels, shortcut hints, disabled reasons
+- [x] Transition reachable for the first time (operation already export-proven)
+- [x] Row heights and folds, keyboard presets — browser settings, no revision
+- [x] Gap objects: selectable, described truthfully, closable in one change set
+- [x] Full suites 2,050 passing; production build exit 0
+- [x] Real browser workflow, 20 steps, four screen sizes measured
+- [ ] Owner visual acceptance
