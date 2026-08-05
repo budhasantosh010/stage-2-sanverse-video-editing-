@@ -51,19 +51,41 @@ const DRAGGABLE_KINDS: readonly TimelineItemView['kind'][] = Object.freeze(['med
 /** Below this the pointer has not really moved; it was a click, and a click selects. */
 const DRAG_THRESHOLD_PX = 3
 
-const itemStateLabel = (item: TimelineItemView): string => {
+/**
+ * The small word under a clip's name — and nothing at all when it would only
+ * repeat what the user can already see.
+ *
+ * Every ordinary clip used to be labelled COMMITTED, in capitals, on the clip
+ * itself. In a video made of eight clips that is the word COMMITTED eight
+ * times, saying nothing: of course it is in the video, it is on the timeline.
+ * Worse, it is our word, not the user's — "committed" is what an engineer calls
+ * an edit that has been recorded, and a non-editor reading it has no idea
+ * whether it is good news.
+ *
+ * The three states that ARE worth a word all mean something is different about
+ * that clip, so those keep their label and now stand out because they are the
+ * only ones wearing one.
+ */
+const itemStateLabel = (item: TimelineItemView): string | null => {
   if (item.state === 'proposed') return 'Proposed'
   if (item.state === 'blocked') return 'Needs attention'
   if (!item.enabled) return 'Hidden'
-  return 'Committed'
+  return null
 }
+
+/**
+ * The same thing for a screen reader, which cannot see that a clip sits on the
+ * timeline and so does need telling. Plain words, never "committed".
+ */
+const itemStateForScreenReader = (item: TimelineItemView): string =>
+  itemStateLabel(item) ?? 'in your video'
 
 const itemAccessibleLabel = (item: TimelineItemView, timescale: number): string => {
   const kind = item.kind.replace('-', ' ')
   const start = formatTimelineTime(item.startTicks, timescale, true)
   const duration = formatTimelineTime(item.durationTicks, timescale, true)
   const detail = item.detail ? `, ${item.detail}` : ''
-  return `${kind}, ${item.label}${detail}, starts ${start}, duration ${duration}, ${itemStateLabel(item)}`
+  return `${kind}, ${item.label}${detail}, starts ${start}, duration ${duration}, ${itemStateForScreenReader(item)}`
 }
 
 /** What the small mark in the corner says, when there is anything to say. */
@@ -287,7 +309,7 @@ export function TimelineItem({
           onStateChange={onDecorationState}
         />
         <span className="timeline-v1__item-label">{item.label}</span>
-        <span className="timeline-v1__item-state">{itemStateLabel(item)}</span>
+        {itemStateLabel(item) ? <span className="timeline-v1__item-state">{itemStateLabel(item)}</span> : null}
         {item.blockedReason ? <span className="timeline-v1__item-warning">Needs attention</span> : null}
         {/*
           A preview that could not be made is SAID, not left as a blank. A blank

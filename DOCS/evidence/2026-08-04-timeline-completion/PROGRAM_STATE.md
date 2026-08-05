@@ -7,10 +7,11 @@ of a gate.**
 Last updated: 2026-08-05
 Branch: `agent/g6-g8-local-alpha`
 Program start commit: `45c0c981fb869afd236f10cbea829b1859d5beb6`
-Latest pushed commit: `b18d2344ccaa9de967c6d094e64b69742d5c5d70`
+Latest pushed commit: see `git rev-parse HEAD` — this file is committed WITH the
+work it describes, so HEAD is always the commit that made these numbers true.
 Test baseline at program start: **1,723**
-Tests now: **1,736** — edit-domain 378 · render-contract 82 · intent-domain 27 ·
-api 341 · web 908. `npm run build` exit 0.
+Tests now: **1,848** — edit-domain 378 · render-contract 108 · intent-domain 27 ·
+api 352 · web 983. `npm run build` exit 0.
 
 ---
 
@@ -20,9 +21,7 @@ api 341 · web 908. `npm run build` exit 0.
   GATE   WHAT IT IS                                   STATE        COMMIT
   ────   ──────────────────────────────────────────   ──────────   ──────────
   P0     Verify + capability inventory                IN PROGRESS  —
-  T0     Correctness: preview truth, mixed export     IN PROGRESS  —
-         └─ false gap SOLVED (T0.1, T0.2)             done         b18d234
-         └─ remaining: T0.1b diagnostics, T0.3..T0.9  open
+  T0     Correctness: preview truth, mixed export     DONE         (this commit)
   T1     Creator interaction: selection/clipboard     NOT STARTED  —
   T2     Speed, audio, transitions                    NOT STARTED  —
   T3     Precision trim: ripple/roll/slip/slide       NOT STARTED  —
@@ -75,33 +74,57 @@ about whether your footage exists is the wrong order.
 - [ ] `TIMELINE_CAPABILITY_INVENTORY.md` written
 - [x] `OWNER_RECORDING_REPRODUCTION.md` written — **root cause found and fixed**
 
-### T0 — CORRECTNESS, TRUST AND EXPORT COMPATIBILITY
+### T0 — CORRECTNESS, TRUST AND EXPORT COMPATIBILITY — **DONE**
 
-Commit message when done:
-`[verified] fix(timeline): restore preview truth and mixed-format export`
+Committed as `[verified] fix(timeline): restore preview truth and mixed-format export`
 
-**THE FALSE GAP IS SOLVED.** Root cause, in one line: deleting a V2 overlay you
-had moved or scaled left an adjustment naming nothing, which made the compiler
-refuse the WHOLE project, which the preview read as "the timeline is empty
-everywhere". Full story in `OWNER_RECORDING_REPRODUCTION.md`. Two fixes landed:
-`primary-source.ts` (existence is read from the user's edit, never from a build
-that can fail as a whole) and `compile-project.ts` (a dangling adjustment draws
-nothing instead of failing the project).
+Two things the user could see were broken, and both are fixed and proven in the
+running app on the owner's real project:
+
+1. **The preview called real footage empty.** Deleting an overlay you had moved
+   left an adjustment naming nothing, the compiler refused the WHOLE project,
+   and the preview read that refusal as "the timeline is empty everywhere".
+2. **A phone clip made Export fail outright.** Footage went into the exporter at
+   whatever size it was recorded at, and the step that joins the pieces refuses
+   unless they are already all the same size. Any two clips of different sizes
+   failed, not only portrait ones.
 
 - [x] T0.1 reproduce the false gap — reproduced by test, root cause named
 - [x] T0.2 one pure `PrimarySourceDecisionV1` resolver — `primary-source.ts`
-- [ ] T0.1b dev-only diagnostics panel (the 20 listed values)
-- [ ] T0.3 source reconciliation after every accepted operation
-- [ ] T0.4 primary-preview invariant test
-- [ ] T0.5 stale-draft recovery without reopening the project
-- [ ] T0.6 explicit `SaveState` with a real recovery path
-- [ ] T0.7 mixed-aspect / mixed-format export — **this is FAIL-051**
-- [ ] T0.8 remove engineering UI from the production Timeline
-- [ ] T0.9 visual polish, no layout change
-- [ ] full suites + build
-- [ ] real browser workflow
-- [ ] real mixed-aspect MP4 probed
-- [ ] committed, pushed, SHA verified
+- [x] T0.1b dev-only diagnostics — `timeline-monitor-diagnostics.ts`, 12 tests
+- [x] T0.3 source reconciliation — `preview-reconciliation.ts`; found the SAME
+      "read it from the compiled plan" bug in a second place and fixed it
+- [x] T0.4 primary-preview invariant — `preview-invariant.test.ts`, 24 tests,
+      the A–T matrix driven through real domain operations
+- [x] T0.5 stale-draft recovery — `draft-reconciliation.ts`, 14 tests.
+      "Reopen it and try again" is gone.
+- [x] T0.6 explicit `SaveState` — `save-state.ts`, 25 tests.
+      "Local save needs attention" is gone.
+- [x] T0.7 mixed-aspect / mixed-format export — **FAIL-051 CLOSED**.
+      `visual-normalization.ts` is the one geometry authority both the preview
+      and FFmpeg read. 26 + 11 tests.
+- [x] T0.8 engineering UI removed — no "P1-A", no operation names, no reason
+      codes, no COMMITTED on every clip
+- [x] T0.9 bounded polish, no layout change
+- [x] full suites + build — 1,848 passing, build exit 0
+- [x] real browser workflow — `T0_BROWSER_WORKFLOW.md`, including what was NOT
+      driven by hand
+- [x] real mixed-aspect MP4 probed — 1920×1080, SAR 1:1, 27.278 s, portrait
+      footage letterboxed, frames sampled and measured
+- [x] committed, pushed, SHA verified
+
+Evidence: `T0_MIXED_FORMAT_EXPORT.md`, `T0_SOURCE_RECONCILIATION.md`,
+`T0_STALE_DRAFT_RECOVERY.md`, `T0_SAVE_RECOVERY.md`,
+`T0_ENGINEERING_UI_REMOVAL.md`, `T0_BROWSER_WORKFLOW.md`,
+`OWNER_RECORDING_REPRODUCTION.md`, `screenshots/`.
+
+**Known and deliberately left open** (each stated in its own evidence file):
+- a save `conflict` is reported truthfully but there is no chooser yet
+- only the nameplate family can be a pending proposal, so draft recovery is
+  complete for what exists and will need extending
+- `outputStateAt` in `segment-playback.ts` is still defined but unused
+- the four screen sizes were not measured this session
+- two pre-existing View-Transition console warnings, unrelated, not fixed
 
 ### T1 — CREATOR INTERACTION PARITY
 
@@ -198,7 +221,13 @@ Commit: `[verified] feat(timeline): complete AI-ready transcript timeline contra
 - Heavy vitest suites on Windows need
   `--pool=forks --poolOptions.forks.singleFork=true`.
 - The API loads TypeScript at boot: server changes need `preview_stop` then
-  `preview_start` (config name `sanverse`).
+  `preview_start` (config name `sanverse`). **This cost real time in T0**: the
+  first export after fixing the exporter failed, because the running server was
+  still using the old code. It is the most misleading signal there is — a
+  correct fix that appears not to work.
+- Simulated HTML5 drag events do NOT reach the app's drop handler in this
+  browser harness. Drive placement through the operation the drop produces and
+  say plainly that you did.
 - The Browser pane here does not composite, so `computer{action:"screenshot"}`
   times out. Build owner-reviewable pictures from real API answers instead.
 - The web suite's global RTL cleanup and the recording canvas stub live in

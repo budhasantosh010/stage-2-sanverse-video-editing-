@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react'
 
+import {
+  saveStateMessage,
+  saveStateOffersRetry,
+  type SaveStateV1,
+} from '../features/save/save-state'
 import { Button, DisabledAction, IconButton, SegmentedControl } from './ui'
 import { StudioWorkspaceTabs, type StudioWorkspace } from './workspace'
 import './EditorShell.css'
@@ -10,7 +15,9 @@ export type EditorShellProps = {
   workspace: EditorWorkspace
   studioWorkspace: StudioWorkspace
   projectName: string
-  saveState: 'idle' | 'saving' | 'saved' | 'error'
+  saveState: SaveStateV1
+  /** Absent means there is nothing to retry with, so no button is offered. */
+  onRetrySave?: (() => void) | undefined
   undoDisabledReason: string | null
   redoDisabledReason: string | null
   exportDisabledReason: string | null
@@ -41,18 +48,13 @@ const WORKSPACES = Object.freeze([
   description: string
 }>)
 
-function saveMessage(saveState: EditorShellProps['saveState']) {
-  if (saveState === 'saving') return 'Saving locally…'
-  if (saveState === 'saved') return 'Saved locally'
-  if (saveState === 'error') return 'Local save needs attention'
-  return 'Local project'
-}
 
 export function EditorShell({
   workspace,
   studioWorkspace,
   projectName,
   saveState,
+  onRetrySave,
   undoDisabledReason,
   redoDisabledReason,
   exportDisabledReason,
@@ -92,12 +94,22 @@ export function EditorShell({
 
         <div className="editor-shell__actions">
           <span
-            className={`editor-shell__save editor-shell__save--${saveState}`}
+            className={`editor-shell__save editor-shell__save--${saveState.status}`}
             role="status"
             aria-label="Project save status"
           >
-            {saveMessage(saveState)}
+            {saveStateMessage(saveState)}
           </span>
+          {/*
+            Something to press, whenever there is something the user can do.
+            The state this replaced said "Local save needs attention" and gave
+            them nothing to press, so the only move left was to guess.
+          */}
+          {saveStateOffersRetry(saveState) && onRetrySave ? (
+            <Button variant="secondary" aria-label="Try saving again" onClick={onRetrySave}>
+              Try saving again
+            </Button>
+          ) : null}
           <DisabledAction disabled={undoDisabled} label="Undo edit" reason={undoDisabledReason}>
             <IconButton label="Undo edit" icon="↶" disabled={undoDisabled} onClick={onUndo} />
           </DisabledAction>

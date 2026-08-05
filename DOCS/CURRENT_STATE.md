@@ -11,7 +11,9 @@ checklist and the rules are in
 `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md` — **read that
 file first in any new session.**
 
-### The most important thing fixed so far: the preview stopped lying
+**Gate T0 is DONE.** Gates T1 through T7 are NOT STARTED. Tests: **1,848**.
+
+### Gate T0, thing one: the preview stopped lying
 
 The monitor used to say **"No media at this time"** while footage was plainly
 under the playhead. It looked like selecting a clip caused it. It did not.
@@ -38,7 +40,60 @@ that your own timeline lies, and after that nothing it shows you can be trusted.
 Now: whether footage exists is read from your edit, never from a build that can
 fail as a whole, so one broken thing costs only its own stretch. And black says
 *which* black it is — no clip, track switched off, clip switched off, or file
-missing (which is reported as a fault, not as a gap). Recorded as FAIL-052.
+missing (which is reported as a fault, not as a gap). Recorded as FAIL-052,
+now closed after being proven in the real browser on your own project — which,
+it turned out, already contained the exact add-move-delete sequence.
+
+### Gate T0, thing two: a phone clip no longer breaks Export
+
+Film something on your phone held upright, add it to a normal widescreen
+project, press Export, and you used to get:
+
+> The local renderer could not produce a verified MP4.
+
+Nothing else. No reason, nowhere to go.
+
+The cause: footage went into the exporter at whatever size it was recorded at,
+and the step that joins the pieces of your finished video end to end **refuses
+outright** unless every piece is already the same width, the same height and the
+same pixel shape. Nothing made that true. It was invisible for as long as a
+project could only hold one recording, because then "the size of the footage" and
+"the size of the finished video" were the same number by accident.
+
+This was recorded as FAIL-051, "portrait footage cannot be exported". That
+understated it. **Any two clips of different sizes failed** — 1080p next to 720p,
+a 4K clip next to anything. Anybody who filmed twice on different devices hit it.
+
+Now one file owns the rule for fitting a picture of one shape into a canvas of
+another, and *both* the preview in your browser and the exporter read it, so the
+two cannot disagree:
+
+```
+  FIT (the default)          FILL (if you ask for it)
+  show the whole picture,    fill the screen edge to edge,
+  black bars at the sides    cut off what hangs over
+```
+
+There is deliberately no third option. Stretching the picture to fit — making a
+face wide and flat — is never what anybody wants.
+
+Proven end to end: your real 714 x 1280 phone clip, in your real 1920 x 1080
+project, exported from the real Export button. `1920 x 1080, 27s`, whole picture,
+correct proportions, bars at the sides. FAIL-051 closed.
+
+### Gate T0, the rest
+
+- **"Local save needs attention" is gone.** It said nothing, offered nothing to
+  press, and never went away. Now the app says what happened, how much of your
+  work is already safely on disk ("up to change 21"), tries again by itself three
+  times where that could help, and gives you a button where it cannot.
+- **"Reopen it and try again" is gone.** Making an ordinary edit while a
+  suggestion was on screen used to force you to leave the editor entirely. Now
+  the suggestion is carried forward wherever it still makes sense, and cancelled
+  — with a reason, and never re-pointed at some other clip — where it does not.
+- **Our own words are off your screen.** No "P1-A timeline lane", no internal
+  operation names, no reason codes, and no "COMMITTED" stamped on every single
+  clip.
 
 ## Previously completed
 

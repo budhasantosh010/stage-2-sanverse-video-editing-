@@ -20,7 +20,12 @@ import {
   startConversationRequest,
   updateDraftRequest,
   type AppState,
+  type StudioState,
 } from './app-state'
+import {
+  draftCancellationMessage,
+  reconcileDetachedDraft,
+} from '../features/proposal-recovery/draft-reconciliation'
 import {
   CONVERSATION_ERROR,
   requestIntent,
@@ -39,6 +44,14 @@ import {
   undoProject,
   type RecentProject,
 } from '../features/project-library/project-library'
+import {
+  classifySaveFailure,
+  isRecoverableRefusal,
+  nextSaveState,
+  openedSaveState,
+  saveRetryDelayMs,
+  type SaveStateV1,
+} from '../features/save/save-state'
 import { transitionView } from '../features/view-transition/view-transition'
 import { probeMediaSourceStatus } from '../features/media'
 import { HomeScreen } from '../screens/home/HomeScreen'
@@ -47,6 +60,31 @@ import { EditorShell, type EditorWorkspace } from '../editor/EditorShell'
 import { loadWorkspaceLayout, type StudioWorkspace } from '../editor/workspace'
 
 const probeProjectMediaSource = (url: string) => probeMediaSourceStatus(url, fetch)
+
+/**
+ * Keep a pending suggestion alive across an accepted edit wherever it still
+ * makes sense, and cancel only that suggestion when it does not.
+ *
+ * `previous` is the studio state before the new project was adopted; `adopted`
+ * is the same state carrying it. The accepted project is never altered here —
+ * the worst outcome is that the suggestion is dropped and the user is told why.
+ */
+function carryDraftForward(previous: StudioState, adopted: StudioState, nextProject: EditProject): StudioState {
+  const pending = previous.proposal
+  if (!pending) return adopted
+  const outcome = reconcileDetachedDraft({
+    draft: pending,
+    baseRevision: previous.editProject.revision,
+    baseProjectId: previous.project.id,
+    nextProject,
+  })
+  if (outcome.status === 'cancelled') {
+    return { ...adopted, proposal: null, editError: draftCancellationMessage(outcome.reason) }
+  }
+  // Unchanged, and deliberately so: carrying forward is a re-check, not a
+  // rewrite. Every word the user typed and every position they chose survives.
+  return { ...adopted, proposal: pending }
+}
 
 export function App() {
   const [appState, setAppState] = useState<AppState>(createInitialState)
@@ -61,7 +99,10 @@ export function App() {
   const [recentProjects, setRecentProjects] = useState<readonly RecentProject[]>([])
   const [libraryError, setLibraryError] = useState('')
   const [isOpeningRecent, setIsOpeningRecent] = useState(false)
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveState, setSaveState] = useState<SaveStateV1>(() => openedSaveState(0))
+  /** The save to run again when the user presses Try saving again, or on reconnect. */
+  const pendingSaveRef = useRef<((projectId: string) => Promise<EditProject>) | null>(null)
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [workspace, setWorkspace] = useState<EditorWorkspace>('assist')
   const [conversationDraft, setConversationDraft] = useState('')
   const [studioWorkspace, setStudioWorkspace] = useState<StudioWorkspace>(() => {
@@ -180,31 +221,102 @@ export function App() {
    * Every edit is applied by the server, one at a time, and the browser adopts
    * whatever the server reports back. The browser never decides the new state,
    * so it can never overwrite work it did not see.
+   *
+   * `attempt` counts automatic retries. A failure that trying again could
+   * genuinely fix — the connection dropped, the server was restarting, a write
+   * did not land — is retried on its own up to three times, waiting longer each
+   * time. Anything else stops immediately and says what happened, because
+   * repeating it would fail identically forever and a spinner that never ends
+   * is a worse lie than an error. See `features/save/save-state.ts`.
    */
-  function requestEdit(run: (projectId: string) => Promise<EditProject>): void {
+  function requestEdit(run: (projectId: string) => Promise<EditProject>, attempt = 0): void {
     if (appState.screen !== 'studio') return
     const projectId = appState.project.id
+    const targetRevision = appState.editProject.revision + 1
     const sequence = saveSequenceRef.current + 1
     saveSequenceRef.current = sequence
+    if (retryTimerRef.current !== null) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
+    pendingSaveRef.current = run
     resetExport()
-    setSaveState('saving')
+    setSaveState((current) => nextSaveState(
+      current,
+      attempt === 0 ? { kind: 'edit-started', targetRevision } : { kind: 'retry-started' },
+    ))
 
     const request = saveQueueRef.current.catch(() => undefined).then(() => run(projectId))
     saveQueueRef.current = request.then(() => undefined, () => undefined)
     void request.then(
       (editProject) => {
         if (saveSequenceRef.current !== sequence) return
-        setAppState((current) => (current.screen === 'studio' ? applyServerProject(current, editProject) : current))
-        setSaveState('saved')
+        pendingSaveRef.current = null
+        setAppState((current) => {
+          if (current.screen !== 'studio') return current
+          const adopted = applyServerProject(current, editProject)
+          // A suggestion sitting on screen was worked out against the project as
+          // it was a moment ago. Now that the project has moved, decide once
+          // whether it still applies — rather than finding out at the moment the
+          // user presses Accept and refusing them then.
+          return current.proposal ? carryDraftForward(current, adopted, editProject) : adopted
+        })
+        setSaveState((current) => nextSaveState(current, { kind: 'persisted', revision: editProject.revision }))
       },
       (error: unknown) => {
         if (saveSequenceRef.current !== sequence) return
-        setSaveState('error')
-        const message = error instanceof Error ? error.message : 'This edit could not be saved. Nothing was changed.'
-        setAppState((current) => (current.screen === 'studio' ? reportEditError(current, message) : current))
+        const online = typeof navigator === 'undefined' ? true : navigator.onLine !== false
+        const refusal = classifySaveFailure(error, online)
+        const nextAttempt = attempt + 1
+        const delay = isRecoverableRefusal(refusal) ? saveRetryDelayMs(nextAttempt) : null
+
+        if (delay !== null) {
+          // Say plainly that it is trying again, rather than leaving the user
+          // watching a spinner that means nothing.
+          setSaveState((current) => nextSaveState(current, { kind: 'retry-scheduled' }))
+          retryTimerRef.current = setTimeout(() => {
+            retryTimerRef.current = null
+            requestEdit(run, nextAttempt)
+          }, delay)
+          return
+        }
+
+        setSaveState((current) => nextSaveState(current, { kind: 'failed', refusal }))
+        // A conflict is not a lost edit and must not read like one. The user's
+        // accepted project is untouched; only this one change did not land.
+        const message = refusal === 'SAVE_CANCELLED'
+          ? null
+          : error instanceof Error ? error.message : 'This edit could not be saved. Nothing was changed.'
+        if (message !== null) {
+          setAppState((current) => (current.screen === 'studio' ? reportEditError(current, message) : current))
+        }
       },
     )
   }
+
+  /**
+   * Pick a failed save back up the moment the connection returns.
+   *
+   * Without this the user has to notice the wifi came back and press something.
+   * They should not have to: the thing that failed is known, and it is safe to
+   * run again because the server applies edits one at a time and refuses one
+   * built on a revision it has moved past.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onOnline = () => {
+      setSaveState((current) => nextSaveState(current, { kind: 'connection-restored' }))
+      const pending = pendingSaveRef.current
+      if (pending) requestEdit(pending, 1)
+    }
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  })
+
+  /** Stop a scheduled retry from firing into a screen that has gone away. */
+  useEffect(() => () => {
+    if (retryTimerRef.current !== null) clearTimeout(retryTimerRef.current)
+  }, [])
 
   /**
    * Ask the assistant for an edit.
@@ -295,7 +407,7 @@ export function App() {
                   setIsStarting(false)
                   setExportState({ status: 'idle' })
                   saveSequenceRef.current += 1
-                  setSaveState('idle')
+                  setSaveState(openedSaveState(project.editProject.revision))
                   setRecentProjects((projects) => Object.freeze([project, ...projects.filter((candidate) => candidate.id !== project.id)]))
                 })
               })
@@ -342,7 +454,7 @@ export function App() {
                   setIsOpeningRecent(false)
                   setExportState({ status: 'idle' })
                   saveSequenceRef.current += 1
-                  setSaveState('saved')
+                  setSaveState(openedSaveState(project.project.revision))
                 })
               })
             })
@@ -381,6 +493,10 @@ export function App() {
       studioWorkspace={studioWorkspace}
       projectName={appState.project.name}
       saveState={saveState}
+      onRetrySave={pendingSaveRef.current ? () => {
+        const pending = pendingSaveRef.current
+        if (pending) requestEdit(pending, 1)
+      } : undefined}
       undoDisabledReason={undoDisabledReason}
       redoDisabledReason={redoDisabledReason}
       exportDisabledReason={exportDisabledReason}
@@ -399,7 +515,8 @@ export function App() {
             )
             setWorkspace('assist')
             saveSequenceRef.current += 1
-            setSaveState('idle')
+            pendingSaveRef.current = null
+            setSaveState(openedSaveState(0))
           })
         })
       }}

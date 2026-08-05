@@ -205,8 +205,16 @@ describe('captions, overlays, and music', () => {
     const model = build(blockedPlacementProject())
     expect(lane(model, 'lane:overlay').items).toEqual([])
     expect(model.diagnostics).toEqual([
-      expect.objectContaining({ code: 'OPERATION_BLOCKED', message: expect.stringContaining('SOURCE_SPAN_REMOVED') }),
+      expect.objectContaining({ code: 'OPERATION_BLOCKED' }),
     ])
+    // The notice says what happened to their video, not what we called it.
+    // It used to read "add-nameplate is blocked: SOURCE_SPAN_REMOVED." — our
+    // internal name for the edit and our internal name for the reason, neither
+    // of which means anything to the person reading it.
+    const [notice] = model.diagnostics
+    expect(notice.message).toContain('cut out')
+    expect(notice.message).not.toMatch(/[A-Z]{2,}_[A-Z]/)
+    expect(notice.message).not.toContain('add-nameplate')
   })
 })
 
@@ -246,7 +254,7 @@ describe('detached proposals and diagnostics', () => {
     ])
   })
 
-  it('reports visual-property operations that have no P1-A lane', () => {
+  it('says nothing at all about a visual adjustment having no lane yet', () => {
     const ids = createIds()
     const nameplateOperation = nameplate(ids.operation())
     let project = acceptOperation(testProject(), nameplateOperation)
@@ -259,9 +267,13 @@ describe('detached proposals and diagnostics', () => {
       ...DEFAULT_VISUAL_PROPERTIES,
       extensions: {},
     })
-    expect(build(project).diagnostics).toContainEqual(
-      expect.objectContaining({ code: 'OPERATION_UNSUPPORTED', operationId: expect.stringMatching(/^operation_/) }),
-    )
+    // This used to raise one notice per adjustment reading "Visual-property
+    // keyframes and effects do not have a P1-A timeline lane." Every word of it
+    // was about our own unfinished work: "P1-A" is a build stage, and nothing
+    // was actually wrong — the adjustment worked, the preview shows it, and the
+    // export includes it. Repeating it taught the user that their project was
+    // full of problems, so real problems stopped standing out.
+    expect(build(project).diagnostics).toEqual([])
   })
 })
 

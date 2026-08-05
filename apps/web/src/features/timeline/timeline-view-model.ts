@@ -17,6 +17,7 @@ import {
   type Track,
 } from '@sanverse/edit-domain'
 
+import { describeOperation } from '../history/describe-operation'
 import type {
   BuildTimelineViewModelInput,
   PendingTimelineInput,
@@ -28,6 +29,27 @@ import type {
   TimelineLaneView,
   TimelineViewModel,
 } from './timeline-contract'
+
+/**
+ * Why one earlier edit is not part of the video any more, in plain words.
+ *
+ * The three reasons the domain can give are all situations the user caused and
+ * can undo, so each one names what happened rather than what the code called it.
+ * An unknown reason still gets a true sentence rather than a code, because a
+ * code on screen is never the right answer even when we are surprised.
+ */
+const blockedEditReason = (reason: string | null): string => {
+  switch (reason) {
+    case 'SOURCE_SPAN_REMOVED':
+      return 'the part of the video it was on has been cut out, so it is not shown.'
+    case 'VISUAL_TARGET_UNKNOWN':
+      return 'the thing it was changing is no longer here, so it is not shown.'
+    case 'FOOTAGE_MOTION_OVERLAP':
+      return 'a later change to the same stretch replaced it, so it is not shown.'
+    default:
+      return 'it no longer fits the video, so it is not shown.'
+  }
+}
 
 type OperationTrace = Readonly<{
   operationId: string
@@ -713,7 +735,15 @@ export const buildTimelineViewModel = (
     record.changeSet.operations.forEach((operation, operationIndex) => {
       addDiagnostic(
         'OPERATION_BLOCKED',
-        `${operation.kind} is blocked: ${record.blockedReason}.`,
+        // Was `${operation.kind} is blocked: ${record.blockedReason}.`, which put
+        // our internal name for the edit ("set-visual-properties") and our
+        // internal reason code ("SOURCE_SPAN_REMOVED") in front of the user.
+        // Neither means anything to them and neither says what to do.
+        //
+        // `describeOperation` is the same sentence the history list already shows
+        // for that edit, so the two agree, and `blockedEditReason` turns the code
+        // into the actual situation.
+        `${describeOperation(operation)} — ${blockedEditReason(record.blockedReason)}`,
         operation.operationId,
         record.changeSet.changeSetId,
         recordIndex * 100 + operationIndex,
@@ -721,17 +751,24 @@ export const buildTimelineViewModel = (
     })
   })
 
-  active.forEach((operation) => {
-    if (operation.kind !== 'set-visual-properties') return
-    const trace = traces.get(operation.operationId)
-    addDiagnostic(
-      'OPERATION_UNSUPPORTED',
-      'Visual-property keyframes and effects do not have a P1-A timeline lane.',
-      operation.operationId,
-      trace?.changeSetId ?? null,
-      trace?.order ?? diagnosticOrder++,
-    )
-  })
+  // Nothing is reported for a visual adjustment that has no timeline lane yet.
+  //
+  // There used to be a notice here, once per adjustment, reading:
+  //
+  //   "Visual-property keyframes and effects do not have a P1-A timeline lane."
+  //
+  // Every word of that is about our own unfinished work, not about the user's
+  // video. "P1-A" is the name of a build stage. "Visual-property keyframes" is
+  // not what anybody calls moving a title. And nothing was actually wrong: the
+  // adjustment worked, the preview shows it and the export includes it — the
+  // only thing missing is a row on the timeline to draw it in.
+  //
+  // Repeating that over the timeline taught the user that their project was
+  // full of problems, so real problems stopped standing out. A notice must be
+  // about the user's video and must be worth acting on; this was neither.
+  //
+  // Nothing became unreachable by removing it. The adjustment is still visible
+  // in the preview, still listed in history, and still in the exported file.
 
   const addPendingSourceItem = (
     proposal: PendingTimelineInput,

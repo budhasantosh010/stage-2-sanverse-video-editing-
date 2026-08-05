@@ -15,6 +15,7 @@ import {
   type TitleOverlayNode,
   type VisualPropertiesNode,
 } from '@sanverse/render-contract'
+import { normalizationFilterSteps } from '@sanverse/render-contract/visual-normalization'
 import {
   calloutLabelTop,
   calloutRectPixels,
@@ -798,12 +799,47 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
           `color=c=black:s=${width}x${height}:r=${rate}:d=${seconds},format=pix_fmts=yuv420p,setsar=1[${videoLabel}]`,
         )
       } else {
+        // ── Make this piece the same shape as every other piece ──────────────
+        //
+        // `concat` below joins the pieces end to end, and it refuses outright
+        // unless every piece is already the same width, the same height and the
+        // same pixel shape. Nothing used to make that true: footage went in at
+        // whatever size it was recorded at. That was invisible while a project
+        // could only hold one recording — "the size of the footage" and "the
+        // size of the finished video" were the same number by accident — and it
+        // failed the ENTIRE export the moment a second recording of a different
+        // size arrived:
+        //
+        //   Input link in0:v0 parameters (size 714x1280, SAR 1:1) do not match
+        //   the corresponding output link in0:v0 parameters (1920x1080, SAR 1:1)
+        //
+        // That is FAIL-051. It was recorded as "portrait phone footage cannot
+        // export", but it was never only about portrait: 1080p next to 720p
+        // failed identically.
+        //
+        // The framing rule itself is not written here. It lives in one file that
+        // the browser preview reads too, so the two cannot drift apart — see
+        // `visual-normalization.ts`.
+        //
+        // It happens BEFORE the motion filters on purpose. Motion moves and
+        // scales the picture relative to the canvas; running it against a
+        // picture that is not yet canvas-shaped would scale an upright phone
+        // clip relative to its own 714x1280 instead, and "no motion" would not
+        // mean the same framing as "motion that changes nothing".
+        const normalizedLabel = `normalized_video_${index}`
         graph.push(
           `[${segmentInput}:v]trim=start=${from}:end=${to},setpts=PTS-STARTPTS,fps=${rate}[${sourceVideoLabel}]`,
         )
+        graph.push(
+          `[${sourceVideoLabel}]${normalizationFilterSteps({
+            canvasWidth: width,
+            canvasHeight: height,
+            fitMode: plan.value.framing ?? 'fit',
+          }).join(',')}[${normalizedLabel}]`,
+        )
         graph.push(...primaryFootageMotionFilters(
           piece.segment,
-          sourceVideoLabel,
+          normalizedLabel,
           motionVideoLabel,
           index,
           width,

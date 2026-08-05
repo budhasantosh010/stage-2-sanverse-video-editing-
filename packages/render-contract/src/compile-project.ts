@@ -14,6 +14,26 @@ import {
 } from '@sanverse/edit-domain'
 
 import { NAMEPLATE_STYLE_ID } from './nameplate-style.ts'
+import { isVisualFitMode, type VisualFitMode } from './visual-normalization.ts'
+
+/**
+ * Where a project records whether footage of a different shape should be shown
+ * whole with black bars, or filled edge to edge with the overhang cut off.
+ *
+ * It lives in the project's `extensions` bag rather than as a new field on the
+ * composition, and that is deliberate. The composition's field list is closed:
+ * adding to it would mean rewriting every project already saved on disk, and a
+ * rewrite that touches the user's stored edits to add a preference is a bad
+ * trade. The extensions bag exists precisely so a preference can be added
+ * without touching anything already saved. A project that has never been asked
+ * simply has no key, which reads as 'fit'.
+ */
+export const PROJECT_FRAMING_EXTENSION_KEY = 'sanverse.render/framing'
+
+export const projectFraming = (project: EditProject): VisualFitMode => {
+  const stored = project.extensions[PROJECT_FRAMING_EXTENSION_KEY]
+  return isVisualFitMode(stored) ? stored : 'fit'
+}
 import {
   MAX_MUSIC_NODES,
   RENDER_PLAN_SCHEMA_VERSION,
@@ -359,6 +379,7 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     compositionId: composition.compositionId,
     width: composition.width,
     height: composition.height,
+    framing: projectFraming(project),
     durationTicks: duration.ticks,
     sources: Object.freeze(sources),
     segments: Object.freeze(segments),

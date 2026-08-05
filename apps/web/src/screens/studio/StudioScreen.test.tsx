@@ -149,7 +149,7 @@ function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = 
     onUndo: vi.fn(),
     onRedo: vi.fn(),
     exportState: { status: 'idle' },
-    saveState: 'idle',
+    saveState: { status: 'saved' as const, persistedRevision: 0 },
     onExport: vi.fn(),
     onBack: vi.fn(),
     ...overrides,
@@ -414,14 +414,29 @@ describe('StudioScreen', () => {
   })
 
   it('shows whether canonical edit history is saving, saved, or unsafe to leave', () => {
-    const { rerender, props } = renderStudioWithAi({ saveState: 'saving' })
+    const { rerender, props } = renderStudioWithAi({
+      saveState: { status: 'saving', targetRevision: 4, persistedRevision: 3 },
+    })
     expect(screen.getByRole('status', { name: /project save status/i })).toHaveTextContent(/saving/i)
 
-    rerender(<StudioScreen {...props} saveState="saved" />)
-    expect(screen.getByRole('status', { name: /project save status/i })).toHaveTextContent(/saved locally/i)
+    rerender(<StudioScreen {...props} saveState={{ status: 'saved', persistedRevision: 4 }} />)
+    const saved = screen.getByRole('status', { name: /project save status/i })
+    expect(saved).toHaveTextContent(/saved on this computer/i)
+    // How much work is safe, said out loud rather than kept for engineers.
+    expect(saved).toHaveTextContent(/4/)
 
-    rerender(<StudioScreen {...props} saveState="error" />)
-    expect(screen.getByRole('alert')).toHaveTextContent(/could not be saved locally/i)
+    rerender(
+      <StudioScreen
+        {...props}
+        saveState={{ status: 'failed', targetRevision: 5, persistedRevision: 4, refusal: 'WRITE_FAILED' }}
+      />,
+    )
+    const failed = screen.getByRole('alert')
+    // The message this replaced was "Local save needs attention": it said what
+    // went wrong, offered nothing to press, and never went away.
+    expect(failed).not.toHaveTextContent(/needs attention/i)
+    expect(failed).toHaveTextContent(/could not be written/i)
+    expect(failed).toHaveTextContent(/already saved/i)
   })
 
   it('returns Home exactly once from the Back action', async () => {
@@ -902,7 +917,7 @@ describe('StudioScreen', () => {
         onUndo={vi.fn()}
         onRedo={vi.fn()}
         exportState={{ status: 'idle' }}
-        saveState="idle"
+        saveState={{ status: 'saved', persistedRevision: 0 }}
         onExport={vi.fn()}
         onBack={vi.fn()}
       />,
@@ -969,7 +984,7 @@ describe('StudioScreen', () => {
         onUndo={vi.fn()}
         onRedo={vi.fn()}
         exportState={{ status: 'idle' }}
-        saveState="idle"
+        saveState={{ status: 'saved', persistedRevision: 0 }}
         onExport={vi.fn()}
         onBack={vi.fn()}
       />,

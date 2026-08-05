@@ -41,7 +41,7 @@ function ShellHarness({
       workspace={workspace}
       studioWorkspace={studioWorkspace}
       projectName="cleaned-interview.mp4"
-      saveState="saved"
+      saveState={{ status: 'saved', persistedRevision: 3 }}
       undoDisabledReason={undoDisabledReason}
       redoDisabledReason={redoDisabledReason}
       exportDisabledReason={exportDisabledReason}
@@ -110,9 +110,12 @@ describe('EditorShell', () => {
     render(<ShellHarness onUndo={onUndo} onExport={onExport} />)
 
     expect(screen.getByText('cleaned-interview.mp4')).toBeInTheDocument()
-    expect(screen.getByRole('status', { name: /project save status/i })).toHaveTextContent(
-      /saved locally/i,
-    )
+    const saveStatus = screen.getByRole('status', { name: /project save status/i })
+    expect(saveStatus).toHaveTextContent(/saved on this computer/i)
+    // The number is how much work is safely on disk. It is shown to the user
+    // rather than kept for engineers, because it is the honest answer to the
+    // only question they actually have when saving goes wrong.
+    expect(saveStatus).toHaveTextContent(/3/)
     expect(screen.getByRole('button', { name: /redo edit/i })).toBeDisabled()
 
     await user.click(screen.getByRole('button', { name: /undo edit/i }))

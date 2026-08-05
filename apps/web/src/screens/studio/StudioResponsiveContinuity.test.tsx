@@ -47,7 +47,7 @@ const props = (project: EditProject, onTimelineEdit: (operation: EditOperation) 
   onUndo: vi.fn(),
   onRedo: vi.fn(),
   exportState: { status: 'idle' as const },
-  saveState: 'saved' as const,
+  saveState: { status: 'saved' as const, persistedRevision: 0 },
   onExport: vi.fn(),
   onBack: vi.fn(),
 })

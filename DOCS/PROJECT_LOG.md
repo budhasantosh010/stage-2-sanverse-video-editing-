@@ -602,3 +602,32 @@ Black also says which black it is now: no clip at all keeps the plain wording
 because that black IS the finished video, while a switched-off track, a
 switched-off clip and a missing file each say so — and the missing file is
 reported as a fault rather than a gap.
+
+## 2026-08-05 — Gate T0 finished: the preview stopped lying, and mixed-shape footage exports
+
+Two things a user could see were broken. Both are fixed and proven in the running
+app on the owner's own project.
+
+**The preview called real footage empty.** Deleting an overlay you had moved left
+behind an instruction naming something that no longer existed. The part that
+builds the video refused the WHOLE project because of it, and the preview read
+that refusal as "the timeline is empty everywhere". The same mistake was then
+found in a second place — which recording the video element points at was read
+from the same failable build — and fixed the same way.
+
+**A phone clip made Export fail completely.** Footage went into the exporter at
+whatever size it was recorded at, and the step that joins the pieces refuses
+unless they are all already the same size. Recorded as FAIL-051 "portrait footage
+cannot export", but it was never about portrait: any two clips of different sizes
+failed. One file now owns the rule for fitting a picture of one shape into a
+canvas of another, and both the browser preview and the exporter read it, so they
+cannot drift apart. Whole picture with black bars by default; fill-and-crop
+offered; stretching deliberately not offered.
+
+Also: "Local save needs attention" replaced with states that say what happened,
+how much work is already safe, and what to press. "Reopen it and try again"
+replaced with carrying the proposal forward wherever it still makes sense. Our
+own vocabulary — "P1-A timeline lane", operation names, reason codes, COMMITTED
+on every clip — taken off the user's screen.
+
+Tests 1,736 → 1,848. Build exit 0. FAIL-051 and FAIL-052 closed.

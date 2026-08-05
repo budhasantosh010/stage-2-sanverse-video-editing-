@@ -99,7 +99,7 @@ function MediaStudioHarness({
         if (result.ok) adopt(result.value)
       }}
       exportState={{ status: 'idle' }}
-      saveState="saved"
+      saveState={{ status: 'saved', persistedRevision: 0 }}
       onExport={vi.fn()}
       onBack={vi.fn()}
     />

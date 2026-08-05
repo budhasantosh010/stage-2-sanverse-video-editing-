@@ -10,6 +10,9 @@ import {
   type VisualPropertyTrack,
   type VisualTransform,
 } from '@sanverse/edit-domain'
+import { isVisualFitMode, type VisualFitMode } from './visual-normalization.ts'
+
+export type { VisualFitMode } from './visual-normalization.ts'
 
 /**
  * What to draw, with every decision already made.
@@ -205,6 +208,13 @@ export type RenderPlan = Readonly<{
   compositionId: string
   width: number
   height: number
+  /**
+   * How footage of a different shape from the canvas is fitted into it.
+   *
+   * Absent means 'fit' — show the whole picture and add black bars. See
+   * `visual-normalization.ts` for the full rule and why there is no 'stretch'.
+   */
+  framing?: VisualFitMode
   /** Total length of the finished video, in project ticks. */
   durationTicks: number
   /**
@@ -281,6 +291,16 @@ const PLAN_KEYS = [
   'visuals',
   'music',
 ] as const
+
+/**
+ * Keys a plan MAY carry. Absent means the documented default, never a refusal.
+ *
+ * `framing` says how footage of a different shape from the canvas is fitted —
+ * see `visual-normalization.ts`. A plan that does not mention it means 'fit',
+ * which is what every project made before this existed already gets, and what a
+ * project whose footage is exactly the canvas size gets either way.
+ */
+const OPTIONAL_PLAN_KEYS = ['framing'] as const
 
 type Issue = RenderPlanError['issues'][number]
 
@@ -478,7 +498,13 @@ export const validateRenderPlan = (
     if (!Object.hasOwn(input, key)) issues.push({ path: key, code: 'FIELD_REQUIRED' })
   }
   for (const key of Object.keys(input)) {
-    if (!(PLAN_KEYS as readonly string[]).includes(key)) issues.push({ path: key, code: 'FIELD_UNKNOWN' })
+    if (
+      !(PLAN_KEYS as readonly string[]).includes(key) &&
+      !(OPTIONAL_PLAN_KEYS as readonly string[]).includes(key)
+    ) issues.push({ path: key, code: 'FIELD_UNKNOWN' })
+  }
+  if (Object.hasOwn(input, 'framing') && !isVisualFitMode(input.framing)) {
+    issues.push({ path: 'framing', code: 'VALUE_OUT_OF_RANGE' })
   }
   if (input.schemaVersion !== RENDER_PLAN_SCHEMA_VERSION) {
     issues.push({ path: 'schemaVersion', code: 'VALUE_OUT_OF_RANGE' })

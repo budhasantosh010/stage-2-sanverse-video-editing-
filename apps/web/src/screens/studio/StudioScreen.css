@@ -1384,3 +1384,49 @@
     transition: none;
   }
 }
+
+/* ── Preview diagnostics — DEVELOPMENT ONLY ────────────────────────────────────
+ *
+ * This panel is never built in a production bundle (see
+ * `features/diagnostics/timeline-monitor-diagnostics.ts`). It is shut until it
+ * is opened, sits over a corner of the monitor rather than taking any layout
+ * space, and never pushes anything else around.
+ */
+.studio-screen__diagnostics {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 5;
+  max-width: min(420px, 90%);
+  max-height: 60%;
+  overflow: auto;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface);
+  font-size: 0.62rem;
+  opacity: 0.92;
+}
+
+.studio-screen__diagnostics > summary {
+  cursor: pointer;
+  padding: 4px 7px;
+  font-weight: 700;
+}
+
+.studio-screen__diagnostics p {
+  margin: 0;
+  padding: 0 7px 4px;
+  color: var(--color-text-muted);
+}
+
+.studio-screen__diagnostics pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 0 7px 7px;
+  font-size: 0.58rem;
+  line-height: 1.35;
+}
+
+.studio-screen__diagnostics button {
+  margin: 0 7px 7px;
+}

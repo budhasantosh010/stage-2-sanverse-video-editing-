@@ -16,13 +16,38 @@ DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md
 working block and is the truth about where the work stands. Do not re-derive the
 plan from chat history.
 
-Gate T0 is in progress. Its headline result so far: the preview used to report
-"No media at this time" over footage that was plainly there, across a whole
-project, because "the plan could not be built" and "the timeline is empty" were
-both expressed as `null`. Fixed by `apps/web/src/features/render-plan/
-primary-source.ts` — footage existence is read from the user's edit, never from
-a build that can fail as a whole. Full story in FAIL-052 and in
-`DOCS/evidence/2026-08-04-timeline-completion/OWNER_RECORDING_REPRODUCTION.md`.
+**Gate T0 is DONE. T1 through T7 are NOT STARTED.** Tests: 1,848. Build: exit 0.
+
+Two things a user could see were broken, and both are now fixed and proven in the
+running app on the owner's real project:
+
+1. **The preview called real footage empty.** "The plan could not be built" and
+   "the timeline is empty" were both expressed as `null`, so one broken thing
+   anywhere made the preview report every moment as a gap. Fixed by
+   `apps/web/src/features/render-plan/primary-source.ts` — footage existence is
+   read from the user's edit, never from a build that can fail as a whole. The
+   **same mistake was then found in a second place** (which file the one video
+   element points at) and fixed the same way. FAIL-052, closed.
+
+2. **Mixed-shape footage could not be exported at all.** FFmpeg's `concat` step
+   refuses unless every piece is already the same size, and nothing made that
+   true. Recorded as FAIL-051 "portrait footage cannot export", but any two clips
+   of different sizes failed. Fixed by
+   `packages/render-contract/src/visual-normalization.ts` — one geometry
+   authority that the browser preview and FFmpeg both read. FAIL-051, closed.
+
+Also in T0: an explicit save state with recovery (no more "Local save needs
+attention"); proposals carried forward across an edit (no more "Reopen it and try
+again"); and our own vocabulary taken off the user's screen.
+
+Evidence: `DOCS/evidence/2026-08-04-timeline-completion/` — `T0_*.md` and
+`screenshots/`. Read `PROGRAM_STATE.md` first.
+
+**Two traps that cost real time in T0, both now in PROGRAM_STATE:** the API
+loads TypeScript at boot, so a change to the exporter does nothing until the
+server is restarted (a correct fix that appears not to work); and a failed export
+is cached against the project revision, so pressing Export again returns the old
+failure instantly.
 
 ## Completed: P1-F.1A
 

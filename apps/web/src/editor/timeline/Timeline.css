@@ -835,3 +835,89 @@
     animation: none !important;
   }
 }
+
+/* ── Gate T0.9 — bounded polish, inside the Timeline only ──────────────────────
+ *
+ * Nothing here moves a panel, changes the Studio layout, or reorders the five
+ * tracks. Every rule below is about making one of the states a clip can be in
+ * readable at a glance, because a state you have to squint at is a state the
+ * user will not notice until it is in the exported file.
+ *
+ * Colour is never the only signal in any of these. Roughly one man in twelve
+ * cannot reliably separate red from green, and a timeline that says "this clip
+ * is switched off" only by tinting it is a timeline that says nothing to them.
+ * So each state also carries a pattern, an outline style, or a word.
+ */
+
+/* A switched-off clip: still there, still exactly as long, plainly not playing.
+   Kept at 55% rather than faded almost away, because the user still has to be
+   able to READ it in order to decide to turn it back on. */
+.timeline-v1__item[data-enabled='false'] {
+  border-style: dashed;
+  opacity: 0.55;
+}
+
+/* A clip whose file cannot be found. Not a style choice — this one is a fault,
+   and it is the only state that gets a solid double outline, so it cannot be
+   confused with a clip the user themselves switched off. */
+.timeline-v1__item--missing-source {
+  border-style: double;
+  border-width: 3px;
+}
+
+/* The selected clip. A thicker ring plus a lifted shadow, so selection survives
+   being looked at on a laptop screen in daylight — a 1px colour change does not. */
+.timeline-v1__item[aria-pressed='true'],
+.timeline-v1__item--selected {
+  box-shadow: 0 0 0 2px var(--color-accent), 0 2px 6px rgb(0 0 0 / 18%);
+}
+
+/* Keyboard focus stays visible even on top of selection, because a keyboard user
+   who cannot see where they are has no way to recover. */
+.timeline-v1__item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* The name on a clip. Slightly stronger contrast than the state word beneath it,
+   so at a glance the eye lands on WHICH clip before HOW it is. */
+.timeline-v1__item-label {
+  color: var(--color-text);
+}
+
+/* The state word, now shown only when it says something. It is deliberately
+   still small and quiet: it is the exception, and exceptions earn attention by
+   being rare rather than by being loud. */
+.timeline-v1__item-state {
+  letter-spacing: 0.05em;
+}
+
+/* Trim handles: a real 8px target rather than a hairline, because a handle you
+   have to hunt for is a handle that gets missed and drags the clip instead. */
+.timeline-v1__trim-handle {
+  min-width: 8px;
+}
+
+/* The ruler. Major ticks carry the number; minor ones are quieter, so the eye
+   can count without reading. */
+.timeline-v1__ruler-tick--major {
+  opacity: 1;
+}
+
+.timeline-v1__ruler-tick {
+  opacity: 0.55;
+}
+
+/* Notices, when there are any. They now appear only for something genuinely
+   wrong with the user's video, so they are allowed to look like it. */
+.timeline-v1__diagnostics p {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+/* Long content never pushes the page sideways. The timeline scrolls inside
+   itself; the window does not. */
+.timeline-v1__diagnostics {
+  max-width: 100%;
+  overflow-x: auto;
+}

@@ -1957,7 +1957,8 @@ desktop gets treated like a phone.
 
 ## FAIL-051 — portrait footage cannot be exported into a landscape project
 
-**Found:** 2026-08-04, while probing the export for Gate D. **NOT FIXED.**
+**Found:** 2026-08-04, while probing the export for Gate D.
+**FIXED and CLOSED:** 2026-08-05, Gate T0.7.
 
 A project whose main video track holds a 1920×1080 recording followed by a
 714×1280 portrait recording fails to export:
@@ -1977,11 +1978,72 @@ fix Gate D blockers only and record everything else. Recorded here.
 and adding that clip to a landscape project cannot export at all, and the message
 they get says nothing about why. It should be the next render task.
 
+### The cause, proved rather than guessed
+
+The exporter's own instructions were run through real FFmpeg on real files:
+
+```
+Input link in0:v0 parameters (size 714x1280, SAR 1:1) do not match the
+corresponding output link in0:v0 parameters (1920x1080, SAR 1:1)
+```
+
+FFmpeg joins the pieces of a finished video end to end with a step called
+`concat`, and `concat` refuses outright unless every piece is already the same
+width, the same height and the same pixel shape. Nothing in the exporter made
+that true: footage went in at whatever size it was recorded at.
+
+That was invisible while a project could only hold ONE recording — "the size of
+the footage" and "the size of the finished video" were the same number by
+accident.
+
+### This entry understated the bug
+
+It was recorded as "portrait footage cannot be exported". The fault was never
+about portrait. **Any two clips of different sizes failed identically** — 1080p
+next to 720p, a 4K clip next to anything, a square clip from social media next to
+a normal one. Anybody who filmed twice on different devices hit it.
+
+### The fix, in one line
+
+One file — `packages/render-contract/src/visual-normalization.ts` — owns the rule
+for where a picture of one shape sits inside a canvas of another, and both the
+browser preview and FFmpeg read it, so the two cannot drift apart. Every piece
+reaching `concat` is now exactly the canvas size with square pixels, whatever was
+imported. Default is Fit (whole picture, black bars); Fill is offered; Stretch
+deliberately is not.
+
+### Proof
+
+Real export from the running app: `1920 × 1080 · 27s`, containing real 714×1280
+phone footage. ffprobe: SAR 1:1, yuv420p, 818 frames, 27.278 s. Sampled
+brightness at the portrait clip: left edge 16 (video black — a bar), centre 120.8
+(real picture). Frames in
+`DOCS/evidence/2026-08-04-timeline-completion/screenshots/`.
+
+Full story: `DOCS/evidence/2026-08-04-timeline-completion/T0_MIXED_FORMAT_EXPORT.md`.
+
 ---
 
 ## FAIL-052 — the monitor reported "No media at this time" over footage that was there
 
-**Found:** in the owner's own screen recording. **Fixed:** 2026-08-05, Gate T0.
+**Found:** in the owner's own screen recording.
+**Fixed:** 2026-08-05, Gate T0. **CLOSED** 2026-08-05 after real-browser proof.
+
+The browser proof that was outstanding is now done, and it needed nothing to be
+constructed: the owner's own saved project already contained the exact sequence.
+Its history holds one `add-media-overlay`, three `set-visual-properties`, and one
+`remove-overlay`, leaving three change sets blocked with `VISUAL_TARGET_UNKNOWN`.
+With those present, the running app reports `primaryDecision: active` and
+`gapReason: null` over the footage, the project compiles, and Export produces a
+file. Seeking the whole composition reported three gaps, all three verified
+against the composition to be genuinely empty stretches.
+
+A **second instance of the same mistake** was found while doing Gate T0.3: which
+recording the one video element should point at was also being read from the
+compiled plan, so the same whole-project failure left the element showing the
+wrong file. Fixed the same way — read it from the user's edit. Recorded here
+because it is the same defect, not a new one: *a value that can mean "I could not
+build this" must never be used to answer "is there anything here".*
 
 The monitor claimed the timeline was empty while footage was plainly under the
 playhead. It looked like selecting a V1 clip caused it. Selection was innocent,

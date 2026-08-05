@@ -46,7 +46,6 @@ import {
 import {
   advancePlayback,
   isUncutPassthrough,
-  assetAt,
   nextVisibleTick,
   playbackSegments,
   sourceTimeFor,
@@ -86,6 +85,17 @@ import {
   type FootageMotionDraft,
 } from '../../features/footage-motion/FootageMotionInspector'
 import { PrimaryFootageCanvasControls } from '../../features/footage-motion/PrimaryFootageCanvasControls'
+import {
+  saveStateMessage,
+  saveStateNeedsUser,
+  type SaveStateV1,
+} from '../../features/save/save-state'
+import {
+  buildTimelineMonitorDiagnostics,
+  diagnosticsAreAvailable,
+  diagnosticsAsText,
+  diagnosticsSummary,
+} from '../../features/diagnostics/timeline-monitor-diagnostics'
 import { formatExportElapsed, type ProjectExportState } from '../../features/project-export/project-export'
 import { ExportProgressStatus } from '../../features/project-export/ExportProgressStatus'
 import { HAVE_CURRENT_DATA } from '../../features/render-plan/media-readiness'
@@ -228,7 +238,7 @@ export type StudioScreenProps = {
   onUndo(): void
   onRedo(): void
   exportState: ProjectExportState
-  saveState: 'idle' | 'saving' | 'saved' | 'error'
+  saveState: SaveStateV1
   onExport(): void
   onBack(): void
   onWorkspaceChange?(workspace: EditorWorkspace): void
@@ -968,10 +978,36 @@ export function StudioScreen({
    *
    * Still one element. Never one per clip.
    */
-  const playheadAssetId = assetAt(previewSegments, millisecondsToTicks(playheadMs))
+  // Which recording is under the playhead comes from the user's EDIT, not from
+  // the compiled plan.
+  //
+  // It used to be `assetAt(previewSegments, ...)`. `previewSegments` is empty
+  // whenever the plan could not be built — which is the exact trap that produced
+  // FAIL-052: one unrelated broken thing anywhere in the project made the plan
+  // fail as a whole, so this answered "no recording", and the one video element
+  // was left pointed at whatever it happened to be showing before. The picture
+  // then had nothing to do with where the playhead was.
+  //
+  // `resolvePrimarySource` reads the composition directly and cannot fail as a
+  // whole, so one broken thing costs only its own stretch.
+  const playheadDecision = resolvePrimarySource(editProject, millisecondsToTicks(playheadMs))
+  const playheadAssetId = playheadDecision.kind === 'active' ? playheadDecision.assetId : null
   const [loadedAssetId, setLoadedAssetId] = useState<string | null>(null)
+  /**
+   * Which source decision is the newest one.
+   *
+   * A file takes time to open. Without this, a load that finishes AFTER the user
+   * has already moved on — pressed Undo, dragged the playhead elsewhere — would
+   * still be obeyed, putting the wrong recording on screen while nothing looked
+   * broken. Every swap takes the next number; a completion carrying an older one
+   * is ignored.
+   */
+  const sourceGenerationRef = useRef(0)
   useEffect(() => {
-    if (playheadAssetId !== null && playheadAssetId !== loadedAssetId) setLoadedAssetId(playheadAssetId)
+    if (playheadAssetId !== null && playheadAssetId !== loadedAssetId) {
+      sourceGenerationRef.current += 1
+      setLoadedAssetId(playheadAssetId)
+    }
   }, [playheadAssetId, loadedAssetId])
   const previewMediaUrl = loadedAssetId !== null && loadedAssetId !== editProject.assets[0]?.assetId
     ? assetUrl(loadedAssetId)
@@ -1351,6 +1387,30 @@ export function StudioScreen({
    * user genuinely left the stretch empty; a switched-off track and a
    * switched-off clip are both black too, and both have something to press.
    */
+  // Built only when the app is running in development, and only then. In a
+  // production build `monitorDiagnostics` is null and nothing renders at all.
+  const monitorDiagnostics = diagnosticsAreAvailable(import.meta.env?.MODE)
+    ? buildTimelineMonitorDiagnostics({
+        projectId: project.id,
+        acceptedRevision: editProject.revision,
+        compositionTicks: compositionDurationTicks,
+        playheadTicks,
+        timelineItemId: selectedTimelineItemId,
+        primaryDecision,
+        v1OutputEnabled: activeTrackOutputs(editProject).V1,
+        currentVideoSrc: videoRef.current?.currentSrc ?? null,
+        requestedVideoSrc: previewMediaUrl,
+        videoReadyState: videoReadiness.readyState,
+        videoNetworkState: videoRef.current?.networkState ?? 0,
+        monitorBaseLayer: baseLayer.kind,
+        sourceSwitchGeneration: sourceGenerationRef.current,
+        selectedItemIds: selectedTimelineItemId ? [selectedTimelineItemId] : [],
+        proposalBaseRevision: pendingTimelineInput?.baseRevision ?? null,
+        proposalStatus: proposal ? 'pending' : null,
+        saveState,
+      })
+    : null
+
   const baseFrameMessage = baseLayer.kind === 'gap' && primaryGapReason !== null
     ? primaryGapMessage(primaryGapReason)
     : monitorBaseFrameMessage(baseFrameState)
@@ -2241,9 +2301,8 @@ export function StudioScreen({
                 Redo
               </button>
             </div> : null}
-            {!embedded && saveState === 'saving' ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">Saving locally…</p> : null}
-            {!embedded && saveState === 'saved' ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">Saved locally</p> : null}
-            {!embedded && saveState === 'error' ? <p className="studio-screen__save-error" role="alert">This edit is open, but it could not be saved locally.</p> : null}
+            {!embedded && !saveStateNeedsUser(saveState) ? <p className="studio-screen__save-status" role="status" aria-label="Project save status">{saveStateMessage(saveState)}</p> : null}
+            {!embedded && saveStateNeedsUser(saveState) ? <p className="studio-screen__save-error" role="alert">{saveStateMessage(saveState)}</p> : null}
           </section> : null}
 
           <section
@@ -2520,6 +2579,29 @@ export function StudioScreen({
                 >
                   {baseFrameMessage}
                 </p>
+              ) : null}
+
+              {/*
+                Everything the preview used to decide what to show, in one place.
+
+                Development only, and shut until it is opened even then. Working
+                out the original false gap meant reading the code backwards from
+                the message to the compiler, because nothing on screen said which
+                of these values was the wrong one. It reads; it never seeks,
+                loads, or makes a revision.
+              */}
+              {monitorDiagnostics ? (
+                <details className="studio-screen__diagnostics" data-testid="monitor-diagnostics">
+                  <summary>Preview diagnostics (development only)</summary>
+                  <p>{diagnosticsSummary(monitorDiagnostics)}</p>
+                  <pre>{diagnosticsAsText(monitorDiagnostics)}</pre>
+                  <button
+                    type="button"
+                    onClick={() => { void navigator.clipboard?.writeText(diagnosticsAsText(monitorDiagnostics)) }}
+                  >
+                    Copy
+                  </button>
+                </details>
               ) : null}
 
               {videoContentLayerStyle ? (

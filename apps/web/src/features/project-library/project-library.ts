@@ -5,7 +5,18 @@ import { isImportedProject, type ImportedProject } from '../project-intake/proje
 const PROJECT_ID = /^project_[a-z0-9]{16,64}$/
 const LIBRARY_ERROR = 'We could not load your local projects. Try again.'
 const EDIT_ERROR = 'This edit could not be saved. Nothing was changed.'
-const CONFLICT_ERROR = 'This project changed while that edit was being prepared. Reopen it and try again.'
+/**
+ * What the user reads when the project moved while an edit was being prepared.
+ *
+ * It used to end "Reopen it and try again", which asked the user to leave the
+ * editor, go back to the project list, open the project again and find their
+ * place — for something completely routine. A pending suggestion is now checked
+ * against the new project and carried forward wherever it still makes sense
+ * (see `features/proposal-recovery/draft-reconciliation.ts`), so this sentence is
+ * only ever reached when the edit genuinely could not be applied, and it says so
+ * without sending anybody anywhere.
+ */
+const CONFLICT_ERROR = 'This project changed while that edit was being prepared, so the edit was not applied. Everything else is safe — try it again.'
 
 export type RecentProject = ImportedProject
 export type OpenedProject = ImportedProject & { project: EditProject }

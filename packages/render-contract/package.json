@@ -8,7 +8,8 @@
     "./nameplate-style": "./src/nameplate-style.ts",
     "./caption-style": "./src/caption-style.ts",
     "./compile-project": "./src/compile-project.ts",
-    "./overlay-style": "./src/overlay-style.ts"
+    "./overlay-style": "./src/overlay-style.ts",
+    "./visual-normalization": "./src/visual-normalization.ts"
   },
   "dependencies": {
     "@sanverse/edit-domain": "*"
