@@ -160,6 +160,37 @@ export const maintainPitchAt = (
   return index === -1 ? true : segments[index].maintainAudioPitch !== false
 }
 
+export type PreparedReversePreview = Readonly<{
+  segmentIndex: number
+  preparedAssetId: string
+}>
+
+/**
+ * Replace one canonical reverse stretch with its prepared forward-playing proxy.
+ *
+ * The proxy contains exactly that source interval already reversed. From the
+ * browser's point of view it begins at source tick zero and plays forwards at
+ * the same rational rate. Every other segment remains byte-for-byte the same,
+ * and the canonical render plan is never changed.
+ */
+export const withPreparedReversePreview = (
+  segments: readonly PlaybackSegment[],
+  prepared: PreparedReversePreview | null,
+): readonly PlaybackSegment[] => {
+  if (prepared === null) return segments
+  if (prepared.segmentIndex < 0 || prepared.segmentIndex >= segments.length) return segments
+  const target = segments[prepared.segmentIndex]
+  if (target.reversed !== true) return segments
+  return Object.freeze(segments.map((segment, index) => index === prepared.segmentIndex
+    ? Object.freeze({
+        ...segment,
+        assetId: prepared.preparedAssetId,
+        sourceStartTicks: 0,
+        reversed: false,
+      })
+    : segment))
+}
+
 /**
  * Anything the preview genuinely cannot show, named plainly.
  *

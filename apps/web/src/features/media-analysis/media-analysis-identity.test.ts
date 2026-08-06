@@ -16,6 +16,7 @@ import {
   createMediaAnalysisClient,
   normalizationRequestUrl,
   parseAudioNormalizationEvidence,
+  reversePreviewRequestUrl,
   parseWaveformBlock,
 } from './media-analysis-client'
 
@@ -155,6 +156,12 @@ describe('the address a name becomes', () => {
       '/api/projects/project_a/media-analysis/normalization?assetId=asset_aaaaaaaa&assetVersion=aaaaaaaaaaaaaaaa&sourceStartTicks=1440000&sourceEndTicks=4320000',
     )
   })
+
+  it('names a backwards proxy by exact source interval and file bytes', () => {
+    expect(reversePreviewRequestUrl('project_a', NORMALIZATION_REQUEST)).toBe(
+      '/api/projects/project_a/media-analysis/reverse?assetId=asset_aaaaaaaa&assetVersion=aaaaaaaaaaaaaaaa&sourceStartTicks=1440000&sourceEndTicks=4320000',
+    )
+  })
 })
 
 describe('reading loudness numbers back off the wire', () => {
@@ -176,6 +183,27 @@ describe('reading loudness numbers back off the wire', () => {
     expect(parseWaveformBlock({ peaks: [0.5] })).toBeNull()
     expect(parseWaveformBlock(null)).toBeNull()
     expect(parseWaveformBlock([0.5])).toBeNull()
+  })
+})
+
+describe('reading a prepared backwards preview off the wire', () => {
+  it('accepts only a bounded MP4 response', async () => {
+    const bytes = new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112])
+    const client = createMediaAnalysisClient({
+      fetchImpl: async () => new Response(bytes, { status: 200, headers: { 'content-type': 'video/mp4' } }),
+    })
+    const result = await client.reversePreview?.('project_a', NORMALIZATION_REQUEST, new AbortController().signal)
+    expect(result).toBeInstanceOf(Blob)
+    expect(result?.size).toBe(bytes.byteLength)
+    expect(result?.type).toBe('video/mp4')
+  })
+
+  it('refuses the wrong media type instead of attaching it to the video element', async () => {
+    const client = createMediaAnalysisClient({
+      fetchImpl: async () => new Response('not video', { status: 200, headers: { 'content-type': 'text/plain' } }),
+    })
+    await expect(client.reversePreview?.('project_a', NORMALIZATION_REQUEST, new AbortController().signal))
+      .rejects.toMatchObject({ refusal: { code: 'ANALYSIS_CACHE_CORRUPT' } })
   })
 })
 

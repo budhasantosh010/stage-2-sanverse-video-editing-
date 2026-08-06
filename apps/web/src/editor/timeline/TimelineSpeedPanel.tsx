@@ -33,13 +33,14 @@ import {
  * was on screen. There is no second calculation that could disagree.
  *
  * ---------------------------------------------------------------------------
- * WHAT IS DELIBERATELY SHOWN AS NOT READY
+ * HOW BACKWARDS PREVIEW STAYS HONEST
  * ---------------------------------------------------------------------------
  *
- * Backwards. It needs a backwards copy of the footage prepared in advance,
- * because a web browser will not play a video file backwards. The switch is
- * there, it cannot be pressed, and it says why. A switch that silently played
- * forwards would be worse than no switch.
+ * A browser video element cannot run at a negative playback rate. The switch
+ * therefore records the canonical reverse edit and the Preview prepares a
+ * short, bounded backwards proxy for that exact source interval. Until the
+ * proxy is ready the original is never shown forwards. Export reads the same
+ * direction from the render plan and uses FFmpeg's reverse filters.
  */
 
 export type TimelineSpeedPanelProps = Readonly<{
@@ -49,6 +50,7 @@ export type TimelineSpeedPanelProps = Readonly<{
   /** Why speed cannot be used right now, in one sentence. Null when it can. */
   unavailableReason: string | null
   currentRate: RationalPlaybackRateV1
+  direction?: 'forward' | 'reverse'
   maintainAudioPitch: boolean
   /** How long the picked piece is on screen now, and how much recording it uses. */
   currentDurationTicks: number
@@ -57,9 +59,9 @@ export type TimelineSpeedPanelProps = Readonly<{
   busy: boolean
   rateStretchActive?: boolean
   onRateStretchActive?(active: boolean): void
-  /** What will happen if this speed is chosen, straight from the planner. */
-  previewFor(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean): string
-  onChoose(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean): void
+  /** What will happen if this speed/direction is chosen, straight from the planner. */
+  previewFor(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean, direction: 'forward' | 'reverse'): string
+  onChoose(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean, direction: 'forward' | 'reverse'): void
   onClose(): void
 }>
 
@@ -70,6 +72,7 @@ export function TimelineSpeedPanel({
   clipLabel,
   unavailableReason,
   currentRate,
+  direction = 'forward',
   maintainAudioPitch,
   currentDurationTicks,
   sourceDurationTicks,
@@ -94,7 +97,7 @@ export function TimelineSpeedPanel({
       return
     }
     setTypedError(null)
-    onChoose(parsed.rate, keepPitch)
+    onChoose(parsed.rate, keepPitch, direction)
   }
 
   return (
@@ -125,8 +128,8 @@ export function TimelineSpeedPanel({
                   className="timeline-speed__preset"
                   aria-pressed={isCurrent}
                   disabled={busy}
-                  title={previewFor(rate, keepPitch)}
-                  onClick={() => onChoose(rate, keepPitch)}
+                  title={previewFor(rate, keepPitch, direction)}
+                  onClick={() => onChoose(rate, keepPitch, direction)}
                 >
                   {formatPlaybackRate(rate)}
                 </button>
@@ -188,20 +191,29 @@ export function TimelineSpeedPanel({
             </span>
           </label>
 
-          <label className="timeline-speed__switch timeline-speed__switch--off">
-            <input type="checkbox" checked={false} disabled onChange={() => undefined} />
+          <label className="timeline-speed__switch">
+            <input
+              type="checkbox"
+              checked={direction === 'reverse'}
+              disabled={busy}
+              onChange={(event) => onChoose(
+                currentRate,
+                keepPitch,
+                event.target.checked ? 'reverse' : 'forward',
+              )}
+            />
             <span>
               Play it backwards
-              <small>Not ready yet. It needs a backwards copy of the footage, which is being built.</small>
+              <small>Sanverse prepares a short backwards preview, then uses the same edit for export.</small>
             </span>
           </label>
 
           <button
             type="button"
             className="timeline-speed__reset"
-            disabled={busy || playbackRatesEqual(currentRate, NORMAL_PLAYBACK_RATE)}
-            title={previewFor(NORMAL_PLAYBACK_RATE, true)}
-            onClick={() => onChoose(NORMAL_PLAYBACK_RATE, true)}
+            disabled={busy || (playbackRatesEqual(currentRate, NORMAL_PLAYBACK_RATE) && direction === 'forward' && maintainAudioPitch)}
+            title={previewFor(NORMAL_PLAYBACK_RATE, true, 'forward')}
+            onClick={() => onChoose(NORMAL_PLAYBACK_RATE, true, 'forward')}
           >
             Back to normal speed
           </button>

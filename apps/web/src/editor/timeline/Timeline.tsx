@@ -127,13 +127,14 @@ export type TimelineProps = Readonly<{
   speedSubject: Readonly<{
     clipLabel: string
     currentRate: RationalPlaybackRateV1
+    direction?: 'forward' | 'reverse'
     maintainAudioPitch: boolean
     currentDurationTicks: number
     sourceDurationTicks: number
   }> | null
-  /** One sentence describing what a speed would do. Comes from the one planner. */
-  onSpeedPreview(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean): string
-  onSpeedChoose(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean): void
+  /** One sentence describing what a speed/direction would do. Comes from the one planner. */
+  onSpeedPreview(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean, direction: 'forward' | 'reverse'): string
+  onSpeedChoose(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean, direction: 'forward' | 'reverse'): void
   onRateStretchPreview?(targetDurationTicks: number): RateStretchPreview
   onRateStretchCommit?(targetDurationTicks: number): void
   onSelectMarker(markerId: string | null): void
@@ -944,6 +945,7 @@ export function Timeline({
         clipLabel={speedSubject?.clipLabel ?? null}
         unavailableReason={speedSubject === null ? disabledReasons.speed : null}
         currentRate={speedSubject?.currentRate ?? NORMAL_PLAYBACK_RATE}
+        direction={speedSubject?.direction ?? 'forward'}
         maintainAudioPitch={speedSubject?.maintainAudioPitch ?? true}
         currentDurationTicks={speedSubject?.currentDurationTicks ?? 0}
         sourceDurationTicks={speedSubject?.sourceDurationTicks ?? 0}
@@ -952,8 +954,8 @@ export function Timeline({
         rateStretchActive={rateStretchActive}
         onRateStretchActive={setRateStretchActive}
         previewFor={onSpeedPreview}
-        onChoose={(rate, keepPitch) => {
-          onSpeedChoose(rate, keepPitch)
+        onChoose={(rate, keepPitch, direction) => {
+          onSpeedChoose(rate, keepPitch, direction)
           setSpeedPanelOpen(false)
         }}
         onClose={() => setSpeedPanelOpen(false)}

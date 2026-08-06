@@ -10,6 +10,7 @@ import {
   sourceSpanOf,
   sourceTimeFor,
   unpreviewableSegmentIndexes,
+  withPreparedReversePreview,
   type PlaybackSegment,
 } from './segment-playback'
 
@@ -166,10 +167,44 @@ describe('the screen and the exported file must agree', () => {
 })
 
 describe('what the preview honestly cannot show', () => {
-  it('names a backwards piece rather than showing it forwards', () => {
+  it('names a backwards piece rather than showing it forwards before its proxy is ready', () => {
     const backwards: readonly PlaybackSegment[] = [{ ...plain[0], reversed: true }]
     expect(unpreviewableSegmentIndexes(backwards)).toEqual([0])
     expect(isUncutPassthrough(backwards)).toBe(false)
+  })
+
+  it('plays the prepared backwards proxy forwards from source zero in the same one-video state machine', () => {
+    const backwards: readonly PlaybackSegment[] = [{
+      ...plain[0],
+      sourceStartTicks: 10 * S,
+      sourceDurationTicks: 30 * S,
+      reversed: true,
+      rateNumerator: 2,
+      rateDenominator: 1,
+      durationTicks: 15 * S,
+    }]
+    const prepared = withPreparedReversePreview(backwards, {
+      segmentIndex: 0,
+      preparedAssetId: 'reverse-preview:asset_a:10:40',
+    })
+    expect(prepared[0]).toMatchObject({
+      assetId: 'reverse-preview:asset_a:10:40',
+      sourceStartTicks: 0,
+      reversed: false,
+      sourceDurationTicks: 30 * S,
+      rateNumerator: 2,
+      rateDenominator: 1,
+    })
+    expect(sourceTimeFor(prepared, 2 * S)).toEqual({ segmentIndex: 0, sourceTicks: 4 * S })
+    expect(playbackRateAt(prepared, 2 * S)).toBe(2)
+    expect(unpreviewableSegmentIndexes(prepared)).toEqual([])
+    expect(backwards[0].reversed).toBe(true)
+  })
+
+  it('refuses to substitute a prepared proxy into a non-reverse or wrong segment', () => {
+    expect(withPreparedReversePreview(plain, { segmentIndex: 0, preparedAssetId: 'proxy' })).toBe(plain)
+    expect(withPreparedReversePreview([{ ...plain[0], reversed: true }], { segmentIndex: 4, preparedAssetId: 'proxy' }))
+      .toHaveLength(1)
   })
 
   it('has nothing to report for an ordinary project', () => {

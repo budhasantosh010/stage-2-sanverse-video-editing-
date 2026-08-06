@@ -49,13 +49,14 @@ import { AnalysisError, type AnalysisRequest, analysisCacheName } from './analys
 
 export const DERIVED_MEDIA_DIRECTORY = join('derived-media', 'v1')
 
-export type DerivedMediaKindFolder = 'frames' | 'images' | 'waveforms' | 'analysis'
+export type DerivedMediaKindFolder = 'frames' | 'images' | 'waveforms' | 'analysis' | 'reverse'
 
 const FOLDER_BY_KIND: Readonly<Record<AnalysisRequest['kind'], DerivedMediaKindFolder>> = Object.freeze({
   'filmstrip-frame': 'frames',
   'image-thumbnail': 'images',
   'waveform-block': 'waveforms',
   'audio-normalization': 'analysis',
+  'reverse-preview': 'reverse',
 })
 
 export type DerivedMediaCacheOptions = Readonly<{
@@ -136,7 +137,7 @@ export const createDerivedMediaCache = (
         if (!entry.isFile()) continue
         const path = join(directory, entry.name)
         // Strays from an interrupted write are never candidates for keeping.
-        if (!/^[a-f0-9]{64}(\.webp|\.jpg|\.json)$/.test(entry.name)) {
+        if (!/^[a-f0-9]{64}(\.webp|\.jpg|\.json|\.mp4)$/.test(entry.name)) {
           await rm(path, { force: true }).catch(() => undefined)
           continue
         }
@@ -153,7 +154,11 @@ export const createDerivedMediaCache = (
   return Object.freeze({
     async read(projectId, request) {
       const directory = await folderFor(projectId, request)
-      const extension = request.kind === 'waveform-block' || request.kind === 'audio-normalization' ? '.json' : '.webp'
+      const extension = request.kind === 'waveform-block' || request.kind === 'audio-normalization'
+        ? '.json'
+        : request.kind === 'reverse-preview'
+          ? '.mp4'
+          : '.webp'
       const path = join(directory, `${analysisCacheName(request)}${extension}`)
       let handle
       try {
@@ -186,7 +191,9 @@ export const createDerivedMediaCache = (
           bytes,
           contentType: request.kind === 'waveform-block' || request.kind === 'audio-normalization'
             ? 'application/json; charset=utf-8'
-            : 'image/webp',
+            : request.kind === 'reverse-preview'
+              ? 'video/mp4'
+              : 'image/webp',
         })
       } catch (error) {
         if (error instanceof AnalysisError) throw error
@@ -199,7 +206,11 @@ export const createDerivedMediaCache = (
     async write(projectId, request, artifact) {
       if (artifact.bytes.byteLength <= 0 || artifact.bytes.byteLength > MAX_ARTIFACT_BYTES) return
       const directory = await folderFor(projectId, request)
-      const extension = request.kind === 'waveform-block' || request.kind === 'audio-normalization' ? '.json' : '.webp'
+      const extension = request.kind === 'waveform-block' || request.kind === 'audio-normalization'
+        ? '.json'
+        : request.kind === 'reverse-preview'
+          ? '.mp4'
+          : '.webp'
       const finalPath = join(directory, `${analysisCacheName(request)}${extension}`)
       const temporaryPath = join(directory, `.tmp-${randomBytes(12).toString('hex')}`)
       let handle

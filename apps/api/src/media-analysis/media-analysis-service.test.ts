@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PROJECT_TIMESCALE, type EditProject } from '@sanverse/edit-domain'
 import {
+  TEST_ASSET_ID,
   TEST_IMAGE_ASSET_ID,
   TEST_MUSIC_ASSET_ID,
   TEST_PROJECT_ID,
@@ -138,6 +139,16 @@ const normalization = (overrides: Partial<Extract<AnalysisRequest, { kind: 'audi
     assetVersion: 'd'.repeat(16),
     sourceStartTicks: 3 * T,
     sourceEndTicks: 8 * T,
+    ...overrides,
+  })
+
+const reversePreview = (overrides: Partial<Extract<AnalysisRequest, { kind: 'reverse-preview' }>> = {}): AnalysisRequest =>
+  Object.freeze({
+    kind: 'reverse-preview' as const,
+    assetId: TEST_ASSET_ID,
+    assetVersion: 'a'.repeat(16),
+    sourceStartTicks: 2 * T,
+    sourceEndTicks: 7 * T,
     ...overrides,
   })
 
@@ -386,6 +397,62 @@ describe('measuring a stretch of sound', () => {
   })
 })
 
+describe('preparing a bounded backwards preview', () => {
+  it('uses the exact source interval, reverses picture and sound, and returns a small MP4 proxy', async () => {
+    const mp4 = Buffer.from('000000186674797069736f6d0000020069736f6d69736f32', 'hex')
+    const { service, invocations } = await harness({ bytes: () => mp4 })
+    const artifact = await service.produce({ projectId: TEST_PROJECT_ID, request: reversePreview() })
+    const args = invocations[0].args
+    expect(args[args.indexOf('-ss') + 1]).toBe('2.000000000')
+    expect(args[args.indexOf('-t') + 1]).toBe('5.000000000')
+    expect(args[args.indexOf('-filter_complex') + 1]).toContain('[0:v:0]reverse')
+    expect(args[args.indexOf('-filter_complex') + 1]).toContain('force_divisible_by=2')
+    expect(args[args.indexOf('-filter_complex') + 1]).toContain('pad=854:480')
+    expect(args[args.indexOf('-filter_complex') + 1]).toContain('[0:a:0]areverse')
+    expect(args).toContain('+faststart')
+    expect(args).toContain('700k')
+    expect(artifact.contentType).toBe('video/mp4')
+    expect(artifact.bytes).toEqual(mp4)
+  })
+
+  it('prepares a silent video without inventing an audio stream', async () => {
+    const base = projectWithEverything()
+    const project = Object.freeze({
+      ...base,
+      assets: Object.freeze(base.assets.map((asset) =>
+        asset.assetId === TEST_ASSET_ID && asset.mediaKind === 'video'
+          ? Object.freeze({ ...asset, hasAudio: false })
+          : asset)),
+    })
+    const { service, invocations } = await harness({
+      project,
+      bytes: () => Buffer.from('mp4'),
+    })
+    await service.produce({ projectId: TEST_PROJECT_ID, request: reversePreview() })
+    const args = invocations[0].args
+    expect(args).toContain('-vf')
+    expect(args[args.indexOf('-vf') + 1]).toContain('reverse')
+    expect(args).toContain('-an')
+    expect(args).not.toContain('areverse')
+  })
+
+  it('caches the exact prepared interval and does not run FFmpeg twice', async () => {
+    const { service, invocations } = await harness({ bytes: () => Buffer.from('mp4') })
+    await service.produce({ projectId: TEST_PROJECT_ID, request: reversePreview() })
+    await service.produce({ projectId: TEST_PROJECT_ID, request: reversePreview() })
+    expect(invocations).toHaveLength(1)
+  })
+
+  it('refuses an interval outside the actual file before starting FFmpeg', async () => {
+    const { service, invocations } = await harness()
+    expect(await refusal(() => service.produce({
+      projectId: TEST_PROJECT_ID,
+      request: reversePreview({ sourceEndTicks: 10_000 * T }),
+    }))).toBe('SOURCE_TIME_OUT_OF_RANGE')
+    expect(invocations).toHaveLength(0)
+  })
+})
+
 describe('measuring real loudness for normalization', () => {
   it('reads the final loudnorm JSON object and refuses incomplete measurements', () => {
     expect(parseLoudnormMeasurement(`noise {"other":1}\n${loudnormStderr()}`)).toEqual({
@@ -521,7 +588,7 @@ describe('turning raw sound numbers into a shape', () => {
 describe('what the process pool reports', () => {
   it('starts at nothing and returns to nothing', async () => {
     const { service } = await harness()
-    expect(service.diagnostics()).toEqual({ activeFrames: 0, activeWaveforms: 0, queued: 0, sharedJobs: 0 })
+    expect(service.diagnostics()).toEqual({ activeFrames: 0, activeWaveforms: 0, activeVideos: 0, queued: 0, sharedJobs: 0 })
     await service.produce({ projectId: TEST_PROJECT_ID, request: frame() })
     expect(service.diagnostics().activeFrames).toBe(0)
     expect(service.diagnostics().sharedJobs).toBe(0)

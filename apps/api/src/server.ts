@@ -369,7 +369,7 @@ export function createSanverseServer(options: ServerOptions) {
        * ever be put in it: a path from a browser is how a server is talked into
        * reading somebody else's files.
        */
-      const analysisMatch = /^\/api\/projects\/([^/]+)\/media-analysis\/(frame|image-thumbnail|waveform|normalization)$/
+      const analysisMatch = /^\/api\/projects\/([^/]+)\/media-analysis\/(frame|image-thumbnail|waveform|normalization|reverse)$/
         .exec(requestUrl.pathname)
       if (request.method === 'GET' && analysisMatch) {
         const [projectId, route] = analysisMatch.slice(1)
@@ -384,7 +384,9 @@ export function createSanverseServer(options: ServerOptions) {
             ? 'waveform-block'
             : route === 'normalization'
               ? 'audio-normalization'
-              : 'image-thumbnail'
+              : route === 'reverse'
+                ? 'reverse-preview'
+                : 'image-thumbnail'
         // A browser that scrolls away closes the connection. That is the signal
         // to stop decoding, so work nobody will look at does not finish.
         const abandoned = new AbortController()

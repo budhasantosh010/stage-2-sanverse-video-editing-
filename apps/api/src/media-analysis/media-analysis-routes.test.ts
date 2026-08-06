@@ -52,7 +52,7 @@ const stubService = (
   produce: MediaAnalysisService['produce'],
 ): MediaAnalysisService => Object.freeze({
   produce,
-  diagnostics: () => Object.freeze({ activeFrames: 0, activeWaveforms: 0, queued: 0, sharedJobs: 0 }),
+  diagnostics: () => Object.freeze({ activeFrames: 0, activeWaveforms: 0, activeVideos: 0, queued: 0, sharedJobs: 0 }),
   cache: {} as MediaAnalysisService['cache'],
 })
 
@@ -95,7 +95,8 @@ describe('asking for a preview picture', () => {
     await call(port, `/api/projects/${PROJECT}/media-analysis/waveform?${VALID}&sourceTicks=0&spanTicks=1440000&peakCount=64`)
     await call(port, `/api/projects/${PROJECT}/media-analysis/image-thumbnail?${VALID}&width=64&height=64`)
     await call(port, `/api/projects/${PROJECT}/media-analysis/normalization?${VALID}&sourceStartTicks=0&sourceEndTicks=1440000`)
-    expect(kinds).toEqual(['waveform-block', 'image-thumbnail', 'audio-normalization'])
+    await call(port, `/api/projects/${PROJECT}/media-analysis/reverse?${VALID}&sourceStartTicks=0&sourceEndTicks=1440000`)
+    expect(kinds).toEqual(['waveform-block', 'image-thumbnail', 'audio-normalization', 'reverse-preview'])
   })
 })
 
@@ -154,11 +155,11 @@ describe('what the machine will admit to', () => {
   it('reports how much decoding is happening, so the bound can be observed', async () => {
     const port = await start(Object.freeze({
       produce: async () => ({ bytes: Buffer.from('x'), contentType: 'image/webp' }),
-      diagnostics: () => Object.freeze({ activeFrames: 2, activeWaveforms: 1, queued: 7, sharedJobs: 3 }),
+      diagnostics: () => Object.freeze({ activeFrames: 2, activeWaveforms: 1, activeVideos: 1, queued: 7, sharedJobs: 3 }),
       cache: {} as MediaAnalysisService['cache'],
     }))
     const response = await call(port, '/api/diagnostics')
     expect(JSON.parse(response.body.toString()).mediaAnalysis)
-      .toEqual({ activeFrames: 2, activeWaveforms: 1, queued: 7, sharedJobs: 3 })
+      .toEqual({ activeFrames: 2, activeWaveforms: 1, activeVideos: 1, queued: 7, sharedJobs: 3 })
   })
 })

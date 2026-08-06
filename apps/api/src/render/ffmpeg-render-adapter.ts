@@ -4,6 +4,7 @@ import { chmod, copyFile, link, lstat, mkdir, realpath, rm, stat, writeFile } fr
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path'
 
 import { DEFAULT_VISUAL_PROPERTIES, evaluateVisualProperties } from '@sanverse/edit-domain'
+import { MAX_REVERSE_SOURCE_DURATION_TICKS } from '@sanverse/edit-domain/clip-time'
 import { PROJECT_TIMESCALE } from '@sanverse/edit-domain/time'
 import {
   validateRenderPlan,
@@ -758,6 +759,14 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
   const plan = validateRenderPlan(input.plan)
   if (!plan.ok) {
     throw renderError('RENDER_INPUT_INVALID', 'The render plan is invalid.')
+  }
+  if (plan.value.segments.some((segment) =>
+    segment.direction === 'reverse' &&
+    segmentSourceDurationTicks(segment) > MAX_REVERSE_SOURCE_DURATION_TICKS)) {
+    throw renderError(
+      'RENDER_INPUT_INVALID',
+      'A backwards clip is longer than the thirty-second render safety limit.',
+    )
   }
   if (!/^[a-zA-Z0-9._-]+$/.test(input.fontPath)) {
     throw renderError('RENDER_INPUT_INVALID', 'The render font reference must be a fixed workspace filename.')

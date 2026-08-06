@@ -77,6 +77,36 @@ describe('how much decoding may happen at once', () => {
     await Promise.all(running)
   })
 
+  it('runs prepared video artifacts one-at-a-time without blocking frames or waveforms', async () => {
+    const coordinator = createAnalysisCoordinator({ ...DEFAULT_ANALYSIS_LIMITS })
+    const videos = [controllable(), controllable()]
+    const picture = controllable()
+    const sound = controllable()
+    let videoStarted = 0
+    let pictureStarted = 0
+    let soundStarted = 0
+
+    const running = [
+      coordinator.run({ lane: 'video', jobId: 'v0', work: async () => { videoStarted += 1; return videos[0].promise } }),
+      coordinator.run({ lane: 'video', jobId: 'v1', work: async () => { videoStarted += 1; return videos[1].promise } }),
+      coordinator.run({ lane: 'frame', jobId: 'p0', work: async () => { pictureStarted += 1; return picture.promise } }),
+      coordinator.run({ lane: 'waveform', jobId: 's0', work: async () => { soundStarted += 1; return sound.promise } }),
+    ]
+
+    await settle()
+    expect(videoStarted).toBe(1)
+    expect(pictureStarted).toBe(1)
+    expect(soundStarted).toBe(1)
+    expect(coordinator.diagnostics()).toMatchObject({ activeVideos: 1, activeFrames: 1, activeWaveforms: 1 })
+
+    videos[0].release()
+    await settle()
+    expect(videoStarted).toBe(2)
+    videos[1].release(); picture.release(); sound.release()
+    await Promise.all(running)
+    expect(coordinator.diagnostics().activeVideos).toBe(0)
+  })
+
   it('turns ten requests for the same thing into one job', async () => {
     const coordinator = createAnalysisCoordinator({ ...DEFAULT_ANALYSIS_LIMITS })
     const job = controllable()

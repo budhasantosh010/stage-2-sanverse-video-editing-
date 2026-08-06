@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 
 import { PROJECT_TIMESCALE } from '@sanverse/edit-domain'
+import { MAX_REVERSE_SOURCE_DURATION_TICKS } from '@sanverse/edit-domain/clip-time'
 
 /**
  * What the browser is allowed to ask for, and nothing else.
@@ -106,6 +107,13 @@ export const MAX_PEAK_COUNT = 256
 export const MAX_WAVEFORM_SPAN_TICKS = 10 * PROJECT_TIMESCALE
 export const MIN_NORMALIZATION_SPAN_TICKS = Math.round(0.4 * PROJECT_TIMESCALE)
 export const MAX_NORMALIZATION_SPAN_TICKS = 30 * 60 * PROJECT_TIMESCALE
+/**
+ * Reverse buffers decoded frames before it can emit the first frame. Thirty
+ * seconds is the product boundary: large enough for creator cutaways, bounded
+ * enough that a single request cannot turn into an unbounded memory job.
+ */
+export const MIN_REVERSE_PREVIEW_SPAN_TICKS = Math.round(0.1 * PROJECT_TIMESCALE)
+export const MAX_REVERSE_PREVIEW_SPAN_TICKS = MAX_REVERSE_SOURCE_DURATION_TICKS
 
 export type AnalysisRequest =
   | Readonly<{
@@ -132,6 +140,13 @@ export type AnalysisRequest =
     }>
   | Readonly<{
       kind: 'audio-normalization'
+      assetId: string
+      assetVersion: string
+      sourceStartTicks: number
+      sourceEndTicks: number
+    }>
+  | Readonly<{
+      kind: 'reverse-preview'
       assetId: string
       assetVersion: string
       sourceStartTicks: number
@@ -165,6 +180,7 @@ export const parseAnalysisRequest = (
     'image-thumbnail': Object.freeze(['assetId', 'assetVersion', 'width', 'height']),
     'waveform-block': Object.freeze(['assetId', 'assetVersion', 'sourceTicks', 'spanTicks', 'peakCount']),
     'audio-normalization': Object.freeze(['assetId', 'assetVersion', 'sourceStartTicks', 'sourceEndTicks']),
+    'reverse-preview': Object.freeze(['assetId', 'assetVersion', 'sourceStartTicks', 'sourceEndTicks']),
   })
   const allowed = allowedByKind[kind]
   if (!allowed) throw analysisKeyInvalid('That kind of preview is not something this editor makes.')
@@ -186,18 +202,32 @@ export const parseAnalysisRequest = (
     return Object.freeze({ kind: 'image-thumbnail' as const, assetId, assetVersion, widthPx, heightPx })
   }
 
-  if (kind === 'audio-normalization') {
+  if (kind === 'audio-normalization' || kind === 'reverse-preview') {
     const sourceStartTicks = wholeNumber(params.get('sourceStartTicks'))
     const sourceEndTicks = wholeNumber(params.get('sourceEndTicks'))
     if (sourceStartTicks === null || sourceEndTicks === null || sourceEndTicks <= sourceStartTicks) {
-      throw analysisKeyInvalid('Choose a real stretch of sound to measure.')
+      throw analysisKeyInvalid(
+        kind === 'audio-normalization'
+          ? 'Choose a real stretch of sound to measure.'
+          : 'Choose a real stretch of footage to prepare backwards.',
+      )
     }
     const span = sourceEndTicks - sourceStartTicks
-    if (span < MIN_NORMALIZATION_SPAN_TICKS || span > MAX_NORMALIZATION_SPAN_TICKS) {
-      throw analysisKeyInvalid('That stretch of sound is outside the normalization analysis limit.')
+    const minimum = kind === 'audio-normalization'
+      ? MIN_NORMALIZATION_SPAN_TICKS
+      : MIN_REVERSE_PREVIEW_SPAN_TICKS
+    const maximum = kind === 'audio-normalization'
+      ? MAX_NORMALIZATION_SPAN_TICKS
+      : MAX_REVERSE_PREVIEW_SPAN_TICKS
+    if (span < minimum || span > maximum) {
+      throw analysisKeyInvalid(
+        kind === 'audio-normalization'
+          ? 'That stretch of sound is outside the normalization analysis limit.'
+          : 'Backwards preview is limited to thirty seconds at a time.',
+      )
     }
     return Object.freeze({
-      kind: 'audio-normalization' as const,
+      kind: kind as 'audio-normalization' | 'reverse-preview',
       assetId,
       assetVersion,
       sourceStartTicks,
@@ -237,6 +267,9 @@ export const analysisRequestId = (request: AnalysisRequest): string => {
   }
   if (request.kind === 'audio-normalization') {
     return `audio-normalization:${request.assetId}:${request.assetVersion}:${request.sourceStartTicks}:${request.sourceEndTicks}:ffmpeg-loudnorm-v1`
+  }
+  if (request.kind === 'reverse-preview') {
+    return `reverse-preview:${request.assetId}:${request.assetVersion}:${request.sourceStartTicks}:${request.sourceEndTicks}:ffmpeg-reverse-preview-v1`
   }
   return `waveform-block:${request.assetId}:${request.assetVersion}:${request.sourceTicks}:${request.spanTicks}:${request.peakCount}`
 }

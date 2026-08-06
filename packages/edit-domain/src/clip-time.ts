@@ -1,5 +1,5 @@
 import { err, isRecord, ok, type Result } from './result.ts'
-import { MAX_PROJECT_TICKS } from './time.ts'
+import { MAX_PROJECT_TICKS, PROJECT_TIMESCALE } from './time.ts'
 
 /**
  * HOW FAST A PIECE OF FOOTAGE PLAYS, WRITTEN AS A FRACTION.
@@ -118,6 +118,14 @@ export const SLOWEST_PLAYBACK_RATE: RationalPlaybackRateV1 = Object.freeze({ num
 export const FASTEST_PLAYBACK_RATE: RationalPlaybackRateV1 = Object.freeze({ numerator: 16, denominator: 1 })
 /** Normal speed. What every piece is until somebody changes it. */
 export const NORMAL_PLAYBACK_RATE: RationalPlaybackRateV1 = Object.freeze({ numerator: 1, denominator: 1 })
+/**
+ * Maximum source span one reverse operation may cover.
+ *
+ * Both browser preparation and FFmpeg's reverse filters buffer the chosen span.
+ * Keeping this in the shared domain prevents the control, derived-media route,
+ * and exporter from quietly adopting different memory limits.
+ */
+export const MAX_REVERSE_SOURCE_DURATION_TICKS = 30 * PROJECT_TIMESCALE
 
 /**
  * The speeds offered as one-click buttons.

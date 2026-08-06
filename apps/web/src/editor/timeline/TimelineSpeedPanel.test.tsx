@@ -15,6 +15,7 @@ const renderPanel = (overrides: Partial<TimelineSpeedPanelProps> = {}) => {
     clipLabel: 'Video 1',
     unavailableReason: null,
     currentRate: NORMAL_PLAYBACK_RATE,
+    direction: 'forward',
     maintainAudioPitch: true,
     currentDurationTicks: 10 * S,
     sourceDurationTicks: 10 * S,
@@ -56,7 +57,7 @@ describe('the speed panel', () => {
   it('hands the chosen speed straight to the caller', () => {
     const { onChoose } = renderPanel()
     fireEvent.click(screen.getByRole('button', { name: '2x' }))
-    expect(onChoose).toHaveBeenCalledWith({ numerator: 2, denominator: 1 }, true)
+    expect(onChoose).toHaveBeenCalledWith({ numerator: 2, denominator: 1 }, true, 'forward')
   })
 
   it('shows the PLANNER’S OWN sentence on every speed button, not one of its own', () => {
@@ -69,7 +70,7 @@ describe('the speed panel', () => {
     const { onChoose } = renderPanel()
     fireEvent.change(screen.getByPlaceholderText('1.5x or 150%'), { target: { value: '150%' } })
     fireEvent.click(screen.getByRole('button', { name: 'Use it' }))
-    expect(onChoose).toHaveBeenCalledWith({ numerator: 3, denominator: 2 }, true)
+    expect(onChoose).toHaveBeenCalledWith({ numerator: 3, denominator: 2 }, true, 'forward')
   })
 
   it('accepts Enter in the box as well as the button', () => {
@@ -77,7 +78,7 @@ describe('the speed panel', () => {
     const box = screen.getByPlaceholderText('1.5x or 150%')
     fireEvent.change(box, { target: { value: '0.5' } })
     fireEvent.keyDown(box, { key: 'Enter' })
-    expect(onChoose).toHaveBeenCalledWith({ numerator: 1, denominator: 2 }, true)
+    expect(onChoose).toHaveBeenCalledWith({ numerator: 1, denominator: 2 }, true, 'forward')
   })
 
   it('says what to type when the box holds something it cannot use, and changes nothing', () => {
@@ -97,14 +98,24 @@ describe('the speed panel', () => {
     const { onChoose } = renderPanel()
     fireEvent.click(screen.getByRole('checkbox', { name: /Keep voices sounding normal/ }))
     fireEvent.click(screen.getByRole('button', { name: '2x' }))
-    expect(onChoose).toHaveBeenCalledWith({ numerator: 2, denominator: 1 }, false)
+    expect(onChoose).toHaveBeenCalledWith({ numerator: 2, denominator: 1 }, false, 'forward')
   })
 
-  it('shows the backwards switch, refuses to let it be pressed, and says why', () => {
-    renderPanel()
+  it('offers backwards playback and sends it through the same planner callback', () => {
+    const { onChoose } = renderPanel()
     const backwards = screen.getByRole('checkbox', { name: /Play it backwards/ }) as HTMLInputElement
-    expect(backwards.disabled).toBe(true)
-    expect(screen.getByText(/Not ready yet\. It needs a backwards copy of the footage/)).toBeTruthy()
+    expect(backwards.disabled).toBe(false)
+    fireEvent.click(backwards)
+    expect(onChoose).toHaveBeenCalledWith(NORMAL_PLAYBACK_RATE, true, 'reverse')
+    expect(screen.getByText(/prepares a short backwards preview/)).toBeTruthy()
+  })
+
+  it('shows the current backwards state and can switch it back to forward', () => {
+    const { onChoose } = renderPanel({ direction: 'reverse' })
+    const backwards = screen.getByRole('checkbox', { name: /Play it backwards/ }) as HTMLInputElement
+    expect(backwards.checked).toBe(true)
+    fireEvent.click(backwards)
+    expect(onChoose).toHaveBeenCalledWith(NORMAL_PLAYBACK_RATE, true, 'forward')
   })
 
   it('offers a way back to normal, and greys it out when it is already normal', () => {
@@ -115,7 +126,7 @@ describe('the speed panel', () => {
   it('lets the way back be pressed once the piece has been retimed', () => {
     const { onChoose } = renderPanel({ currentRate: { numerator: 2, denominator: 1 } })
     fireEvent.click(screen.getByRole('button', { name: 'Back to normal speed' }))
-    expect(onChoose).toHaveBeenCalledWith(NORMAL_PLAYBACK_RATE, true)
+    expect(onChoose).toHaveBeenCalledWith(NORMAL_PLAYBACK_RATE, true, 'forward')
   })
 
   it('says WHY instead of showing speeds when nothing suitable is picked', () => {

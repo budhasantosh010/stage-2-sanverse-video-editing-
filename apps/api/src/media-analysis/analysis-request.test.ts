@@ -9,8 +9,10 @@ import {
   MAX_ANALYSIS_PIXELS,
   MAX_NORMALIZATION_SPAN_TICKS,
   MAX_PEAK_COUNT,
+  MAX_REVERSE_PREVIEW_SPAN_TICKS,
   MAX_WAVEFORM_SPAN_TICKS,
   MIN_NORMALIZATION_SPAN_TICKS,
+  MIN_REVERSE_PREVIEW_SPAN_TICKS,
   parseAnalysisRequest,
   ticksToSeconds,
 } from './analysis-request.ts'
@@ -141,6 +143,35 @@ describe('reading one request out of a web address', () => {
     ]) {
       expect(refusalCode(() => parseAnalysisRequest(
         'audio-normalization',
+        params(`${VALID}&sourceStartTicks=${start}&sourceEndTicks=${end}`),
+      ))).toBe('ANALYSIS_KEY_INVALID')
+    }
+  })
+
+  it('accepts an exact backwards-preview interval up to thirty seconds', () => {
+    const request = parseAnalysisRequest(
+      'reverse-preview',
+      params(`${VALID}&sourceStartTicks=1440000&sourceEndTicks=${1_440_000 + MAX_REVERSE_PREVIEW_SPAN_TICKS}`),
+    )
+    expect(request).toEqual({
+      kind: 'reverse-preview',
+      assetId: 'asset_aaaaaaaa',
+      assetVersion: 'aaaaaaaaaaaaaaaa',
+      sourceStartTicks: 1_440_000,
+      sourceEndTicks: 1_440_000 + MAX_REVERSE_PREVIEW_SPAN_TICKS,
+    })
+    expect(analysisRequestId(request)).toContain('ffmpeg-reverse-preview-v1')
+  })
+
+  it('refuses empty, tiny, reversed, or over-thirty-second reverse previews', () => {
+    for (const [start, end] of [
+      [0, 0],
+      [100, 99],
+      [0, MIN_REVERSE_PREVIEW_SPAN_TICKS - 1],
+      [0, MAX_REVERSE_PREVIEW_SPAN_TICKS + 1],
+    ]) {
+      expect(refusalCode(() => parseAnalysisRequest(
+        'reverse-preview',
         params(`${VALID}&sourceStartTicks=${start}&sourceEndTicks=${end}`),
       ))).toBe('ANALYSIS_KEY_INVALID')
     }

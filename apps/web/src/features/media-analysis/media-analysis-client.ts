@@ -124,6 +124,27 @@ export type AudioNormalizationRequestV1 = Readonly<{
   sourceEndTicks: number
 }>
 
+export type ReversePreviewRequestV1 = Readonly<{
+  assetId: string
+  assetVersion: string
+  sourceStartTicks: number
+  sourceEndTicks: number
+}>
+
+export const reversePreviewRequestUrl = (
+  projectId: string,
+  request: ReversePreviewRequestV1,
+): string => {
+  const base = `/api/projects/${encodeURIComponent(projectId)}/media-analysis/reverse`
+  const params = new URLSearchParams({
+    assetId: request.assetId,
+    assetVersion: request.assetVersion,
+    sourceStartTicks: String(request.sourceStartTicks),
+    sourceEndTicks: String(request.sourceEndTicks),
+  })
+  return `${base}?${params.toString()}`
+}
+
 export type MediaAnalysisClient = Readonly<{
   picture(projectId: string, key: MediaAnalysisKeyV1, signal: AbortSignal): Promise<ImageBitmap>
   peaks(projectId: string, key: MediaAnalysisKeyV1, signal: AbortSignal): Promise<readonly number[]>
@@ -132,6 +153,11 @@ export type MediaAnalysisClient = Readonly<{
     request: AudioNormalizationRequestV1,
     signal: AbortSignal,
   ): Promise<AudioNormalizationEvidenceV1>
+  reversePreview?(
+    projectId: string,
+    request: ReversePreviewRequestV1,
+    signal: AbortSignal,
+  ): Promise<Blob>
 }>
 
 type Fetcher = (input: string, init: { signal: AbortSignal }) => Promise<Response>
@@ -207,6 +233,20 @@ export const createMediaAnalysisClient = (options: Readonly<{
         }))
       }
       return parsed
+    },
+
+    async reversePreview(projectId, request, signal) {
+      const response = await fetchImpl(reversePreviewRequestUrl(projectId, request), { signal })
+      if (!response.ok) throw new AnalysisRefusalError(await refusalFrom(response))
+      const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
+      const blob = await response.blob()
+      if (contentType !== 'video/mp4' || blob.size <= 0 || blob.size > 4 * 1024 * 1024) {
+        throw new AnalysisRefusalError(Object.freeze({
+          code: 'ANALYSIS_CACHE_CORRUPT',
+          message: 'The backwards preview came back in a form this editor does not understand.',
+        }))
+      }
+      return blob
     },
   })
 }

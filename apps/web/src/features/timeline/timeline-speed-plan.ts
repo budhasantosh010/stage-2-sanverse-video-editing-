@@ -7,6 +7,7 @@ import {
 import {
   DEFAULT_CLIP_TIME_TRANSFORM,
   FASTEST_PLAYBACK_RATE,
+  MAX_REVERSE_SOURCE_DURATION_TICKS,
   NORMAL_PLAYBACK_RATE,
   SLOWEST_PLAYBACK_RATE,
   anchoredCompositionDuration,
@@ -62,7 +63,7 @@ export type SpeedRefusalCode =
   | 'RATE_INVALID'
   | 'WOULD_COLLIDE'
   | 'TARGET_LENGTH_INVALID'
-  | 'REVERSE_NOT_READY'
+  | 'REVERSE_TOO_LONG'
 
 export type SpeedRefusal = Readonly<{
   code: SpeedRefusalCode
@@ -170,14 +171,13 @@ export const planSpeedChange = (input: SpeedPlanInput): SpeedPlan => {
   }
   const rate = checkedRate.value
 
-  if (input.direction === 'reverse') {
-    // Stated plainly rather than accepted and then quietly shown forwards.
-    // The preview has one video player and a browser will not run a file
-    // backwards, so until a prepared backwards copy exists the honest answer
-    // is that this is not ready.
+  if (
+    input.direction === 'reverse' &&
+    clip.sourceRange.duration.ticks > MAX_REVERSE_SOURCE_DURATION_TICKS
+  ) {
     return refuse(
-      'REVERSE_NOT_READY',
-      'Playing a piece backwards is not ready yet. It needs a backwards copy of the footage, which is being built.',
+      'REVERSE_TOO_LONG',
+      'Backwards clips are limited to thirty seconds. Split this piece into shorter parts first.',
     )
   }
 
@@ -233,9 +233,13 @@ export const planSpeedChange = (input: SpeedPlanInput): SpeedPlan => {
   return Object.freeze({
     ok: true as const,
     operations: Object.freeze([validated.value]),
-    description: playbackRatesEqual(rate, NORMAL_PLAYBACK_RATE)
-      ? 'Put a piece back to normal speed'
-      : `Changed a piece to ${rateLabel} speed`,
+    description: input.direction === 'reverse'
+      ? playbackRatesEqual(rate, NORMAL_PLAYBACK_RATE)
+        ? 'Played a piece backwards'
+        : `Played a piece backwards at ${rateLabel}`
+      : playbackRatesEqual(rate, NORMAL_PLAYBACK_RATE)
+        ? 'Put a piece back to normal speed'
+        : `Changed a piece to ${rateLabel} speed`,
     feedback: Object.freeze({
       clipId: clip.clipId,
       currentDurationTicks,

@@ -64,6 +64,25 @@ const twoClips = (): Composition => {
   return built.value
 }
 
+const longReverseClip = (): Composition => {
+  const built = validateComposition(
+    {
+      compositionId: 'composition_planlong1',
+      width: 1920,
+      height: 1080,
+      tracks: [{
+        trackId: 'track_planlong1',
+        kind: 'video',
+        order: 0,
+        clips: [clip('clip_planlong1', 0, 31 * S, 0)],
+      }],
+    },
+    [asset],
+  )
+  if (!built.ok) throw new Error(`fixture invalid: ${JSON.stringify(built.error.issues)}`)
+  return built.value
+}
+
 const input = (overrides: Partial<SpeedPlanInput> = {}): SpeedPlanInput => ({
   composition: twoClips(),
   clipId: 'clip_plan0001',
@@ -166,10 +185,27 @@ describe('the refusals, in words the user can act on', () => {
     expect(refusal?.message).toContain('push the rest along')
   })
 
-  it('says plainly that backwards is not ready, instead of playing forwards', () => {
-    const refusal = refusalOf({ direction: 'reverse' })
-    expect(refusal?.code).toBe('REVERSE_NOT_READY')
-    expect(refusal?.message).toContain('not ready')
+  it('accepts a bounded backwards clip through the same one-operation planner', () => {
+    const plan = planSpeedChange(input({ direction: 'reverse' }))
+    expect(plan.ok).toBe(true)
+    if (!plan.ok) return
+    expect(plan.operations).toHaveLength(1)
+    expect(plan.operations[0]).toMatchObject({
+      kind: 'set-clip-time-transform',
+      direction: 'reverse',
+    })
+    expect(plan.description).toContain('backwards')
+  })
+
+  it('refuses a backwards span over thirty seconds and says to split it first', () => {
+    const refusal = refusalOf({
+      composition: longReverseClip(),
+      clipId: 'clip_planlong1',
+      direction: 'reverse',
+    })
+    expect(refusal?.code).toBe('REVERSE_TOO_LONG')
+    expect(refusal?.message).toContain('thirty seconds')
+    expect(refusal?.message).toContain('Split')
   })
 
   it('never mentions a field path, an operation name or a code', () => {
@@ -179,7 +215,7 @@ describe('the refusals, in words the user can act on', () => {
       { lockedTrackIds: ['track_plan0001'] },
       { rate: NORMAL_PLAYBACK_RATE },
       { rate: rate(20, 1) },
-      { direction: 'reverse' as const },
+      { composition: longReverseClip(), clipId: 'clip_planlong1', direction: 'reverse' as const },
     ]) {
       const message = refusalOf(overrides)?.message ?? ''
       expect(message, message).not.toMatch(/set-clip|operation_|\$\.|_INVALID|clipId/)

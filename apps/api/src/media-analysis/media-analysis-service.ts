@@ -202,6 +202,7 @@ const ACCEPTS: Readonly<Record<AnalysisRequest['kind'], readonly MediaAsset['med
   'image-thumbnail': Object.freeze(['image'] as const),
   'waveform-block': Object.freeze(['video', 'audio'] as const),
   'audio-normalization': Object.freeze(['video', 'audio'] as const),
+  'reverse-preview': Object.freeze(['video'] as const),
 })
 
 export function createMediaAnalysisService(options: MediaAnalysisServiceOptions): MediaAnalysisService {
@@ -466,6 +467,67 @@ export function createMediaAnalysisService(options: MediaAnalysisServiceOptions)
     }
   }
 
+  /**
+   * Prepare one short backwards copy for the browser Preview.
+   *
+   * FFmpeg's reverse filters buffer the chosen interval before emitting it, so
+   * the request parser caps this at thirty seconds and the coordinator runs one
+   * prepared-video job at a time. The artifact is intentionally a modest H.264
+   * MP4: it is a throwaway editing proxy, not the final export, and it must stay
+   * under the derived-media cache's four-megabyte per-file ceiling.
+   */
+  const extractReversePreview = async (
+    projectId: string,
+    filePath: string,
+    request: Extract<AnalysisRequest, { kind: 'reverse-preview' }>,
+    hasAudio: boolean,
+    signal: AbortSignal,
+  ): Promise<DerivedArtifact> => {
+    const output = await workFile(projectId, '.mp4')
+    const cwd = await projectDirectory(projectId)
+    const durationTicks = request.sourceEndTicks - request.sourceStartTicks
+    const common = [
+      '-hide_banner', '-nostdin', '-v', 'error',
+      '-ss', ticksToSeconds(request.sourceStartTicks),
+      '-t', ticksToSeconds(durationTicks),
+      '-i', filePath,
+    ] as const
+    const videoEncoding = [
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30',
+      '-maxrate', '700k', '-bufsize', '1400k',
+      '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+      '-map_metadata', '-1',
+    ] as const
+    try {
+      if (hasAudio) {
+        await runFfmpeg([
+          ...common,
+          '-filter_complex',
+          '[0:v:0]reverse,scale=854:480:force_original_aspect_ratio=decrease:force_divisible_by=2,pad=854:480:(ow-iw)/2:(oh-ih)/2,setsar=1[v];[0:a:0]areverse[a]',
+          '-map', '[v]', '-map', '[a]',
+          ...videoEncoding,
+          '-c:a', 'aac', '-b:a', '64k', '-ar', '48000',
+          '-y', output,
+        ], cwd, signal)
+      } else {
+        await runFfmpeg([
+          ...common,
+          '-map', '0:v:0',
+          '-vf', 'reverse,scale=854:480:force_original_aspect_ratio=decrease:force_divisible_by=2,pad=854:480:(ow-iw)/2:(oh-ih)/2,setsar=1',
+          ...videoEncoding,
+          '-an',
+          '-y', output,
+        ], cwd, signal)
+      }
+      return Object.freeze({
+        bytes: await readWorkFile(output, 4 * 1024 * 1024),
+        contentType: 'video/mp4',
+      })
+    } finally {
+      await rm(output, { force: true }).catch(() => undefined)
+    }
+  }
+
   const analyzeNormalization = async (
     projectId: string,
     filePath: string,
@@ -536,14 +598,20 @@ export function createMediaAnalysisService(options: MediaAnalysisServiceOptions)
       }
 
       const durationTicks = asset.duration?.ticks ?? 0
-      if (request.kind === 'audio-normalization') {
+      if (request.kind === 'audio-normalization' || request.kind === 'reverse-preview') {
         if (
           durationTicks <= 0 ||
           request.sourceStartTicks < 0 ||
           request.sourceEndTicks > durationTicks ||
           request.sourceEndTicks <= request.sourceStartTicks
         ) {
-          throw new AnalysisError('SOURCE_TIME_OUT_OF_RANGE', 'That stretch of sound is outside the file.', 416)
+          throw new AnalysisError(
+            'SOURCE_TIME_OUT_OF_RANGE',
+            request.kind === 'audio-normalization'
+              ? 'That stretch of sound is outside the file.'
+              : 'That stretch of footage is outside the file.',
+            416,
+          )
         }
       } else if (request.kind !== 'image-thumbnail') {
         if (durationTicks <= 0 || request.sourceTicks >= durationTicks) {
@@ -561,9 +629,11 @@ export function createMediaAnalysisService(options: MediaAnalysisServiceOptions)
       const cached = await cache.read(projectId, request)
       if (cached) return cached
 
-      const lane = request.kind === 'waveform-block' || request.kind === 'audio-normalization'
-        ? 'waveform' as const
-        : 'frame' as const
+      const lane = request.kind === 'reverse-preview'
+        ? 'video' as const
+        : request.kind === 'waveform-block' || request.kind === 'audio-normalization'
+          ? 'waveform' as const
+          : 'frame' as const
       return coordinator.run({
         lane,
         jobId: `${projectId}:${analysisRequestId(request)}`,
@@ -587,7 +657,9 @@ export function createMediaAnalysisService(options: MediaAnalysisServiceOptions)
               ? await extractImage(projectId, filePath, request, jobSignal)
               : request.kind === 'audio-normalization'
                 ? await analyzeNormalization(projectId, filePath, request, jobSignal)
-                : await extractWaveform(projectId, filePath, request, availableTicks, jobSignal)
+                : request.kind === 'reverse-preview'
+                  ? await extractReversePreview(projectId, filePath, request, asset.hasAudio, jobSignal)
+                  : await extractWaveform(projectId, filePath, request, availableTicks, jobSignal)
 
           // Only successes are kept. A file that was busy for one second must
           // not be reported missing for the rest of the session.

@@ -42,13 +42,15 @@ import { AnalysisError } from './analysis-request.ts'
  * held forever.
  */
 
-export type AnalysisLane = 'frame' | 'waveform'
+export type AnalysisLane = 'frame' | 'waveform' | 'video'
 
 export type AnalysisCoordinatorLimits = Readonly<{
   /** Pictures being made at once. Images count here too: same short job. */
   maxConcurrentFrames: number
   /** Stretches of sound being decoded at once. */
   maxConcurrentWaveforms: number
+  /** Prepared video artifacts being encoded at once. These are intentionally one-at-a-time. */
+  maxConcurrentVideos: number
   /** Jobs allowed to be waiting. Past this the answer is a refusal. */
   maxQueued: number
   /** How long one job may take before it is killed. */
@@ -58,6 +60,7 @@ export type AnalysisCoordinatorLimits = Readonly<{
 export const DEFAULT_ANALYSIS_LIMITS: AnalysisCoordinatorLimits = Object.freeze({
   maxConcurrentFrames: 2,
   maxConcurrentWaveforms: 1,
+  maxConcurrentVideos: 1,
   maxQueued: 64,
   timeoutMs: 20_000,
 })
@@ -84,6 +87,7 @@ export const resolveAnalysisLimits = (
   return Object.freeze({
     maxConcurrentFrames: read('SANVERSE_ANALYSIS_MAX_FRAMES', DEFAULT_ANALYSIS_LIMITS.maxConcurrentFrames, 1, 16),
     maxConcurrentWaveforms: read('SANVERSE_ANALYSIS_MAX_WAVEFORMS', DEFAULT_ANALYSIS_LIMITS.maxConcurrentWaveforms, 1, 8),
+    maxConcurrentVideos: read('SANVERSE_ANALYSIS_MAX_VIDEOS', DEFAULT_ANALYSIS_LIMITS.maxConcurrentVideos, 1, 4),
     maxQueued: read('SANVERSE_ANALYSIS_MAX_QUEUED', DEFAULT_ANALYSIS_LIMITS.maxQueued, 1, 1024),
     timeoutMs: read('SANVERSE_ANALYSIS_TIMEOUT_MS', DEFAULT_ANALYSIS_LIMITS.timeoutMs, 1_000, 120_000),
   })
@@ -92,6 +96,7 @@ export const resolveAnalysisLimits = (
 export type AnalysisDiagnostics = Readonly<{
   activeFrames: number
   activeWaveforms: number
+  activeVideos: number
   queued: number
   sharedJobs: number
 }>
@@ -116,12 +121,16 @@ export const createAnalysisCoordinator = (
   limits: AnalysisCoordinatorLimits = DEFAULT_ANALYSIS_LIMITS,
 ): AnalysisCoordinator => {
   const jobs = new Map<string, Job>()
-  const active: Record<AnalysisLane, number> = { frame: 0, waveform: 0 }
-  const waiting: Record<AnalysisLane, (() => void)[]> = { frame: [], waveform: [] }
+  const active: Record<AnalysisLane, number> = { frame: 0, waveform: 0, video: 0 }
+  const waiting: Record<AnalysisLane, (() => void)[]> = { frame: [], waveform: [], video: [] }
   let queued = 0
 
   const ceiling = (lane: AnalysisLane): number =>
-    lane === 'frame' ? limits.maxConcurrentFrames : limits.maxConcurrentWaveforms
+    lane === 'frame'
+      ? limits.maxConcurrentFrames
+      : lane === 'waveform'
+        ? limits.maxConcurrentWaveforms
+        : limits.maxConcurrentVideos
 
   const acquire = async (lane: AnalysisLane): Promise<void> => {
     if (active[lane] < ceiling(lane)) {
@@ -214,6 +223,7 @@ export const createAnalysisCoordinator = (
     diagnostics: (): AnalysisDiagnostics => Object.freeze({
       activeFrames: active.frame,
       activeWaveforms: active.waveform,
+      activeVideos: active.video,
       queued,
       sharedJobs: jobs.size,
     }),

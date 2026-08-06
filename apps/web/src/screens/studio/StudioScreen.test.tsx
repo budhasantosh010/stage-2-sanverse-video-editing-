@@ -123,6 +123,30 @@ function prepareCanvasGeometry(container: HTMLElement, currentTime = 12.4) {
   return { video, contentLayer, root }
 }
 
+const reverseProject = (): EditProject => {
+  const base = testProject()
+  return Object.freeze({
+    ...base,
+    composition: Object.freeze({
+      ...base.composition,
+      tracks: Object.freeze(base.composition.tracks.map((track) => Object.freeze({
+        ...track,
+        clips: Object.freeze(track.clips.map((clip) => clip.clipId === TEST_CLIP_ID
+          ? Object.freeze({
+              ...clip,
+              sourceRange: Object.freeze({ ...clip.sourceRange, duration: ms(10_000) }),
+              timeTransform: Object.freeze({
+                playbackRate: Object.freeze({ numerator: 1, denominator: 1 }),
+                direction: 'reverse' as const,
+                maintainAudioPitch: true,
+              }),
+            })
+          : clip)),
+      }))),
+    }),
+  })
+}
+
 function renderStudio(overrides: Partial<ComponentProps<typeof StudioScreen>> = {}) {
   const props: ComponentProps<typeof StudioScreen> = {
     project: {
@@ -1096,6 +1120,56 @@ describe('StudioScreen production timeline', () => {
       transform: { scale: 1.2, opacity: 1 },
       tracks: [],
     })
+  })
+
+  it('prepares a reverse proxy on demand, never shows the original forwards, and keeps one video element', async () => {
+    let release: ((response: Response) => void) | null = null
+    const fetchMock = vi.fn((input: string) => {
+      if (String(input).includes('/media-analysis/reverse?')) {
+        return new Promise<Response>((resolve) => { release = resolve })
+      }
+      return Promise.resolve(new Response(JSON.stringify({
+        code: 'ASSET_NOT_FOUND',
+        error: 'Derived media is not part of this reverse test.',
+      }), { status: 404, headers: { 'content-type': 'application/json' } }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const createObjectUrl = vi.fn(() => 'blob:prepared-reverse')
+    const revokeObjectUrl = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrl })
+
+    const view = renderStudio({ editProject: reverseProject() })
+    expect(view.container.querySelectorAll('video')).toHaveLength(1)
+    expect(screen.getByText('Preparing backwards preview…')).toBeInTheDocument()
+    expect(view.container.querySelector('video')?.getAttribute('src')).toBeNull()
+    const reverseCalls = fetchMock.mock.calls.filter(([input]) => String(input).includes('/media-analysis/reverse?'))
+    expect(reverseCalls).toHaveLength(1)
+
+    act(() => release?.(new Response(new Blob([new Uint8Array([0, 0, 0, 24])], { type: 'video/mp4' }), {
+      status: 200,
+      headers: { 'content-type': 'video/mp4' },
+    })))
+    await waitFor(() => expect(view.container.querySelector('video')?.getAttribute('src')).toBe('blob:prepared-reverse'))
+    expect(screen.queryByText('Preparing backwards preview…')).toBeNull()
+    expect(view.container.querySelectorAll('video')).toHaveLength(1)
+
+    view.unmount()
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:prepared-reverse')
+  })
+
+  it('reports a reverse preparation failure instead of falling back to forward footage', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      code: 'DECODER_FAILED',
+      error: 'The backwards preview could not be prepared.',
+    }), { status: 502, headers: { 'content-type': 'application/json' } })))
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn() })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
+
+    const { container } = renderStudio({ editProject: reverseProject() })
+    await screen.findByText('The backwards preview could not be prepared.')
+    expect(container.querySelector('video')?.getAttribute('src')).toBeNull()
+    expect(container.querySelectorAll('video')).toHaveLength(1)
   })
 
   it('keeps one native video and gives Point mode precedence over primary-footage Canvas handles', async () => {

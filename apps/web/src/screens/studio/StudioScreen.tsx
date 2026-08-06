@@ -90,12 +90,16 @@ import { clipCompositionDurationTicks, findClip } from '@sanverse/edit-domain/co
 import type { RationalPlaybackRateV1 } from '@sanverse/edit-domain/clip-time'
 import {
   advancePlayback,
+  assetAt,
   isUncutPassthrough,
   maintainPitchAt,
   nextVisibleTick,
   playbackRateAt,
   playbackSegments,
+  segmentIndexAt,
+  sourceSpanOf,
   sourceTimeFor,
+  withPreparedReversePreview,
   type PlaybackSegment,
 } from '../../features/render-plan/segment-playback'
 import {
@@ -228,6 +232,7 @@ import {
   createMediaAnalysisController,
   MediaAnalysisContext,
   type AssetFacts,
+  type ReversePreviewRequestV1,
 } from '../../features/media-analysis'
 import {
   formatPointTargetTime,
@@ -237,6 +242,14 @@ import './StudioScreen.css'
 import type { EditorWorkspace } from '../../editor/EditorShell'
 
 const EMPTY_ASSET_ORIGINAL_NAMES: Readonly<Record<string, string>> = Object.freeze({})
+
+type ReversePreviewState =
+  | Readonly<{ status: 'idle' }>
+  | Readonly<{ status: 'preparing'; key: string }>
+  | Readonly<{ status: 'ready'; key: string; segmentIndex: number; preparedAssetId: string; url: string }>
+  | Readonly<{ status: 'error'; key: string; message: string }>
+
+const IDLE_REVERSE_PREVIEW: ReversePreviewState = Object.freeze({ status: 'idle' })
 
 export type StudioScreenProps = {
   embedded?: boolean
@@ -1084,6 +1097,11 @@ export function StudioScreen({
   // The footage as it now stands: what was imported, plus every accepted cut.
   const composition = effectiveComposition(editProject)
 
+  // One transport for all derived media. The timeline controller and the
+  // on-demand reverse artifact share it, while retaining separate bounded
+  // coordinator lanes on the server.
+  const mediaAnalysisClient = useMemo(() => createMediaAnalysisClient(), [])
+
   // What the video is MADE OF depends only on the saved project: a pending
   // nameplate changes what is drawn, never which footage plays. Deriving the
   // stretches from the saved project alone keeps playback steady while the user
@@ -1093,6 +1111,92 @@ export function StudioScreen({
     () => (footagePlan ? playbackSegments(footagePlan) : []),
     [footagePlan],
   )
+  const reversePreviewTicks = Math.max(0, millisecondsToTicks(playheadMs))
+  const activeReverseTarget = useMemo<Readonly<{
+    key: string
+    segmentIndex: number
+    preparedAssetId: string
+    request: ReversePreviewRequestV1
+  }> | null>(() => {
+    const segmentIndex = segmentIndexAt(previewSegments, reversePreviewTicks)
+    if (segmentIndex < 0) return null
+    const segment = previewSegments[segmentIndex]
+    if (segment.reversed !== true) return null
+    const asset = editProject.assets.find((candidate) => candidate.assetId === segment.assetId)
+    if (!asset) return null
+    const assetVersion = assetVersionFromSha256(asset.sha256)
+    if (assetVersion.length === 0) return null
+    const request = Object.freeze({
+      assetId: segment.assetId,
+      assetVersion,
+      sourceStartTicks: segment.sourceStartTicks,
+      sourceEndTicks: segment.sourceStartTicks + sourceSpanOf(segment),
+    })
+    const key = `${segmentIndex}:${request.assetId}:${request.assetVersion}:${request.sourceStartTicks}:${request.sourceEndTicks}`
+    return Object.freeze({
+      key,
+      segmentIndex,
+      preparedAssetId: `reverse-preview:${key}`,
+      request,
+    })
+  }, [editProject.assets, previewSegments, reversePreviewTicks])
+  const [reversePreviewState, setReversePreviewState] = useState<ReversePreviewState>(IDLE_REVERSE_PREVIEW)
+  useEffect(() => {
+    const target = activeReverseTarget
+    if (target === null) {
+      setReversePreviewState(IDLE_REVERSE_PREVIEW)
+      return
+    }
+    const requestReversePreview = mediaAnalysisClient.reversePreview
+    if (!requestReversePreview || typeof URL.createObjectURL !== 'function') {
+      setReversePreviewState(Object.freeze({
+        status: 'error',
+        key: target.key,
+        message: 'Backwards preview is unavailable in this browser.',
+      }))
+      return
+    }
+    const controller = new AbortController()
+    let objectUrl: string | null = null
+    let stopped = false
+    setReversePreviewState(Object.freeze({ status: 'preparing', key: target.key }))
+    void requestReversePreview(editProject.projectId, target.request, controller.signal).then((blob) => {
+      if (stopped) return
+      objectUrl = URL.createObjectURL(blob)
+      setReversePreviewState(Object.freeze({
+        status: 'ready',
+        key: target.key,
+        segmentIndex: target.segmentIndex,
+        preparedAssetId: target.preparedAssetId,
+        url: objectUrl,
+      }))
+    }).catch((error: unknown) => {
+      if (stopped || controller.signal.aborted) return
+      setReversePreviewState(Object.freeze({
+        status: 'error',
+        key: target.key,
+        message: error instanceof Error ? error.message : 'Backwards preview could not be prepared.',
+      }))
+    })
+    return () => {
+      stopped = true
+      controller.abort()
+      if (objectUrl !== null) URL.revokeObjectURL(objectUrl)
+    }
+  }, [activeReverseTarget?.key, editProject.projectId, mediaAnalysisClient])
+  const preparedReverse = useMemo(() =>
+    reversePreviewState.status === 'ready' && activeReverseTarget?.key === reversePreviewState.key
+      ? Object.freeze({
+          segmentIndex: reversePreviewState.segmentIndex,
+          preparedAssetId: reversePreviewState.preparedAssetId,
+        })
+      : null,
+  [activeReverseTarget?.key, reversePreviewState])
+  const browserSegments = useMemo(
+    () => withPreparedReversePreview(previewSegments, preparedReverse),
+    [preparedReverse, previewSegments],
+  )
+  const reversePreviewPending = activeReverseTarget !== null && preparedReverse === null
 
   /**
    * Which file the ONE video element is currently pointed at.
@@ -1106,21 +1210,19 @@ export function StudioScreen({
    *
    * Still one element. Never one per clip.
    */
-  // Which recording is under the playhead comes from the user's EDIT, not from
-  // the compiled plan.
-  //
-  // It used to be `assetAt(previewSegments, ...)`. `previewSegments` is empty
-  // whenever the plan could not be built — which is the exact trap that produced
-  // FAIL-052: one unrelated broken thing anywhere in the project made the plan
-  // fail as a whole, so this answered "no recording", and the one video element
-  // was left pointed at whatever it happened to be showing before. The picture
-  // then had nothing to do with where the playhead was.
-  //
-  // `resolvePrimarySource` reads the composition directly and cannot fail as a
-  // whole, so one broken thing costs only its own stretch.
-  const playheadDecision = resolvePrimarySource(editProject, millisecondsToTicks(playheadMs))
-  const playheadAssetId = playheadDecision.kind === 'active' ? playheadDecision.assetId : null
-  const [loadedAssetId, setLoadedAssetId] = useState<string | null>(null)
+  // The compiled segments remain the source of truth whenever they exist,
+  // because that is where the prepared reverse proxy is substituted. If the
+  // whole plan is unavailable because an unrelated overlay is broken, the
+  // direct composition resolver still prevents FAIL-052 and keeps ordinary
+  // footage usable. A reverse stretch that is still preparing deliberately
+  // resolves to no source: showing the original forwards would be a lie.
+  const playheadDecision = resolvePrimarySource(editProject, reversePreviewTicks)
+  const browserAssetId = assetAt(browserSegments, reversePreviewTicks)
+  const fallbackAssetId = playheadDecision.kind === 'active' ? playheadDecision.assetId : null
+  const playheadAssetId = reversePreviewPending
+    ? null
+    : browserAssetId ?? (footagePlan === null ? fallbackAssetId : null)
+  const [loadedAssetId, setLoadedAssetId] = useState<string | null>(playheadAssetId)
   /**
    * Which source decision is the newest one.
    *
@@ -1132,14 +1234,18 @@ export function StudioScreen({
    */
   const sourceGenerationRef = useRef(0)
   useEffect(() => {
-    if (playheadAssetId !== null && playheadAssetId !== loadedAssetId) {
+    if (playheadAssetId !== loadedAssetId) {
       sourceGenerationRef.current += 1
       setLoadedAssetId(playheadAssetId)
     }
   }, [playheadAssetId, loadedAssetId])
-  const previewMediaUrl = loadedAssetId !== null && loadedAssetId !== editProject.assets[0]?.assetId
-    ? assetUrl(loadedAssetId)
-    : project.mediaUrl
+  const previewMediaUrl = loadedAssetId === null
+    ? ''
+    : reversePreviewState.status === 'ready' && loadedAssetId === reversePreviewState.preparedAssetId
+      ? reversePreviewState.url
+      : loadedAssetId !== editProject.assets[0]?.assetId
+        ? assetUrl(loadedAssetId)
+        : project.mediaUrl
 
   const previewProposalOperation = proposal && proposalCanvasPoint
     ? Object.freeze({
@@ -1188,8 +1294,8 @@ export function StudioScreen({
    * each render would throw away the whole cache every time anything changed.
    */
   const mediaAnalysis = useMemo(() => createMediaAnalysisController({
-    client: createMediaAnalysisClient(),
-  }), [])
+    client: mediaAnalysisClient,
+  }), [mediaAnalysisClient])
   useEffect(() => () => mediaAnalysis.dispose(), [mediaAnalysis])
   const contentBox = video ? monitorGeometry(video, monitorFitMode)?.displayedContentRect ?? null : null
   const previewScale = contentBox && composition.width > 0 ? contentBox.width / composition.width : 0
@@ -1241,10 +1347,10 @@ export function StudioScreen({
   // The media effect is attached once and reads these through refs, so they are
   // refreshed here rather than by re-subscribing every listener on every cut.
   useEffect(() => {
-    segmentsRef.current = previewSegments
+    segmentsRef.current = browserSegments
     totalTicksRef.current = compositionDurationTicks
-    if (segmentIndexRef.current >= previewSegments.length) segmentIndexRef.current = 0
-  }, [previewSegments, compositionDurationTicks])
+    if (segmentIndexRef.current >= browserSegments.length) segmentIndexRef.current = 0
+  }, [browserSegments, compositionDurationTicks])
 
   const playheadTicks = Math.min(
     compositionDurationTicks,
@@ -1479,16 +1585,22 @@ export function StudioScreen({
   const primaryDecision = resolvePrimarySource(editProject, playheadTicks)
   const primaryGapReason = primaryDecision.kind === 'gap' ? primaryDecision.reason : null
   const primaryAssetMissing = primaryGapReason === 'ASSET_MISSING'
+  const reversePreviewError =
+    reversePreviewState.status === 'error' && activeReverseTarget?.key === reversePreviewState.key
+      ? reversePreviewState.message
+      : null
+  const reversePreviewPreparing = activeReverseTarget !== null && preparedReverse === null && reversePreviewError === null
 
   const baseLayer = resolveMonitorBaseLayer({
-    hasSource: project.mediaUrl.length > 0,
+    hasSource: !reversePreviewPreparing && previewMediaUrl.length > 0,
     readyState: videoReadiness.readyState,
     seeking: videoReadiness.seeking,
-    mediaError: hasPreviewError
-      ? 'Preview unavailable'
-      : primaryAssetMissing
-        ? primaryGapMessage('ASSET_MISSING')
-        : null,
+    mediaError: reversePreviewError
+      ?? (hasPreviewError
+        ? 'Preview unavailable'
+        : primaryAssetMissing
+          ? primaryGapMessage('ASSET_MISSING')
+          : null),
     // The ONLY input allowed to produce 'gap': the composition itself has no
     // enabled, resolvable clip at this tick.
     inCanonicalGap: primaryGapReason !== null && !primaryAssetMissing,
@@ -1539,9 +1651,12 @@ export function StudioScreen({
       })
     : null
 
-  const baseFrameMessage = baseLayer.kind === 'gap' && primaryGapReason !== null
-    ? primaryGapMessage(primaryGapReason)
-    : monitorBaseFrameMessage(baseFrameState)
+  const baseFrameMessage = reversePreviewPreparing
+    ? 'Preparing backwards preview…'
+    : reversePreviewError
+      ?? (baseLayer.kind === 'gap' && primaryGapReason !== null
+        ? primaryGapMessage(primaryGapReason)
+        : monitorBaseFrameMessage(baseFrameState))
 
   const canvasVisibleNodes = [
     ...previewNodes,
@@ -1734,6 +1849,20 @@ export function StudioScreen({
       return
     }
 
+    const canonicalSegmentIndex = segmentIndexAt(previewSegments, nextTicks)
+    const canonicalSegment = canonicalSegmentIndex >= 0 ? previewSegments[canonicalSegmentIndex] : null
+    if (
+      canonicalSegment?.reversed === true &&
+      preparedReverse?.segmentIndex !== canonicalSegmentIndex
+    ) {
+      // Preparing is not a deliberate timeline hole. Keep the monitor paused
+      // and let the explicit reverse status say what is happening.
+      videoElement.pause()
+      inHoleRef.current = false
+      setIsShowingHole(false)
+      return
+    }
+
     // Whether there is footage here is decided by the user's edit, never by
     // whether the render plan happened to compile. One unresolvable clip
     // elsewhere in the project used to make this return null at EVERY tick,
@@ -1748,11 +1877,11 @@ export function StudioScreen({
 
     inHoleRef.current = false
     setIsShowingHole(false)
-    // The plan supplies only the index the playback state machine counts from.
-    // Its absence is no longer allowed to mean "there is nothing here".
-    const target = sourceTimeFor(previewSegments, nextTicks)
+    // A prepared reverse proxy begins at source zero, while ordinary footage
+    // keeps its canonical source moment. The browser segments answer both cases.
+    const target = sourceTimeFor(browserSegments, nextTicks)
     if (target) segmentIndexRef.current = target.segmentIndex
-    videoElement.currentTime = decision.sourceTicks / PROJECT_TIMESCALE
+    videoElement.currentTime = (target?.sourceTicks ?? decision.sourceTicks) / PROJECT_TIMESCALE
   }
 
   function toggleMonitorPlayback() {
@@ -1956,6 +2085,7 @@ export function StudioScreen({
       clipId,
       clipLabel: item?.label ?? 'This piece',
       currentRate: clip.timeTransform.playbackRate,
+      direction: clip.timeTransform.direction,
       maintainAudioPitch: clip.timeTransform.maintainAudioPitch,
       currentDurationTicks: clipCompositionDurationTicks(clip),
       sourceDurationTicks: clip.sourceRange.duration.ticks,
@@ -1970,12 +2100,16 @@ export function StudioScreen({
    * speed the tooltip says is fine is a speed the button will accept, and a
    * speed the tooltip refuses is refused with the same words when pressed.
    */
-  function describeSpeedChoice(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean): string {
+  function describeSpeedChoice(
+    rate: RationalPlaybackRateV1,
+    maintainAudioPitch: boolean,
+    direction: 'forward' | 'reverse',
+  ): string {
     const preview = previewSpeedChange({
       composition: effectiveComposition(editProject),
       clipId: speedSubject?.clipId ?? null,
       rate,
-      direction: 'forward',
+      direction,
       maintainAudioPitch,
       durationPolicy: 'ripple',
       lockedTrackIds,
@@ -1993,14 +2127,18 @@ export function StudioScreen({
   }
 
   /** Commit a speed change: one operation, one change set, one Undo. */
-  function handleSpeedChoose(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean) {
+  function handleSpeedChoose(
+    rate: RationalPlaybackRateV1,
+    maintainAudioPitch: boolean,
+    direction: 'forward' | 'reverse',
+  ) {
     const changeSetId = createChangeSetId()
     const ids = createIdFactory(changeSetId)
     const plan = planSpeedChange({
       composition: effectiveComposition(editProject),
       clipId: speedSubject?.clipId ?? null,
       rate,
-      direction: 'forward',
+      direction,
       maintainAudioPitch,
       // "Make this bit faster" means the rest of the video comes with it. The
       // alternative leaves a hole where the piece used to be, which is not
@@ -3070,7 +3208,7 @@ export function StudioScreen({
                 ref={videoRef}
                 className="studio-screen__video"
                 preload="metadata"
-                src={previewMediaUrl}
+                src={previewMediaUrl || undefined}
                 aria-label={`Preview of ${project.name}`}
                 style={{ opacity: transitionOpacity }}
                 onError={() => setHasPreviewError(true)}

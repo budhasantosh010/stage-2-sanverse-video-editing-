@@ -177,6 +177,24 @@ describe('FFmpeg render adapter', () => {
     // exports. What is refused is a plan with no FOOTAGE in it.
     expect(() => buildFfmpegArguments({ ...base, plan: testPlan({ segments: [] }) }))
       .toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
+    expect(() => buildFfmpegArguments({
+      ...base,
+      plan: testPlan({
+        durationTicks: ms(31_000).ticks,
+        segments: [testSegmentNode({
+          interval: { start: ms(0), duration: ms(31_000) },
+          sourceDurationTicks: ms(31_000).ticks,
+          direction: 'reverse',
+          playbackRateNumerator: 1,
+          playbackRateDenominator: 1,
+          maintainAudioPitch: true,
+        })],
+        overlays: [],
+      }),
+    })).toThrow(expect.objectContaining({
+      code: 'RENDER_INPUT_INVALID',
+      message: expect.stringContaining('thirty-second'),
+    }))
     expect(buildFfmpegArguments({ ...base, plan: testPlan({ overlays: [] }) })).toContain('-filter_complex_script')
     // An unrecognised node is refused, never skipped.
     expect(() => buildFfmpegArguments({
