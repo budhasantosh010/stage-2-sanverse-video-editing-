@@ -80,6 +80,38 @@ export type SourceSegmentNode = Readonly<{
   /** Additional sound ramps for that transition; zero when audio stays cut. */
   transitionAudioFadeInTicks: number
   transitionAudioFadeOutTicks: number
+  /**
+   * THE RETIMING FIELDS. Every one of them is OPTIONAL, and that is the whole
+   * point.
+   *
+   * Until speed existed, a piece used exactly as much recording as it occupied
+   * on screen, so one number said both things. Now they can differ, and these
+   * fields say how.
+   *
+   * A plan that does not mention them means: same as it always was — the same
+   * length, forwards, normal speed, pitch untouched, sound centred.
+   *
+   * Why OPTIONAL rather than always written out: the export key is a
+   * fingerprint of this plan. Writing `playbackRateNumerator: 1` into every
+   * plan would change the fingerprint of every project ever made, and every
+   * user with a finished export would be made to wait for a byte-identical
+   * one. Leaving the fields out when nothing was retimed means an untouched
+   * project fingerprints exactly as before. That is why the plan's version
+   * number did NOT move for T2.
+   */
+  /** How much recording this piece consumes. Absent means the same as its on-screen length. */
+  sourceDurationTicks?: number
+  /** Speed as a fraction: source ticks per on-screen tick. Absent means 1/1. */
+  playbackRateNumerator?: number
+  playbackRateDenominator?: number
+  /** Absent means 'forward'. */
+  direction?: 'forward' | 'reverse'
+  /** Absent means true: a sped-up voice keeps its normal pitch. */
+  maintainAudioPitch?: boolean
+  /** -10000 full left, 0 centred, +10000 full right. Absent means centred. */
+  pan?: number
+  /** What colour the picture fades through. Absent means black. */
+  transitionColor?: 'black' | 'white'
 }>
 
 export type TextOverlayNode = Readonly<{
@@ -372,9 +404,15 @@ const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]
         ? segment.sourceStartTicks as number
         : -1
       const intervalCandidate = readInterval(segment.interval)
-      const segmentSourceEnd = intervalCandidate === null
+      // How much RECORDING this piece uses. At normal speed that is the same
+      // as how long it lasts on screen, which is why a plan that says nothing
+      // about speed still measures this correctly.
+      const consumedSourceTicks = Number.isSafeInteger(segment.sourceDurationTicks)
+        ? (segment.sourceDurationTicks as number)
+        : intervalCandidate?.duration ?? -1
+      const segmentSourceEnd = intervalCandidate === null || consumedSourceTicks < 0
         ? -1
-        : segmentSourceStart + intervalCandidate.duration
+        : segmentSourceStart + consumedSourceTicks
       segment.footageMotions.forEach((motion, motionIndex) => {
         const motionPath = `${path}.footageMotions[${motionIndex}]`
         if (!isRecord(motion)) {
@@ -431,6 +469,52 @@ const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]
     }
     if (typeof segment.audioEnabled !== 'boolean') {
       issues.push({ path: `${path}.audioEnabled`, code: 'TYPE_INVALID' })
+    }
+
+    // The retiming fields. Absent is always fine and always means "as it
+    // always was". Present but nonsense is refused, never repaired, because a
+    // renderer given a repaired value would produce a video the preview never
+    // showed.
+    if (Object.hasOwn(segment, 'sourceDurationTicks')) {
+      const consumed = segment.sourceDurationTicks
+      if (!Number.isSafeInteger(consumed) || (consumed as number) <= 0) {
+        issues.push({ path: `${path}.sourceDurationTicks`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+    }
+    for (const key of ['playbackRateNumerator', 'playbackRateDenominator'] as const) {
+      if (!Object.hasOwn(segment, key)) continue
+      const term = segment[key]
+      if (!Number.isSafeInteger(term) || (term as number) <= 0 || (term as number) > 10_000) {
+        issues.push({ path: `${path}.${key}`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+    }
+    // One term without the other would be half a fraction, which has no
+    // meaning. Both or neither.
+    if (Object.hasOwn(segment, 'playbackRateNumerator') !== Object.hasOwn(segment, 'playbackRateDenominator')) {
+      issues.push({ path: `${path}.playbackRateNumerator`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    if (
+      Object.hasOwn(segment, 'direction') &&
+      segment.direction !== 'forward' &&
+      segment.direction !== 'reverse'
+    ) {
+      issues.push({ path: `${path}.direction`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    if (Object.hasOwn(segment, 'maintainAudioPitch') && typeof segment.maintainAudioPitch !== 'boolean') {
+      issues.push({ path: `${path}.maintainAudioPitch`, code: 'TYPE_INVALID' })
+    }
+    if (Object.hasOwn(segment, 'pan')) {
+      const pan = segment.pan
+      if (!Number.isSafeInteger(pan) || (pan as number) < -10_000 || (pan as number) > 10_000) {
+        issues.push({ path: `${path}.pan`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+    }
+    if (
+      Object.hasOwn(segment, 'transitionColor') &&
+      segment.transitionColor !== 'black' &&
+      segment.transitionColor !== 'white'
+    ) {
+      issues.push({ path: `${path}.transitionColor`, code: 'VALUE_OUT_OF_RANGE' })
     }
 
     const interval = readInterval(segment.interval)

@@ -62,6 +62,24 @@ export type TimelineItemView = Readonly<{
   gainDb: number | null
   fadeInTicks: number | null
   fadeOutTicks: number | null
+  /**
+   * Where this piece's sound sits between the speakers, in hundredths of a
+   * percent: -10000 hard left, 0 centred, +10000 hard right. Null for anything
+   * that has no sound of its own.
+   */
+  pan: number | null
+  /**
+   * WHAT THE SMALL BADGE ON THE CLIP SAYS, ready to draw.
+   *
+   * Worked out here rather than in the component, for the same reason every
+   * other label is: the timeline picture is a pure function of the project, so
+   * a test can read what the user will see without rendering anything.
+   *
+   * Null means the piece is at normal speed, forwards, with its pitch kept —
+   * which is every piece nobody has touched — and nothing is drawn over it.
+   * Badges cost screen space that belongs to the filmstrip.
+   */
+  speedBadge: string | null
 
   /** Present only for detached proposal ghosts. */
   proposalId: string | null

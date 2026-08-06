@@ -92,7 +92,10 @@ const itemAccessibleLabel = (item: TimelineItemView, timescale: number): string 
   const start = formatTimelineTime(item.startTicks, timescale, true)
   const duration = formatTimelineTime(item.durationTicks, timescale, true)
   const detail = item.detail ? `, ${item.detail}` : ''
-  return `${kind}, ${item.label}${detail}, starts ${start}, duration ${duration}, ${itemStateForScreenReader(item)}`
+  // A screen reader hears the speed too. A badge only a sighted user can see
+  // would make a retimed clip indistinguishable from a normal one by ear.
+  const speed = item.speedBadge ? `, playing at ${item.speedBadge}` : ''
+  return `${kind}, ${item.label}${detail}${speed}, starts ${start}, duration ${duration}, ${itemStateForScreenReader(item)}`
 }
 
 /** What the small mark in the corner says, when there is anything to say. */
@@ -324,6 +327,18 @@ export function TimelineItem({
           onStateChange={onDecorationState}
         />
         <span className="timeline-v1__item-label">{item.label}</span>
+        {/*
+          The speed badge. Drawn only when the piece has actually been retimed,
+          because it sits over the filmstrip and every badge hides frames the
+          user is using to find their place. `aria-hidden` because the same
+          words are already inside the button's spoken label above, and hearing
+          them twice is worse than not hearing them at all.
+        */}
+        {item.speedBadge ? (
+          <span className="timeline-v1__item-speed" aria-hidden="true" data-timeline-speed-badge={item.speedBadge}>
+            {item.speedBadge}
+          </span>
+        ) : null}
         {itemStateLabel(item) ? <span className="timeline-v1__item-state">{itemStateLabel(item)}</span> : null}
         {item.blockedReason ? <span className="timeline-v1__item-warning">Needs attention</span> : null}
         {/*

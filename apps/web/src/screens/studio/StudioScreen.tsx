@@ -75,10 +75,15 @@ import {
   type TrackPresentationV1,
 } from '../../features/timeline'
 import type { TimelineToolbarAction } from '../../editor/timeline/TimelineToolbar'
+import { planSpeedChange, previewSpeedChange } from '../../features/timeline/timeline-speed-plan'
+import { clipCompositionDurationTicks, findClip } from '@sanverse/edit-domain/composition'
+import type { RationalPlaybackRateV1 } from '@sanverse/edit-domain/clip-time'
 import {
   advancePlayback,
   isUncutPassthrough,
+  maintainPitchAt,
   nextVisibleTick,
+  playbackRateAt,
   playbackSegments,
   sourceTimeFor,
   type PlaybackSegment,
@@ -885,15 +890,42 @@ export function StudioScreen({
         Math.round(currentTime * PROJECT_TIMESCALE),
         totalTicksRef.current,
       )
+      /**
+       * Tell the player how fast to run for the piece now on screen.
+       *
+       * Done on every step rather than only when a piece changes, because the
+       * cost is a comparison and the failure it prevents is silent: a browser
+       * that quietly resets the rate on a seek would play the rest of the
+       * project at the wrong speed with nothing on screen to say so.
+       *
+       * The shared playhead stays on the FINISHED VIDEO's clock. This only
+       * changes how fast the recording is fed to it; `advancePlayback` still
+       * decides where the playhead is, from the recording's own position.
+       */
+      const applySpeed = (compositionTicks: number) => {
+        const wanted = playbackRateAt(segments, compositionTicks)
+        if (video.playbackRate !== wanted) video.playbackRate = wanted
+        const keepPitch = maintainPitchAt(segments, compositionTicks)
+        // Not every engine offers this, and one of them still uses the old
+        // prefixed name. Whichever exists is set; where neither does, the
+        // sound simply changes pitch with the speed, which is stated in the
+        // Speed panel rather than hidden.
+        const player = video as unknown as Record<string, unknown>
+        if ('preservesPitch' in player) player.preservesPitch = keepPitch
+        else if ('webkitPreservesPitch' in player) player.webkitPreservesPitch = keepPitch
+      }
+
       switch (action.kind) {
         case 'show':
           segmentIndexRef.current = action.segmentIndex
+          applySpeed(action.compositionTicks)
           setPlayheadMs(action.compositionTicks / TICKS_PER_MS)
           drawFootageMotion(action.compositionTicks)
           return
         case 'seek':
           segmentIndexRef.current = action.segmentIndex
           video.currentTime = action.sourceTicks / PROJECT_TIMESCALE
+          applySpeed(action.compositionTicks)
           setPlayheadMs(action.compositionTicks / TICKS_PER_MS)
           drawFootageMotion(action.compositionTicks)
           return
@@ -1878,6 +1910,82 @@ export function StudioScreen({
       const failure = await onApplyOperations(plan.operations as never, changeSetId)
       if (failure) setTimelineNotice(failure)
     })()
+  }
+
+  /**
+   * The piece of the main video the Speed panel is about, or null.
+   *
+   * Speed applies to a piece of the video's own body. B-roll, pictures, titles
+   * and music are laid ON TOP of the video and are anchored to moments of the
+   * footage, so retiming them is a different question with a different answer;
+   * they return null here and the panel says so rather than guessing.
+   */
+  const speedSubject = useMemo(() => {
+    const itemId = primarySelectedItemId(timelineSelection)
+    if (itemId === null) return null
+    const item = timelineModel.lanes.flatMap((lane) => lane.items).find((candidate) => candidate.id === itemId)
+    const clipId = item?.clipId ?? item?.linkedClipId ?? null
+    if (clipId === null) return null
+    const clip = findClip(effectiveComposition(editProject), clipId)
+    if (!clip) return null
+    return {
+      clipId,
+      clipLabel: item?.label ?? 'This piece',
+      currentRate: clip.timeTransform.playbackRate,
+      maintainAudioPitch: clip.timeTransform.maintainAudioPitch,
+      currentDurationTicks: clipCompositionDurationTicks(clip),
+      sourceDurationTicks: clip.sourceRange.duration.ticks,
+    }
+  }, [editProject, timelineModel, timelineSelection])
+
+  /**
+   * Ask the ONE planner what a speed would do, and turn its answer into a
+   * sentence for the button's tooltip.
+   *
+   * Nothing is calculated here. The tooltip is the planner's own reading, so a
+   * speed the tooltip says is fine is a speed the button will accept, and a
+   * speed the tooltip refuses is refused with the same words when pressed.
+   */
+  function describeSpeedChoice(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean): string {
+    const preview = previewSpeedChange({
+      composition: effectiveComposition(editProject),
+      clipId: speedSubject?.clipId ?? null,
+      rate,
+      direction: 'forward',
+      maintainAudioPitch,
+      durationPolicy: 'ripple',
+      lockedTrackIds,
+      operationId: 'operation_speedpreview',
+    })
+    if (!preview.ok) return preview.refusal.message
+    const before = (preview.feedback.currentDurationTicks / PROJECT_TIMESCALE).toFixed(2)
+    const after = (preview.feedback.nextDurationTicks / PROJECT_TIMESCALE).toFixed(2)
+    const ripple = preview.feedback.ripples
+      ? preview.feedback.rippleShiftTicks > 0
+        ? ' Everything after it moves later.'
+        : ' Everything after it moves earlier.'
+      : ''
+    return `${preview.feedback.rateLabel}: ${before}s becomes ${after}s.${ripple}`
+  }
+
+  /** Commit a speed change: one operation, one change set, one Undo. */
+  function handleSpeedChoose(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean) {
+    const changeSetId = createChangeSetId()
+    const ids = createIdFactory(changeSetId)
+    const plan = planSpeedChange({
+      composition: effectiveComposition(editProject),
+      clipId: speedSubject?.clipId ?? null,
+      rate,
+      direction: 'forward',
+      maintainAudioPitch,
+      // "Make this bit faster" means the rest of the video comes with it. The
+      // alternative leaves a hole where the piece used to be, which is not
+      // what anybody means by speeding a clip up.
+      durationPolicy: 'ripple',
+      lockedTrackIds,
+      operationId: ids.operation(0),
+    })
+    applyPlanned(plan, changeSetId)
   }
 
   /**
@@ -3268,6 +3376,9 @@ export function StudioScreen({
           onSelectionChange={requestTimelineSelection}
           onGesture={handleTimelineGesture}
           onAction={handleTimelineToolbarAction}
+          speedSubject={speedSubject}
+          onSpeedPreview={describeSpeedChoice}
+          onSpeedChoose={handleSpeedChoose}
           onSelectMarker={setSelectedMarkerId}
           onMoveMarker={handleMoveMarker}
           onDeleteMarker={handleDeleteMarker}

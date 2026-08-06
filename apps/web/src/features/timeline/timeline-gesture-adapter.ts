@@ -101,7 +101,15 @@ const validateBuiltOperation = (
       validated.ok ? 'OPERATION_UNSUPPORTED' : validated.error.issues[0]?.code ?? 'OPERATION_INVALID',
     )
   }
-  const applied = applyTimelineOperation(effectiveComposition(project), operation, project.assets)
+  // The VALIDATED operation is what gets applied, not the one just built.
+  // Validation is where an optional field becomes its documented default, so
+  // applying the raw form would hand the composition an `undefined` where a
+  // number belongs and the whole edit would be refused for no visible reason.
+  const applied = applyTimelineOperation(
+    effectiveComposition(project),
+    validated.value as TimelineOperation,
+    project.assets,
+  )
   if (!applied.ok) {
     return refuse(
       'DOMAIN_REFUSAL',

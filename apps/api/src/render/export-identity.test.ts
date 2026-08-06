@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  CLIP_TIME_TRANSFORM_PRIMITIVE_ID,
   TIMELINE_GROUPS_PRIMITIVE_ID,
   TIMELINE_MARKERS_PRIMITIVE_ID,
   TRACK_OUTPUT_PRIMITIVE_ID,
@@ -130,6 +131,81 @@ describe('T1 — an export is identified by what it will produce', () => {
     const a = testMultiAssetProject()
     const b = { ...a, projectId: 'project_bbbbbbbbbbbbbbbb' } as EditProject
     expect(exportIdempotencyKey(a)).not.toBe(exportIdempotencyKey(b))
+  })
+
+  it('DOES change when a piece is given a different speed', () => {
+    // Speed reaches the finished video, so it must produce a new export. The
+    // opposite failure — handing back the old file — would give the user a
+    // video at the speed they had already rejected.
+    const before = testMultiAssetProject()
+    const clipId = before.composition.tracks.flatMap((track) => track.clips)[0].clipId
+    const after = accept(before, 'changeset_speedkey1', [{
+      schemaVersion: 'sanverse.operation/v3',
+      operationId: 'operation_speedkey1',
+      kind: 'set-clip-time-transform',
+      capabilityId: CLIP_TIME_TRANSFORM_PRIMITIVE_ID,
+      clipId,
+      playbackRate: { numerator: 2, denominator: 1 },
+      direction: 'forward',
+      maintainAudioPitch: true,
+      durationPolicy: 'ripple',
+      extensions: {},
+    }])
+    expect(exportIdempotencyKey(after)).not.toBe(exportIdempotencyKey(before))
+  })
+
+  it('DOES change when only the pitch switch is flipped', () => {
+    // Same speed, same length, same frames — but the sound is different, and a
+    // user who turned the squeaky effect on must not be handed the old file.
+    const before = testMultiAssetProject()
+    const clipId = before.composition.tracks.flatMap((track) => track.clips)[0].clipId
+    const keepPitch = accept(before, 'changeset_pitchkey1', [{
+      schemaVersion: 'sanverse.operation/v3',
+      operationId: 'operation_pitchkey1',
+      kind: 'set-clip-time-transform',
+      capabilityId: CLIP_TIME_TRANSFORM_PRIMITIVE_ID,
+      clipId,
+      playbackRate: { numerator: 2, denominator: 1 },
+      direction: 'forward',
+      maintainAudioPitch: true,
+      durationPolicy: 'ripple',
+      extensions: {},
+    }])
+    const squeaky = accept(keepPitch, 'changeset_pitchkey2', [{
+      schemaVersion: 'sanverse.operation/v3',
+      operationId: 'operation_pitchkey2',
+      kind: 'set-clip-time-transform',
+      capabilityId: CLIP_TIME_TRANSFORM_PRIMITIVE_ID,
+      clipId,
+      playbackRate: { numerator: 2, denominator: 1 },
+      direction: 'forward',
+      maintainAudioPitch: false,
+      durationPolicy: 'ripple',
+      extensions: {},
+    }])
+    expect(exportIdempotencyKey(squeaky)).not.toBe(exportIdempotencyKey(keepPitch))
+  })
+
+  it('does NOT change when a piece is put back to the speed it already had', () => {
+    // A reset to normal on a piece that was never retimed produces the exact
+    // plan it already had, so the finished export is still correct and is
+    // handed straight back. Refused upstream as "nothing would change", but
+    // proved here at the identity itself.
+    const before = testMultiAssetProject()
+    const clipId = before.composition.tracks.flatMap((track) => track.clips)[0].clipId
+    const after = accept(before, 'changeset_resetkey1', [{
+      schemaVersion: 'sanverse.operation/v3',
+      operationId: 'operation_resetkey1',
+      kind: 'set-clip-time-transform',
+      capabilityId: CLIP_TIME_TRANSFORM_PRIMITIVE_ID,
+      clipId,
+      playbackRate: { numerator: 1, denominator: 1 },
+      direction: 'forward',
+      maintainAudioPitch: true,
+      durationPolicy: 'ripple',
+      extensions: {},
+    }])
+    expect(exportIdempotencyKey(after)).toBe(exportIdempotencyKey(before))
   })
 
   it('still answers for a project that cannot be compiled', () => {

@@ -14,6 +14,7 @@ import {
   type Composition,
   type TimelineOperation,
 } from '@sanverse/edit-domain'
+import { clipCompositionDurationTicks } from '@sanverse/edit-domain/composition'
 
 /**
  * Turning "cut here" into an operation the server will accept.
@@ -192,7 +193,11 @@ export const buildSetAudioAtPlayhead = (
   }
   const fadeIn = Math.max(0, Math.round(fadeInTicks))
   const fadeOut = Math.max(0, Math.round(fadeOutTicks))
-  if (fadeIn + fadeOut > clip.sourceRange.duration.ticks) {
+  // Ramps are heard on the finished video's clock, so they are measured
+  // against how long the piece lasts ON SCREEN. At normal speed that is the
+  // same number as the amount of recording it uses, which is why this reads
+  // identically for every project made before speed existed.
+  if (fadeIn + fadeOut > clipCompositionDurationTicks(clip)) {
     return refuse('The fades cannot be longer than this section.')
   }
   return Object.freeze({
@@ -206,6 +211,14 @@ export const buildSetAudioAtPlayhead = (
       gainDb,
       fadeIn: Object.freeze({ ticks: fadeIn, timescale: PROJECT_TIMESCALE }),
       fadeOut: Object.freeze({ ticks: fadeOut, timescale: PROJECT_TIMESCALE }),
+      // The piece's CURRENT left/right position, carried through unchanged.
+      //
+      // This one line matters: `set-clip-audio` carries the whole answer for a
+      // piece's sound, and the last one wins outright. Leaving pan out would
+      // mean that nudging the volume slider on a clip the user had placed hard
+      // left silently snapped it back to the middle — a setting destroyed by
+      // an unrelated edit, with nothing on screen to say so.
+      pan: clip.pan,
       extensions: Object.freeze({}),
     }) as TimelineOperation,
   })

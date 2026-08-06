@@ -73,6 +73,9 @@ export const REMOVE_RANGE_COMPONENT_ID = 'sanverse.timeline.remove-range.compone
 /** "Make this stretch quieter, or fade it." */
 export const AUDIO_LEVEL_COMPONENT_ID = 'sanverse.timeline.audio-level.component/v1'
 export const CLIP_TRANSITION_COMPONENT_ID = 'sanverse.timeline.transition.component/v1'
+/** "Play this bit faster, slower, or backwards." */
+export const CLIP_TIME_TRANSFORM_PRIMITIVE_ID = 'sanverse.timeline.time-transform.primitive/v1'
+export const CLIP_SPEED_COMPONENT_ID = 'sanverse.timeline.speed.component/v1'
 
 /**
  * G4-A registers only what already exists. Workflow-level capabilities begin
@@ -336,6 +339,24 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     accepts: 'A smooth dip between two adjacent pieces, with an explicit sound fade policy.',
     produces: Object.freeze(['set-clip-transition']),
     requires: Object.freeze([CLIP_TRANSITION_PRIMITIVE_ID]),
+  }),
+  Object.freeze({
+    capabilityId: CLIP_TIME_TRANSFORM_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts:
+      'One piece of footage, a speed written as a fraction, whether it runs backwards, ' +
+      'whether voices keep their pitch, and whether later pieces slide along.',
+    produces: Object.freeze(['set-clip-time-transform']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: CLIP_SPEED_COMPONENT_ID,
+    version: 1,
+    level: 'component' as const,
+    accepts: 'A piece of the video and how much faster or slower it should play.',
+    produces: Object.freeze(['set-clip-time-transform']),
+    requires: Object.freeze([CLIP_TIME_TRANSFORM_PRIMITIVE_ID]),
   }),
 ])
 

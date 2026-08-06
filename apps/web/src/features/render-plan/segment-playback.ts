@@ -40,7 +40,45 @@ export type PlaybackSegment = Readonly<{
    */
   videoEnabled: boolean
   audioEnabled: boolean
+  /**
+   * How much RECORDING this stretch uses.
+   *
+   * Until speed existed this was always the same number as `durationTicks`,
+   * and the code below simply used one for both. A stretch at 2x lasts three
+   * seconds on screen and uses six seconds of recording, so the two are now
+   * carried separately and every sum says which one it means.
+   *
+   * OPTIONAL, and absent means "the same as `durationTicks`" - which is what
+   * every stretch meant before speed existed, and what every stretch nobody
+   * has retimed still means. Same reasoning as the render plan's own optional
+   * retiming fields: a default that is exactly the old behaviour costs nobody
+   * anything, and no existing caller had to change.
+   */
+  sourceDurationTicks?: number
+  /** Speed as a fraction: recording ticks used per on-screen tick. Absent means 1/1. */
+  rateNumerator?: number
+  rateDenominator?: number
+  /** Backwards playback. Absent means forwards. See `unpreviewableSegmentIndexes`. */
+  reversed?: boolean
+  /** Whether a sped-up voice keeps its normal pitch. Absent means yes. */
+  maintainAudioPitch?: boolean
 }>
+
+/** How much recording a stretch uses. Absent means the same as its on-screen length. */
+export const sourceSpanOf = (segment: PlaybackSegment): number =>
+  typeof segment.sourceDurationTicks === 'number' && segment.sourceDurationTicks > 0
+    ? segment.sourceDurationTicks
+    : segment.durationTicks
+
+/** The speed fraction of a stretch. Absent means normal. */
+export const rateOf = (segment: PlaybackSegment): Readonly<{ numerator: number; denominator: number }> => {
+  const numerator = segment.rateNumerator
+  const denominator = segment.rateDenominator
+  if (typeof numerator !== 'number' || typeof denominator !== 'number' || numerator <= 0 || denominator <= 0) {
+    return Object.freeze({ numerator: 1, denominator: 1 })
+  }
+  return Object.freeze({ numerator, denominator })
+}
 
 export const playbackSegments = (plan: RenderPlan): readonly PlaybackSegment[] =>
   Object.freeze(
@@ -53,8 +91,87 @@ export const playbackSegments = (plan: RenderPlan): readonly PlaybackSegment[] =
         assetId: segment.assetId,
         videoEnabled: segment.videoEnabled,
         audioEnabled: segment.audioEnabled,
+        // A plan that says nothing about speed means normal speed, which is
+        // what every plan meant before speed existed.
+        sourceDurationTicks:
+          typeof segment.sourceDurationTicks === 'number' && segment.sourceDurationTicks > 0
+            ? segment.sourceDurationTicks
+            : segment.interval.duration.ticks,
+        rateNumerator:
+          typeof segment.playbackRateNumerator === 'number' && segment.playbackRateNumerator > 0
+            ? segment.playbackRateNumerator
+            : 1,
+        rateDenominator:
+          typeof segment.playbackRateDenominator === 'number' && segment.playbackRateDenominator > 0
+            ? segment.playbackRateDenominator
+            : 1,
+        reversed: segment.direction === 'reverse',
+        maintainAudioPitch: segment.maintainAudioPitch !== false,
       })),
   )
+
+/**
+ * How far into the RECORDING a given distance into a stretch is.
+ *
+ * One place, used by everything below, so the preview cannot apply the speed
+ * in one sum and forget it in another. Rounding is half-up on whole numbers,
+ * matching the domain exactly.
+ */
+const sourceOffsetFor = (segment: PlaybackSegment, screenOffsetTicks: number): number => {
+  const rate = rateOf(segment)
+  if (rate.numerator === rate.denominator) return screenOffsetTicks
+  return Math.floor((2 * screenOffsetTicks * rate.numerator + rate.denominator) / (2 * rate.denominator))
+}
+
+/** The exact opposite question: how far into the stretch a point in the recording is. */
+const screenOffsetFor = (segment: PlaybackSegment, sourceOffsetTicks: number): number => {
+  const rate = rateOf(segment)
+  if (rate.numerator === rate.denominator) return sourceOffsetTicks
+  return Math.floor((2 * sourceOffsetTicks * rate.denominator + rate.numerator) / (2 * rate.numerator))
+}
+
+/**
+ * How fast to run the video element at one moment of the finished video.
+ *
+ * This is the ONE place a decimal appears, and it appears at the very last
+ * step: the browser's `playbackRate` takes a decimal and there is no way
+ * round that. Every tick has already been decided exactly by then.
+ *
+ * Inside a hole the answer is normal speed. Nothing is playing there, and
+ * leaving the element at 4x through a gap would make the moment it resumes
+ * lurch.
+ */
+export const playbackRateAt = (
+  segments: readonly PlaybackSegment[],
+  compositionTicks: number,
+): number => {
+  const index = segmentIndexAt(segments, compositionTicks)
+  if (index === -1) return 1
+  const rate = rateOf(segments[index])
+  return rate.numerator / rate.denominator
+}
+
+/** Whether a sped-up voice should keep its pitch at one moment. */
+export const maintainPitchAt = (
+  segments: readonly PlaybackSegment[],
+  compositionTicks: number,
+): boolean => {
+  const index = segmentIndexAt(segments, compositionTicks)
+  return index === -1 ? true : segments[index].maintainAudioPitch !== false
+}
+
+/**
+ * Anything the preview genuinely cannot show, named plainly.
+ *
+ * Backwards playback is the only member of this list. A browser video element
+ * will not run a file backwards — a negative `playbackRate` is either ignored
+ * or silently treated as a pause by every engine — so the only truthful way
+ * to show it is to play a prepared backwards copy of the file. Until that
+ * exists, this reports the fact instead of showing forwards footage and
+ * pretending.
+ */
+export const unpreviewableSegmentIndexes = (segments: readonly PlaybackSegment[]): readonly number[] =>
+  Object.freeze(segments.map((segment, index) => (segment.reversed === true ? index : -1)).filter((index) => index !== -1))
 
 /**
  * Which recording is on screen at one moment, and whether that is a change.
@@ -97,7 +214,7 @@ export const sourceTimeFor = (
   const segment = segments[index]
   return Object.freeze({
     segmentIndex: index,
-    sourceTicks: segment.sourceStartTicks + (compositionTicks - segment.startTicks),
+    sourceTicks: segment.sourceStartTicks + sourceOffsetFor(segment, compositionTicks - segment.startTicks),
   })
 }
 
@@ -165,14 +282,19 @@ export const advancePlayback = (
   const showing = (index: number): PlaybackAction =>
     Object.freeze({
       kind: 'show',
-      compositionTicks: segments[index].startTicks + (sourceTicks - segments[index].sourceStartTicks),
+      compositionTicks:
+        segments[index].startTicks +
+        screenOffsetFor(segments[index], sourceTicks - segments[index].sourceStartTicks),
       segmentIndex: index,
     })
 
   const expected = segments[expectedIndex]
   if (expected) {
+    // Measured against how much RECORDING the stretch uses, because that is
+    // the clock the video element's own playhead is on. Comparing it against
+    // the on-screen length would end a 2x stretch halfway through.
     const offset = sourceTicks - expected.sourceStartTicks
-    if (offset >= 0 && offset < expected.durationTicks) return showing(expectedIndex)
+    if (offset >= 0 && offset < sourceSpanOf(expected)) return showing(expectedIndex)
   }
 
   // The browser's own scrubber is on screen, so the user can drag the recording
@@ -181,7 +303,7 @@ export const advancePlayback = (
   const scrubbedInto = segments.findIndex(
     (segment) =>
       sourceTicks >= segment.sourceStartTicks &&
-      sourceTicks < segment.sourceStartTicks + segment.durationTicks,
+      sourceTicks < segment.sourceStartTicks + sourceSpanOf(segment),
   )
   if (scrubbedInto !== -1) return showing(scrubbedInto)
 
@@ -229,4 +351,11 @@ export const advancePlayback = (
  * for machinery it does not need.
  */
 export const isUncutPassthrough = (segments: readonly PlaybackSegment[]): boolean =>
-  segments.length === 1 && segments[0].startTicks === 0 && segments[0].sourceStartTicks === 0
+  segments.length === 1 &&
+  segments[0].startTicks === 0 &&
+  segments[0].sourceStartTicks === 0 &&
+  // A retimed stretch is never a straight play-through: the element has to be
+  // told how fast to run, and its own clock no longer matches the timeline's.
+  rateOf(segments[0]).numerator === rateOf(segments[0]).denominator &&
+  segments[0].reversed !== true
+

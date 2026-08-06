@@ -1,4 +1,5 @@
 import { toMilliseconds, type EditOperation } from '@sanverse/edit-domain'
+import { formatPlaybackRate } from '@sanverse/edit-domain/clip-time'
 
 /**
  * One short, plain sentence for an accepted edit, for the history list.
@@ -128,6 +129,15 @@ export const describeOperation = (operation: EditOperation): string => {
         : operation.groups.length === 1
           ? 'Made some things move together'
           : `Changed which things move together (${operation.groups.length} groups)`
+    case 'set-clip-time-transform': {
+      // Reversing is the headline when it happens, because it is the change a
+      // user is most likely to be looking for in the list. Otherwise the speed
+      // itself is the whole story, written the way it is written on the badge.
+      if (operation.direction === 'reverse') return 'Played a piece backwards'
+      const speed = formatPlaybackRate(operation.playbackRate)
+      if (speed === '1x') return 'Put a piece back to normal speed'
+      return `Changed a piece to ${speed} speed`
+    }
     case 'set-footage-motion':
       return operation.tracks.length > 0
         ? 'Changed how the main footage moves'

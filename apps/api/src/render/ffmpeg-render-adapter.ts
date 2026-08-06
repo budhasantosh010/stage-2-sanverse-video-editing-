@@ -17,6 +17,14 @@ import {
 } from '@sanverse/render-contract'
 import { normalizationFilterSteps } from '@sanverse/render-contract/visual-normalization'
 import {
+  audioSpeedSteps,
+  panFilter,
+  segmentRate,
+  segmentSourceDurationTicks,
+  segmentTransitionColor,
+  videoSpeedSteps,
+} from './ffmpeg-retiming.ts'
+import {
   calloutLabelTop,
   calloutRectPixels,
   resolveCalloutMetrics,
@@ -640,7 +648,11 @@ const splitSegmentForMotion = (
 ): readonly RenderPlan['segments'][number][] => {
   if (segment.footageMotions.length === 0) return Object.freeze([segment])
   const sourceStart = segment.sourceStartTicks
-  const sourceEnd = sourceStart + segment.interval.duration.ticks
+  const sourceEnd = sourceStart + segmentSourceDurationTicks(segment)
+  const motionRate = segmentRate(segment)
+  /** Where a point in the recording lands on screen, relative to this piece. */
+  const onScreenOffset = (sourceTicks: number): number =>
+    Math.round(((sourceTicks - sourceStart) * motionRate.denominator) / motionRate.numerator)
   const boundaries = new Set<number>([sourceStart, sourceEnd])
   for (const motion of segment.footageMotions) {
     const start = Math.max(sourceStart, motion.sourceInterval.start.ticks)
@@ -662,14 +674,21 @@ const splitSegmentForMotion = (
     return Object.freeze({
       ...segment,
       nodeId: `${segment.nodeId}.motion.${index}`,
+      // Both edges are converted to on-screen time separately and then
+      // subtracted, exactly as the timeline itself does it, so the sub-pieces
+      // still add up to the whole piece with no tick lost between them.
       interval: Object.freeze({
         start: Object.freeze({
-          ticks: segment.interval.start.ticks + start - sourceStart,
+          ticks: segment.interval.start.ticks + onScreenOffset(start),
           timescale: segment.interval.start.timescale,
         }),
-        duration: Object.freeze({ ticks: end - start, timescale: segment.interval.duration.timescale }),
+        duration: Object.freeze({
+          ticks: Math.max(1, onScreenOffset(end) - onScreenOffset(start)),
+          timescale: segment.interval.duration.timescale,
+        }),
       }),
       sourceStartTicks: start,
+      sourceDurationTicks: end - start,
       footageMotions: Object.freeze(active),
       fadeInTicks: first ? segment.fadeInTicks : 0,
       fadeOutTicks: last ? segment.fadeOutTicks : 0,
@@ -771,8 +790,15 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
         )
       }
     } else {
+      // How much RECORDING to take. Before speed existed this was the same
+      // number as how long the piece lasts on screen, and the exporter simply
+      // reused that. A 2x piece takes twice as much recording as it occupies,
+      // so the two numbers are now asked for separately.
       const from = ticksToSeconds(piece.segment.sourceStartTicks)
-      const to = ticksToSeconds(piece.segment.sourceStartTicks + piece.durationTicks)
+      const to = ticksToSeconds(piece.segment.sourceStartTicks + segmentSourceDurationTicks(piece.segment))
+      const retimeVideo = videoSpeedSteps(piece.segment)
+      const retimeAudio = audioSpeedSteps(piece.segment, AUDIO_SAMPLE_RATE)
+      const transitionColor = segmentTransitionColor(piece.segment)
       const sourceVideoLabel = `source_video_${index}`
       const motionVideoLabel = `motion_video_${index}`
       /**
@@ -827,8 +853,13 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
         // clip relative to its own 714x1280 instead, and "no motion" would not
         // mean the same framing as "motion that changes nothing".
         const normalizedLabel = `normalized_video_${index}`
+        // Reverse and speed sit between "take this part of the recording" and
+        // "make it this many frames per second". Reversing after the frame
+        // rate was fixed would reverse frames that had already been duplicated
+        // or dropped, and the last frame would land at the wrong instant.
         graph.push(
-          `[${segmentInput}:v]trim=start=${from}:end=${to},setpts=PTS-STARTPTS,fps=${rate}[${sourceVideoLabel}]`,
+          `[${segmentInput}:v]trim=start=${from}:end=${to},setpts=PTS-STARTPTS` +
+            `${retimeVideo.length > 0 ? `,${retimeVideo.join(',')}` : ''},fps=${rate}[${sourceVideoLabel}]`,
         )
         graph.push(
           `[${sourceVideoLabel}]${normalizationFilterSteps({
@@ -850,12 +881,12 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
         ))
         const videoSteps: string[] = []
         if (piece.segment.videoFadeInTicks > 0) {
-          videoSteps.push(`fade=t=in:st=0:d=${ticksToSeconds(piece.segment.videoFadeInTicks)}:color=black`)
+          videoSteps.push(`fade=t=in:st=0:d=${ticksToSeconds(piece.segment.videoFadeInTicks)}:color=${transitionColor}`)
         }
         if (piece.segment.videoFadeOutTicks > 0) {
           videoSteps.push(
             `fade=t=out:st=${ticksToSeconds(piece.durationTicks - piece.segment.videoFadeOutTicks)}` +
-              `:d=${ticksToSeconds(piece.segment.videoFadeOutTicks)}:color=black`,
+              `:d=${ticksToSeconds(piece.segment.videoFadeOutTicks)}:color=${transitionColor}`,
           )
         }
         videoSteps.push('format=pix_fmts=yuv420p', 'setsar=1')
@@ -876,7 +907,18 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
           `aresample=${AUDIO_SAMPLE_RATE}`,
           `aformat=sample_fmts=fltp:channel_layouts=${AUDIO_CHANNEL_LAYOUT}`,
         ]
+        // Speed and direction come BEFORE loudness, ramps and left/right, so
+        // that a half-second fade is half a second of FINISHED VIDEO. Applied
+        // the other way round, a fade on a 2x piece would last a quarter of a
+        // second on screen and the ramp the user dragged would be wrong.
+        steps.push(...retimeAudio)
+        // Timestamps are restated after retiming: `atempo` and `areverse` both
+        // leave the stream starting somewhere other than zero, and `concat`
+        // joins on timestamps.
+        if (retimeAudio.length > 0) steps.push('asetpts=PTS-STARTPTS')
         if (piece.segment.gainDb !== 0) steps.push(`volume=${piece.segment.gainDb}dB`)
+        const pan = panFilter(piece.segment.pan ?? 0)
+        if (pan !== null) steps.push(pan)
         if (piece.segment.fadeInTicks > 0) {
           steps.push(`afade=t=in:st=0:d=${ticksToSeconds(piece.segment.fadeInTicks)}`)
         }
@@ -1380,7 +1422,7 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
         if (available === undefined) {
           throw renderError('RENDER_INPUT_INVALID', 'A piece of footage names a file this export did not open.')
         }
-        const endTicks = segment.sourceStartTicks + segment.interval.duration.ticks
+        const endTicks = segment.sourceStartTicks + segmentSourceDurationTicks(segment)
         if (endTicks > available) {
           throw renderError('RENDER_INPUT_INVALID', 'An accepted edit extends beyond the source duration.')
         }

@@ -128,19 +128,19 @@ describe('T1.1 the icon toolbar', () => {
     expect(paste).toHaveAttribute('title', expect.stringContaining('Copy something first'))
   })
 
-  it('offers Speed, disabled, and says plainly that it is not built yet', async () => {
+  it('offers Speed, and says which thing to pick rather than going quiet', async () => {
     /*
-     * Hiding it would make the toolbar change shape between versions, and a user
-     * who read about the feature would conclude it was missing rather than
-     * coming. What would be WRONG is a Speed button that does nothing when
-     * pressed — and this cannot be pressed, and it says why.
+     * Speed became real in T2. With nothing picked it is still refused — but
+     * the refusal now names what to do about it, because it is a state the
+     * user can leave by clicking a clip. In T1 this button said "not built
+     * yet", which was the truth then and would be a lie now.
      */
     const user = userEvent.setup()
     renderTimeline()
     await user.click(screen.getByRole('button', { name: 'More things you can do' }))
-    const speed = screen.getByRole('menuitem', { name: /Speed — Changing how fast/i })
+    const speed = screen.getByRole('menuitem', { name: /Speed — Choose a piece of the main video first/i })
     expect(speed).toBeDisabled()
-    expect(speed).toHaveAttribute('title', expect.stringContaining('not built yet'))
+    expect(speed).toHaveAttribute('title', expect.stringContaining('cannot be sped up yet'))
   })
 
   it('keeps the long list behind More, so the row still fits a small screen', async () => {

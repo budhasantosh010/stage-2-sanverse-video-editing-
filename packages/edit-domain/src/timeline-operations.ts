@@ -3,13 +3,24 @@ import { capabilityProduces } from './capabilities.ts'
 import {
   CLIP_ID_PATTERN,
   MAX_CLIP_GAIN_DB,
+  MAX_CLIP_PAN,
   MIN_CLIP_GAIN_DB,
+  MIN_CLIP_PAN,
   TRACK_ID_PATTERN,
+  clipCompositionDurationTicks,
+  clipCompositionEndTicks,
   validateComposition,
   type Clip,
   type Composition,
   type Track,
 } from './composition.ts'
+import {
+  DEFAULT_CLIP_TIME_TRANSFORM,
+  anchoredCompositionDuration,
+  validatePlaybackRate,
+  type ClipTimeTransformV1,
+  type RationalPlaybackRateV1,
+} from './clip-time.ts'
 import { emptyExtensions, validateExtensions, type Extensions } from './json.ts'
 import type { MediaAsset } from './assets.ts'
 import {
@@ -103,7 +114,16 @@ export type SetClipEnabledOperation = Common &
     enabled: boolean
   }>
 
-/** Loudness and ramps for one piece. */
+/**
+ * Loudness, ramps and left/right placement for one piece.
+ *
+ * `pan` was added in T2 and is OPTIONAL on the wire. A request that does not
+ * mention it leaves the piece centred, which is what every request written
+ * before T2 meant, so no saved change set and no stored AI answer had to be
+ * rewritten. This is why a second `set-clip-pan` operation was NOT created:
+ * two operations that both decide how a clip sounds would eventually be
+ * applied in an order nobody chose, and the loser would be silently discarded.
+ */
 export type SetClipAudioOperation = Common &
   Readonly<{
     kind: 'set-clip-audio'
@@ -111,7 +131,88 @@ export type SetClipAudioOperation = Common &
     gainDb: number
     fadeIn: MediaTime
     fadeOut: MediaTime
+    /** -10000 full left, 0 centred, +10000 full right. See `Clip.pan`. */
+    pan: number
   }>
+
+/**
+ * How one piece is played through: its speed, its direction, and whether a
+ * sped-up voice keeps its normal pitch.
+ *
+ * `durationPolicy` decides what happens to everything AFTER this piece when
+ * the change makes it longer or shorter:
+ *
+ *   'ripple'          later pieces on the same track slide along to keep the
+ *                     sequence gapless. Nothing is overwritten, nothing is
+ *                     lost, and the finished video's total length changes.
+ *
+ *   'preserve-start'  nothing else moves. The piece grows or shrinks in place.
+ *                     If growing would run it into the next piece, the whole
+ *                     operation is REFUSED — never a silent overwrite.
+ *
+ * Both are real intentions and neither is a safe default for the other, so the
+ * request must say which. The toolbar sends 'ripple' because that is what a
+ * creator means by "make this bit faster"; the ripple is shown as displaced
+ * ghosts before the mouse is released.
+ */
+export type SetClipTimeTransformOperation = Common &
+  Readonly<{
+    kind: 'set-clip-time-transform'
+    clipId: string
+    playbackRate: RationalPlaybackRateV1
+    direction: 'forward' | 'reverse'
+    maintainAudioPitch: boolean
+    durationPolicy: 'ripple' | 'preserve-start'
+  }>
+
+/**
+ * THE TRANSITION KINDS THIS PRODUCT WILL ACTUALLY PERFORM.
+ *
+ * The rule, and it is not negotiable: a kind appears in this list only when it
+ * works in the on-screen preview AND in the exported file AND has tests. A
+ * chooser full of names that produce nothing is worse than a short chooser,
+ * because the user cannot tell which half is real until they wait for an
+ * export.
+ *
+ *   'none'            an ordinary cut: one shot ends, the next begins
+ *   'dip-to-black'    both shots fade through black
+ *   'dip-to-white'    both shots fade through white
+ *
+ * Cross Dissolve, Wipe, Slide, Push and Zoom are DELIBERATELY ABSENT, and the
+ * reason is one shared reason worth stating plainly:
+ *
+ *   All five need TWO shots visible at the SAME INSTANT — one melting into,
+ *   sliding over, or wiping across the other.
+ *
+ *   The on-screen preview has exactly one video player, by a rule that is not
+ *   up for negotiation, because a second player is a second clock and two
+ *   clocks drift. One player can show one frame at a time. It therefore
+ *   CANNOT show two shots at once.
+ *
+ *   The exporter could produce them. The preview could not. The user would
+ *   watch a plain cut, wait for an export, and be handed a different video.
+ *
+ * The preview and the exported file agreeing is worth more than five extra
+ * names in a menu, so those five wait until the preview is rebuilt to hold
+ * two pictures. What is shipped instead is the two that ONE picture can do
+ * honestly: fading through black and fading through white.
+ *
+ * This is recorded here, in the chooser, and in T2_TRANSITIONS.md rather than
+ * shipped as a button that quietly does nothing.
+ */
+export const TRANSITION_STYLES = Object.freeze([
+  'none',
+  'dip-to-black',
+  'dip-to-white',
+] as const)
+
+export type TransitionStyle = (typeof TRANSITION_STYLES)[number]
+
+export const isTransitionStyle = (value: unknown): value is TransitionStyle =>
+  typeof value === 'string' && (TRANSITION_STYLES as readonly string[]).includes(value)
+
+/** The longest a transition may run: two seconds on each side. */
+export const MAX_TRANSITION_TICKS = 2_880_000
 
 export type SetClipTransitionOperation = Common &
   Readonly<{
@@ -119,7 +220,7 @@ export type SetClipTransitionOperation = Common &
     clipId: string
     /** The outgoing clip is `clipId`; this is the immediately following clip. */
     nextClipId: string
-    style: 'none' | 'dip-to-black'
+    style: TransitionStyle
     /** Length of each side's ramp. The timeline duration itself is unchanged. */
     duration: MediaTime
     audio: 'cut' | 'fade-through-silence'
@@ -179,10 +280,12 @@ export type TimelineOperation =
   | SetClipEnabledOperation
   | SetClipAudioOperation
   | SetClipTransitionOperation
+  | SetClipTimeTransformOperation
   | PlacePrimaryClipOperation
   | MovePrimaryClipOperation
 
 export const TIMELINE_OPERATION_KINDS: readonly string[] = Object.freeze([
+  'set-clip-time-transform',
   'split-clip',
   'trim-clip',
   'remove-clip',
@@ -219,6 +322,14 @@ const KEYS_BY_KIND: Readonly<Record<string, readonly string[]>> = Object.freeze(
   'reorder-clip': Object.freeze([...COMMON_KEYS, 'clipId', 'toIndex']),
   'set-clip-enabled': Object.freeze([...COMMON_KEYS, 'clipId', 'enabled']),
   'set-clip-audio': Object.freeze([...COMMON_KEYS, 'clipId', 'gainDb', 'fadeIn', 'fadeOut']),
+  'set-clip-time-transform': Object.freeze([
+    ...COMMON_KEYS,
+    'clipId',
+    'playbackRate',
+    'direction',
+    'maintainAudioPitch',
+    'durationPolicy',
+  ]),
   'set-clip-transition': Object.freeze([
     ...COMMON_KEYS,
     'clipId',
@@ -231,6 +342,16 @@ const KEYS_BY_KIND: Readonly<Record<string, readonly string[]>> = Object.freeze(
     ...COMMON_KEYS, 'clipId', 'trackId', 'assetId', 'sourceRange', 'compositionStart',
   ]),
   'move-primary-clip': Object.freeze([...COMMON_KEYS, 'clipId', 'compositionStart']),
+})
+
+/**
+ * Keys a request MAY carry. Missing means the documented default.
+ *
+ * Only `set-clip-audio` has one, and only because pan arrived after the
+ * operation was already in use. Everything else stays strictly closed.
+ */
+const OPTIONAL_KEYS_BY_KIND: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  'set-clip-audio': Object.freeze(['pan']),
 })
 
 export const OPERATION_ID_PATTERN = /^operation_[a-z0-9]{8,64}$/
@@ -258,11 +379,14 @@ export const validateTimelineOperation = (
     return err({ code: 'OPERATION_INVALID', issues: [{ path: `${path}.kind`, code: 'OPERATION_KIND_UNKNOWN' }] })
   }
   const keys = KEYS_BY_KIND[kind as string]
+  const optionalKeys = OPTIONAL_KEYS_BY_KIND[kind as string] ?? []
   for (const key of keys) {
     if (!Object.hasOwn(input, key)) issues.push({ path: `${path}.${key}`, code: 'FIELD_REQUIRED' })
   }
   for (const key of Object.keys(input)) {
-    if (!keys.includes(key)) issues.push({ path: `${path}.${key}`, code: 'FIELD_UNKNOWN' })
+    if (!keys.includes(key) && !optionalKeys.includes(key)) {
+      issues.push({ path: `${path}.${key}`, code: 'FIELD_UNKNOWN' })
+    }
   }
 
   if (input.schemaVersion !== OPERATION_SCHEMA_VERSION) {
@@ -345,7 +469,43 @@ export const validateTimelineOperation = (
       }
       const fadeIn = time(input.fadeIn, 'fadeIn')
       const fadeOut = time(input.fadeOut, 'fadeOut')
-      extra = { gainDb, fadeIn, fadeOut }
+      // Absent means centred. Present but out of range, or a decimal, is a
+      // refusal — a hand-written -1.5 must not become "nearly full left".
+      let pan = 0
+      if (Object.hasOwn(input, 'pan')) {
+        const requested = input.pan
+        if (
+          typeof requested !== 'number' ||
+          !Number.isSafeInteger(requested) ||
+          requested < MIN_CLIP_PAN ||
+          requested > MAX_CLIP_PAN
+        ) {
+          issues.push({ path: `${path}.pan`, code: 'VALUE_OUT_OF_RANGE' })
+        } else {
+          pan = requested
+        }
+      }
+      extra = { gainDb, fadeIn, fadeOut, pan }
+      break
+    }
+    case 'set-clip-time-transform': {
+      const rate = validatePlaybackRate(input.playbackRate, `${path}.playbackRate`)
+      if (!rate.ok) issues.push({ path: rate.error.path, code: 'VALUE_OUT_OF_RANGE' })
+      if (input.direction !== 'forward' && input.direction !== 'reverse') {
+        issues.push({ path: `${path}.direction`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      if (typeof input.maintainAudioPitch !== 'boolean') {
+        issues.push({ path: `${path}.maintainAudioPitch`, code: 'TYPE_INVALID' })
+      }
+      if (input.durationPolicy !== 'ripple' && input.durationPolicy !== 'preserve-start') {
+        issues.push({ path: `${path}.durationPolicy`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      extra = {
+        playbackRate: rate.ok ? rate.value : null,
+        direction: input.direction,
+        maintainAudioPitch: input.maintainAudioPitch,
+        durationPolicy: input.durationPolicy,
+      }
       break
     }
     case 'place-primary-clip': {
@@ -378,14 +538,14 @@ export const validateTimelineOperation = (
       if (typeof input.nextClipId !== 'string' || !CLIP_ID_PATTERN.test(input.nextClipId)) {
         issues.push({ path: `${path}.nextClipId`, code: 'VALUE_OUT_OF_RANGE' })
       }
-      if (input.style !== 'none' && input.style !== 'dip-to-black') {
+      if (!isTransitionStyle(input.style)) {
         issues.push({ path: `${path}.style`, code: 'VALUE_OUT_OF_RANGE' })
       }
       const duration = time(input.duration, 'duration')
       if (
         duration !== null &&
         (
-          duration.ticks > 2_880_000 ||
+          duration.ticks > MAX_TRANSITION_TICKS ||
           (input.style === 'none' ? duration.ticks !== 0 : duration.ticks <= 0)
         )
       ) {
@@ -454,13 +614,23 @@ const ordered = (track: Track): readonly Clip[] =>
 const isGapless = (track: Track): boolean => {
   const clips = ordered(track)
   for (let index = 1; index < clips.length; index += 1) {
-    const previous = clips[index - 1]
-    if (clips[index].compositionStart.ticks !== previous.compositionStart.ticks + previous.sourceRange.duration.ticks) {
+    if (clips[index].compositionStart.ticks !== clipCompositionEndTicks(clips[index - 1])) {
       return false
     }
   }
   return true
 }
+
+/**
+ * How much of the finished video a stretch of THIS piece's recording occupies.
+ *
+ * Wraps the anchored rule so callers in this file never have to remember to
+ * measure from the recording's own beginning. Passing `fromSourceTicks` as the
+ * clip's own source start and `spanTicks` as its whole length gives exactly
+ * `clipCompositionDurationTicks(clip)`.
+ */
+const onScreenTicksFor = (clip: Clip, fromSourceTicks: number, spanTicks: number): number =>
+  anchoredCompositionDuration(fromSourceTicks, spanTicks, clip.timeTransform.playbackRate)
 
 const shiftAfter = (clips: readonly Clip[], fromTicks: number, deltaTicks: number): readonly Clip[] =>
   clips.map((clip) =>
@@ -477,7 +647,10 @@ const shiftAfter = (clips: readonly Clip[], fromTicks: number, deltaTicks: numbe
  * edit already made impossible to honour.
  */
 const clampFades = (clip: Clip): Clip => {
-  const duration = clip.sourceRange.duration.ticks
+  // Measured on the finished video's clock, because that is where a ramp is
+  // heard. A 2x clip made from four seconds of recording lasts two seconds on
+  // screen, so a two-and-a-half-second fade no longer fits and is pulled in.
+  const duration = clipCompositionDurationTicks(clip)
   const fadeIn = Math.min(clip.fadeIn.ticks, duration)
   const fadeOut = Math.min(clip.fadeOut.ticks, duration - fadeIn)
   if (fadeIn === clip.fadeIn.ticks && fadeOut === clip.fadeOut.ticks) return clip
@@ -522,6 +695,8 @@ export const applyTimelineOperation = (
       gainDb: 0,
       fadeIn: ZERO_TIME,
       fadeOut: ZERO_TIME,
+      pan: 0,
+      timeTransform: DEFAULT_CLIP_TIME_TRANSFORM,
     }
     // Whether the new piece overlaps something, and whether the stretch asked
     // for exists inside that recording, are both decided by the composition
@@ -558,6 +733,11 @@ export const applyTimelineOperation = (
         sourceRange: { start: clip.sourceRange.start, duration: mediaTime(at) },
         fadeOut: ZERO_TIME,
       })
+      // The right half begins where the left half ENDS ON SCREEN, which at any
+      // speed other than normal is not the same number as `at`. Deriving it
+      // from the left half's own on-screen length — rather than converting `at`
+      // a second time — is what guarantees the two halves exactly touch, with
+      // no one-tick gap and no one-tick overlap.
       const right = clampFades({
         ...clip,
         clipId: operation.newClipId,
@@ -565,9 +745,16 @@ export const applyTimelineOperation = (
           start: mediaTime(clip.sourceRange.start.ticks + at),
           duration: mediaTime(clip.sourceRange.duration.ticks - at),
         },
-        compositionStart: mediaTime(clip.compositionStart.ticks + at),
+        compositionStart: mediaTime(clipCompositionEndTicks(left)),
         fadeIn: ZERO_TIME,
       })
+      // At an extreme speed a half can round to no time at all on screen.
+      // Refused by name rather than quietly stretched, because stretching one
+      // half would make the two halves longer than the piece they came from
+      // and the next clip along would be overlapped.
+      if (clipCompositionDurationTicks(left) <= 0 || clipCompositionDurationTicks(right) <= 0) {
+        return err(fail('SPLIT_TIME_OUTSIDE_CLIP'))
+      }
       nextClips = track.clips.flatMap((candidate) =>
         candidate.clipId === clip.clipId ? [left, right] : [candidate],
       )
@@ -579,21 +766,48 @@ export const applyTimelineOperation = (
       const remaining = clip.sourceRange.duration.ticks - removed
       if (remaining <= 0) return err(fail('TRIM_LEAVES_NOTHING'))
 
+      // `trimStart` shortens the piece from the end the VIEWER SEES FIRST.
+      // For an ordinary piece that is the beginning of the recording. For a
+      // piece running backwards it is the END of the recording, because the
+      // recording is being played from its tail. Doing the mirroring here, in
+      // one place, means no caller has to remember it and no two callers can
+      // disagree about it.
+      const backwards = clip.timeTransform.direction === 'reverse'
+      const newSourceStart = backwards
+        ? clip.sourceRange.start.ticks + operation.trimEnd.ticks
+        : clip.sourceRange.start.ticks + operation.trimStart.ticks
+
+      const oldOnScreen = clipCompositionDurationTicks(clip)
+      const newOnScreen = onScreenTicksFor(clip, newSourceStart, remaining)
+      // How much of the finished video the removed HEAD used to occupy. That,
+      // not the amount of recording removed, is how far the piece slides right
+      // when the user is not rippling. The head the viewer saw first sits at
+      // the START of the recording normally, and at its END when the piece
+      // runs backwards.
+      const headSourceStart = backwards
+        ? clip.sourceRange.start.ticks + clip.sourceRange.duration.ticks - operation.trimStart.ticks
+        : clip.sourceRange.start.ticks
+      const headOnScreen = onScreenTicksFor(clip, headSourceStart, operation.trimStart.ticks)
+
       const trimmed = clampFades({
         ...clip,
         sourceRange: {
-          start: mediaTime(clip.sourceRange.start.ticks + operation.trimStart.ticks),
+          start: mediaTime(newSourceStart),
           duration: mediaTime(remaining),
         },
         compositionStart: operation.ripple
           ? clip.compositionStart
-          : mediaTime(clip.compositionStart.ticks + operation.trimStart.ticks),
+          : mediaTime(clip.compositionStart.ticks + Math.max(0, headOnScreen)),
       })
       const replaced = track.clips.map((candidate) =>
         candidate.clipId === clip.clipId ? trimmed : candidate,
       )
       nextClips = operation.ripple
-        ? shiftAfter(replaced, clip.compositionStart.ticks + clip.sourceRange.duration.ticks, -removed)
+        ? shiftAfter(
+            replaced,
+            clipCompositionEndTicks(clip),
+            -(oldOnScreen - newOnScreen),
+          )
         : replaced
       break
     }
@@ -609,8 +823,8 @@ export const applyTimelineOperation = (
       nextClips = operation.ripple
         ? shiftAfter(
             survivors,
-            clip.compositionStart.ticks + clip.sourceRange.duration.ticks,
-            -clip.sourceRange.duration.ticks,
+            clipCompositionEndTicks(clip),
+            -clipCompositionDurationTicks(clip),
           )
         : survivors
       break
@@ -628,7 +842,7 @@ export const applyTimelineOperation = (
       let cursor = running[0].compositionStart.ticks
       nextClips = rearranged.map((candidate) => {
         const placed = { ...candidate, compositionStart: mediaTime(cursor) }
-        cursor += candidate.sourceRange.duration.ticks
+        cursor += clipCompositionDurationTicks(candidate)
         return placed
       })
       break
@@ -648,7 +862,9 @@ export const applyTimelineOperation = (
     }
 
     case 'set-clip-audio': {
-      if (operation.fadeIn.ticks + operation.fadeOut.ticks > clip.sourceRange.duration.ticks) {
+      // Ramps are heard on the finished video's clock, so they are checked
+      // against how long the piece lasts on screen.
+      if (operation.fadeIn.ticks + operation.fadeOut.ticks > clipCompositionDurationTicks(clip)) {
         return err(fail('FADE_LONGER_THAN_CLIP'))
       }
       nextClips = track.clips.map((candidate) =>
@@ -658,9 +874,36 @@ export const applyTimelineOperation = (
               gainDb: operation.gainDb,
               fadeIn: operation.fadeIn,
               fadeOut: operation.fadeOut,
+              pan: operation.pan,
             }
           : candidate,
       )
+      break
+    }
+
+    case 'set-clip-time-transform': {
+      const nextTransform: ClipTimeTransformV1 = Object.freeze({
+        playbackRate: operation.playbackRate,
+        direction: operation.direction,
+        maintainAudioPitch: operation.maintainAudioPitch,
+      })
+      const retimed = clampFades({ ...clip, timeTransform: nextTransform })
+      const oldOnScreen = clipCompositionDurationTicks(clip)
+      const newOnScreen = clipCompositionDurationTicks(retimed)
+      const replaced = track.clips.map((candidate) =>
+        candidate.clipId === clip.clipId ? retimed : candidate,
+      )
+      if (operation.durationPolicy === 'preserve-start') {
+        // Nothing else moves. If the piece got longer and now runs into its
+        // neighbour, the composition validator at the bottom of this function
+        // refuses the whole thing — which is the point. A silent overwrite
+        // would destroy footage the user never asked to lose.
+        nextClips = replaced
+        break
+      }
+      // Ripple: everything later on this track slides by exactly the change in
+      // on-screen length, so the sequence stays gapless and nothing is lost.
+      nextClips = shiftAfter(replaced, clipCompositionEndTicks(clip), newOnScreen - oldOnScreen)
       break
     }
 
@@ -683,13 +926,17 @@ export const applyTimelineOperation = (
       if (
         !next ||
         next.clipId !== operation.nextClipId ||
-        clip.compositionStart.ticks + clip.sourceRange.duration.ticks !== next.compositionStart.ticks
+        clipCompositionEndTicks(clip) !== next.compositionStart.ticks
       ) {
         return err(fail('TRANSITION_TARGET_INVALID'))
       }
+      // A transition's length is time on screen, so it is measured against how
+      // long each piece lasts on screen. A two-second dip cannot sit on a
+      // one-second clip even if that clip was made from four seconds of
+      // recording played at 4x.
       if (
-        operation.duration.ticks > clip.sourceRange.duration.ticks ||
-        operation.duration.ticks > next.sourceRange.duration.ticks
+        operation.duration.ticks > clipCompositionDurationTicks(clip) ||
+        operation.duration.ticks > clipCompositionDurationTicks(next)
       ) {
         return err(fail('TRANSITION_LONGER_THAN_CLIP'))
       }

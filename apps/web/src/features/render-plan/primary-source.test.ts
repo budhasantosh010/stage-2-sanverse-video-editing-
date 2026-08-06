@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PROJECT_TIMESCALE, acceptChangeSet, type EditProject } from '@sanverse/edit-domain'
 import { TRACK_OUTPUT_PRIMITIVE_ID } from '@sanverse/edit-domain/capabilities'
+import { DEFAULT_CLIP_TIME_TRANSFORM } from '@sanverse/edit-domain/clip-time'
 import { compileProjectToRenderPlan } from '@sanverse/render-contract/compile-project'
 import { compilePreviewPlan } from './render-plan-preview.ts'
 import { playbackSegments, sourceTimeFor } from './segment-playback.ts'
@@ -47,6 +48,10 @@ const projectWithOneUnresolvableClip = (): EditProject => {
               gainDb: 0,
               fadeIn: Object.freeze({ ticks: 0, timescale: PROJECT_TIMESCALE }),
               fadeOut: Object.freeze({ ticks: 0, timescale: PROJECT_TIMESCALE }),
+              // Hand-built to sidestep the validator on purpose, so the two
+              // fields the validator would have filled in are written out here.
+              pan: 0,
+              timeTransform: DEFAULT_CLIP_TIME_TRANSFORM,
             }),
           ]),
         }),

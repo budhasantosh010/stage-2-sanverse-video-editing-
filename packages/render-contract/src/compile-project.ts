@@ -9,9 +9,11 @@ import {
   effectiveFootageMotions,
   findAsset,
   isNameplateOperation,
+  mediaTime,
   placeSourceSpan,
   type EditProject,
 } from '@sanverse/edit-domain'
+import { clipCompositionDurationTicks, clipIsRetimed } from '@sanverse/edit-domain/composition'
 
 import { NAMEPLATE_STYLE_ID } from './nameplate-style.ts'
 import { isVisualFitMode, type VisualFitMode } from './visual-normalization.ts'
@@ -79,14 +81,20 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
    * a plan that already describes the video the user asked for.
    */
   const trackOutputs = activeTrackOutputs(project)
-  const transitionIn = new Map<string, { video: number; audio: number }>()
-  const transitionOut = new Map<string, { video: number; audio: number }>()
+  type TransitionEdge = { video: number; audio: number; color: 'black' | 'white' }
+  const transitionIn = new Map<string, TransitionEdge>()
+  const transitionOut = new Map<string, TransitionEdge>()
   for (const operation of operations) {
     if (operation.kind !== 'set-clip-transition') continue
-    const video = operation.style === 'dip-to-black' ? operation.duration.ticks : 0
+    // 'none' is how a transition is REMOVED: the same operation, with no
+    // length and no colour. There is no separate delete, which is what keeps
+    // one edit point from ever having two disagreeing answers.
+    const dipping = operation.style === 'dip-to-black' || operation.style === 'dip-to-white'
+    const video = dipping ? operation.duration.ticks : 0
     const audio = operation.audio === 'fade-through-silence' ? operation.duration.ticks : 0
-    transitionOut.set(operation.clipId, { video, audio })
-    transitionIn.set(operation.nextClipId, { video, audio })
+    const color: 'black' | 'white' = operation.style === 'dip-to-white' ? 'white' : 'black'
+    transitionOut.set(operation.clipId, { video, audio, color })
+    transitionIn.set(operation.nextClipId, { video, audio, color })
   }
 
   // Every file the renderer must open, in the order they are first needed.
@@ -124,15 +132,33 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
       if (!useSource(clip.assetId)) {
         return { ok: false, error: { code: 'COMPILE_FAILED', reason: 'A piece of footage is missing.' } }
       }
+      // Retiming is written into the plan ONLY when the piece was actually
+      // retimed, and pan only when it was actually moved off centre. A piece
+      // nobody touched produces byte-for-byte the plan it always produced, so
+      // its finished export is still valid and is handed straight back.
+      const retimed = clipIsRetimed(clip)
+      const transition = transitionOut.get(clip.clipId) ?? transitionIn.get(clip.clipId)
+      const retiming = retimed
+        ? {
+            sourceDurationTicks: clip.sourceRange.duration.ticks,
+            playbackRateNumerator: clip.timeTransform.playbackRate.numerator,
+            playbackRateDenominator: clip.timeTransform.playbackRate.denominator,
+            direction: clip.timeTransform.direction,
+            maintainAudioPitch: clip.timeTransform.maintainAudioPitch,
+          }
+        : {}
       segments.push(Object.freeze({
         nodeId: clip.clipId,
         kind: 'source-segment' as const,
         interval: Object.freeze({
           start: clip.compositionStart,
-          duration: clip.sourceRange.duration,
+          duration: mediaTime(clipCompositionDurationTicks(clip)),
         }),
         assetId: clip.assetId,
         sourceStartTicks: clip.sourceRange.start.ticks,
+        ...retiming,
+        ...(clip.pan === 0 ? {} : { pan: clip.pan }),
+        ...(transition && transition.color === 'white' ? { transitionColor: 'white' as const } : {}),
         // V1 carries the picture, A1 the sound that came with it. Turning one
         // off leaves the other exactly as it was, and leaves the piece the same
         // length so nothing after it moves.

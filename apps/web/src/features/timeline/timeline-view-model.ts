@@ -16,6 +16,13 @@ import {
   type TimeRange,
   type Track,
 } from '@sanverse/edit-domain'
+import { clipCompositionDurationTicks } from '@sanverse/edit-domain/composition'
+import {
+  formatPlaybackRate,
+  isDefaultClipTimeTransform,
+  isNormalPlaybackRate,
+  type ClipTimeTransformV1,
+} from '@sanverse/edit-domain/clip-time'
 
 import { describeOperation } from '../history/describe-operation'
 import type {
@@ -91,8 +98,8 @@ const previewText = (value: string, fallback: string): string => {
 }
 
 type TimelineItemInput =
-  Omit<TimelineItemView, 'selected' | 'captionSetId' | 'cueId' | 'visualId'> &
-  Partial<Pick<TimelineItemView, 'captionSetId' | 'cueId' | 'visualId'>>
+  Omit<TimelineItemView, 'selected' | 'captionSetId' | 'cueId' | 'visualId' | 'pan' | 'speedBadge'> &
+  Partial<Pick<TimelineItemView, 'captionSetId' | 'cueId' | 'visualId' | 'pan' | 'speedBadge'>>
 
 const makeItem = (input: TimelineItemInput, selectedItemIds: ReadonlySet<string>): TimelineItemView =>
   Object.freeze({
@@ -100,8 +107,36 @@ const makeItem = (input: TimelineItemInput, selectedItemIds: ReadonlySet<string>
     cueId: null,
     visualId: null,
     ...input,
+    // Nothing has a badge or a left/right position unless it says so. Written
+    // AFTER the spread with an explicit fallback, so a row that does say so
+    // still wins and a row that says nothing gets null rather than undefined.
+    pan: input.pan ?? null,
+    speedBadge: input.speedBadge ?? null,
     selected: selectedItemIds.has(input.id),
   })
+
+/**
+ * The words that go on the small badge over a retimed piece.
+ *
+ * Written the way a person would say it out loud, shortest first, because the
+ * badge sits on top of the filmstrip and every extra character hides a frame:
+ *
+ *   2x                  sped up
+ *   0.5x                slowed down
+ *   Backwards           reversed at normal speed
+ *   2x Backwards        both
+ *   2x Pitch off        sped up with the chipmunk effect deliberately left on
+ *
+ * Null for a piece nobody has retimed, so nothing is drawn at all.
+ */
+export const speedBadgeFor = (transform: ClipTimeTransformV1): string | null => {
+  if (isDefaultClipTimeTransform(transform)) return null
+  const parts: string[] = []
+  if (!isNormalPlaybackRate(transform.playbackRate)) parts.push(formatPlaybackRate(transform.playbackRate))
+  if (transform.direction === 'reverse') parts.push('Backwards')
+  if (!transform.maintainAudioPitch) parts.push('Pitch off')
+  return parts.length === 0 ? null : parts.join(' ')
+}
 
 const operationTraceMap = (
   records: readonly ChangeSetRecord[],
@@ -402,7 +437,10 @@ export const buildTimelineViewModel = (
         label,
         detail: motionDetail,
         startTicks: clip.compositionStart.ticks,
-        durationTicks: clip.sourceRange.duration.ticks,
+        // How long the piece lasts ON SCREEN. Until speed existed that was the
+        // same number as how much recording it uses, and this row simply used
+        // the recording amount. A 2x piece is half as wide on the timeline.
+        durationTicks: clipCompositionDurationTicks(clip),
         enabled: clip.enabled,
         blockedReason: null,
         clipId: clip.clipId,
@@ -415,6 +453,8 @@ export const buildTimelineViewModel = (
         gainDb: clip.gainDb,
         fadeInTicks: clip.fadeIn.ticks,
         fadeOutTicks: clip.fadeOut.ticks,
+        pan: clip.pan,
+        speedBadge: speedBadgeFor(clip.timeTransform),
         proposalId: null,
         proposalBaseRevision: null,
       }, selectedItemIds))
@@ -430,7 +470,9 @@ export const buildTimelineViewModel = (
         )}`,
         detail: null,
         startTicks: clip.compositionStart.ticks,
-        durationTicks: clip.sourceRange.duration.ticks,
+        // The recorded sound is the same length on screen as its own picture,
+        // always, because it is the same piece of footage.
+        durationTicks: clipCompositionDurationTicks(clip),
         enabled: clip.enabled,
         blockedReason: null,
         clipId: null,
@@ -443,6 +485,8 @@ export const buildTimelineViewModel = (
         gainDb: clip.gainDb,
         fadeInTicks: clip.fadeIn.ticks,
         fadeOutTicks: clip.fadeOut.ticks,
+        pan: clip.pan,
+        speedBadge: speedBadgeFor(clip.timeTransform),
         proposalId: null,
         proposalBaseRevision: null,
       }, selectedItemIds))

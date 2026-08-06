@@ -21,6 +21,7 @@ import {
   MUSIC_COMPONENT_ID,
   TITLE_COMPONENT_ID,
   CLIP_AUDIO_PRIMITIVE_ID,
+  CLIP_TIME_TRANSFORM_PRIMITIVE_ID,
   CLIP_TRANSITION_PRIMITIVE_ID,
   CLIP_ENABLED_PRIMITIVE_ID,
   FOOTAGE_MOTION_PRIMITIVE_ID,
@@ -244,6 +245,19 @@ export const testSetAudio = (
   gainDb: -6,
   fadeIn: ms(500),
   fadeOut: ms(500),
+  pan: 0,
+  ...overrides,
+})
+
+export const testSetTimeTransform = (
+  overrides: Partial<Extract<TimelineOperation, { kind: 'set-clip-time-transform' }>> = {},
+): TimelineOperation => ({
+  ...timelineDefaults('operation_speed001', CLIP_TIME_TRANSFORM_PRIMITIVE_ID),
+  kind: 'set-clip-time-transform',
+  playbackRate: { numerator: 2, denominator: 1 },
+  direction: 'forward',
+  maintainAudioPitch: true,
+  durationPolicy: 'ripple',
   ...overrides,
 })
 

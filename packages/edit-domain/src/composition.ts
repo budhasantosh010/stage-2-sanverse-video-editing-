@@ -1,6 +1,15 @@
 import { err, isRecord, ok, type Result } from './result.ts'
 import { findAsset, type MediaAsset, type VideoAsset } from './assets.ts'
 import {
+  DEFAULT_CLIP_TIME_TRANSFORM,
+  anchoredCompositionDuration,
+  compositionTicksForSourceOffset,
+  isDefaultClipTimeTransform,
+  sourceTicksForCompositionOffset,
+  validateClipTimeTransform,
+  type ClipTimeTransformV1,
+} from './clip-time.ts'
+import {
   ZERO_TIME,
   mediaTime,
   rangeIntersection,
@@ -27,10 +36,15 @@ export type TimeAnchor =
  * `sourceRange` is the part of the asset used. `compositionStart` is where that
  * part begins in the finished video.
  *
- * INVARIANT (G4-A): a clip occupies exactly `sourceRange.duration` in the
- * composition. There is no separate composition duration field, which is what
- * makes "no retiming" impossible to express rather than merely discouraged.
- * Speed changes arrive with an explicit rate field in a later schema version.
+ * INVARIANT (G4-A, amended by T2): a clip occupies exactly
+ * `clipCompositionDurationTicks(clip)` in the composition. There is still no
+ * stored composition-duration field — the length on the timeline is DERIVED
+ * from the source length and the speed, never written down twice. Two fields
+ * that must agree eventually disagree; one field and a rule cannot.
+ *
+ * Before T2 the derived length was always identical to `sourceRange.duration`,
+ * and for every piece at normal speed it still is, to the tick. That is why no
+ * saved project needed rewriting when speed arrived.
  */
 export type Clip = Readonly<{
   clipId: string
@@ -39,15 +53,52 @@ export type Clip = Readonly<{
   compositionStart: MediaTime
   enabled: boolean
   /**
+   * How this piece is played through: its speed, whether it runs backwards,
+   * and whether sped-up voices keep their normal pitch.
+   *
+   * Always present after validation. A stored clip that does not mention it —
+   * which is every clip in every project saved before speed existed — reads as
+   * `DEFAULT_CLIP_TIME_TRANSFORM`, meaning normal speed, forwards, pitch kept.
+   * That default is not a guess: it is exactly and only what those projects
+   * already did, so reading them produces the identical video.
+   */
+  timeTransform: ClipTimeTransformV1
+  /**
    * Loudness change for this piece, in decibels. 0 means untouched. Kept on the
    * clip rather than on a separate operation list so that cutting a clip in two
    * carries the loudness to both halves automatically.
    */
   gainDb: number
-  /** Silence-to-full ramp at the head of this piece. Zero means no ramp. */
+  /**
+   * Silence-to-full ramp at the head of this piece. Zero means no ramp.
+   *
+   * Measured in FINISHED-VIDEO time, because that is what the listener hears:
+   * "half a second to fade up" means half a second on the viewer's clock, not
+   * half a second of recording that a 2x speed would compress into a quarter.
+   * At normal speed the two readings are the same number, which is why no
+   * saved project changed when speed arrived.
+   */
   fadeIn: MediaTime
-  /** Full-to-silence ramp at the tail of this piece. Zero means no ramp. */
+  /** Full-to-silence ramp at the tail of this piece, in finished-video time. */
   fadeOut: MediaTime
+  /**
+   * Where this piece's sound sits between the left and right speakers.
+   *
+   * Held in hundredths of a percent — what a bank calls basis points — so it
+   * is a whole number and cannot drift:
+   *
+   *   -10000  all the way left
+   *        0  centred (what everything is until somebody moves it)
+   *   +10000  all the way right
+   *
+   * A decimal from -1 to 1 was the obvious alternative and was rejected for
+   * the same reason speed is a fraction: 0.1 cannot be held exactly, so two
+   * "identical" projects could hash differently and re-export for nothing.
+   *
+   * Absent in a stored clip means centred, which is what every project saved
+   * before this existed already did.
+   */
+  pan: number
 }>
 
 export type TrackKind = 'video' | 'audio' | 'overlay'
@@ -85,6 +136,16 @@ export type CompositionIssueCode =
   | 'DUPLICATE_ID'
   | 'GAIN_OUT_OF_RANGE'
   | 'FADE_LONGER_THAN_CLIP'
+  /**
+   * The piece would occupy no time at all in the finished video.
+   *
+   * Only reachable through an extreme speed on a very short stretch — one tick
+   * of recording at 16x. Such a piece cannot be seen, clicked or selected, so
+   * a user who made one would believe their clip had been deleted. Refusing it
+   * is the honest answer; silently stretching it to one tick is not, because
+   * that breaks the rule that cutting a piece in two preserves its length.
+   */
+  | 'CLIP_TOO_SHORT_TO_SEE'
 
 export type CompositionError = {
   readonly code: 'COMPOSITION_INVALID'
@@ -105,6 +166,11 @@ const MAX_DIMENSION = 16_384
 export const MIN_CLIP_GAIN_DB = -60
 export const MAX_CLIP_GAIN_DB = 12
 
+/** Full left and full right, in hundredths of a percent. See `Clip.pan`. */
+export const MIN_CLIP_PAN = -10_000
+export const MAX_CLIP_PAN = 10_000
+export const CENTRE_PAN = 0
+
 const CLIP_KEYS = [
   'clipId',
   'assetId',
@@ -115,15 +181,62 @@ const CLIP_KEYS = [
   'fadeIn',
   'fadeOut',
 ] as const
+
+/**
+ * Keys a stored clip MAY carry. Missing means the documented default, never a
+ * refusal.
+ *
+ * This is how speed was added without rewriting a single saved project. The
+ * alternative — adding `timeTransform` to the required list — would have made
+ * every project on disk invalid until a migration rewrote it, and a migration
+ * that touches the user's stored edits in order to add a setting they have not
+ * used is a bad trade. The same reasoning already governs `framing` on the
+ * render plan.
+ */
+const OPTIONAL_CLIP_KEYS = ['timeTransform', 'pan'] as const
 const TRACK_KEYS = ['trackId', 'kind', 'order', 'clips'] as const
 const COMPOSITION_KEYS = ['compositionId', 'width', 'height', 'tracks'] as const
 const TRACK_KINDS: readonly TrackKind[] = ['video', 'audio', 'overlay']
 
+/**
+ * HOW LONG THIS PIECE IS IN THE FINISHED VIDEO.
+ *
+ * The single authority. Anywhere that used to write
+ * `clip.sourceRange.duration.ticks` and mean "how long it is on the timeline"
+ * must call this instead, because those two numbers stopped being the same the
+ * moment speed existed.
+ *
+ * A piece at normal speed gets back exactly `sourceRange.duration.ticks`, with
+ * no arithmetic at all, so nothing about an untouched project can shift.
+ */
+export const clipCompositionDurationTicks = (clip: Clip): number =>
+  anchoredCompositionDuration(
+    clip.sourceRange.start.ticks,
+    clip.sourceRange.duration.ticks,
+    clip.timeTransform.playbackRate,
+  )
+
 /** The half-open span this clip occupies in the finished video. */
 export const clipCompositionRange = (clip: Clip): TimeRange =>
-  Object.freeze({ start: clip.compositionStart, duration: clip.sourceRange.duration })
+  Object.freeze({
+    start: clip.compositionStart,
+    duration: mediaTime(clipCompositionDurationTicks(clip)),
+  })
 
-/** Map a time on a clip's own timeline to the finished video's timeline. */
+/** Exclusive end of this piece in the finished video. */
+export const clipCompositionEndTicks = (clip: Clip): number =>
+  clip.compositionStart.ticks + clipCompositionDurationTicks(clip)
+
+/**
+ * "Clip time" means time measured from the START OF THIS PIECE, ON THE
+ * FINISHED VIDEO'S CLOCK.
+ *
+ * That choice is stated once here and never varied. It is the clock the user
+ * is looking at: they point at a spot on the clip, and what they mean is "this
+ * many seconds after this clip appears". The other clock — how far into the
+ * recording that is — is reached through `clipTimeToSource`, which is where
+ * the speed is applied and where the only rounding happens.
+ */
 export const clipTimeToComposition = (clip: Clip, clipTime: MediaTime): MediaTime =>
   mediaTime(clip.compositionStart.ticks + clipTime.ticks)
 
@@ -131,13 +244,38 @@ export const clipTimeToComposition = (clip: Clip, clipTime: MediaTime): MediaTim
 export const compositionTimeToClip = (clip: Clip, compositionTime: MediaTime): MediaTime =>
   mediaTime(compositionTime.ticks - clip.compositionStart.ticks)
 
-/** Map a time on a clip's own timeline to a time inside the source asset. */
-export const clipTimeToSource = (clip: Clip, clipTime: MediaTime): MediaTime =>
-  mediaTime(clip.sourceRange.start.ticks + clipTime.ticks)
+/**
+ * Map a point on this piece's on-screen timeline to the point in the recording
+ * that is showing there.
+ *
+ * At normal speed this is a plain addition. At 2x, being 4 seconds into the
+ * clip means being 8 seconds into the recording. Running backwards, being 4
+ * seconds in means being 4 seconds before the END of the chosen stretch.
+ */
+export const clipTimeToSource = (clip: Clip, clipTime: MediaTime): MediaTime => {
+  const rate = clip.timeTransform.playbackRate
+  const sourceOffset = sourceTicksForCompositionOffset(clipTime.ticks, rate)
+  if (clip.timeTransform.direction === 'reverse') {
+    // The last frame plays first. Being `sourceOffset` into a backwards clip
+    // means being that far back from the end of the chosen stretch. Clamped to
+    // the first tick so the very end of the clip cannot ask for a frame that
+    // sits before the stretch begins.
+    const fromEnd = clip.sourceRange.start.ticks + clip.sourceRange.duration.ticks - sourceOffset
+    return mediaTime(Math.max(clip.sourceRange.start.ticks, fromEnd))
+  }
+  return mediaTime(clip.sourceRange.start.ticks + sourceOffset)
+}
 
 /** Map a time inside the source asset back onto a clip's own timeline. */
-export const sourceTimeToClip = (clip: Clip, sourceTime: MediaTime): MediaTime =>
-  mediaTime(sourceTime.ticks - clip.sourceRange.start.ticks)
+export const sourceTimeToClip = (clip: Clip, sourceTime: MediaTime): MediaTime => {
+  const rate = clip.timeTransform.playbackRate
+  if (clip.timeTransform.direction === 'reverse') {
+    const fromEnd = clip.sourceRange.start.ticks + clip.sourceRange.duration.ticks - sourceTime.ticks
+    return mediaTime(Math.max(0, compositionTicksForSourceOffset(Math.max(0, fromEnd), rate)))
+  }
+  const sourceOffset = sourceTime.ticks - clip.sourceRange.start.ticks
+  return mediaTime(Math.max(0, compositionTicksForSourceOffset(Math.max(0, sourceOffset), rate)))
+}
 
 /** One surviving appearance of a source-anchored span in the finished video. */
 export type SourceSpanPlacement = Readonly<{
@@ -173,13 +311,32 @@ export const placeSourceSpan = (
       if (clip.assetId !== assetId) continue
       const overlap = rangeIntersection(clip.sourceRange, sourceRange)
       if (!overlap) continue
-      const offset = overlap.start.ticks - clip.sourceRange.start.ticks
+      // Where the surviving part sits on screen, once the piece's speed and
+      // direction are taken into account. Both edges are converted separately
+      // and then subtracted, for the same reason the clip's own length is
+      // computed that way: it keeps neighbouring pieces exactly touching.
+      const rate = clip.timeTransform.playbackRate
+      const clipSourceStart = clip.sourceRange.start.ticks
+      const clipSourceEnd = clipSourceStart + clip.sourceRange.duration.ticks
+      const overlapStart = overlap.start.ticks
+      const overlapEnd = overlapStart + overlap.duration.ticks
+      const nearEdge =
+        clip.timeTransform.direction === 'reverse'
+          // Running backwards, the LAST part of the recording appears FIRST.
+          ? clipSourceEnd - overlapEnd
+          : overlapStart - clipSourceStart
+      const farEdge =
+        clip.timeTransform.direction === 'reverse'
+          ? clipSourceEnd - overlapStart
+          : overlapEnd - clipSourceStart
+      const startOffset = compositionTicksForSourceOffset(nearEdge, rate)
+      const endOffset = compositionTicksForSourceOffset(farEdge, rate)
       placements.push(Object.freeze({
         clip,
         sourceRange: overlap,
         compositionRange: Object.freeze({
-          start: mediaTime(clip.compositionStart.ticks + offset),
-          duration: overlap.duration,
+          start: mediaTime(clip.compositionStart.ticks + startOffset),
+          duration: mediaTime(Math.max(1, endOffset - startOffset)),
         }),
       }))
     }
@@ -197,7 +354,7 @@ export const clipAtCompositionTime = (composition: Composition, time: MediaTime)
   for (const track of composition.tracks) {
     for (const clip of track.clips) {
       const start = clip.compositionStart.ticks
-      if (time.ticks >= start && time.ticks < start + clip.sourceRange.duration.ticks) return clip
+      if (time.ticks >= start && time.ticks < start + clipCompositionDurationTicks(clip)) return clip
     }
   }
   return undefined
@@ -216,7 +373,7 @@ export const compositionDuration = (composition: Composition): MediaTime => {
   let ticks = 0
   for (const track of composition.tracks) {
     for (const clip of track.clips) {
-      ticks = Math.max(ticks, clip.compositionStart.ticks + clip.sourceRange.duration.ticks)
+      ticks = Math.max(ticks, clipCompositionEndTicks(clip))
     }
   }
   return mediaTime(ticks)
@@ -241,8 +398,38 @@ const validateClip = (
     if (!Object.hasOwn(input, key)) issues.push({ path: `${path}.${key}`, code: 'FIELD_REQUIRED' })
   }
   for (const key of Object.keys(input)) {
-    if (!(CLIP_KEYS as readonly string[]).includes(key)) {
+    if (
+      !(CLIP_KEYS as readonly string[]).includes(key) &&
+      !(OPTIONAL_CLIP_KEYS as readonly string[]).includes(key)
+    ) {
       issues.push({ path: `${path}.${key}`, code: 'FIELD_UNKNOWN' })
+    }
+  }
+  // Absent means normal speed, forwards, pitch kept — which is exactly what
+  // every project saved before speed existed already did. Present but wrong is
+  // a refusal, not a silent fallback: a rate somebody hand-edited into a file
+  // must not be quietly replaced by a different one.
+  let pan = CENTRE_PAN
+  if (Object.hasOwn(input, 'pan')) {
+    const stored = input.pan
+    if (
+      typeof stored !== 'number' ||
+      !Number.isSafeInteger(stored) ||
+      stored < MIN_CLIP_PAN ||
+      stored > MAX_CLIP_PAN
+    ) {
+      issues.push({ path: `${path}.pan`, code: 'VALUE_OUT_OF_RANGE' })
+    } else {
+      pan = stored
+    }
+  }
+  let timeTransform: ClipTimeTransformV1 = DEFAULT_CLIP_TIME_TRANSFORM
+  if (Object.hasOwn(input, 'timeTransform')) {
+    const validated = validateClipTimeTransform(input.timeTransform, `${path}.timeTransform`)
+    if (!validated.ok) {
+      issues.push({ path: validated.error.path, code: 'VALUE_OUT_OF_RANGE' })
+    } else {
+      timeTransform = validated.value
     }
   }
   if (typeof input.clipId !== 'string' || !CLIP_ID_PATTERN.test(input.clipId)) {
@@ -286,8 +473,29 @@ const validateClip = (
   // Two ramps longer than the piece they live on would overlap and produce a
   // loudness curve nobody asked for, so the pair is refused rather than capped.
   if (fadeIn.ok && fadeOut.ok && sourceRange.ok) {
-    if (fadeIn.value.ticks + fadeOut.value.ticks > sourceRange.value.duration.ticks) {
+    // Ramps are measured on the finished video's clock, so they are checked
+    // against how long the piece lasts ON SCREEN, not against how much
+    // recording it uses. At normal speed those are the same number.
+    const onScreenTicks = anchoredCompositionDuration(
+      sourceRange.value.start.ticks,
+      sourceRange.value.duration.ticks,
+      timeTransform.playbackRate,
+    )
+    if (fadeIn.value.ticks + fadeOut.value.ticks > onScreenTicks) {
       issues.push({ path: `${path}.fadeIn`, code: 'FADE_LONGER_THAN_CLIP' })
+    }
+  }
+  // A piece that occupies no time in the finished video cannot be seen or
+  // clicked. Refused here, once, so no operation can be the path that creates
+  // one and no reader downstream has to cope with a zero-length clip.
+  if (sourceRange.ok && sourceRange.value.duration.ticks > 0) {
+    const onScreenTicks = anchoredCompositionDuration(
+      sourceRange.value.start.ticks,
+      sourceRange.value.duration.ticks,
+      timeTransform.playbackRate,
+    )
+    if (onScreenTicks <= 0) {
+      issues.push({ path: `${path}.timeTransform`, code: 'CLIP_TOO_SHORT_TO_SEE' })
     }
   }
 
@@ -312,6 +520,8 @@ const validateClip = (
     gainDb,
     fadeIn: fadeIn.value,
     fadeOut: fadeOut.value,
+    pan,
+    timeTransform,
   })
 }
 
@@ -395,7 +605,7 @@ export const validateComposition = (
         for (let index = 1; index < ordered.length; index += 1) {
           const previous = ordered[index - 1]
           const current = ordered[index]
-          if (current.compositionStart.ticks < previous.compositionStart.ticks + previous.sourceRange.duration.ticks) {
+          if (current.compositionStart.ticks < clipCompositionEndTicks(previous)) {
             issues.push({ path: `${trackPath}.clips`, code: 'CLIPS_OVERLAP' })
             break
           }
@@ -454,6 +664,8 @@ export const createSingleClipComposition = (input: {
               gainDb: 0,
               fadeIn: ZERO_TIME,
               fadeOut: ZERO_TIME,
+              pan: CENTRE_PAN,
+              timeTransform: DEFAULT_CLIP_TIME_TRANSFORM,
             },
           ],
         },
@@ -461,3 +673,14 @@ export const createSingleClipComposition = (input: {
     },
     [input.asset],
   )
+
+/**
+ * True when this piece has been retimed at all — sped up, slowed down,
+ * reversed, or had its pitch protection switched off.
+ *
+ * Used to decide whether a badge is worth drawing over the clip, and whether
+ * the render plan needs to mention speed at all. A plan that says nothing
+ * about speed means normal speed, which is what every existing plan means, so
+ * untouched projects keep their finished exports.
+ */
+export const clipIsRetimed = (clip: Clip): boolean => !isDefaultClipTimeTransform(clip.timeTransform)

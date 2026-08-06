@@ -12,6 +12,7 @@
     "./media-organization": "./src/media-organization.ts",
     "./geometry": "./src/geometry.ts",
     "./composition": "./src/composition.ts",
+    "./clip-time": "./src/clip-time.ts",
     "./operations": "./src/operations.ts",
     "./timeline-operations": "./src/timeline-operations.ts",
     "./caption-operations": "./src/caption-operations.ts",

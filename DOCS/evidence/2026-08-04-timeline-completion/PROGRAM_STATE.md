@@ -10,8 +10,8 @@ Program start commit: `45c0c981fb869afd236f10cbea829b1859d5beb6`
 Latest pushed commit: see `git rev-parse HEAD` — this file is committed WITH the
 work it describes, so HEAD is always the commit that made these numbers true.
 Test baseline at program start: **1,723**
-Tests now: **2,050** — edit-domain 419 · render-contract 108 · intent-domain 27 ·
-api 361 · web 1,135. `npm run build` exit 0.
+Tests now: **2,215** — edit-domain 488 · render-contract 119 · intent-domain 27 ·
+api 388 · web 1,193. `npm run build` exit 0.
 
 ---
 
@@ -22,8 +22,9 @@ api 361 · web 1,135. `npm run build` exit 0.
   ────   ──────────────────────────────────────────   ──────────   ──────────
   P0     Verify + capability inventory                DONE         ad11b07..
   T0     Correctness: preview truth, mixed export     DONE         ad11b07
-  T1     Creator interaction: selection/clipboard     DONE         (this commit)
-  T2     Speed, audio, transitions                    NOT STARTED  —
+  T1     Creator interaction: selection/clipboard     DONE         ef9332c
+  T2     Speed, audio, transitions                    PART DONE    (this commit)
+         └─ speed + pitch + pan + dip-to-white DONE; six parts NOT STARTED
   T3     Precision trim: ripple/roll/slip/slide       NOT STARTED  —
   T4     Keyframe lanes + graph editor                NOT STARTED  —
   T5     Advanced tracks, expandable tracks           NOT STARTED  —
@@ -167,13 +168,72 @@ Evidence: `T1_CREATOR_INTERACTION.md`, `TIMELINE_CAPABILITY_INVENTORY.md`,
 - a group was not proved to survive a reload; markers were, the same way
 - marker drag-to-move was not driven by hand
 
-### T2 — SPEED, AUDIO, TRANSITIONS
+### T2 — SPEED, AUDIO, TRANSITIONS — **PART DONE**
 
-Commit: `[verified] feat(timeline): add speed audio transitions and creator time tools`
+**START HERE NEXT SESSION.** Full evidence: `T2_SPEED_EVIDENCE.md`.
+Decisions and rejected alternatives: `DOCS/decisions/ADR-CLIP-TIME-AUDIO-TRANSITIONS-V1.md`.
+What already existed before T2: `T2_EXISTING_CONTRACT_AUDIT.md`.
 
-- [ ] T2.1 constant speed (rational rate) - [ ] T2.2 rate stretch - [ ] T2.3 reverse
-- [ ] T2.4 freeze frame - [ ] T2.5 audio clip controls - [ ] T2.6 J/L cuts
-- [ ] T2.7 transition contract - [ ] T2.8 transition UI - [ ] T2.9 placement extensions
+**The gate rule still holds: T2 is NOT done, and is not recorded as done.** What
+landed is a complete, tested, browser-proven vertical slice — the time model
+plus everything that rides on it — and six parts that were not begun.
+
+#### DONE and proved end to end
+
+- [x] T2.0 audit of `set-clip-audio`, `set-clip-transition` and the time model
+- [x] ADR written before any time-model code
+- [x] **T2.1 constant speed** — `clip-time.ts`, a rational `{numerator,denominator}`
+      from 0.1x to 16x, never a float. 44 + 25 tests. Ripple and preserve-start,
+      with a truthful refusal instead of a silent overwrite
+- [x] **maintain pitch** — on by default; the squeaky effect offered deliberately
+- [x] **pan** — added to the EXISTING `set-clip-audio` as an optional field,
+      whole numbers in hundredths of a percent, constant-power law. 24 tests
+- [x] **dip-to-white** — one more value in the EXISTING `set-clip-transition`
+- [x] **preview and export both retimed** — `ffmpeg-retiming.ts` (24 tests),
+      `segment-playback.ts` (17 tests). One `<video>` element, still
+- [x] **the Speed panel** — 8 presets, typed speeds, pitch switch, reset. 17 tests
+- [x] **the speed badge** on the clip, and in the screen-reader label
+- [x] **render-plan version deliberately NOT moved** — every new field is
+      optional and written only when a piece is actually retimed, so an
+      untouched project keeps its finished export. Proved by test
+- [x] real browser run on the owner's project: 30 → 31 → Undo 32 → Redo 33,
+      clip 294px → 147px, next clip moved by exactly 147px, badge, reload,
+      four screen sizes
+- [x] **a real MP4 exported and probed**: 25.804 s against 25.808 s predicted,
+      774 frames at 30 fps, stereo 48 kHz. Re-export returned the same job in
+      206 ms
+
+#### NOT STARTED — each with the reason, in `T2_SPEED_EVIDENCE.md` Part 7
+
+- [ ] **T2.2 rate-stretch GESTURE** — the arithmetic is built and tested
+      (`rateForTargetDuration`); no pointer drag is wired to it
+- [ ] **T2.3 reverse** — needs a prepared backwards copy of the footage through
+      the derived-media system. The control REFUSES in plain words today rather
+      than showing forwards footage
+- [ ] **T2.4 freeze frame** — needs its own closed segment kind. Cannot be
+      "speed zero"; that is division by zero
+- [ ] **T2.5 direct gain line and fade handles** — the values work; the dragging
+      does not exist
+- [ ] **T2.5 normalisation** — needs real loudness measurement, not waveform pixels
+- [ ] **T2.6 J-cuts and L-cuts** — needs a separate audio window that still
+      shares one identity. Shape change
+- [ ] **T2.8 transition chooser, duration handles, numeric entry**
+- [ ] **T2.9 Replace · Fit source to duration · Place on Top · Ripple Overwrite ·
+      Swap · Shuffle** — six planners, none started
+
+#### DELIBERATELY REFUSED, and why
+
+Cross Dissolve, Wipe, Slide, Push, Zoom. All five need TWO shots on screen at
+the same instant. The preview has ONE video player and that rule is not
+negotiable. The exporter could produce them; the preview could not; the user
+would watch a cut and be handed a dissolve.
+
+#### Limits of the proof
+
+- the preview's speed was proved by TEST, not driven by hand — the frame loop
+  needs sustained real playback, which this browser harness does not do
+- the pitch switch was not measured with a 440 Hz tone; the filters were read
+- clicks were dispatched as events, not made with a physical mouse
 
 ### T3 — PRECISION TRIM
 
@@ -265,6 +325,24 @@ Commit: `[verified] feat(timeline): complete AI-ready transcript timeline contra
   revision. So the old trick of bumping the revision with a harmless toggle NO
   LONGER busts a cached failure: the plan is unchanged, so the key is unchanged.
   To force a genuinely fresh export, change something that reaches the video.
+- **T2 added a SECOND length to every piece of footage.** `sourceRange.duration`
+  is how much RECORDING it uses; `clipCompositionDurationTicks(clip)` is how long
+  it lasts ON SCREEN. They are equal at normal speed and only then. Any new code
+  that writes `clip.sourceRange.duration.ticks` and means "how wide is this on
+  the timeline" is a bug — there are 54 such reads across 17 files and each one
+  was classified by hand.
+- **A speed is a fraction, never a decimal.** `{numerator, denominator}`, in
+  lowest terms. A decimal appears in exactly two places, both at the very last
+  step: the browser's `playbackRate` and an FFmpeg filter string.
+- **Rounding is done on a piece's EDGES, measured from the start of the
+  recording — never on its length.** Rounding the length makes a clip grow by a
+  tick when it is cut, which overlaps the next piece and refuses the edit.
+- **`set-clip-audio` carries the WHOLE answer for a piece's sound.** Any builder
+  of it must carry the piece's current `pan` through, or an unrelated volume
+  nudge silently re-centres it. This already bit once, in T2.
+- **Validate BEFORE applying.** Validation is where an optional field becomes its
+  documented default; applying the unvalidated form hands the composition an
+  `undefined` and refuses the edit with no visible reason. This also bit once.
 - The Browser pane here does not composite, so `computer{action:"screenshot"}`
   times out. Build owner-reviewable pictures from real API answers instead.
 - The web suite's global RTL cleanup and the recording canvas stub live in

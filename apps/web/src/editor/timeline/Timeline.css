@@ -1216,3 +1216,166 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* ── Speed ────────────────────────────────────────────────────────────────
+   The badge that says how fast a piece plays, and the panel that sets it.
+
+   The badge sits over the filmstrip, so it is deliberately small, high in
+   contrast, and drawn only when a piece has actually been retimed. Nothing is
+   drawn over a normal clip: that space belongs to the frames the user is
+   scanning to find their place.
+   ------------------------------------------------------------------------ */
+
+.timeline-v1__item-speed {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  z-index: 3;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: #0b0d10;
+  background: #f0c14b;
+  pointer-events: none;
+}
+
+.timeline-speed {
+  margin: 6px 8px 0;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--sv-border, #2a2f37);
+  border-radius: 8px;
+  background: var(--sv-surface-2, #14171c);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.timeline-speed__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.timeline-speed__close {
+  background: none;
+  border: 1px solid var(--sv-border, #2a2f37);
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.timeline-speed__subject,
+.timeline-speed__range,
+.timeline-speed__unavailable,
+.timeline-speed__error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
+.timeline-speed__error {
+  color: #ff9b8a;
+  opacity: 1;
+}
+
+.timeline-speed__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 32 pixels is the smallest target measured at every screen size in T1, and it
+   stays 32 here. A speed button that is hard to hit on a laptop trackpad is a
+   speed button that gets pressed twice. */
+.timeline-speed__preset {
+  min-width: 46px;
+  min-height: 32px;
+  border: 1px solid var(--sv-border, #2a2f37);
+  border-radius: 6px;
+  background: var(--sv-surface-3, #1b1f26);
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.timeline-speed__preset[aria-pressed='true'] {
+  background: #f0c14b;
+  color: #0b0d10;
+  border-color: #f0c14b;
+}
+
+.timeline-speed__preset:disabled,
+.timeline-speed__reset:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.timeline-speed__typed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.timeline-speed__typed input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--sv-border, #2a2f37);
+  border-radius: 6px;
+  background: var(--sv-surface-3, #1b1f26);
+  color: inherit;
+  font-size: 12px;
+}
+
+.timeline-speed__typed button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--sv-border, #2a2f37);
+  border-radius: 6px;
+  background: var(--sv-surface-3, #1b1f26);
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.timeline-speed__switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.timeline-speed__switch small {
+  display: block;
+  opacity: 0.7;
+}
+
+.timeline-speed__switch--off {
+  opacity: 0.6;
+}
+
+.timeline-speed__reset {
+  align-self: flex-start;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--sv-border, #2a2f37);
+  border-radius: 6px;
+  background: var(--sv-surface-3, #1b1f26);
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+}

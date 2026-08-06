@@ -856,6 +856,7 @@ export { emptyExtensions }
 export type { Extensions, MediaAsset, VideoAsset, Composition, ChangeSet, ChangeSetRecord, EditOperation, Result }
 
 export * from './time.ts'
+export * from './clip-time.ts'
 export * from './geometry.ts'
 export {
   ASSET_ID_PATTERN,

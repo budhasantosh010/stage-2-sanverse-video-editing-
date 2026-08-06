@@ -65,6 +65,8 @@ import { TimelineTrackHeader } from './TimelineTrackHeader'
 import { timelinePointerToTicks } from './timeline-ruler-model'
 import { snapTimelineTicks, timelineSnapCandidates, type TimelineSnapResult } from './timeline-snap'
 import { TimelineToolbar, type TimelineTool, type TimelineToolbarAction } from './TimelineToolbar'
+import { TimelineSpeedPanel } from './TimelineSpeedPanel'
+import { NORMAL_PLAYBACK_RATE, type RationalPlaybackRateV1 } from '@sanverse/edit-domain/clip-time'
 import './Timeline.css'
 
 export type TimelineProps = Readonly<{
@@ -107,6 +109,21 @@ export type TimelineProps = Readonly<{
   onSelectionChange(selection: TimelineSelectionV2): void
   onGesture(gesture: TimelineGesture): void
   onAction(action: TimelineToolbarAction): void
+  /**
+   * What the Speed panel needs to know about the picked piece, or null when
+   * nothing suitable is picked. Supplied from above rather than worked out
+   * here, because only the screen holding the project can answer it.
+   */
+  speedSubject: Readonly<{
+    clipLabel: string
+    currentRate: RationalPlaybackRateV1
+    maintainAudioPitch: boolean
+    currentDurationTicks: number
+    sourceDurationTicks: number
+  }> | null
+  /** One sentence describing what a speed would do. Comes from the one planner. */
+  onSpeedPreview(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean): string
+  onSpeedChoose(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean): void
   onSelectMarker(markerId: string | null): void
   onMoveMarker(markerId: string, toStartTicks: number): void
   onDeleteMarker(markerId: string): void
@@ -174,6 +191,9 @@ export function Timeline({
   onSelectionChange,
   onGesture,
   onAction,
+  speedSubject,
+  onSpeedPreview,
+  onSpeedChoose,
   onSelectMarker,
   onMoveMarker,
   onDeleteMarker,
@@ -188,6 +208,12 @@ export function Timeline({
   const [contextMenu, setContextMenu] = useState<Readonly<{ itemId: string; x: number; y: number }> | null>(null)
   const [tool, setTool] = useState<TimelineTool>('select')
   const [marquee, setMarquee] = useState<MarqueeSession | null>(null)
+  /**
+   * Whether the Speed panel is showing. Kept here, next to the button that
+   * opens it, because it is a view state and nothing else: no operation, no
+   * revision, nothing saved. Same reasoning as the More menu.
+   */
+  const [speedPanelOpen, setSpeedPanelOpen] = useState(false)
 
   const allItems = useMemo(() => model.lanes.flatMap((lane) => lane.items), [model])
   const soleSelectedId = primarySelectedItemId(selection)
@@ -453,8 +479,13 @@ export function Timeline({
     transition: !selectedItem || selectedItem.kind !== 'clip' || selectedItem.clipId === null
       ? 'Choose a piece of the main video first.'
       : lockedReason,
-    // Honest, and it says what is missing rather than pretending.
-    speed: 'Changing how fast a clip plays is not built yet.',
+    // Speed works on a piece of the MAIN video. B-roll, pictures and music are
+    // not pieces of the video's own body — they are laid on top of it — and
+    // retiming them needs a different mechanism, so this says so plainly
+    // instead of accepting the click and doing nothing.
+    speed: !selectedItem || selectedItem.kind !== 'clip' || selectedItem.clipId === null
+      ? 'Choose a piece of the main video first. B-roll, pictures and music cannot be sped up yet.'
+      : lockedReason,
   }
 
   const isMac = isMacPlatform()
@@ -477,6 +508,12 @@ export function Timeline({
    */
   const runToolbarAction = (action: TimelineToolbarAction) => {
     if (disabledReasons[action] !== null || busy) return
+    if (action === 'speed') {
+      // Opening and closing a panel is not an edit. No operation, no change
+      // set, no revision, no Undo step — exactly like folding a row away.
+      setSpeedPanelOpen((wasOpen) => !wasOpen)
+      return
+    }
     if (action !== 'split' && action !== 'lift' && action !== 'ripple-delete') {
       onAction(action)
       return
@@ -784,6 +821,24 @@ export function Timeline({
         onZoomOut={() => changeZoom(viewport.pixelsPerSecond / 1.25)}
         onZoomIn={() => changeZoom(viewport.pixelsPerSecond * 1.25)}
         onFit={fit}
+      />
+
+      <TimelineSpeedPanel
+        open={speedPanelOpen}
+        clipLabel={speedSubject?.clipLabel ?? null}
+        unavailableReason={speedSubject === null ? disabledReasons.speed : null}
+        currentRate={speedSubject?.currentRate ?? NORMAL_PLAYBACK_RATE}
+        maintainAudioPitch={speedSubject?.maintainAudioPitch ?? true}
+        currentDurationTicks={speedSubject?.currentDurationTicks ?? 0}
+        sourceDurationTicks={speedSubject?.sourceDurationTicks ?? 0}
+        timescale={model.timescale}
+        busy={busy}
+        previewFor={onSpeedPreview}
+        onChoose={(rate, keepPitch) => {
+          onSpeedChoose(rate, keepPitch)
+          setSpeedPanelOpen(false)
+        }}
+        onClose={() => setSpeedPanelOpen(false)}
       />
 
       <div className="timeline-v1__viewport-grid">
