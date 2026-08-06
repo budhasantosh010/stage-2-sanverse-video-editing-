@@ -278,8 +278,8 @@ describe('Timeline V1', () => {
     renderTimeline({ onViewportChange, onGesture })
     onViewportChange.mockClear()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Zoom timeline in' }))
-    fireEvent.click(screen.getByRole('button', { name: /^fit$/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom Timeline in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Fit Timeline horizontally' }))
 
     expect(onViewportChange).toHaveBeenCalledTimes(2)
     expect(onGesture).not.toHaveBeenCalled()

@@ -6,6 +6,7 @@ import type { EditOperation, EditProject } from '@sanverse/edit-domain'
 
 import { StudioWorkspaceTabs, type StudioWorkspace } from '../../editor/workspace'
 import { STUDIO_LAYOUT_V2_STORAGE_KEY } from '../../editor/layout-v2'
+import { readTimelineZoomPresentation } from '../../features/timeline'
 import { testProject } from '../../test-fixtures'
 import { StudioScreen } from './StudioScreen'
 
@@ -144,8 +145,8 @@ describe('Studio workspace integration', () => {
     if (!timelineViewport) throw new Error('Timeline viewport missing')
     timelineViewport.scrollLeft = 96
     fireEvent.scroll(timelineViewport)
-    await user.click(screen.getByRole('button', { name: 'Zoom timeline in' }))
-    const zoom = screen.getByLabelText('Timeline zoom level').textContent
+    await user.click(screen.getByRole('button', { name: 'Zoom Timeline in' }))
+    const zoom = screen.getByLabelText('Timeline horizontal zoom value').textContent
     const timelineScrollLeft = timelineViewport.scrollLeft
 
     await user.click(screen.getByRole('button', { name: 'Expand AI' }))
@@ -161,7 +162,7 @@ describe('Studio workspace integration', () => {
       expect(screen.getByRole('textbox', { name: /ask for an edit/i })).toBe(chat)
       expect(chat).toHaveValue('keep one shared AI draft')
       expect(within(videoLane).getByRole('button', { name: /^clip, owner\.mp4,/i })).toHaveAttribute('aria-selected', 'true')
-      expect(screen.getByLabelText('Timeline zoom level')).toHaveTextContent(zoom ?? '')
+      expect(screen.getByLabelText('Timeline horizontal zoom value')).toHaveTextContent(zoom ?? '')
       expect(timelineViewport.scrollLeft).toBe(timelineScrollLeft)
       expect(screen.getByTestId('timeline-v1')).toHaveAttribute('data-project-revision', '0')
     }
@@ -169,6 +170,43 @@ describe('Studio workspace integration', () => {
     expect(create).not.toHaveBeenCalled()
     expect(timelineEdit).not.toHaveBeenCalled()
     expect(resizeObserveCount).toBe(1)
+  }, 10_000)
+
+  it('persists both zoom axes without an edit, revision, history change, or destroyed base height', async () => {
+    const user = userEvent.setup()
+    const create = vi.fn(async () => null)
+    const timelineEdit = vi.fn(async () => null)
+    const { container, unmount } = render(<Harness onCreateOverlay={create} onTimelineEdit={timelineEdit} />)
+    prepareVideo(container)
+
+    const horizontal = screen.getByRole('slider', { name: 'Timeline horizontal zoom' })
+    const vertical = screen.getByRole('slider', { name: 'Timeline vertical zoom' })
+    const v1Header = container.querySelector<HTMLElement>('[data-track-id="V1"]')
+    if (!v1Header) throw new Error('V1 header missing')
+    const baseHeight = v1Header.style.getPropertyValue('--timeline-lane-height')
+
+    fireEvent.change(horizontal, { target: { value: '15' } })
+    await waitFor(() => expect(screen.getByLabelText('Timeline horizontal zoom value')).toHaveTextContent('320 px/s'))
+    fireEvent.change(vertical, { target: { value: '15000' } })
+    await waitFor(() => expect(screen.getByLabelText('Timeline vertical zoom value')).toHaveTextContent('150%'))
+    expect(v1Header.style.getPropertyValue('--timeline-lane-height')).not.toBe(baseHeight)
+
+    await user.click(screen.getByRole('button', { name: 'Reset vertical zoom' }))
+    await waitFor(() => expect(v1Header.style.getPropertyValue('--timeline-lane-height')).toBe(baseHeight))
+
+    expect(screen.getByTestId('timeline-v1')).toHaveAttribute('data-project-revision', '0')
+    expect(create).not.toHaveBeenCalled()
+    expect(timelineEdit).not.toHaveBeenCalled()
+    expect(readTimelineZoomPresentation('project_1234567890abcdef')).toMatchObject({
+      horizontalPixelsPerSecond: 320,
+      vertical: { scaleBasisPoints: 10_000 },
+    })
+
+    unmount()
+    const reopened = render(<Harness onCreateOverlay={create} onTimelineEdit={timelineEdit} />)
+    prepareVideo(reopened.container)
+    await waitFor(() => expect(screen.getByLabelText('Timeline horizontal zoom value')).toHaveTextContent('320 px/s'))
+    expect(screen.getByLabelText('Timeline vertical zoom value')).toHaveTextContent('100%')
   }, 10_000)
 
   it('persists layout presentation changes without touching editor authority', async () => {

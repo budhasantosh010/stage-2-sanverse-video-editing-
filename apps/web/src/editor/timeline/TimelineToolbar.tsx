@@ -1,6 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { PLACEMENT_MODES, type PlacementMode, type TimelineViewportState } from '../../features/timeline'
+import {
+  DEFAULT_VERTICAL_ZOOM_BASIS_POINTS,
+  HORIZONTAL_ZOOM_LEVELS,
+  MAX_VERTICAL_ZOOM_BASIS_POINTS,
+  MIN_VERTICAL_ZOOM_BASIS_POINTS,
+  VERTICAL_ZOOM_STEP_BASIS_POINTS,
+  horizontalZoomAtLevel,
+  horizontalZoomAtMaximum,
+  horizontalZoomAtMinimum,
+  horizontalZoomLevelIndex,
+  PLACEMENT_MODES,
+  type PlacementMode,
+  type TimelineVerticalZoomV1,
+  type TimelineViewportState,
+} from '../../features/timeline'
 import { formatTimelineTime } from './timeline-ruler-model'
 
 /**
@@ -54,6 +68,7 @@ export type TimelineToolbarProps = Readonly<{
   durationTicks: number
   timescale: number
   viewport: TimelineViewportState
+  verticalZoom: TimelineVerticalZoomV1
   selectedSummary: string | null
   selectedCount: number
   /** Null when the action is available; otherwise the reason it is not, in words. */
@@ -70,7 +85,13 @@ export type TimelineToolbarProps = Readonly<{
   onPlacementMode(mode: PlacementMode): void
   onZoomOut(): void
   onZoomIn(): void
-  onFit(): void
+  onHorizontalZoom(pixelsPerSecond: number): void
+  onReduceTrackHeight(): void
+  onIncreaseTrackHeight(): void
+  onVerticalZoom(scaleBasisPoints: number): void
+  onFitTimeline(): void
+  onFitTracks(): void
+  onResetVerticalZoom(): void
 }>
 
 const MODE_LABELS: Readonly<Record<PlacementMode, string>> = Object.freeze({
@@ -131,6 +152,9 @@ const ICONS = Object.freeze({
   gap: 'M3 6v8M17 6v8M6 10h8M6 8v4M14 8v4',
   delete: 'M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10',
   rippleDelete: 'M4 6h9V4h-4M5 6l1 10h5l1-10M15 8l2 2-2 2',
+  horizontalAxis: 'M3 10h14M3 10l3-3M3 10l3 3M17 10l-3-3M17 10l-3 3',
+  verticalAxis: 'M10 3v14M10 3L7 6M10 3l3 3M10 17l-3-3M10 17l3-3',
+  zoom: 'M8.5 4a4.5 4.5 0 100 9 4.5 4.5 0 000-9zM12 12l4 4M6.5 8.5h4M8.5 6.5v4',
 })
 
 type ButtonSpec = Readonly<{
@@ -182,6 +206,7 @@ export function TimelineToolbar({
   durationTicks,
   timescale,
   viewport,
+  verticalZoom,
   selectedSummary,
   selectedCount,
   disabledReasons,
@@ -196,10 +221,26 @@ export function TimelineToolbar({
   onPlacementMode,
   onZoomOut,
   onZoomIn,
-  onFit,
+  onHorizontalZoom,
+  onReduceTrackHeight,
+  onIncreaseTrackHeight,
+  onVerticalZoom,
+  onFitTimeline,
+  onFitTracks,
+  onResetVerticalZoom,
 }: TimelineToolbarProps) {
   const [moreOpen, setMoreOpen] = useState(false)
+  const [zoomOpen, setZoomOpen] = useState(false)
+  const [compactZoom, setCompactZoom] = useState(() => typeof window !== 'undefined' && window.innerWidth < 600)
   const moreRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const update = () => setCompactZoom(window.innerWidth < 600)
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
 
   /*
    * Closing More by clicking elsewhere, and by pressing Escape.
@@ -262,6 +303,79 @@ export function TimelineToolbar({
       </button>
     )
   }
+
+  const zoomControls = (
+    <div className="timeline-v1__zoom-panel" role="group" aria-label="Timeline Zoom">
+      <div className="timeline-v1__zoom-axis" role="group" aria-label="Horizontal timeline zoom controls">
+        <span className="timeline-v1__zoom-axis-icon" title="Horizontal zoom"><Icon path={ICONS.horizontalAxis} /></span>
+        <button
+          type="button"
+          onClick={onZoomOut}
+          disabled={horizontalZoomAtMinimum(viewport.pixelsPerSecond)}
+          aria-label="Zoom Timeline out"
+          title="Zoom Timeline out"
+        >−</button>
+        <input
+          type="range"
+          min={0}
+          max={HORIZONTAL_ZOOM_LEVELS.length - 1}
+          step={1}
+          value={horizontalZoomLevelIndex(viewport.pixelsPerSecond)}
+          aria-label="Timeline horizontal zoom"
+          aria-valuetext={`${Math.round(viewport.pixelsPerSecond)} pixels per second`}
+          onChange={(event) => onHorizontalZoom(horizontalZoomAtLevel(Number(event.currentTarget.value)))}
+        />
+        <button
+          type="button"
+          onClick={onZoomIn}
+          disabled={horizontalZoomAtMaximum(viewport.pixelsPerSecond)}
+          aria-label="Zoom Timeline in"
+          title="Zoom Timeline in"
+        >+</button>
+        <output aria-label="Timeline horizontal zoom value">{Math.round(viewport.pixelsPerSecond)} px/s</output>
+      </div>
+
+      <div className="timeline-v1__zoom-axis" role="group" aria-label="Vertical timeline zoom controls">
+        <span className="timeline-v1__zoom-axis-icon" title="Vertical zoom"><Icon path={ICONS.verticalAxis} /></span>
+        <button
+          type="button"
+          onClick={onReduceTrackHeight}
+          disabled={verticalZoom.scaleBasisPoints <= MIN_VERTICAL_ZOOM_BASIS_POINTS}
+          aria-label="Reduce track height"
+          title="Reduce track height"
+        >−</button>
+        <input
+          type="range"
+          min={MIN_VERTICAL_ZOOM_BASIS_POINTS}
+          max={MAX_VERTICAL_ZOOM_BASIS_POINTS}
+          step={VERTICAL_ZOOM_STEP_BASIS_POINTS}
+          value={verticalZoom.scaleBasisPoints}
+          aria-label="Timeline vertical zoom"
+          aria-valuetext={`${Math.round(verticalZoom.scaleBasisPoints / 100)} percent`}
+          onChange={(event) => onVerticalZoom(Number(event.currentTarget.value))}
+        />
+        <button
+          type="button"
+          onClick={onIncreaseTrackHeight}
+          disabled={verticalZoom.scaleBasisPoints >= MAX_VERTICAL_ZOOM_BASIS_POINTS}
+          aria-label="Increase track height"
+          title="Increase track height"
+        >+</button>
+        <output aria-label="Timeline vertical zoom value">{Math.round(verticalZoom.scaleBasisPoints / 100)}%</output>
+      </div>
+
+      <div className="timeline-v1__zoom-fits" role="group" aria-label="Fit timeline controls">
+        <button type="button" onClick={onFitTimeline} aria-label="Fit Timeline horizontally">Fit Timeline</button>
+        <button type="button" onClick={onFitTracks} aria-label="Fit tracks vertically">Fit Tracks</button>
+        <button
+          type="button"
+          onClick={onResetVerticalZoom}
+          disabled={verticalZoom.scaleBasisPoints === DEFAULT_VERTICAL_ZOOM_BASIS_POINTS}
+          aria-label="Reset vertical zoom"
+        >Reset height</button>
+      </div>
+    </div>
+  )
 
   return (
     <div className="timeline-v1__toolbar" aria-label="Timeline controls">
@@ -372,12 +486,19 @@ export function TimelineToolbar({
         ) : null}
       </div>
 
-      <div className="timeline-v1__zoom-controls" role="group" aria-label="Timeline zoom">
-        <button type="button" onClick={onZoomOut} aria-label="Zoom timeline out" title="Zoom out (−)">−</button>
-        <output aria-label="Timeline zoom level">{Math.round(viewport.pixelsPerSecond)} px/s</output>
-        <button type="button" onClick={onZoomIn} aria-label="Zoom timeline in" title="Zoom in (+)">+</button>
-        <button type="button" onClick={onFit} title="Fit the whole video on screen">Fit</button>
-      </div>
+      <details
+        className="timeline-v1__zoom-controls"
+        open={!compactZoom || zoomOpen}
+        onToggle={(event) => {
+          if (compactZoom) setZoomOpen(event.currentTarget.open)
+        }}
+      >
+        <summary aria-label="Timeline Zoom" title="Timeline Zoom">
+          <Icon path={ICONS.zoom} />
+          <span>Timeline Zoom</span>
+        </summary>
+        {zoomControls}
+      </details>
 
       <p className="timeline-v1__selection-summary" title={selectedSummary ?? undefined}>
         <span className="timeline-v1__toolbar-duration">{formatTimelineTime(durationTicks, timescale)}</span>

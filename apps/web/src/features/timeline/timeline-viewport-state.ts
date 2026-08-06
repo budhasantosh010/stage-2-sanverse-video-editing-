@@ -1,3 +1,5 @@
+import { PROJECT_TIMESCALE } from '@sanverse/edit-domain'
+
 export const MIN_PIXELS_PER_SECOND = 10
 export const MAX_PIXELS_PER_SECOND = 1_000
 export const DEFAULT_PIXELS_PER_SECOND = 100
@@ -94,6 +96,47 @@ export const clampTimelineScroll = (input: Readonly<{
   return Math.min(maximum, nonNegative(input.scrollLeftPx))
 }
 
+/**
+ * Recalculate horizontal scroll after zooming while preserving one exact
+ * composition tick under one viewport X coordinate.
+ *
+ * The anchor is an integer project tick. Display seconds never enter this
+ * calculation, so repeated zoom in/out cannot accumulate time rounding.
+ */
+export const calculateHorizontalZoomScroll = (input: Readonly<{
+  previousPixelsPerSecond: number
+  nextPixelsPerSecond: number
+  previousScrollLeft: number
+  viewportWidth: number
+  anchorTicks: number
+  anchorViewportX: number
+  compositionDurationTicks: number
+}>): number => {
+  const previousPixelsPerSecond = clampPixelsPerSecond(input.previousPixelsPerSecond)
+  const nextPixelsPerSecond = clampPixelsPerSecond(input.nextPixelsPerSecond)
+  const viewportWidth = nonNegative(input.viewportWidth)
+  const durationTicks = safeInteger(input.compositionDurationTicks, 'floor')
+  const previousContentWidth = timelineContentWidthPx(durationTicks, PROJECT_TIMESCALE, previousPixelsPerSecond)
+  const previousScrollLeft = clampTimelineScroll({
+    scrollLeftPx: input.previousScrollLeft,
+    contentWidthPx: previousContentWidth,
+    viewportWidthPx: viewportWidth,
+  })
+  const anchorTicks = Math.min(durationTicks, safeInteger(input.anchorTicks, 'nearest'))
+  const anchorViewportX = Math.min(viewportWidth, nonNegative(input.anchorViewportX))
+  const nextContentWidth = timelineContentWidthPx(durationTicks, PROJECT_TIMESCALE, nextPixelsPerSecond)
+  const nextAnchorPx = ticksToPixels(anchorTicks, PROJECT_TIMESCALE, nextPixelsPerSecond)
+
+  // Validate the complete previous state even though the explicit anchor is the
+  // value that decides the new scroll position.
+  void previousScrollLeft
+  return clampTimelineScroll({
+    scrollLeftPx: nextAnchorPx - anchorViewportX,
+    contentWidthPx: nextContentWidth,
+    viewportWidthPx: viewportWidth,
+  })
+}
+
 export const visibleTickRange = (input: Readonly<{
   viewport: TimelineViewportState
   durationTicks: number
@@ -146,13 +189,25 @@ export const zoomTimelineAtAnchor = (input: Readonly<{
     contentWidthPx: currentContentWidth,
     viewportWidthPx: viewportWidth,
   })
-  const anchorSeconds = (currentScroll + anchorX) / currentPixelsPerSecond
-  const nextContentWidth = timelineContentWidthPx(duration, input.timescale, nextPixelsPerSecond)
-  const nextScroll = clampTimelineScroll({
-    scrollLeftPx: anchorSeconds * nextPixelsPerSecond - anchorX,
-    contentWidthPx: nextContentWidth,
-    viewportWidthPx: viewportWidth,
-  })
+  const anchorTicks = safeInteger(
+    ((currentScroll + anchorX) / currentPixelsPerSecond) * input.timescale,
+    'nearest',
+  )
+  const nextScroll = input.timescale === PROJECT_TIMESCALE
+    ? calculateHorizontalZoomScroll({
+        previousPixelsPerSecond: currentPixelsPerSecond,
+        nextPixelsPerSecond,
+        previousScrollLeft: currentScroll,
+        viewportWidth,
+        anchorTicks,
+        anchorViewportX: anchorX,
+        compositionDurationTicks: duration,
+      })
+    : clampTimelineScroll({
+        scrollLeftPx: ticksToPixels(anchorTicks, input.timescale, nextPixelsPerSecond) - anchorX,
+        contentWidthPx: timelineContentWidthPx(duration, input.timescale, nextPixelsPerSecond),
+        viewportWidthPx: viewportWidth,
+      })
 
   return Object.freeze({
     pixelsPerSecond: nextPixelsPerSecond,

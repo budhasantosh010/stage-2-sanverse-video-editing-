@@ -7,7 +7,10 @@ import {
   beginMarquee,
   cancelMarquee,
   extendSelection,
+  calculateHorizontalZoomScroll,
+  effectiveTrackHeightPx,
   fitTimelineToViewport,
+  fitTrackHeights,
   gapSnapTicks,
   itemIntersectsVisibleRange,
   marqueeAutoScrollPx,
@@ -15,17 +18,20 @@ import {
   marqueeIsMeaningful,
   marqueeModeFor,
   parseGapItemId,
+  pixelsToTicks,
   selectAll,
   selectOnly,
   primarySelectedItemId,
   timelineContentWidthPx,
   ticksToPixels,
   toggleSelection,
-  trackHeightPx,
   trackIdForLane,
   updateMarquee,
   visibleTickRange,
-  zoomTimelineAtAnchor,
+  nextHorizontalZoom,
+  verticalZoom as createVerticalZoom,
+  DEFAULT_VERTICAL_ZOOM_BASIS_POINTS,
+  VERTICAL_ZOOM_STEP_BASIS_POINTS,
   type KeymapV1,
   type MarqueeSession,
   type MultiItemGesture,
@@ -36,6 +42,7 @@ import {
   type TimelineSelectionV2,
   type TimelineViewModel,
   type TimelineViewportState,
+  type TimelineVerticalZoomV1,
   type TrackPresentationV1,
 } from '../../features/timeline'
 import {
@@ -82,6 +89,8 @@ export type TimelineProps = Readonly<{
   selectedMarkerId: string | null
   /** Row heights and folds. A browser setting: no revision, no Undo, no export change. */
   trackPresentation: TrackPresentationV1
+  /** One global multiplier over the stored base heights. Presentation only. */
+  verticalZoom?: TimelineVerticalZoomV1
   keymap: KeymapV1
   clipboardHasContent: boolean
   busy: boolean
@@ -129,6 +138,7 @@ export type TimelineProps = Readonly<{
   onDeleteMarker(markerId: string): void
   onEditMarker(markerId: string, changes: Readonly<{ label?: string; note?: string; color?: MarkerColor }>): void
   onTrackPresentationChange(state: TrackPresentationV1): void
+  onVerticalZoomChange?(state: TimelineVerticalZoomV1): void
   onOpenProposal(): void
 }>
 
@@ -149,6 +159,8 @@ const isTypingTarget = (target: EventTarget | null): boolean => {
 
 /** One frame at 30 per second, in ticks. Used by the arrow keys. */
 const FRAME_TICKS = 48_000
+const DEFAULT_VERTICAL_ZOOM = createVerticalZoom(DEFAULT_VERTICAL_ZOOM_BASIS_POINTS)
+const IGNORE_VERTICAL_ZOOM = (_state: TimelineVerticalZoomV1): void => undefined
 
 /** A stable empty object, so a project without files does not remount every lane. */
 const EMPTY_ASSET_FACTS: Readonly<Record<string, AssetFacts>> = Object.freeze({})
@@ -165,6 +177,7 @@ export function Timeline({
   markers,
   selectedMarkerId,
   trackPresentation,
+  verticalZoom = DEFAULT_VERTICAL_ZOOM,
   keymap,
   clipboardHasContent,
   busy,
@@ -199,10 +212,17 @@ export function Timeline({
   onDeleteMarker,
   onEditMarker,
   onTrackPresentationChange,
+  onVerticalZoomChange = IGNORE_VERTICAL_ZOOM,
   onOpenProposal,
 }: TimelineProps) {
   const timelineRef = useRef<HTMLElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
+  const viewportGridRef = useRef<HTMLDivElement>(null)
+  const horizontalZoomFrameRef = useRef<number | null>(null)
+  const pendingHorizontalZoomRef = useRef<number | null>(null)
+  const verticalZoomFrameRef = useRef<number | null>(null)
+  const pendingVerticalZoomRef = useRef<number | null>(null)
+  const verticalAnchorFrameRef = useRef<number | null>(null)
   const advancedDetailsRef = useRef<HTMLDetailsElement>(null)
   const [snapGuideTicks, setSnapGuideTicks] = useState<number | null>(null)
   const [contextMenu, setContextMenu] = useState<Readonly<{ itemId: string; x: number; y: number }> | null>(null)
@@ -214,6 +234,12 @@ export function Timeline({
    * revision, nothing saved. Same reasoning as the More menu.
    */
   const [speedPanelOpen, setSpeedPanelOpen] = useState(false)
+
+  useEffect(() => () => {
+    if (horizontalZoomFrameRef.current !== null) cancelAnimationFrame(horizontalZoomFrameRef.current)
+    if (verticalZoomFrameRef.current !== null) cancelAnimationFrame(verticalZoomFrameRef.current)
+    if (verticalAnchorFrameRef.current !== null) cancelAnimationFrame(verticalAnchorFrameRef.current)
+  }, [])
 
   const allItems = useMemo(() => model.lanes.flatMap((lane) => lane.items), [model])
   const soleSelectedId = primarySelectedItemId(selection)
@@ -616,20 +642,83 @@ export function Timeline({
   }
 
   const changeZoom = (nextPixelsPerSecond: number, anchorViewportX?: number) => {
-    const anchor = anchorViewportX ?? Math.min(
-      viewport.viewportWidthPx,
-      Math.max(0, playheadLeftPx - viewport.scrollLeftPx),
-    )
-    onViewportChange(zoomTimelineAtAnchor({
-      viewport,
-      nextPixelsPerSecond,
-      anchorViewportX: Number.isFinite(anchor) ? anchor : viewport.viewportWidthPx / 2,
-      durationTicks: model.durationTicks,
-      timescale: model.timescale,
+    const viewportWidth = Math.max(0, viewport.viewportWidthPx)
+    const playheadVisible = playheadLeftPx >= viewport.scrollLeftPx
+      && playheadLeftPx <= viewport.scrollLeftPx + viewportWidth
+    const pointerAnchor = Number.isFinite(anchorViewportX)
+      ? Math.min(viewportWidth, Math.max(0, anchorViewportX as number))
+      : null
+    const anchorX = pointerAnchor ?? (playheadVisible
+      ? playheadLeftPx - viewport.scrollLeftPx
+      : viewportWidth / 2)
+    const anchorTicks = pointerAnchor !== null
+      ? pixelsToTicks(viewport.scrollLeftPx + pointerAnchor, model.timescale, viewport.pixelsPerSecond)
+      : playheadVisible
+        ? Math.min(model.durationTicks, Math.max(0, playheadTicks))
+        : pixelsToTicks(viewport.scrollLeftPx + viewportWidth / 2, model.timescale, viewport.pixelsPerSecond)
+
+    onViewportChange(Object.freeze({
+      pixelsPerSecond: nextPixelsPerSecond,
+      scrollLeftPx: calculateHorizontalZoomScroll({
+        previousPixelsPerSecond: viewport.pixelsPerSecond,
+        nextPixelsPerSecond,
+        previousScrollLeft: viewport.scrollLeftPx,
+        viewportWidth,
+        anchorTicks,
+        anchorViewportX: anchorX,
+        compositionDurationTicks: model.durationTicks,
+      }),
+      viewportWidthPx: viewportWidth,
     }))
   }
 
-  const fit = () => {
+  const scheduleHorizontalZoom = (nextPixelsPerSecond: number) => {
+    pendingHorizontalZoomRef.current = nextPixelsPerSecond
+    if (horizontalZoomFrameRef.current !== null) return
+    horizontalZoomFrameRef.current = requestAnimationFrame(() => {
+      horizontalZoomFrameRef.current = null
+      const pending = pendingHorizontalZoomRef.current
+      pendingHorizontalZoomRef.current = null
+      if (pending !== null) changeZoom(pending)
+    })
+  }
+
+  const changeVerticalZoom = (nextBasisPoints: number) => {
+    const anchor = selectedTrackId
+      ? timelineRef.current?.querySelector<HTMLElement>(`[data-track-id="${selectedTrackId}"]`)
+      : viewportGridRef.current
+    const beforeRect = anchor?.getBoundingClientRect()
+    const beforeCenter = beforeRect ? beforeRect.top + beforeRect.height / 2 : null
+    onVerticalZoomChange(createVerticalZoom(nextBasisPoints))
+
+    if (beforeCenter === null || typeof window === 'undefined') return
+    if (verticalAnchorFrameRef.current !== null) cancelAnimationFrame(verticalAnchorFrameRef.current)
+    verticalAnchorFrameRef.current = requestAnimationFrame(() => {
+      verticalAnchorFrameRef.current = requestAnimationFrame(() => {
+        verticalAnchorFrameRef.current = null
+        const afterAnchor = selectedTrackId
+          ? timelineRef.current?.querySelector<HTMLElement>(`[data-track-id="${selectedTrackId}"]`)
+          : viewportGridRef.current
+        const afterRect = afterAnchor?.getBoundingClientRect()
+        if (!afterRect || typeof window.scrollBy !== 'function') return
+        const afterCenter = afterRect.top + afterRect.height / 2
+        if (Math.abs(afterCenter - beforeCenter) > 0.5) window.scrollBy(0, afterCenter - beforeCenter)
+      })
+    })
+  }
+
+  const scheduleVerticalZoom = (nextBasisPoints: number) => {
+    pendingVerticalZoomRef.current = nextBasisPoints
+    if (verticalZoomFrameRef.current !== null) return
+    verticalZoomFrameRef.current = requestAnimationFrame(() => {
+      verticalZoomFrameRef.current = null
+      const pending = pendingVerticalZoomRef.current
+      pendingVerticalZoomRef.current = null
+      if (pending !== null) changeVerticalZoom(pending)
+    })
+  }
+
+  const fitTimeline = () => {
     setContextMenu(null)
     onViewportChange({
       pixelsPerSecond: fitTimelineToViewport({
@@ -641,6 +730,15 @@ export function Timeline({
       scrollLeftPx: 0,
       viewportWidthPx: viewport.viewportWidthPx,
     })
+  }
+
+  const fitTracks = () => {
+    const currentHeight = viewportGridRef.current?.clientHeight ?? 0
+    const availableEffectiveHeight = Math.max(120, currentHeight - 24)
+    const availableBaseHeight = Math.round(
+      availableEffectiveHeight * DEFAULT_VERTICAL_ZOOM_BASIS_POINTS / verticalZoom.scaleBasisPoints,
+    )
+    onTrackPresentationChange(fitTrackHeights(trackPresentation, availableBaseHeight))
   }
 
   const onWheel = (event: WheelEvent<HTMLDivElement>) => {
@@ -722,13 +820,13 @@ export function Timeline({
         onToggleSnapping()
         return
       case 'zoom-in':
-        changeZoom(viewport.pixelsPerSecond * 1.25)
+        changeZoom(nextHorizontalZoom(viewport.pixelsPerSecond, 1))
         return
       case 'zoom-out':
-        changeZoom(viewport.pixelsPerSecond / 1.25)
+        changeZoom(nextHorizontalZoom(viewport.pixelsPerSecond, -1))
         return
       case 'fit':
-        fit()
+        fitTimeline()
         return
       case 'go-to-start':
         onSeek(0)
@@ -806,6 +904,7 @@ export function Timeline({
         durationTicks={model.durationTicks}
         timescale={model.timescale}
         viewport={viewport}
+        verticalZoom={verticalZoom}
         selectedSummary={selectedItem ? `${selectedItem.label} · ${selectedItem.kind}` : null}
         selectedCount={selection.itemIds.length}
         disabledReasons={disabledReasons}
@@ -818,9 +917,15 @@ export function Timeline({
         onAction={runToolbarAction}
         onToggleSnapping={onToggleSnapping}
         onPlacementMode={onPlacementMode}
-        onZoomOut={() => changeZoom(viewport.pixelsPerSecond / 1.25)}
-        onZoomIn={() => changeZoom(viewport.pixelsPerSecond * 1.25)}
-        onFit={fit}
+        onZoomOut={() => changeZoom(nextHorizontalZoom(viewport.pixelsPerSecond, -1))}
+        onZoomIn={() => changeZoom(nextHorizontalZoom(viewport.pixelsPerSecond, 1))}
+        onHorizontalZoom={scheduleHorizontalZoom}
+        onReduceTrackHeight={() => changeVerticalZoom(verticalZoom.scaleBasisPoints - VERTICAL_ZOOM_STEP_BASIS_POINTS)}
+        onIncreaseTrackHeight={() => changeVerticalZoom(verticalZoom.scaleBasisPoints + VERTICAL_ZOOM_STEP_BASIS_POINTS)}
+        onVerticalZoom={scheduleVerticalZoom}
+        onFitTimeline={fitTimeline}
+        onFitTracks={fitTracks}
+        onResetVerticalZoom={() => changeVerticalZoom(DEFAULT_VERTICAL_ZOOM_BASIS_POINTS)}
       />
 
       <TimelineSpeedPanel
@@ -841,7 +946,7 @@ export function Timeline({
         onClose={() => setSpeedPanelOpen(false)}
       />
 
-      <div className="timeline-v1__viewport-grid">
+      <div ref={viewportGridRef} className="timeline-v1__viewport-grid">
         {/*
           The track headers are real controls, so this column can no longer be
           hidden from screen readers the way a decorative label column was.
@@ -859,7 +964,12 @@ export function Timeline({
                 locked={lockedTrackIds.includes(trackId)}
                 outputEnabled={trackOutputs[trackId]}
                 outputDisabledReason={busy ? 'Project edits are paused right now.' : null}
-                heightPx={trackHeightPx(trackPresentation, trackId, laneHeightPx(lane.kind, windowWidthPx))}
+                heightPx={effectiveTrackHeightPx(
+                  trackPresentation,
+                  verticalZoom,
+                  trackId,
+                  laneHeightPx(lane.kind, windowWidthPx),
+                )}
                 collapsed={trackPresentation.collapsed.includes(trackId)}
                 onToggleLock={() => onToggleTrackLock(trackId)}
                 onToggleOutput={() => onToggleTrackOutput(trackId)}
@@ -966,8 +1076,9 @@ export function Timeline({
                   assetFacts={assetFacts ?? EMPTY_ASSET_FACTS}
                   muted={trackOutputs[trackIdForLane(lane.id)] === false}
                   layoutWidthPx={windowWidthPx}
-                  heightPx={trackHeightPx(
+                  heightPx={effectiveTrackHeightPx(
                     trackPresentation,
+                    verticalZoom,
                     trackIdForLane(lane.id),
                     laneHeightPx(lane.kind, windowWidthPx),
                   )}

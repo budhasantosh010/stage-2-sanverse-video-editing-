@@ -58,11 +58,15 @@ import {
   readKeymap,
   readTimelineLockState,
   readTrackPresentation,
+  readTimelineZoomPresentation,
   reconcileSelectionV2,
   primarySelectedItemId,
   trackIdForLane,
   writeTimelineLockState,
   writeTrackPresentation,
+  writeTimelineZoomPresentation,
+  DEFAULT_TIMELINE_ZOOM_PRESENTATION,
+  TIMELINE_ZOOM_PRESENTATION_SCHEMA_VERSION,
   type KeymapV1,
   type MultiItemGesture,
   type PlacementMode,
@@ -72,6 +76,7 @@ import {
   type TimelineSelectionV2,
   type TimelineTrackId,
   type TimelineViewportState,
+  type TimelineVerticalZoomV1,
   type TrackPresentationV1,
 } from '../../features/timeline'
 import type { TimelineToolbarAction } from '../../editor/timeline/TimelineToolbar'
@@ -578,6 +583,9 @@ export function StudioScreen({
    * neither changes one frame of the exported video.
    */
   const [trackPresentation, setTrackPresentation] = useState<TrackPresentationV1>(DEFAULT_TRACK_PRESENTATION)
+  const [timelineVerticalZoom, setTimelineVerticalZoom] = useState<TimelineVerticalZoomV1>(
+    DEFAULT_TIMELINE_ZOOM_PRESENTATION.vertical,
+  )
   const [keymap, setKeymap] = useState<KeymapV1>(DEFAULT_KEYMAP)
   /*
    * The clipboard. Deliberately NOT part of the project and NOT saved: a copy is
@@ -605,6 +613,17 @@ export function StudioScreen({
     scrollLeftPx: 0,
     viewportWidthPx: 0,
   }))
+
+  useEffect(() => {
+    const zoom = readTimelineZoomPresentation(editProject.projectId)
+    setTimelineVerticalZoom(zoom.vertical)
+    setTimelineViewport((current) => Object.freeze({
+      ...current,
+      pixelsPerSecond: zoom.horizontalPixelsPerSecond,
+      scrollLeftPx: 0,
+    }))
+  }, [editProject.projectId])
+
   /** A plain sentence explaining why a timeline edit was not made. */
   const [timelineNotice, setTimelineNotice] = useState<string | null>(null)
   const [trimSeconds, setTrimSeconds] = useState(1)
@@ -2202,6 +2221,24 @@ export function StudioScreen({
     writeTrackPresentation(editProject.projectId, next)
   }
 
+  function persistTimelineZoom(horizontalPixelsPerSecond: number, vertical: TimelineVerticalZoomV1) {
+    writeTimelineZoomPresentation(editProject.projectId, Object.freeze({
+      schemaVersion: TIMELINE_ZOOM_PRESENTATION_SCHEMA_VERSION,
+      horizontalPixelsPerSecond,
+      vertical,
+    }))
+  }
+
+  function handleTimelineViewportChange(next: TimelineViewportState) {
+    setTimelineViewport(next)
+    persistTimelineZoom(next.pixelsPerSecond, timelineVerticalZoom)
+  }
+
+  function handleTimelineVerticalZoomChange(next: TimelineVerticalZoomV1) {
+    setTimelineVerticalZoom(next)
+    persistTimelineZoom(timelineViewport.pixelsPerSecond, next)
+  }
+
   /**
    * A padlock. Presentation only: no operation, no revision, no Undo entry, and
    * the exported file is byte-for-byte what it would have been without it.
@@ -3351,6 +3388,7 @@ export function StudioScreen({
           markers={timelineMarkers}
           selectedMarkerId={selectedMarkerId}
           trackPresentation={trackPresentation}
+          verticalZoom={timelineVerticalZoom}
           keymap={keymap}
           clipboardHasContent={!clipboardIsEmpty(timelineClipboard)}
           busy={timelineBusy}
@@ -3371,7 +3409,7 @@ export function StudioScreen({
           onToggleSnapping={() => setSnappingEnabled((current) => !current)}
           onItemAction={handleTimelineItemAction}
           onMultiGesture={handleMultiGesture}
-          onViewportChange={setTimelineViewport}
+          onViewportChange={handleTimelineViewportChange}
           onSeek={seekCompositionTicks}
           onSelectionChange={requestTimelineSelection}
           onGesture={handleTimelineGesture}
@@ -3384,6 +3422,7 @@ export function StudioScreen({
           onDeleteMarker={handleDeleteMarker}
           onEditMarker={handleEditMarker}
           onTrackPresentationChange={handleTrackPresentationChange}
+          onVerticalZoomChange={handleTimelineVerticalZoomChange}
           onOpenProposal={() => {
             commitLayoutValue({ toolCollapsed: false })
             requestAnimationFrame(() => inspectorRegionRef.current?.focus())

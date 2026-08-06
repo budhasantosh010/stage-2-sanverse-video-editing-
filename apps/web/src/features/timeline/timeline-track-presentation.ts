@@ -1,5 +1,10 @@
 import { TIMELINE_TRACK_IDS, type TimelineTrackId } from '@sanverse/edit-domain'
 
+import {
+  DEFAULT_VERTICAL_ZOOM_BASIS_POINTS,
+  type TimelineVerticalZoomV1,
+} from './timeline-zoom-presentation'
+
 /**
  * How tall each row is drawn, and whether it is folded away.
  *
@@ -85,6 +90,29 @@ export const trackHeightPx = (
     return Math.min(MAX_TRACK_HEIGHT_PX, Math.max(MIN_TRACK_HEIGHT_PX, Math.round(stored)))
   }
   return fallbackPx
+}
+
+/**
+ * Apply the global vertical zoom to the stored BASE height.
+ *
+ * Folding stays a fixed 14-pixel strip. The multiplier never overwrites a
+ * preset or custom height, so returning to 100% restores the exact base value.
+ */
+export const effectiveTrackHeightPx = (
+  state: TrackPresentationV1,
+  zoom: TimelineVerticalZoomV1,
+  trackId: TimelineTrackId,
+  fallbackPx: number,
+): number => {
+  if (state.collapsed.includes(trackId)) return COLLAPSED_TRACK_HEIGHT_PX
+  const base = trackHeightPx(state, trackId, fallbackPx)
+  const basisPoints = Number.isFinite(zoom.scaleBasisPoints)
+    ? zoom.scaleBasisPoints
+    : DEFAULT_VERTICAL_ZOOM_BASIS_POINTS
+  return Math.min(
+    MAX_TRACK_HEIGHT_PX,
+    Math.max(MIN_TRACK_HEIGHT_PX, Math.round(base * basisPoints / DEFAULT_VERTICAL_ZOOM_BASIS_POINTS)),
+  )
 }
 
 export const isTrackCollapsed = (state: TrackPresentationV1, trackId: TimelineTrackId): boolean =>

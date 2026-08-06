@@ -6,6 +6,7 @@ import {
   DEFAULT_PIXELS_PER_SECOND,
   MAX_PIXELS_PER_SECOND,
   MIN_PIXELS_PER_SECOND,
+  calculateHorizontalZoomScroll,
   clampPixelsPerSecond,
   clampTimelineScroll,
   fitTimelineToViewport,
@@ -120,6 +121,70 @@ describe('visible range and anchored zoom', () => {
     })
     const afterSeconds = (after.scrollLeftPx + anchorX) / after.pixelsPerSecond
     expect(afterSeconds).toBeCloseTo(beforeSeconds, 10)
+  })
+
+  it('preserves an exact playhead X in the middle of a one-hour project', () => {
+    const duration = 60 * 60 * S
+    const anchorTicks = 35 * 60 * S + 12_345
+    const anchorViewportX = 417
+    const nextScroll = calculateHorizontalZoomScroll({
+      previousPixelsPerSecond: 50,
+      nextPixelsPerSecond: 320,
+      previousScrollLeft: ticksToPixels(anchorTicks, S, 50) - anchorViewportX,
+      viewportWidth: 1_000,
+      anchorTicks,
+      anchorViewportX,
+      compositionDurationTicks: duration,
+    })
+    const afterAnchor = pixelsToTicks(nextScroll + anchorViewportX, S, 320)
+    expect(Math.abs(afterAnchor - anchorTicks)).toBeLessThanOrEqual(1)
+  })
+
+  it('preserves a center fallback anchor when the playhead is outside the viewport', () => {
+    const duration = 3_600 * S
+    const anchorTicks = 1_800 * S
+    const nextScroll = calculateHorizontalZoomScroll({
+      previousPixelsPerSecond: 100,
+      nextPixelsPerSecond: 25,
+      previousScrollLeft: ticksToPixels(anchorTicks, S, 100) - 450,
+      viewportWidth: 900,
+      anchorTicks,
+      anchorViewportX: 450,
+      compositionDurationTicks: duration,
+    })
+    expect(pixelsToTicks(nextScroll + 450, S, 25)).toBe(anchorTicks)
+  })
+
+  it('clamps anchored zoom at the start, end, and when the project is shorter than the viewport', () => {
+    expect(calculateHorizontalZoomScroll({
+      previousPixelsPerSecond: 100,
+      nextPixelsPerSecond: 200,
+      previousScrollLeft: 0,
+      viewportWidth: 800,
+      anchorTicks: 0,
+      anchorViewportX: 400,
+      compositionDurationTicks: 60 * S,
+    })).toBe(0)
+
+    expect(calculateHorizontalZoomScroll({
+      previousPixelsPerSecond: 100,
+      nextPixelsPerSecond: 200,
+      previousScrollLeft: 5_000,
+      viewportWidth: 800,
+      anchorTicks: 60 * S,
+      anchorViewportX: 400,
+      compositionDurationTicks: 60 * S,
+    })).toBe(11_200)
+
+    expect(calculateHorizontalZoomScroll({
+      previousPixelsPerSecond: 100,
+      nextPixelsPerSecond: 10,
+      previousScrollLeft: 100,
+      viewportWidth: 800,
+      anchorTicks: 10 * S,
+      anchorViewportX: 400,
+      compositionDurationTicks: 20 * S,
+    })).toBe(0)
   })
 
   it('handles zero-duration zoom without NaN or scroll', () => {
