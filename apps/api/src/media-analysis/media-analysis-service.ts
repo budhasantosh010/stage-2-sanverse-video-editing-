@@ -2,7 +2,13 @@ import { randomBytes } from 'node:crypto'
 import { mkdir, open, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { PROJECT_TIMESCALE, type EditProject, type MediaAsset } from '@sanverse/edit-domain'
+import {
+  MAX_CLIP_GAIN_DB,
+  MIN_CLIP_GAIN_DB,
+  PROJECT_TIMESCALE,
+  type EditProject,
+  type MediaAsset,
+} from '@sanverse/edit-domain'
 
 import { createCommandRunner, type CommandRunner } from '../process/command-runner.ts'
 import type { ProjectRepository } from '../projects/project-repository.ts'
@@ -90,6 +96,55 @@ export type WaveformBlockPayload = Readonly<{
 
 export const WAVEFORM_BLOCK_SCHEMA_VERSION = 'sanverse.waveform-block/v1'
 
+export const AUDIO_NORMALIZATION_SCHEMA_VERSION = 'sanverse.audio-normalization-evidence/v1' as const
+export const AUDIO_NORMALIZATION_ANALYSIS_VERSION = 'ffmpeg-loudnorm-v1' as const
+export const CREATOR_TARGET_INTEGRATED_LUFS = -16
+export const CREATOR_TARGET_TRUE_PEAK_DB = -1
+
+export type AudioNormalizationEvidenceV1 = Readonly<{
+  schemaVersion: typeof AUDIO_NORMALIZATION_SCHEMA_VERSION
+  assetId: string
+  assetVersion: string
+  sourceStartTicks: number
+  sourceEndTicks: number
+  analysisVersion: typeof AUDIO_NORMALIZATION_ANALYSIS_VERSION
+  integratedLufs: number
+  loudnessRangeLufs: number
+  truePeakDb: number
+  recommendedGainDb: number
+  targetIntegratedLufs: number
+  targetTruePeakDb: number
+}>
+
+type LoudnormMeasurement = Readonly<{
+  integratedLufs: number
+  loudnessRangeLufs: number
+  truePeakDb: number
+}>
+
+const finiteMetric = (value: unknown): number | null => {
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : Number.NaN
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+/** Read only the final JSON object emitted by FFmpeg loudnorm. */
+export const parseLoudnormMeasurement = (stderr: string): LoudnormMeasurement | null => {
+  const objects = stderr.match(/\{[\s\S]*?\}/g) ?? []
+  for (let index = objects.length - 1; index >= 0; index -= 1) {
+    try {
+      const value = JSON.parse(objects[index]) as Record<string, unknown>
+      const integratedLufs = finiteMetric(value.input_i)
+      const loudnessRangeLufs = finiteMetric(value.input_lra)
+      const truePeakDb = finiteMetric(value.input_tp)
+      if (integratedLufs === null || loudnessRangeLufs === null || truePeakDb === null) continue
+      return Object.freeze({ integratedLufs, loudnessRangeLufs, truePeakDb })
+    } catch {
+      // FFmpeg may print unrelated braces. Continue to the preceding object.
+    }
+  }
+  return null
+}
+
 export type MediaAnalysisService = Readonly<{
   produce(input: Readonly<{
     projectId: string
@@ -146,6 +201,7 @@ const ACCEPTS: Readonly<Record<AnalysisRequest['kind'], readonly MediaAsset['med
   'filmstrip-frame': Object.freeze(['video'] as const),
   'image-thumbnail': Object.freeze(['image'] as const),
   'waveform-block': Object.freeze(['video', 'audio'] as const),
+  'audio-normalization': Object.freeze(['video', 'audio'] as const),
 })
 
 export function createMediaAnalysisService(options: MediaAnalysisServiceOptions): MediaAnalysisService {
@@ -243,6 +299,31 @@ export function createMediaAnalysisService(options: MediaAnalysisServiceOptions)
     }
     if (result.exitCode !== 0) {
       throw new AnalysisError('DECODER_FAILED', 'That part of the file could not be read.', 502)
+    }
+  }
+
+  const runFfmpegForMeasurement = async (
+    args: readonly string[],
+    cwd: string,
+    signal: AbortSignal,
+  ): Promise<string> => {
+    try {
+      const result = await runCommand({ executable: ffmpegExecutable, args, cwd, signal })
+      if (result.exitCode !== 0) {
+        throw new AnalysisError('DECODER_FAILED', 'That sound could not be measured.', 502)
+      }
+      return result.stderr
+    } catch (error) {
+      if (error instanceof AnalysisError) throw error
+      if (signal.aborted) throw new AnalysisError('ANALYSIS_CANCELLED', 'That analysis was no longer needed.', 499)
+      const code = (error as { code?: unknown })?.code
+      if (code === 'RENDER_TOOL_UNAVAILABLE' || code === 'RENDER_PROCESS_BLOCKED') {
+        throw new AnalysisError('DECODER_UNAVAILABLE', 'The tool that measures sound is not available.', 503)
+      }
+      if (code === 'RENDER_CANCELLED') {
+        throw new AnalysisError('ANALYSIS_CANCELLED', 'That analysis was no longer needed.', 499)
+      }
+      throw new AnalysisError('DECODER_FAILED', 'That sound could not be measured.', 502)
     }
   }
 
@@ -385,6 +466,52 @@ export function createMediaAnalysisService(options: MediaAnalysisServiceOptions)
     }
   }
 
+  const analyzeNormalization = async (
+    projectId: string,
+    filePath: string,
+    request: Extract<AnalysisRequest, { kind: 'audio-normalization' }>,
+    signal: AbortSignal,
+  ): Promise<DerivedArtifact> => {
+    const durationTicks = request.sourceEndTicks - request.sourceStartTicks
+    const projectCwd = await projectDirectory(projectId)
+    const stderr = await runFfmpegForMeasurement([
+      '-hide_banner', '-nostdin', '-v', 'info',
+      '-ss', ticksToSeconds(request.sourceStartTicks),
+      '-t', ticksToSeconds(durationTicks),
+      '-i', filePath,
+      '-vn', '-map', '0:a:0',
+      '-af', `loudnorm=I=${CREATOR_TARGET_INTEGRATED_LUFS}:LRA=11:TP=${CREATOR_TARGET_TRUE_PEAK_DB}:print_format=json`,
+      '-f', 'null', '-',
+    ], projectCwd, signal)
+    const measured = parseLoudnormMeasurement(stderr)
+    if (!measured || measured.integratedLufs <= -70) {
+      throw new AnalysisError('AUDIO_SILENT', 'This sound is silent or too quiet to normalize safely.', 422)
+    }
+    const loudnessGain = CREATOR_TARGET_INTEGRATED_LUFS - measured.integratedLufs
+    const peakSafeGain = CREATOR_TARGET_TRUE_PEAK_DB - measured.truePeakDb
+    const recommendedGainDb = Math.round(
+      Math.min(MAX_CLIP_GAIN_DB, Math.max(MIN_CLIP_GAIN_DB, Math.min(loudnessGain, peakSafeGain))) * 100,
+    ) / 100
+    const evidence: AudioNormalizationEvidenceV1 = Object.freeze({
+      schemaVersion: AUDIO_NORMALIZATION_SCHEMA_VERSION,
+      assetId: request.assetId,
+      assetVersion: request.assetVersion,
+      sourceStartTicks: request.sourceStartTicks,
+      sourceEndTicks: request.sourceEndTicks,
+      analysisVersion: AUDIO_NORMALIZATION_ANALYSIS_VERSION,
+      integratedLufs: measured.integratedLufs,
+      loudnessRangeLufs: measured.loudnessRangeLufs,
+      truePeakDb: measured.truePeakDb,
+      recommendedGainDb,
+      targetIntegratedLufs: CREATOR_TARGET_INTEGRATED_LUFS,
+      targetTruePeakDb: CREATOR_TARGET_TRUE_PEAK_DB,
+    })
+    return Object.freeze({
+      bytes: Buffer.from(JSON.stringify(evidence), 'utf8'),
+      contentType: 'application/json; charset=utf-8',
+    })
+  }
+
   return Object.freeze({
     cache,
     diagnostics: () => coordinator.diagnostics(),
@@ -404,27 +531,39 @@ export function createMediaAnalysisService(options: MediaAnalysisServiceOptions)
       if (!ACCEPTS[request.kind].includes(asset.mediaKind)) {
         throw new AnalysisError('ASSET_KIND_UNSUPPORTED', 'That kind of preview does not apply to this file.', 415)
       }
-      if (request.kind === 'waveform-block' && !asset.hasAudio) {
-        throw new AnalysisError('ASSET_KIND_UNSUPPORTED', 'That file has no sound to draw.', 415)
+      if ((request.kind === 'waveform-block' || request.kind === 'audio-normalization') && !asset.hasAudio) {
+        throw new AnalysisError('ASSET_KIND_UNSUPPORTED', 'That file has no sound to measure.', 415)
       }
 
       const durationTicks = asset.duration?.ticks ?? 0
-      if (request.kind !== 'image-thumbnail') {
+      if (request.kind === 'audio-normalization') {
+        if (
+          durationTicks <= 0 ||
+          request.sourceStartTicks < 0 ||
+          request.sourceEndTicks > durationTicks ||
+          request.sourceEndTicks <= request.sourceStartTicks
+        ) {
+          throw new AnalysisError('SOURCE_TIME_OUT_OF_RANGE', 'That stretch of sound is outside the file.', 416)
+        }
+      } else if (request.kind !== 'image-thumbnail') {
         if (durationTicks <= 0 || request.sourceTicks >= durationTicks) {
           throw new AnalysisError('SOURCE_TIME_OUT_OF_RANGE', 'That moment is past the end of the file.', 416)
         }
       }
-      // A picture has no moments, so nothing of it "remains" from one.
-      const availableTicks = request.kind === 'image-thumbnail'
-        ? 0
-        : Math.max(0, durationTicks - request.sourceTicks)
+      // A picture and a whole-interval loudness measurement do not use the
+      // waveform-only "amount remaining after sourceTicks" value.
+      const availableTicks = request.kind === 'filmstrip-frame' || request.kind === 'waveform-block'
+        ? Math.max(0, durationTicks - request.sourceTicks)
+        : 0
 
       // Already made? Then no program has to run at all. This is what makes a
       // reopened project instant and a re-scroll free.
       const cached = await cache.read(projectId, request)
       if (cached) return cached
 
-      const lane = request.kind === 'waveform-block' ? 'waveform' as const : 'frame' as const
+      const lane = request.kind === 'waveform-block' || request.kind === 'audio-normalization'
+        ? 'waveform' as const
+        : 'frame' as const
       return coordinator.run({
         lane,
         jobId: `${projectId}:${analysisRequestId(request)}`,
@@ -446,7 +585,9 @@ export function createMediaAnalysisService(options: MediaAnalysisServiceOptions)
             ? await extractFrame(projectId, filePath, request, jobSignal)
             : request.kind === 'image-thumbnail'
               ? await extractImage(projectId, filePath, request, jobSignal)
-              : await extractWaveform(projectId, filePath, request, availableTicks, jobSignal)
+              : request.kind === 'audio-normalization'
+                ? await analyzeNormalization(projectId, filePath, request, jobSignal)
+                : await extractWaveform(projectId, filePath, request, availableTicks, jobSignal)
 
           // Only successes are kept. A file that was busy for one second must
           // not be reported missing for the rest of the session.

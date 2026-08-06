@@ -108,19 +108,21 @@ describe('timeline gesture adapter', () => {
     })
   })
 
-  it('emits existing clip gain and fade values', () => {
+  it('emits the whole accepted clip-audio state, including pan', () => {
     const result = adapt(testProject(), {
       type: 'set-audio',
       clipId: TEST_CLIP_ID,
       gainDb: -6,
       fadeInTicks: ticks(2),
       fadeOutTicks: ticks(3),
+      pan: 5_000,
     })
     expect(result.ok).toBe(true)
     if (!result.ok || result.value.kind !== 'set-clip-audio') return
     expect(result.value.gainDb).toBe(-6)
     expect(result.value.fadeIn.ticks).toBe(ticks(2))
     expect(result.value.fadeOut.ticks).toBe(ticks(3))
+    expect(result.value.pan).toBe(5_000)
   })
 
   it('refuses out-of-range gain and excessive fades', () => {

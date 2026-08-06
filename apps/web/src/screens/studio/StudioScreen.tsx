@@ -80,7 +80,12 @@ import {
   type TrackPresentationV1,
 } from '../../features/timeline'
 import type { TimelineToolbarAction } from '../../editor/timeline/TimelineToolbar'
-import { planSpeedChange, previewSpeedChange } from '../../features/timeline/timeline-speed-plan'
+import {
+  planRateStretch,
+  planSpeedChange,
+  previewRateStretch,
+  previewSpeedChange,
+} from '../../features/timeline/timeline-speed-plan'
 import { clipCompositionDurationTicks, findClip } from '@sanverse/edit-domain/composition'
 import type { RationalPlaybackRateV1 } from '@sanverse/edit-domain/clip-time'
 import {
@@ -2007,6 +2012,48 @@ export function StudioScreen({
     applyPlanned(plan, changeSetId)
   }
 
+  function describeRateStretch(targetDurationTicks: number) {
+    const preview = previewRateStretch({
+      composition: effectiveComposition(editProject),
+      clipId: speedSubject?.clipId ?? null,
+      targetDurationTicks,
+      direction: 'forward',
+      maintainAudioPitch: speedSubject?.maintainAudioPitch ?? true,
+      durationPolicy: 'ripple',
+      lockedTrackIds,
+      operationId: 'operation_ratestretchpreview',
+    })
+    if (!preview.ok) return Object.freeze({ ok: false, message: preview.refusal.message })
+    const target = (preview.feedback.targetDurationTicks / PROJECT_TIMESCALE).toFixed(2)
+    const source = (preview.feedback.sourceDurationTicks / PROJECT_TIMESCALE).toFixed(2)
+    const errorMs = Math.abs(preview.feedback.approximationErrorTicks / PROJECT_TIMESCALE * 1_000)
+    const ripple = preview.feedback.ripples
+      ? preview.feedback.rippleShiftTicks > 0
+        ? ' Later clips move later.'
+        : ' Later clips move earlier.'
+      : ''
+    return Object.freeze({
+      ok: true,
+      message: `${target}s target · ${preview.feedback.rateLabel} · ${source}s source · ${errorMs.toFixed(3)}ms error.${ripple}`,
+    })
+  }
+
+  function handleRateStretchCommit(targetDurationTicks: number) {
+    const changeSetId = createChangeSetId()
+    const ids = createIdFactory(changeSetId)
+    const plan = planRateStretch({
+      composition: effectiveComposition(editProject),
+      clipId: speedSubject?.clipId ?? null,
+      targetDurationTicks,
+      direction: 'forward',
+      maintainAudioPitch: speedSubject?.maintainAudioPitch ?? true,
+      durationPolicy: 'ripple',
+      lockedTrackIds,
+      operationId: ids.operation(0),
+    })
+    applyPlanned(plan, changeSetId)
+  }
+
   /**
    * Everything the toolbar, the context menu and the keyboard can ask for.
    *
@@ -3417,6 +3464,8 @@ export function StudioScreen({
           speedSubject={speedSubject}
           onSpeedPreview={describeSpeedChoice}
           onSpeedChoose={handleSpeedChoose}
+          onRateStretchPreview={describeRateStretch}
+          onRateStretchCommit={handleRateStretchCommit}
           onSelectMarker={setSelectedMarkerId}
           onMoveMarker={handleMoveMarker}
           onDeleteMarker={handleDeleteMarker}

@@ -7,8 +7,10 @@ import {
   analysisCacheName,
   analysisRequestId,
   MAX_ANALYSIS_PIXELS,
+  MAX_NORMALIZATION_SPAN_TICKS,
   MAX_PEAK_COUNT,
   MAX_WAVEFORM_SPAN_TICKS,
+  MIN_NORMALIZATION_SPAN_TICKS,
   parseAnalysisRequest,
   ticksToSeconds,
 } from './analysis-request.ts'
@@ -116,6 +118,34 @@ describe('reading one request out of a web address', () => {
     ))).toBe('ANALYSIS_KEY_INVALID')
   })
 
+  it('accepts a bounded, exact source interval for loudness normalization', () => {
+    const request = parseAnalysisRequest(
+      'audio-normalization',
+      params(`${VALID}&sourceStartTicks=1440000&sourceEndTicks=2880000`),
+    )
+    expect(request).toEqual({
+      kind: 'audio-normalization',
+      assetId: 'asset_aaaaaaaa',
+      assetVersion: 'aaaaaaaaaaaaaaaa',
+      sourceStartTicks: 1_440_000,
+      sourceEndTicks: 2_880_000,
+    })
+  })
+
+  it('refuses empty, tiny, reversed, or unbounded normalization intervals', () => {
+    for (const [start, end] of [
+      [0, 0],
+      [100, 99],
+      [0, MIN_NORMALIZATION_SPAN_TICKS - 1],
+      [0, MAX_NORMALIZATION_SPAN_TICKS + 1],
+    ]) {
+      expect(refusalCode(() => parseAnalysisRequest(
+        'audio-normalization',
+        params(`${VALID}&sourceStartTicks=${start}&sourceEndTicks=${end}`),
+      ))).toBe('ANALYSIS_KEY_INVALID')
+    }
+  })
+
   it('refuses a repeated value rather than picking one of them', () => {
     expect(refusalCode(() => parseAnalysisRequest(
       'filmstrip-frame',
@@ -140,6 +170,19 @@ describe('naming the answer', () => {
       params('assetId=asset_aaaaaaaa&assetVersion=bbbbbbbbbbbbbbbb&sourceTicks=0&width=64'),
     )
     expect(analysisRequestId(first)).not.toBe(analysisRequestId(second))
+  })
+
+  it('keys normalization by exact bytes, exact interval, and analysis version', () => {
+    const first = parseAnalysisRequest(
+      'audio-normalization',
+      params(`${VALID}&sourceStartTicks=0&sourceEndTicks=${PROJECT_TIMESCALE}`),
+    )
+    const later = parseAnalysisRequest(
+      'audio-normalization',
+      params(`${VALID}&sourceStartTicks=${PROJECT_TIMESCALE}&sourceEndTicks=${2 * PROJECT_TIMESCALE}`),
+    )
+    expect(analysisRequestId(first)).toContain('ffmpeg-loudnorm-v1')
+    expect(analysisRequestId(first)).not.toBe(analysisRequestId(later))
   })
 
   it('puts nothing a person typed into a filename', () => {

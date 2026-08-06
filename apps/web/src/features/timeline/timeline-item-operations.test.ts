@@ -223,6 +223,44 @@ describe('P1-F.1A C1.11 trimming', () => {
   })
 })
 
+describe('T2 direct audio controls on A2 music', () => {
+  it('reuses the existing set-music operation and commits gain plus both fades together', () => {
+    const project = withMusic()
+    const result = plan(project, 'music:music_0001:0', {
+      type: 'set-audio',
+      gainDb: -12,
+      fadeInTicks: ms(1_000).ticks,
+      fadeOutTicks: ms(2_000).ticks,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.operations).toHaveLength(1)
+    expect(result.operations[0]).toMatchObject({ kind: 'set-music', gainDb: -12 })
+
+    const changed = applyPlan(project, result.operations)
+    const music = activeOverlayOperations(changed).find((operation) => operation.kind === 'add-music')
+    expect(music).toMatchObject({
+      kind: 'add-music',
+      gainDb: -12,
+      fadeIn: ms(1_000),
+      fadeOut: ms(2_000),
+    })
+  })
+
+  it('refuses fades longer than the playable music span and returns no operation', () => {
+    const project = withMusic()
+    const playable = laneSpans(project, 'A2')[0].durationTicks
+    const result = plan(project, 'music:music_0001:0', {
+      type: 'set-audio',
+      gainDb: -6,
+      fadeInTicks: playable,
+      fadeOutTicks: 1,
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.refusal.code).toBe('OUT_OF_RANGE')
+  })
+})
+
 describe('P1-F.1A C1.12 splitting', () => {
   it('splits B-roll into two halves that together cover exactly what one covered', () => {
     const project = withBroll()

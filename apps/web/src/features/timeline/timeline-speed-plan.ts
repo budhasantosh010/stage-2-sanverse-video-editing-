@@ -323,6 +323,66 @@ export const rateForTargetDuration = (
   return Object.freeze({ ok: true as const, rate: checked.value })
 }
 
+export type RateStretchFeedback = SpeedFeedback & Readonly<{
+  /** What the pointer asked for. The accepted rational may differ by a few ticks. */
+  targetDurationTicks: number
+  /** Accepted duration minus requested duration. Zero means exactly representable. */
+  approximationErrorTicks: number
+}>
+
+export type RateStretchPlan =
+  | Readonly<{
+      ok: true
+      feedback: RateStretchFeedback
+      operations: readonly EditOperation[]
+      description: string
+    }>
+  | Readonly<{ ok: false; refusal: SpeedRefusal }>
+
+/**
+ * Rate Stretch uses the exact same speed planner as the panel. The only new
+ * input is a wanted on-screen duration; the canonical rate remains a reduced
+ * rational and the returned operation is still `set-clip-time-transform`.
+ */
+export const planRateStretch = (
+  input: Omit<SpeedPlanInput, 'rate'> & Readonly<{ targetDurationTicks: number }>,
+): RateStretchPlan => {
+  if (input.clipId === null) return Object.freeze({
+    ok: false as const,
+    refusal: Object.freeze({ code: 'NOTHING_PICKED' as const, message: 'Pick a piece of the main video first.' }),
+  })
+  const clip = findClip(input.composition, input.clipId)
+  if (!clip) return Object.freeze({
+    ok: false as const,
+    refusal: Object.freeze({
+      code: 'NOT_A_PIECE_OF_FOOTAGE' as const,
+      message: 'Rate Stretch works on pieces of the main video.',
+    }),
+  })
+  const fitted = rateForTargetDuration(clip, input.targetDurationTicks)
+  if (!fitted.ok) return fitted
+  const planned = planSpeedChange({ ...input, rate: fitted.rate })
+  if (!planned.ok) return Object.freeze({ ok: false as const, refusal: planned.refusal })
+  return Object.freeze({
+    ...planned,
+    feedback: Object.freeze({
+      ...planned.feedback,
+      targetDurationTicks: input.targetDurationTicks,
+      approximationErrorTicks: planned.feedback.nextDurationTicks - input.targetDurationTicks,
+    }),
+    description: `Rate stretched a piece to ${formatPlaybackRate(fitted.rate)}`,
+  })
+}
+
+export const previewRateStretch = (
+  input: Omit<SpeedPlanInput, 'rate'> & Readonly<{ targetDurationTicks: number }>,
+): Readonly<{ ok: true; feedback: RateStretchFeedback }> | Readonly<{ ok: false; refusal: SpeedRefusal }> => {
+  const plan = planRateStretch(input)
+  return plan.ok
+    ? Object.freeze({ ok: true as const, feedback: plan.feedback })
+    : Object.freeze({ ok: false as const, refusal: plan.refusal })
+}
+
 /**
  * Turn something a person typed — "1.5", "150%", "2x" — into a fraction.
  *

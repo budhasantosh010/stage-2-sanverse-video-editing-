@@ -18,7 +18,9 @@ import type { CommandInvocation, CommandResult } from '../process/command-runner
 import type { ProjectRepository } from '../projects/project-repository.ts'
 import { AnalysisError, type AnalysisRequest } from './analysis-request.ts'
 import {
+  AUDIO_NORMALIZATION_SCHEMA_VERSION,
   createMediaAnalysisService,
+  parseLoudnormMeasurement,
   peaksFromPcm,
   WAVEFORM_SAMPLE_RATE,
 } from './media-analysis-service.ts'
@@ -67,6 +69,7 @@ type Harness = Readonly<{
 const harness = async (options: Readonly<{
   bytes?: (invocation: CommandInvocation) => Buffer
   exitCode?: number
+  stderr?: string
   project?: EditProject
   missingAsset?: boolean
   onRun?: (invocation: CommandInvocation) => Promise<void>
@@ -88,10 +91,10 @@ const harness = async (options: Readonly<{
     invocations.push(invocation)
     await options.onRun?.(invocation)
     const exitCode = options.exitCode ?? 0
-    if (exitCode === 0) {
+    if (exitCode === 0 && outputPath(invocation) !== '-') {
       await writeFile(outputPath(invocation), options.bytes?.(invocation) ?? Buffer.from('WEBPfake'))
     }
-    return { exitCode, stdout: '', stderr: '' }
+    return { exitCode, stdout: '', stderr: options.stderr ?? '' }
   }
 
   const project = options.project ?? projectWithEverything()
@@ -127,6 +130,28 @@ const waveform = (overrides: Partial<Extract<AnalysisRequest, { kind: 'waveform-
     peakCount: 64,
     ...overrides,
   })
+
+const normalization = (overrides: Partial<Extract<AnalysisRequest, { kind: 'audio-normalization' }>> = {}): AnalysisRequest =>
+  Object.freeze({
+    kind: 'audio-normalization' as const,
+    assetId: TEST_MUSIC_ASSET_ID,
+    assetVersion: 'd'.repeat(16),
+    sourceStartTicks: 3 * T,
+    sourceEndTicks: 8 * T,
+    ...overrides,
+  })
+
+const loudnormStderr = (overrides: Partial<Record<'input_i' | 'input_lra' | 'input_tp', string>> = {}): string => `
+[Parsed_loudnorm_0 @ 0001]
+{
+  "input_i" : "${overrides.input_i ?? '-23.20'}",
+  "input_tp" : "${overrides.input_tp ?? '-7.50'}",
+  "input_lra" : "${overrides.input_lra ?? '4.10'}",
+  "input_thresh" : "-33.20",
+  "output_i" : "-16.01",
+  "target_offset" : "0.01"
+}
+`
 
 const refusal = async (run: () => Promise<unknown>): Promise<string> => {
   try { await run() } catch (error) {
@@ -358,6 +383,75 @@ describe('measuring a stretch of sound', () => {
       projectId: TEST_PROJECT_ID,
       request: waveform({ sourceTicks: 120 * T }),
     }))).toBe('SOURCE_TIME_OUT_OF_RANGE')
+  })
+})
+
+describe('measuring real loudness for normalization', () => {
+  it('reads the final loudnorm JSON object and refuses incomplete measurements', () => {
+    expect(parseLoudnormMeasurement(`noise {"other":1}\n${loudnormStderr()}`)).toEqual({
+      integratedLufs: -23.2,
+      loudnessRangeLufs: 4.1,
+      truePeakDb: -7.5,
+    })
+    expect(parseLoudnormMeasurement('{"input_i":"-23"}')).toBeNull()
+    expect(parseLoudnormMeasurement('not json')).toBeNull()
+  })
+
+  it('streams only the chosen source interval and returns reviewable evidence', async () => {
+    const { service, invocations } = await harness({ stderr: loudnormStderr() })
+    const artifact = await service.produce({ projectId: TEST_PROJECT_ID, request: normalization() })
+    const args = invocations[0].args
+    expect(args[args.indexOf('-ss') + 1]).toBe('3.000000000')
+    expect(args[args.indexOf('-t') + 1]).toBe('5.000000000')
+    expect(args.join(' ')).toContain('loudnorm=I=-16:LRA=11:TP=-1:print_format=json')
+    expect(args.slice(-2)).toEqual(['null', '-'])
+
+    const body = JSON.parse(artifact.bytes.toString('utf8'))
+    expect(body).toEqual({
+      schemaVersion: AUDIO_NORMALIZATION_SCHEMA_VERSION,
+      assetId: TEST_MUSIC_ASSET_ID,
+      assetVersion: 'd'.repeat(16),
+      sourceStartTicks: 3 * T,
+      sourceEndTicks: 8 * T,
+      analysisVersion: 'ffmpeg-loudnorm-v1',
+      integratedLufs: -23.2,
+      loudnessRangeLufs: 4.1,
+      truePeakDb: -7.5,
+      recommendedGainDb: 6.5,
+      targetIntegratedLufs: -16,
+      targetTruePeakDb: -1,
+    })
+  })
+
+  it('uses the true-peak ceiling when loudness alone would clip', async () => {
+    const { service } = await harness({
+      stderr: loudnormStderr({ input_i: '-30.00', input_tp: '-2.00' }),
+    })
+    const artifact = await service.produce({ projectId: TEST_PROJECT_ID, request: normalization() })
+    expect(JSON.parse(artifact.bytes.toString('utf8')).recommendedGainDb).toBe(1)
+  })
+
+  it('caches exact evidence and does not run the decoder twice', async () => {
+    const { service, invocations } = await harness({ stderr: loudnormStderr() })
+    await service.produce({ projectId: TEST_PROJECT_ID, request: normalization() })
+    await service.produce({ projectId: TEST_PROJECT_ID, request: normalization() })
+    expect(invocations).toHaveLength(1)
+  })
+
+  it('refuses silence or an unreadable measurement without inventing a gain', async () => {
+    const silent = await harness({
+      stderr: loudnormStderr({ input_i: '-80.00', input_tp: '-80.00', input_lra: '0.00' }),
+    })
+    expect(await refusal(() => silent.service.produce({
+      projectId: TEST_PROJECT_ID,
+      request: normalization(),
+    }))).toBe('AUDIO_SILENT')
+
+    const broken = await harness({ stderr: 'no loudnorm json' })
+    expect(await refusal(() => broken.service.produce({
+      projectId: TEST_PROJECT_ID,
+      request: normalization(),
+    }))).toBe('AUDIO_SILENT')
   })
 })
 

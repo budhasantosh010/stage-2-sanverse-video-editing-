@@ -93,6 +93,7 @@ export type TimelineItemAction =
   | Readonly<{ type: 'trim-start'; toStartTicks: number }>
   | Readonly<{ type: 'trim-end'; toEndTicks: number }>
   | Readonly<{ type: 'split'; atTicks: number }>
+  | Readonly<{ type: 'set-audio'; gainDb: number; fadeInTicks: number; fadeOutTicks: number }>
   | Readonly<{ type: 'delete'; ripple: boolean }>
 
 /** The smallest a thing on the timeline may become. Below this it cannot be grabbed again. */
@@ -473,6 +474,25 @@ const planMusicAction = (
     ], 'Trim music')
   }
 
+  if (action.type === 'set-audio') {
+    const gainDb = Number(action.gainDb)
+    const fadeInTicks = Math.max(0, Math.round(action.fadeInTicks))
+    const fadeOutTicks = Math.max(0, Math.round(action.fadeOutTicks))
+    if (!Number.isFinite(gainDb) || gainDb < -60 || gainDb > 12) {
+      return refuse('OUT_OF_RANGE', 'Choose a loudness between -60 and 12 dB.')
+    }
+    if (fadeInTicks + fadeOutTicks > mine.durationTicks) {
+      return refuse('OUT_OF_RANGE', 'The fades cannot be longer than this music clip.')
+    }
+    return validateAll([
+      setMusic(current, {
+        gainDb,
+        fadeIn: time(fadeInTicks),
+        fadeOut: time(fadeOutTicks),
+      }, input.ids.operation(0)),
+    ], 'Adjust music audio')
+  }
+
   if (action.type === 'trim-end') {
     const end = Math.round(action.toEndTicks)
     const length = end - mine.startTicks
@@ -530,6 +550,10 @@ const planMediaOverlayAction = (
   if (!mine) return refuse('ITEM_UNKNOWN', 'That clip is no longer on the timeline.')
 
   const composition = effectiveComposition(project)
+
+  if (action.type === 'set-audio') {
+    return refuse('OPERATION_UNSUPPORTED', 'This overlay has no editable audio on the current V2 lane.')
+  }
 
   /**
    * Turn a wanted finished-video span into the source span that produces it.

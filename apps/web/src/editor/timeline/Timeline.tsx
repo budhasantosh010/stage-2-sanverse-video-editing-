@@ -73,6 +73,7 @@ import { timelinePointerToTicks } from './timeline-ruler-model'
 import { snapTimelineTicks, timelineSnapCandidates, type TimelineSnapResult } from './timeline-snap'
 import { TimelineToolbar, type TimelineTool, type TimelineToolbarAction } from './TimelineToolbar'
 import { TimelineSpeedPanel } from './TimelineSpeedPanel'
+import type { RateStretchPreview } from './TimelineRateStretchHandle'
 import { NORMAL_PLAYBACK_RATE, type RationalPlaybackRateV1 } from '@sanverse/edit-domain/clip-time'
 import './Timeline.css'
 
@@ -133,6 +134,8 @@ export type TimelineProps = Readonly<{
   /** One sentence describing what a speed would do. Comes from the one planner. */
   onSpeedPreview(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean): string
   onSpeedChoose(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean): void
+  onRateStretchPreview?(targetDurationTicks: number): RateStretchPreview
+  onRateStretchCommit?(targetDurationTicks: number): void
   onSelectMarker(markerId: string | null): void
   onMoveMarker(markerId: string, toStartTicks: number): void
   onDeleteMarker(markerId: string): void
@@ -161,6 +164,11 @@ const isTypingTarget = (target: EventTarget | null): boolean => {
 const FRAME_TICKS = 48_000
 const DEFAULT_VERTICAL_ZOOM = createVerticalZoom(DEFAULT_VERTICAL_ZOOM_BASIS_POINTS)
 const IGNORE_VERTICAL_ZOOM = (_state: TimelineVerticalZoomV1): void => undefined
+const NO_RATE_STRETCH_PREVIEW = (_targetDurationTicks: number): RateStretchPreview => Object.freeze({
+  ok: false,
+  message: 'Rate Stretch is unavailable for this selection.',
+})
+const IGNORE_RATE_STRETCH = (_targetDurationTicks: number): void => undefined
 
 /** A stable empty object, so a project without files does not remount every lane. */
 const EMPTY_ASSET_FACTS: Readonly<Record<string, AssetFacts>> = Object.freeze({})
@@ -207,6 +215,8 @@ export function Timeline({
   speedSubject,
   onSpeedPreview,
   onSpeedChoose,
+  onRateStretchPreview = NO_RATE_STRETCH_PREVIEW,
+  onRateStretchCommit = IGNORE_RATE_STRETCH,
   onSelectMarker,
   onMoveMarker,
   onDeleteMarker,
@@ -234,6 +244,7 @@ export function Timeline({
    * revision, nothing saved. Same reasoning as the More menu.
    */
   const [speedPanelOpen, setSpeedPanelOpen] = useState(false)
+  const [rateStretchActive, setRateStretchActive] = useState(false)
 
   useEffect(() => () => {
     if (horizontalZoomFrameRef.current !== null) cancelAnimationFrame(horizontalZoomFrameRef.current)
@@ -938,6 +949,8 @@ export function Timeline({
         sourceDurationTicks={speedSubject?.sourceDurationTicks ?? 0}
         timescale={model.timescale}
         busy={busy}
+        rateStretchActive={rateStretchActive}
+        onRateStretchActive={setRateStretchActive}
         previewFor={onSpeedPreview}
         onChoose={(rate, keepPitch) => {
           onSpeedChoose(rate, keepPitch)
@@ -1073,6 +1086,7 @@ export function Timeline({
                 <TimelineLane
                   key={lane.id}
                   lane={lane}
+                  projectId={model.projectId}
                   assetFacts={assetFacts ?? EMPTY_ASSET_FACTS}
                   muted={trackOutputs[trackIdForLane(lane.id)] === false}
                   layoutWidthPx={windowWidthPx}
@@ -1090,6 +1104,9 @@ export function Timeline({
                   visibleRange={visibleRange}
                   overscanTicks={overscanTicks}
                   busy={busy}
+                  rateStretchActive={rateStretchActive && soleSelectedId !== null && lane.kind === 'video'}
+                  onRateStretchPreview={onRateStretchPreview}
+                  onRateStretchCommit={onRateStretchCommit}
                   pointerTicks={pointerTicks}
                   pointerTime={pointerTime}
                   onSnapGuide={setSnapGuideTicks}

@@ -7,12 +7,14 @@ import {
   type TimelineItemView,
   type TimelineLaneKind,
 } from '../../features/timeline'
-import type { ClipDerivedMedia } from '../../features/media-analysis'
+import type { AudioNormalizationRequestV1, ClipDerivedMedia } from '../../features/media-analysis'
 import { formatTimelineTime } from './timeline-ruler-model'
 import type { TimelineSnapResult } from './timeline-snap'
 import { TimelineTrimHandle } from './TimelineTrimHandle'
 import { TimelineFilmstrip } from './TimelineFilmstrip'
 import { TimelineWaveform } from './TimelineWaveform'
+import { TimelineRateStretchHandle, type RateStretchPreview } from './TimelineRateStretchHandle'
+import { TimelineAudioDirectControls, type TimelineAudioState } from './TimelineAudioDirectControls'
 
 export type TimelineItemProps = Readonly<{
   item: TimelineItemView
@@ -26,6 +28,10 @@ export type TimelineItemProps = Readonly<{
   timescale: number
   pixelsPerSecond: number
   busy: boolean
+  rateStretchActive: boolean
+  onRateStretchPreview(targetDurationTicks: number): RateStretchPreview
+  onRateStretchCommit(targetDurationTicks: number): void
+  normalization: Readonly<{ projectId: string; request: AudioNormalizationRequestV1 }> | null
   pointerTicks(clientX: number): number
   pointerTime(clientX: number, excludedTicks?: readonly number[], bypassSnapping?: boolean): TimelineSnapResult
   onSnapGuide(ticks: number | null): void
@@ -113,6 +119,10 @@ export function TimelineItem({
   timescale,
   pixelsPerSecond,
   busy,
+  rateStretchActive,
+  onRateStretchPreview,
+  onRateStretchCommit,
+  normalization,
   pointerTicks,
   pointerTime,
   onSnapGuide,
@@ -124,6 +134,10 @@ export function TimelineItem({
   onContextMenu,
 }: TimelineItemProps) {
   const [trimPreview, setTrimPreview] = useState<Readonly<{ edge: 'start' | 'end'; deltaTicks: number }> | null>(null)
+  const [rateStretchDraft, setRateStretchDraft] = useState<Readonly<{
+    targetDurationTicks: number
+    preview: RateStretchPreview
+  }> | null>(null)
   /**
    * Whether the pictures or the sound shape arrived.
    *
@@ -152,16 +166,30 @@ export function TimelineItem({
   const previewStartTicks = trimPreview?.edge === 'start'
     ? item.startTicks + trimPreview.deltaTicks
     : item.startTicks
-  const previewDurationTicks = trimPreview
-    ? item.durationTicks - trimPreview.deltaTicks
-    : item.durationTicks
+  const previewDurationTicks = rateStretchDraft
+    ? rateStretchDraft.targetDurationTicks
+    : trimPreview
+      ? item.durationTicks - trimPreview.deltaTicks
+      : item.durationTicks
   const leftPx = trimPreview?.edge === 'start'
     ? ticksToPixels(previewStartTicks, timescale, pixelsPerSecond)
     : canonicalLeftPx
   const widthPx = ticksToPixels(previewDurationTicks, timescale, pixelsPerSecond)
   const isOverlayFamily = DRAGGABLE_KINDS.includes(item.kind)
-  const canTrim = item.state === 'committed' && item.selected
+  const canTrim = !rateStretchActive && item.state === 'committed' && item.selected
     && ((item.kind === 'clip' && item.clipId !== null) || isOverlayFamily)
+  const canRateStretch = rateStretchActive
+    && item.state === 'committed'
+    && item.selected
+    && item.kind === 'clip'
+    && item.clipId !== null
+  const canDirectAudio = item.state === 'committed'
+    && item.selected
+    && (laneKind === 'dialogue' || laneKind === 'music')
+    && item.gainDb !== null
+    && item.fadeInTicks !== null
+    && item.fadeOutTicks !== null
+    && (laneKind === 'music' || item.pan !== null)
   const canDragBody = isOverlayFamily && item.state === 'committed' && !busy
 
   const selectAndSeek = (event?: MouseEvent<HTMLButtonElement>) => {
@@ -242,6 +270,7 @@ export function TimelineItem({
       className={[
         'timeline-v1__item-shell',
         trimPreview ? 'timeline-v1__item-shell--trimming' : '',
+        rateStretchDraft ? 'timeline-v1__item-shell--rate-stretching' : '',
         dragOffsetTicks !== null ? 'timeline-v1__item-shell--dragging' : '',
       ].filter(Boolean).join(' ')}
       style={{ left: `${ghostLeftPx}px`, width: `${Math.max(2, widthPx)}px` }}
@@ -352,6 +381,60 @@ export function TimelineItem({
         ) : null}
       </button>
 
+      {canRateStretch ? (
+        <TimelineRateStretchHandle
+          itemStartTicks={item.startTicks}
+          itemDurationTicks={item.durationTicks}
+          disabled={busy}
+          pointerTime={pointerTime}
+          previewFor={onRateStretchPreview}
+          onSnapGuide={onSnapGuide}
+          onDraft={(targetDurationTicks, preview) => {
+            setRateStretchDraft(targetDurationTicks === null || preview === null
+              ? null
+              : Object.freeze({ targetDurationTicks, preview }))
+          }}
+          onCommit={onRateStretchCommit}
+        />
+      ) : null}
+
+      {canDirectAudio ? (
+        <TimelineAudioDirectControls
+          accepted={Object.freeze({
+            gainDb: item.gainDb as number,
+            fadeInTicks: item.fadeInTicks as number,
+            fadeOutTicks: item.fadeOutTicks as number,
+            pan: item.pan ?? 0,
+          })}
+          durationTicks={item.durationTicks}
+          disabled={busy}
+          muted={muted || !item.enabled}
+          supportsPan={laneKind === 'dialogue'}
+          normalization={normalization}
+          onCommit={(next: TimelineAudioState) => {
+            if (laneKind === 'dialogue' && item.linkedClipId !== null) {
+              onGesture({
+                type: 'set-audio',
+                clipId: item.linkedClipId,
+                gainDb: next.gainDb,
+                fadeInTicks: next.fadeInTicks,
+                fadeOutTicks: next.fadeOutTicks,
+                pan: next.pan,
+              })
+              return
+            }
+            if (laneKind === 'music') {
+              onItemAction(item.id, {
+                type: 'set-audio',
+                gainDb: next.gainDb,
+                fadeInTicks: next.fadeInTicks,
+                fadeOutTicks: next.fadeOutTicks,
+              })
+            }
+          }}
+        />
+      ) : null}
+
       {canTrim ? (
         <>
           <TimelineTrimHandle
@@ -395,6 +478,11 @@ export function TimelineItem({
       {trimPreview ? (
         <output className="timeline-v1__trim-tooltip" aria-live="polite">
           Start {formatTimelineTime(previewStartTicks, timescale, true)} · Duration {formatTimelineTime(previewDurationTicks, timescale, true)}
+        </output>
+      ) : null}
+      {rateStretchDraft ? (
+        <output className={`timeline-v1__trim-tooltip timeline-v1__rate-stretch-tooltip${rateStretchDraft.preview.ok ? '' : ' timeline-v1__rate-stretch-tooltip--refused'}`} aria-live="polite">
+          {rateStretchDraft.preview.message}
         </output>
       ) : null}
     </div>

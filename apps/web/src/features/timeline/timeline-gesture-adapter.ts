@@ -36,6 +36,7 @@ export type TimelineGesture =
       gainDb: number
       fadeInTicks: number
       fadeOutTicks: number
+      pan?: number
     }>
 
 export type TimelineGestureRefusalCode =
@@ -240,6 +241,7 @@ export const adaptTimelineGesture = (
           gesture.fadeInTicks,
           gesture.fadeOutTicks,
           input.createOperationId,
+          gesture.pan,
         )
         break
       default: {

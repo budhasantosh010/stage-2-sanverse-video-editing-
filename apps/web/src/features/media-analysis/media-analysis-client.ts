@@ -69,6 +69,17 @@ export const analysisRequestUrl = (projectId: string, key: MediaAnalysisKeyV1): 
   return `${base}/waveform?${shared}&sourceTicks=${key.sourceTicks}&spanTicks=${key.spanTicks}&peakCount=${key.resolution}`
 }
 
+export const normalizationRequestUrl = (
+  projectId: string,
+  request: AudioNormalizationRequestV1,
+): string => {
+  const base = `/api/projects/${encodeURIComponent(projectId)}/media-analysis/normalization`
+  return `${base}?assetId=${encodeURIComponent(request.assetId)}`
+    + `&assetVersion=${encodeURIComponent(request.assetVersion)}`
+    + `&sourceStartTicks=${request.sourceStartTicks}`
+    + `&sourceEndTicks=${request.sourceEndTicks}`
+}
+
 export class AnalysisRefusalError extends Error {
   readonly refusal: AnalysisRefusal
   constructor(refusal: AnalysisRefusal) {
@@ -89,9 +100,38 @@ export type ImageDecoder = (blob: Blob) => Promise<ImageBitmap>
 
 export const defaultImageDecoder: ImageDecoder = (blob) => createImageBitmap(blob)
 
+export const AUDIO_NORMALIZATION_SCHEMA_VERSION = 'sanverse.audio-normalization-evidence/v1' as const
+
+export type AudioNormalizationEvidenceV1 = Readonly<{
+  schemaVersion: typeof AUDIO_NORMALIZATION_SCHEMA_VERSION
+  assetId: string
+  assetVersion: string
+  sourceStartTicks: number
+  sourceEndTicks: number
+  analysisVersion: string
+  integratedLufs: number
+  loudnessRangeLufs: number
+  truePeakDb: number
+  recommendedGainDb: number
+  targetIntegratedLufs: number
+  targetTruePeakDb: number
+}>
+
+export type AudioNormalizationRequestV1 = Readonly<{
+  assetId: string
+  assetVersion: string
+  sourceStartTicks: number
+  sourceEndTicks: number
+}>
+
 export type MediaAnalysisClient = Readonly<{
   picture(projectId: string, key: MediaAnalysisKeyV1, signal: AbortSignal): Promise<ImageBitmap>
   peaks(projectId: string, key: MediaAnalysisKeyV1, signal: AbortSignal): Promise<readonly number[]>
+  normalization?(
+    projectId: string,
+    request: AudioNormalizationRequestV1,
+    signal: AbortSignal,
+  ): Promise<AudioNormalizationEvidenceV1>
 }>
 
 type Fetcher = (input: string, init: { signal: AbortSignal }) => Promise<Response>
@@ -148,6 +188,26 @@ export const createMediaAnalysisClient = (options: Readonly<{
       }
       return parsed
     },
+
+    async normalization(projectId, request, signal) {
+      const response = await fetchImpl(normalizationRequestUrl(projectId, request), { signal })
+      if (!response.ok) throw new AnalysisRefusalError(await refusalFrom(response))
+      const body: unknown = await response.json()
+      const parsed = parseAudioNormalizationEvidence(body)
+      if (
+        parsed === null ||
+        parsed.assetId !== request.assetId ||
+        parsed.assetVersion !== request.assetVersion ||
+        parsed.sourceStartTicks !== request.sourceStartTicks ||
+        parsed.sourceEndTicks !== request.sourceEndTicks
+      ) {
+        throw new AnalysisRefusalError(Object.freeze({
+          code: 'ANALYSIS_CACHE_CORRUPT',
+          message: 'The loudness measurement came back in a form this editor does not understand.',
+        }))
+      }
+      return parsed
+    },
   })
 }
 
@@ -170,6 +230,39 @@ export const parseWaveformBlock = (value: unknown): readonly number[] | null => 
     peaks.push(entry)
   }
   return Object.freeze(peaks)
+}
+
+export const parseAudioNormalizationEvidence = (value: unknown): AudioNormalizationEvidenceV1 | null => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
+  const record = value as Record<string, unknown>
+  const expectedKeys = [
+    'schemaVersion', 'assetId', 'assetVersion', 'sourceStartTicks', 'sourceEndTicks',
+    'analysisVersion', 'integratedLufs', 'loudnessRangeLufs', 'truePeakDb',
+    'recommendedGainDb', 'targetIntegratedLufs', 'targetTruePeakDb',
+  ] as const
+  const keys = Object.keys(record)
+  if (keys.length !== expectedKeys.length || keys.some((key) => !expectedKeys.includes(key as typeof expectedKeys[number]))) return null
+  if (record.schemaVersion !== AUDIO_NORMALIZATION_SCHEMA_VERSION) return null
+  if (typeof record.assetId !== 'string' || typeof record.assetVersion !== 'string' || typeof record.analysisVersion !== 'string') return null
+  if (!Number.isSafeInteger(record.sourceStartTicks) || !Number.isSafeInteger(record.sourceEndTicks)) return null
+  if ((record.sourceStartTicks as number) < 0 || (record.sourceEndTicks as number) <= (record.sourceStartTicks as number)) return null
+  const finite = (entry: unknown): entry is number => typeof entry === 'number' && Number.isFinite(entry)
+  if (!finite(record.integratedLufs) || !finite(record.loudnessRangeLufs)) return null
+  if (!finite(record.truePeakDb) || !finite(record.recommendedGainDb) || !finite(record.targetIntegratedLufs) || !finite(record.targetTruePeakDb)) return null
+  return Object.freeze({
+    schemaVersion: AUDIO_NORMALIZATION_SCHEMA_VERSION,
+    assetId: record.assetId,
+    assetVersion: record.assetVersion,
+    sourceStartTicks: record.sourceStartTicks as number,
+    sourceEndTicks: record.sourceEndTicks as number,
+    analysisVersion: record.analysisVersion,
+    integratedLufs: record.integratedLufs,
+    loudnessRangeLufs: record.loudnessRangeLufs,
+    truePeakDb: record.truePeakDb,
+    recommendedGainDb: record.recommendedGainDb,
+    targetIntegratedLufs: record.targetIntegratedLufs,
+    targetTruePeakDb: record.targetTruePeakDb,
+  })
 }
 
 /** Kept beside the client so the two things that must agree sit together. */

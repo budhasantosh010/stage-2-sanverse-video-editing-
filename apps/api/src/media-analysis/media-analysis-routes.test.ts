@@ -8,7 +8,7 @@ import { AnalysisError, type AnalysisRequest } from './analysis-request.ts'
 import type { MediaAnalysisService } from './media-analysis-service.ts'
 
 /**
- * Gate D — the three addresses the browser asks for preview pictures at.
+ * Gate D/T2 — the bounded addresses the browser asks for derived media at.
  *
  * The maker of pictures is replaced here, because what is under test is the
  * ROUTE: what it accepts, what it refuses, what it puts in the headers, and
@@ -86,7 +86,7 @@ describe('asking for a preview picture', () => {
     expect(String(response.headers['cache-control'])).toContain('private')
   })
 
-  it('routes the sound shape and the picture to their own kinds', async () => {
+  it('routes waveform, picture, and normalization requests to their own closed kinds', async () => {
     const kinds: string[] = []
     const port = await start(stubService(async ({ request: analysisRequest }) => {
       kinds.push(analysisRequest.kind)
@@ -94,7 +94,8 @@ describe('asking for a preview picture', () => {
     }))
     await call(port, `/api/projects/${PROJECT}/media-analysis/waveform?${VALID}&sourceTicks=0&spanTicks=1440000&peakCount=64`)
     await call(port, `/api/projects/${PROJECT}/media-analysis/image-thumbnail?${VALID}&width=64&height=64`)
-    expect(kinds).toEqual(['waveform-block', 'image-thumbnail'])
+    await call(port, `/api/projects/${PROJECT}/media-analysis/normalization?${VALID}&sourceStartTicks=0&sourceEndTicks=1440000`)
+    expect(kinds).toEqual(['waveform-block', 'image-thumbnail', 'audio-normalization'])
   })
 })
 

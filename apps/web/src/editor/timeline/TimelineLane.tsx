@@ -18,15 +18,18 @@ import {
   clipDerivedMedia,
   derivedMediaClipFor,
   type AssetFacts,
+  type AudioNormalizationRequestV1,
   type ClipDerivedMedia,
 } from '../../features/media-analysis'
 import { TimelineItem } from './TimelineItem'
 import { decorationHeightPx, laneDensity, laneHeightPx } from './timeline-lane-metrics'
 import type { TimelineSnapResult } from './timeline-snap'
+import type { RateStretchPreview } from './TimelineRateStretchHandle'
 
 const NO_MEDIA: ClipDerivedMedia = Object.freeze({ kind: 'none' as const })
 
 export type TimelineLaneProps = Readonly<{
+  projectId: string
   /** What each file is and which bytes it holds. Never a path, never a URL. */
   assetFacts: Readonly<Record<string, AssetFacts>>
   /** True when this row has been silenced, so its shape is drawn faintly. */
@@ -47,6 +50,9 @@ export type TimelineLaneProps = Readonly<{
   visibleRange: VisibleTickRange
   overscanTicks: number
   busy: boolean
+  rateStretchActive: boolean
+  onRateStretchPreview(targetDurationTicks: number): RateStretchPreview
+  onRateStretchCommit(targetDurationTicks: number): void
   pointerTicks(clientX: number): number
   pointerTime(clientX: number, excludedTicks?: readonly number[], bypassSnapping?: boolean): TimelineSnapResult
   onSnapGuide(ticks: number | null): void
@@ -61,6 +67,7 @@ export type TimelineLaneProps = Readonly<{
 
 export function TimelineLane({
   lane,
+  projectId,
   assetFacts,
   muted,
   layoutWidthPx,
@@ -73,6 +80,9 @@ export function TimelineLane({
   visibleRange,
   overscanTicks,
   busy,
+  rateStretchActive,
+  onRateStretchPreview,
+  onRateStretchCommit,
   pointerTicks,
   pointerTime,
   onSnapGuide,
@@ -127,6 +137,29 @@ export function TimelineLane({
     })
   }
 
+  const normalizationFor = (
+    item: TimelineItemView,
+  ): Readonly<{ projectId: string; request: AudioNormalizationRequestV1 }> | null => {
+    if (
+      (lane.kind !== 'dialogue' && lane.kind !== 'music') ||
+      item.assetId === null ||
+      item.sourceStartTicks === null ||
+      item.sourceDurationTicks === null ||
+      item.sourceDurationTicks <= 0
+    ) return null
+    const facts = assetFacts[item.assetId]
+    if (!facts?.hasAudio) return null
+    return Object.freeze({
+      projectId,
+      request: Object.freeze({
+        assetId: item.assetId,
+        assetVersion: facts.assetVersion,
+        sourceStartTicks: item.sourceStartTicks,
+        sourceEndTicks: item.sourceStartTicks + item.sourceDurationTicks,
+      }),
+    })
+  }
+
   return (
     <div
       className={`timeline-v1__lane timeline-v1__lane--${lane.kind}`}
@@ -172,6 +205,10 @@ export function TimelineLane({
           timescale={timescale}
           pixelsPerSecond={viewport.pixelsPerSecond}
           busy={busy}
+          rateStretchActive={rateStretchActive}
+          onRateStretchPreview={onRateStretchPreview}
+          onRateStretchCommit={onRateStretchCommit}
+          normalization={normalizationFor(item)}
           pointerTicks={pointerTicks}
           pointerTime={pointerTime}
           onSnapGuide={onSnapGuide}

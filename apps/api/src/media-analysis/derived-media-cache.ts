@@ -49,12 +49,13 @@ import { AnalysisError, type AnalysisRequest, analysisCacheName } from './analys
 
 export const DERIVED_MEDIA_DIRECTORY = join('derived-media', 'v1')
 
-export type DerivedMediaKindFolder = 'frames' | 'images' | 'waveforms'
+export type DerivedMediaKindFolder = 'frames' | 'images' | 'waveforms' | 'analysis'
 
 const FOLDER_BY_KIND: Readonly<Record<AnalysisRequest['kind'], DerivedMediaKindFolder>> = Object.freeze({
   'filmstrip-frame': 'frames',
   'image-thumbnail': 'images',
   'waveform-block': 'waveforms',
+  'audio-normalization': 'analysis',
 })
 
 export type DerivedMediaCacheOptions = Readonly<{
@@ -152,7 +153,7 @@ export const createDerivedMediaCache = (
   return Object.freeze({
     async read(projectId, request) {
       const directory = await folderFor(projectId, request)
-      const extension = request.kind === 'waveform-block' ? '.json' : '.webp'
+      const extension = request.kind === 'waveform-block' || request.kind === 'audio-normalization' ? '.json' : '.webp'
       const path = join(directory, `${analysisCacheName(request)}${extension}`)
       let handle
       try {
@@ -170,7 +171,7 @@ export const createDerivedMediaCache = (
           await rm(path, { force: true }).catch(() => undefined)
           return null
         }
-        if (request.kind === 'waveform-block') {
+        if (request.kind === 'waveform-block' || request.kind === 'audio-normalization') {
           // Numbers that no longer parse are corruption, not an answer.
           try { JSON.parse(bytes.toString('utf8')) }
           catch {
@@ -183,7 +184,9 @@ export const createDerivedMediaCache = (
         await utimes(path, now, now).catch(() => undefined)
         return Object.freeze({
           bytes,
-          contentType: request.kind === 'waveform-block' ? 'application/json; charset=utf-8' : 'image/webp',
+          contentType: request.kind === 'waveform-block' || request.kind === 'audio-normalization'
+            ? 'application/json; charset=utf-8'
+            : 'image/webp',
         })
       } catch (error) {
         if (error instanceof AnalysisError) throw error
@@ -196,7 +199,7 @@ export const createDerivedMediaCache = (
     async write(projectId, request, artifact) {
       if (artifact.bytes.byteLength <= 0 || artifact.bytes.byteLength > MAX_ARTIFACT_BYTES) return
       const directory = await folderFor(projectId, request)
-      const extension = request.kind === 'waveform-block' ? '.json' : '.webp'
+      const extension = request.kind === 'waveform-block' || request.kind === 'audio-normalization' ? '.json' : '.webp'
       const finalPath = join(directory, `${analysisCacheName(request)}${extension}`)
       const temporaryPath = join(directory, `.tmp-${randomBytes(12).toString('hex')}`)
       let handle

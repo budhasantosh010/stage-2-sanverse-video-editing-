@@ -55,6 +55,8 @@ export type TimelineSpeedPanelProps = Readonly<{
   sourceDurationTicks: number
   timescale: number
   busy: boolean
+  rateStretchActive?: boolean
+  onRateStretchActive?(active: boolean): void
   /** What will happen if this speed is chosen, straight from the planner. */
   previewFor(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean): string
   onChoose(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean): void
@@ -73,6 +75,8 @@ export function TimelineSpeedPanel({
   sourceDurationTicks,
   timescale,
   busy,
+  rateStretchActive = false,
+  onRateStretchActive = () => undefined,
   previewFor,
   onChoose,
   onClose,
@@ -157,6 +161,19 @@ export function TimelineSpeedPanel({
             Anything from {SLOWEST_LABEL} to {FASTEST_LABEL}.
           </p>
           {typedError !== null ? <p className="timeline-speed__error">{typedError}</p> : null}
+
+          <label className="timeline-speed__switch">
+            <input
+              type="checkbox"
+              checked={rateStretchActive}
+              disabled={busy}
+              onChange={(event) => onRateStretchActive(event.target.checked)}
+            />
+            <span>
+              Rate Stretch tool
+              <small>Drag the striped end handle to choose a duration. Sanverse derives the exact rational speed.</small>
+            </span>
+          </label>
 
           <label className="timeline-speed__switch">
             <input

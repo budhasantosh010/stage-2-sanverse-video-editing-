@@ -8,7 +8,9 @@ import {
   clipIsAtRate,
   isAtNormalSpeed,
   parseTypedSpeed,
+  planRateStretch,
   planSpeedChange,
+  previewRateStretch,
   previewSpeedChange,
   rateForTargetDuration,
   type SpeedPlanInput,
@@ -235,6 +237,42 @@ describe('dragging the end of a piece to choose its length', () => {
     const tooSlow = rateForTargetDuration(first(), 200 * S)
     expect(tooSlow.ok).toBe(false)
     if (!tooSlow.ok) expect(tooSlow.refusal.code).toBe('TOO_SLOW')
+  })
+
+  it('commits the same rational operation the speed panel would use', () => {
+    const stretched = planRateStretch({
+      ...input(),
+      targetDurationTicks: 5 * S,
+    })
+    expect(stretched.ok).toBe(true)
+    if (!stretched.ok) return
+    expect(stretched.operations).toHaveLength(1)
+    expect(stretched.feedback.rate).toEqual(rate(2, 1))
+    expect(stretched.feedback.targetDurationTicks).toBe(5 * S)
+    expect(stretched.feedback.approximationErrorTicks).toBe(0)
+    expect(stretched.operations[0]).toMatchObject({
+      kind: 'set-clip-time-transform',
+      playbackRate: rate(2, 1),
+    })
+  })
+
+  it('uses one planner for the pointer ghost and the committed edit', () => {
+    const shared = { ...input(), targetDurationTicks: 7 * S }
+    const ghost = previewRateStretch(shared)
+    const edit = planRateStretch(shared)
+    expect(ghost.ok).toBe(true)
+    expect(edit.ok).toBe(true)
+    if (!ghost.ok || !edit.ok) return
+    expect(ghost.feedback).toEqual(edit.feedback)
+  })
+
+  it('returns no operation when the requested length is outside the supported speed range', () => {
+    const refused = planRateStretch({
+      ...input(),
+      targetDurationTicks: 200 * S,
+    })
+    expect(refused.ok).toBe(false)
+    if (!refused.ok) expect(refused.refusal.code).toBe('TOO_SLOW')
   })
 })
 

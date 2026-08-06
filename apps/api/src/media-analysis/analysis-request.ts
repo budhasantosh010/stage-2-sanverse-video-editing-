@@ -43,6 +43,7 @@ export const ANALYSIS_REFUSAL_CODES = Object.freeze([
   'DECODER_FAILED',
   'ANALYSIS_CANCELLED',
   'ANALYSIS_CACHE_CORRUPT',
+  'AUDIO_SILENT',
 ] as const)
 
 export type AnalysisRefusalCode = (typeof ANALYSIS_REFUSAL_CODES)[number]
@@ -103,6 +104,8 @@ export const MAX_PEAK_COUNT = 256
  * music is. Ten seconds of stereo 48 kHz 16-bit is under 2 MB.
  */
 export const MAX_WAVEFORM_SPAN_TICKS = 10 * PROJECT_TIMESCALE
+export const MIN_NORMALIZATION_SPAN_TICKS = Math.round(0.4 * PROJECT_TIMESCALE)
+export const MAX_NORMALIZATION_SPAN_TICKS = 30 * 60 * PROJECT_TIMESCALE
 
 export type AnalysisRequest =
   | Readonly<{
@@ -126,6 +129,13 @@ export type AnalysisRequest =
       sourceTicks: number
       spanTicks: number
       peakCount: number
+    }>
+  | Readonly<{
+      kind: 'audio-normalization'
+      assetId: string
+      assetVersion: string
+      sourceStartTicks: number
+      sourceEndTicks: number
     }>
 
 /** A whole number written in plain decimal. No signs, no exponents, no spaces. */
@@ -154,6 +164,7 @@ export const parseAnalysisRequest = (
     'filmstrip-frame': Object.freeze(['assetId', 'assetVersion', 'sourceTicks', 'width']),
     'image-thumbnail': Object.freeze(['assetId', 'assetVersion', 'width', 'height']),
     'waveform-block': Object.freeze(['assetId', 'assetVersion', 'sourceTicks', 'spanTicks', 'peakCount']),
+    'audio-normalization': Object.freeze(['assetId', 'assetVersion', 'sourceStartTicks', 'sourceEndTicks']),
   })
   const allowed = allowedByKind[kind]
   if (!allowed) throw analysisKeyInvalid('That kind of preview is not something this editor makes.')
@@ -173,6 +184,25 @@ export const parseAnalysisRequest = (
     const heightPx = bounded(wholeNumber(params.get('height')), MIN_ANALYSIS_PIXELS, MAX_ANALYSIS_PIXELS)
     if (widthPx === null || heightPx === null) throw analysisKeyInvalid('That preview size is outside what this editor makes.')
     return Object.freeze({ kind: 'image-thumbnail' as const, assetId, assetVersion, widthPx, heightPx })
+  }
+
+  if (kind === 'audio-normalization') {
+    const sourceStartTicks = wholeNumber(params.get('sourceStartTicks'))
+    const sourceEndTicks = wholeNumber(params.get('sourceEndTicks'))
+    if (sourceStartTicks === null || sourceEndTicks === null || sourceEndTicks <= sourceStartTicks) {
+      throw analysisKeyInvalid('Choose a real stretch of sound to measure.')
+    }
+    const span = sourceEndTicks - sourceStartTicks
+    if (span < MIN_NORMALIZATION_SPAN_TICKS || span > MAX_NORMALIZATION_SPAN_TICKS) {
+      throw analysisKeyInvalid('That stretch of sound is outside the normalization analysis limit.')
+    }
+    return Object.freeze({
+      kind: 'audio-normalization' as const,
+      assetId,
+      assetVersion,
+      sourceStartTicks,
+      sourceEndTicks,
+    })
   }
 
   const sourceTicks = wholeNumber(params.get('sourceTicks'))
@@ -204,6 +234,9 @@ export const analysisRequestId = (request: AnalysisRequest): string => {
   }
   if (request.kind === 'filmstrip-frame') {
     return `filmstrip-frame:${request.assetId}:${request.assetVersion}:${request.sourceTicks}:${request.widthPx}`
+  }
+  if (request.kind === 'audio-normalization') {
+    return `audio-normalization:${request.assetId}:${request.assetVersion}:${request.sourceStartTicks}:${request.sourceEndTicks}:ffmpeg-loudnorm-v1`
   }
   return `waveform-block:${request.assetId}:${request.assetVersion}:${request.sourceTicks}:${request.spanTicks}:${request.peakCount}`
 }

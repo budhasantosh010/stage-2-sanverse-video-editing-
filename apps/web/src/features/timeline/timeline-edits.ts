@@ -185,6 +185,7 @@ export const buildSetAudioAtPlayhead = (
   fadeInTicks: number,
   fadeOutTicks: number,
   makeOperationId: IdMaker,
+  pan?: number,
 ): TimelineEditResult => {
   const clip = clipAt(composition, playheadTicks)
   if (!clip) return refuse('There is nothing to adjust at this moment.')
@@ -218,7 +219,7 @@ export const buildSetAudioAtPlayhead = (
       // mean that nudging the volume slider on a clip the user had placed hard
       // left silently snapped it back to the middle — a setting destroyed by
       // an unrelated edit, with nothing on screen to say so.
-      pan: clip.pan,
+      pan: pan ?? clip.pan,
       extensions: Object.freeze({}),
     }) as TimelineOperation,
   })

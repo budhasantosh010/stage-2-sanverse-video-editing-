@@ -11,7 +11,13 @@ import {
   parseMediaAnalysisKey,
   waveformBlockKey,
 } from './media-analysis-key'
-import { analysisRequestUrl, parseWaveformBlock } from './media-analysis-client'
+import {
+  analysisRequestUrl,
+  createMediaAnalysisClient,
+  normalizationRequestUrl,
+  parseAudioNormalizationEvidence,
+  parseWaveformBlock,
+} from './media-analysis-client'
 
 /**
  * Gate D — that a piece of derived media can only ever be found by the exact
@@ -25,6 +31,23 @@ import { analysisRequestUrl, parseWaveformBlock } from './media-analysis-client'
 const T = PROJECT_TIMESCALE
 const A = 'a'.repeat(16)
 const B = 'b'.repeat(16)
+const NORMALIZATION_REQUEST = Object.freeze({
+  assetId: 'asset_aaaaaaaa',
+  assetVersion: A,
+  sourceStartTicks: T,
+  sourceEndTicks: 3 * T,
+})
+const NORMALIZATION_EVIDENCE = Object.freeze({
+  schemaVersion: 'sanverse.audio-normalization-evidence/v1',
+  ...NORMALIZATION_REQUEST,
+  analysisVersion: 'ffmpeg-loudnorm-v1',
+  integratedLufs: -23.2,
+  loudnessRangeLufs: 4.1,
+  truePeakDb: -7.5,
+  recommendedGainDb: 6.5,
+  targetIntegratedLufs: -16,
+  targetTruePeakDb: -1,
+})
 
 describe('which bytes a name refers to', () => {
   it('takes the version from the file checksum the project already records', () => {
@@ -126,6 +149,12 @@ describe('the address a name becomes', () => {
       assetId: 'asset_m', assetVersion: B, sourceTicks: 3 * T, peaksPerBlock: 64,
     }))).toContain('/media-analysis/waveform?assetId=asset_m&assetVersion=bbbbbbbbbbbbbbbb&sourceTicks=4320000&spanTicks=1440000&peakCount=64')
   })
+
+  it('names normalization by exact source interval and file bytes', () => {
+    expect(normalizationRequestUrl('project_a', NORMALIZATION_REQUEST)).toBe(
+      '/api/projects/project_a/media-analysis/normalization?assetId=asset_aaaaaaaa&assetVersion=aaaaaaaaaaaaaaaa&sourceStartTicks=1440000&sourceEndTicks=4320000',
+    )
+  })
 })
 
 describe('reading loudness numbers back off the wire', () => {
@@ -147,5 +176,26 @@ describe('reading loudness numbers back off the wire', () => {
     expect(parseWaveformBlock({ peaks: [0.5] })).toBeNull()
     expect(parseWaveformBlock(null)).toBeNull()
     expect(parseWaveformBlock([0.5])).toBeNull()
+  })
+})
+
+describe('reading normalization evidence back off the wire', () => {
+  it('accepts only the exact, finite evidence contract', () => {
+    expect(parseAudioNormalizationEvidence(NORMALIZATION_EVIDENCE)).toEqual(NORMALIZATION_EVIDENCE)
+    expect(parseAudioNormalizationEvidence({ ...NORMALIZATION_EVIDENCE, integratedLufs: Number.NaN })).toBeNull()
+    expect(parseAudioNormalizationEvidence({ ...NORMALIZATION_EVIDENCE, extra: 'field' })).toBeNull()
+    expect(parseAudioNormalizationEvidence({ ...NORMALIZATION_EVIDENCE, sourceEndTicks: T })).toBeNull()
+  })
+
+  it('rejects valid-looking evidence for a different source interval', async () => {
+    const client = createMediaAnalysisClient({
+      fetchImpl: async () => new Response(JSON.stringify({
+        ...NORMALIZATION_EVIDENCE,
+        sourceStartTicks: 0,
+      }), { status: 200, headers: { 'content-type': 'application/json' } }),
+    })
+    expect(client.normalization).toBeTypeOf('function')
+    await expect(client.normalization?.('project_a', NORMALIZATION_REQUEST, new AbortController().signal))
+      .rejects.toMatchObject({ refusal: { code: 'ANALYSIS_CACHE_CORRUPT' } })
   })
 })
