@@ -22,7 +22,6 @@ import {
   panFilter,
   segmentRate,
   segmentSourceDurationTicks,
-  segmentTransitionColor,
   videoSpeedSteps,
 } from './ffmpeg-retiming.ts'
 import {
@@ -647,15 +646,20 @@ const primaryFootageMotionFilters = (
 const splitSegmentForMotion = (
   segment: RenderPlan['segments'][number],
 ): readonly RenderPlan['segments'][number][] => {
+  if (segment.kind === 'freeze-segment') return Object.freeze([segment])
   if (segment.footageMotions.length === 0) return Object.freeze([segment])
-  const sourceStart = segment.sourceStartTicks
-  const sourceEnd = sourceStart + segmentSourceDurationTicks(segment)
-  const motionRate = segmentRate(segment)
+
+  // From here down the discriminant has narrowed this to moving footage, so
+  // speed/source helpers can never be handed a freeze by accident.
+  const sourceSegment = segment
+  const sourceStart = sourceSegment.sourceStartTicks
+  const sourceEnd = sourceStart + segmentSourceDurationTicks(sourceSegment)
+  const motionRate = segmentRate(sourceSegment)
   /** Where a point in the recording lands on screen, relative to this piece. */
   const onScreenOffset = (sourceTicks: number): number =>
     Math.round(((sourceTicks - sourceStart) * motionRate.denominator) / motionRate.numerator)
   const boundaries = new Set<number>([sourceStart, sourceEnd])
-  for (const motion of segment.footageMotions) {
+  for (const motion of sourceSegment.footageMotions) {
     const start = Math.max(sourceStart, motion.sourceInterval.start.ticks)
     const end = Math.min(sourceEnd, motion.sourceInterval.start.ticks + motion.sourceInterval.duration.ticks)
     if (end > start) {
@@ -666,37 +670,30 @@ const splitSegmentForMotion = (
   const ordered = [...boundaries].sort((left, right) => left - right)
   return Object.freeze(ordered.slice(0, -1).map((start, index) => {
     const end = ordered[index + 1]
-    const active = segment.footageMotions.filter((motion) =>
+    const active = sourceSegment.footageMotions.filter((motion) =>
       motion.sourceInterval.start.ticks <= start &&
       start < motion.sourceInterval.start.ticks + motion.sourceInterval.duration.ticks,
     )
     const first = index === 0
     const last = index === ordered.length - 2
     return Object.freeze({
-      ...segment,
-      nodeId: `${segment.nodeId}.motion.${index}`,
-      // Both edges are converted to on-screen time separately and then
-      // subtracted, exactly as the timeline itself does it, so the sub-pieces
-      // still add up to the whole piece with no tick lost between them.
+      ...sourceSegment,
+      nodeId: `${sourceSegment.nodeId}.motion.${index}`,
       interval: Object.freeze({
         start: Object.freeze({
-          ticks: segment.interval.start.ticks + onScreenOffset(start),
-          timescale: segment.interval.start.timescale,
+          ticks: sourceSegment.interval.start.ticks + onScreenOffset(start),
+          timescale: sourceSegment.interval.start.timescale,
         }),
         duration: Object.freeze({
           ticks: Math.max(1, onScreenOffset(end) - onScreenOffset(start)),
-          timescale: segment.interval.duration.timescale,
+          timescale: sourceSegment.interval.duration.timescale,
         }),
       }),
       sourceStartTicks: start,
       sourceDurationTicks: end - start,
       footageMotions: Object.freeze(active),
-      fadeInTicks: first ? segment.fadeInTicks : 0,
-      fadeOutTicks: last ? segment.fadeOutTicks : 0,
-      videoFadeInTicks: first ? segment.videoFadeInTicks : 0,
-      videoFadeOutTicks: last ? segment.videoFadeOutTicks : 0,
-      transitionAudioFadeInTicks: first ? segment.transitionAudioFadeInTicks : 0,
-      transitionAudioFadeOutTicks: last ? segment.transitionAudioFadeOutTicks : 0,
+      fadeInTicks: first ? sourceSegment.fadeInTicks : 0,
+      fadeOutTicks: last ? sourceSegment.fadeOutTicks : 0,
     })
   }))
 }
@@ -784,6 +781,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
   const segmentInputIndex = new Map(planInputs(plan.value).map((source) => [source.assetId, source.index]))
   const graph: string[] = []
   const concatInputs: string[] = []
+  const hasOutputAudio = planHasAudio(plan.value, input.hasAudio)
 
   pieces.forEach((piece, index) => {
     const videoLabel = `v${index}`
@@ -792,24 +790,30 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
 
     if (piece.kind === 'hole') {
       graph.push(`color=c=black:s=${width}x${height}:r=${rate}:d=${seconds},format=pix_fmts=yuv420p,setsar=1[${videoLabel}]`)
-      if (input.hasAudio) {
+      if (hasOutputAudio) {
         graph.push(
           `anullsrc=channel_layout=${AUDIO_CHANNEL_LAYOUT}:sample_rate=${AUDIO_SAMPLE_RATE}:d=${seconds}` +
             `,asetpts=PTS-STARTPTS[${audioLabel}]`,
         )
       }
     } else {
-      // How much RECORDING to take. Before speed existed this was the same
-      // number as how long the piece lasts on screen, and the exporter simply
-      // reused that. A 2x piece takes twice as much recording as it occupies,
-      // so the two numbers are now asked for separately.
-      const from = ticksToSeconds(piece.segment.sourceStartTicks)
-      const to = ticksToSeconds(piece.segment.sourceStartTicks + segmentSourceDurationTicks(piece.segment))
-      const retimeVideo = videoSpeedSteps(piece.segment)
-      const retimeAudio = audioSpeedSteps(piece.segment, AUDIO_SAMPLE_RATE)
-      const transitionColor = segmentTransitionColor(piece.segment)
       const sourceVideoLabel = `source_video_${index}`
       const motionVideoLabel = `motion_video_${index}`
+      const canonicalId = piece.segment.nodeId.split('.motion.')[0]
+      const canonical = plan.value.segments.find((segment) => segment.nodeId === canonicalId)
+      const firstVisualPiece = canonical?.interval.start.ticks === piece.segment.interval.start.ticks
+      const lastVisualPiece = canonical
+        ? canonical.interval.start.ticks + canonical.interval.duration.ticks ===
+          piece.segment.interval.start.ticks + piece.segment.interval.duration.ticks
+        : false
+      const incomingTransition = firstVisualPiece
+        ? plan.value.transitions.find((transition) => transition.toSegmentId === canonicalId)
+        : undefined
+      const outgoingTransition = lastVisualPiece
+        ? plan.value.transitions.find((transition) => transition.fromSegmentId === canonicalId)
+        : undefined
+      const transitionStyle = incomingTransition?.style ?? outgoingTransition?.style ?? 'dip-to-black'
+      const transitionColor = transitionStyle === 'dip-to-white' ? 'white' : 'black'
       /**
        * Which of FFmpeg's inputs holds THIS piece of footage.
        *
@@ -862,14 +866,26 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
         // clip relative to its own 714x1280 instead, and "no motion" would not
         // mean the same framing as "motion that changes nothing".
         const normalizedLabel = `normalized_video_${index}`
-        // Reverse and speed sit between "take this part of the recording" and
-        // "make it this many frames per second". Reversing after the frame
-        // rate was fixed would reverse frames that had already been duplicated
-        // or dropped, and the last frame would land at the wrong instant.
-        graph.push(
-          `[${segmentInput}:v]trim=start=${from}:end=${to},setpts=PTS-STARTPTS` +
-            `${retimeVideo.length > 0 ? `,${retimeVideo.join(',')}` : ''},fps=${rate}[${sourceVideoLabel}]`,
-        )
+        if (piece.segment.kind === 'freeze-segment') {
+          // One exact source frame, repeated only for the authored hold. The
+          // source is never asked to play at speed zero and no audio is copied.
+          const from = ticksToSeconds(piece.segment.sourceTimeTicks)
+          graph.push(
+            `[${segmentInput}:v]trim=start=${from},setpts=PTS-STARTPTS,` +
+              `select='eq(n\\,0)',loop=loop=-1:size=1:start=0,` +
+              `trim=duration=${seconds},setpts=PTS-STARTPTS,fps=${rate}[${sourceVideoLabel}]`,
+          )
+        } else {
+          // Reverse and speed sit between selecting source frames and fixing
+          // the output frame rate. A 2x picture consumes twice its screen time.
+          const from = ticksToSeconds(piece.segment.sourceStartTicks)
+          const to = ticksToSeconds(piece.segment.sourceStartTicks + segmentSourceDurationTicks(piece.segment))
+          const retimeVideo = videoSpeedSteps(piece.segment)
+          graph.push(
+            `[${segmentInput}:v]trim=start=${from}:end=${to},setpts=PTS-STARTPTS` +
+              `${retimeVideo.length > 0 ? `,${retimeVideo.join(',')}` : ''},fps=${rate}[${sourceVideoLabel}]`,
+          )
+        }
         graph.push(
           `[${sourceVideoLabel}]${normalizationFilterSteps({
             canvasWidth: width,
@@ -889,74 +905,41 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
           piece.durationTicks,
         ))
         const videoSteps: string[] = []
-        if (piece.segment.videoFadeInTicks > 0) {
-          videoSteps.push(`fade=t=in:st=0:d=${ticksToSeconds(piece.segment.videoFadeInTicks)}:color=${transitionColor}`)
+        const fadeInTicks = incomingTransition?.durationTicks ?? 0
+        const fadeOutTicks = outgoingTransition?.durationTicks ?? 0
+        if (fadeInTicks > 0) {
+          videoSteps.push(`fade=t=in:st=0:d=${ticksToSeconds(fadeInTicks)}:color=${transitionColor}`)
         }
-        if (piece.segment.videoFadeOutTicks > 0) {
+        if (fadeOutTicks > 0) {
           videoSteps.push(
-            `fade=t=out:st=${ticksToSeconds(piece.durationTicks - piece.segment.videoFadeOutTicks)}` +
-              `:d=${ticksToSeconds(piece.segment.videoFadeOutTicks)}:color=${transitionColor}`,
+            `fade=t=out:st=${ticksToSeconds(piece.durationTicks - fadeOutTicks)}` +
+              `:d=${ticksToSeconds(fadeOutTicks)}:color=${transitionColor}`,
           )
         }
         videoSteps.push('format=pix_fmts=yuv420p', 'setsar=1')
         graph.push(`[${motionVideoLabel}]${videoSteps.join(',')}[${videoLabel}]`)
       }
 
-      if (input.hasAudio && !piece.segment.audioEnabled) {
-        // Muted dialogue is real silence of the same length, not the clip at a
-        // very low volume. Very low is still audible on headphones.
+      // Picture pieces are concatenated with silence only. Canonical A1 sound
+      // is mixed later from its own linked window, which is what allows a J-cut
+      // to begin before its picture and an L-cut to continue after it without
+      // creating a second clip identity.
+      if (hasOutputAudio) {
         graph.push(
           `anullsrc=channel_layout=${AUDIO_CHANNEL_LAYOUT}:sample_rate=${AUDIO_SAMPLE_RATE}:d=${seconds}` +
             `,asetpts=PTS-STARTPTS[${audioLabel}]`,
         )
-      } else if (input.hasAudio) {
-        const steps = [
-          `[${segmentInput}:a]atrim=start=${from}:end=${to}`,
-          'asetpts=PTS-STARTPTS',
-          `aresample=${AUDIO_SAMPLE_RATE}`,
-          `aformat=sample_fmts=fltp:channel_layouts=${AUDIO_CHANNEL_LAYOUT}`,
-        ]
-        // Speed and direction come BEFORE loudness, ramps and left/right, so
-        // that a half-second fade is half a second of FINISHED VIDEO. Applied
-        // the other way round, a fade on a 2x piece would last a quarter of a
-        // second on screen and the ramp the user dragged would be wrong.
-        steps.push(...retimeAudio)
-        // Timestamps are restated after retiming: `atempo` and `areverse` both
-        // leave the stream starting somewhere other than zero, and `concat`
-        // joins on timestamps.
-        if (retimeAudio.length > 0) steps.push('asetpts=PTS-STARTPTS')
-        if (piece.segment.gainDb !== 0) steps.push(`volume=${piece.segment.gainDb}dB`)
-        const pan = panFilter(piece.segment.pan ?? 0)
-        if (pan !== null) steps.push(pan)
-        if (piece.segment.fadeInTicks > 0) {
-          steps.push(`afade=t=in:st=0:d=${ticksToSeconds(piece.segment.fadeInTicks)}`)
-        }
-        if (piece.segment.fadeOutTicks > 0) {
-          const start = piece.durationTicks - piece.segment.fadeOutTicks
-          steps.push(`afade=t=out:st=${ticksToSeconds(start)}:d=${ticksToSeconds(piece.segment.fadeOutTicks)}`)
-        }
-        if (piece.segment.transitionAudioFadeInTicks > 0) {
-          steps.push(`afade=t=in:st=0:d=${ticksToSeconds(piece.segment.transitionAudioFadeInTicks)}`)
-        }
-        if (piece.segment.transitionAudioFadeOutTicks > 0) {
-          const start = piece.durationTicks - piece.segment.transitionAudioFadeOutTicks
-          steps.push(
-            `afade=t=out:st=${ticksToSeconds(start)}:` +
-              `d=${ticksToSeconds(piece.segment.transitionAudioFadeOutTicks)}`,
-          )
-        }
-        graph.push(`${steps.join(',')}[${audioLabel}]`)
       }
     }
 
     concatInputs.push(`[${videoLabel}]`)
-    if (input.hasAudio) concatInputs.push(`[${audioLabel}]`)
+    if (hasOutputAudio) concatInputs.push(`[${audioLabel}]`)
   })
 
-  const audioStreams = input.hasAudio ? 1 : 0
+  const audioStreams = hasOutputAudio ? 1 : 0
   graph.push(
     `${concatInputs.join('')}concat=n=${pieces.length}:v=1:a=${audioStreams}` +
-      `[vcat]${input.hasAudio ? '[acat]' : ''}`,
+      `[vcat]${hasOutputAudio ? '[acat]' : ''}`,
   )
 
   const inputIndex = new Map(planInputs(plan.value).map((source) => [source.assetId, source.index]))
@@ -1166,6 +1149,52 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
     extraAudio.push(`[${label}]`)
   }
 
+  plan.value.segments.forEach((segment, index) => {
+    if (segment.kind !== 'source-segment' || !segment.audioEnabled || segment.linkedAudio == null) return
+    const source = inputIndex.get(segment.assetId)
+    if (source === undefined) {
+      throw renderError('RENDER_INPUT_INVALID', 'Linked dialogue names a file the plan does not list.')
+    }
+    const window = segment.linkedAudio
+    const from = ticksToSeconds(window.sourceStartTicks)
+    const to = ticksToSeconds(window.sourceStartTicks + window.sourceDurationTicks)
+    const steps = [
+      `[${source}:a]atrim=start=${from}:end=${to}`,
+      'asetpts=PTS-STARTPTS',
+      `aresample=${AUDIO_SAMPLE_RATE}`,
+      `aformat=sample_fmts=fltp:channel_layouts=${AUDIO_CHANNEL_LAYOUT}`,
+    ]
+    const retime = audioSpeedSteps(segment, AUDIO_SAMPLE_RATE)
+    steps.push(...retime)
+    if (retime.length > 0) steps.push('asetpts=PTS-STARTPTS')
+    if (segment.gainDb !== 0) steps.push(`volume=${segment.gainDb}dB`)
+    const pan = panFilter(segment.pan ?? 0)
+    if (pan !== null) steps.push(pan)
+    if (segment.fadeInTicks > 0) {
+      steps.push(`afade=t=in:st=0:d=${ticksToSeconds(segment.fadeInTicks)}`)
+    }
+    if (segment.fadeOutTicks > 0) {
+      const start = window.interval.duration.ticks - segment.fadeOutTicks
+      steps.push(`afade=t=out:st=${ticksToSeconds(start)}:d=${ticksToSeconds(segment.fadeOutTicks)}`)
+    }
+    const incoming = plan.value.transitions.find((transition) =>
+      transition.toSegmentId === segment.nodeId && transition.audio === 'fade-through-silence')
+    const outgoing = plan.value.transitions.find((transition) =>
+      transition.fromSegmentId === segment.nodeId && transition.audio === 'fade-through-silence')
+    if (incoming) steps.push(`afade=t=in:st=0:d=${ticksToSeconds(incoming.durationTicks)}`)
+    if (outgoing) {
+      const start = window.interval.duration.ticks - outgoing.durationTicks
+      steps.push(`afade=t=out:st=${ticksToSeconds(start)}:d=${ticksToSeconds(outgoing.durationTicks)}`)
+    }
+    if (window.interval.start.ticks > 0) {
+      const delayMs = Math.round(window.interval.start.ticks / (PROJECT_TIMESCALE / 1000))
+      steps.push(`adelay=${delayMs}|${delayMs}`)
+    }
+    const label = `pri${index}`
+    graph.push(`${steps.join(',')}[${label}]`)
+    extraAudio.push(`[${label}]`)
+  })
+
   plan.value.music.forEach((node, index) => {
     const source = inputIndex.get(node.assetId)
     if (source === undefined) {
@@ -1227,6 +1256,8 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
 export function planHasAudio(plan: RenderPlan, sourceHasAudio: boolean): boolean {
   return (
     sourceHasAudio ||
+    plan.segments.some((segment) =>
+      segment.kind === 'source-segment' && segment.audioEnabled && segment.linkedAudio !== null) ||
     plan.music.length > 0 ||
     plan.overlays.some((node) => node.kind === 'media-overlay' && node.useOverlayAudio)
   )
@@ -1431,8 +1462,17 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
         if (available === undefined) {
           throw renderError('RENDER_INPUT_INVALID', 'A piece of footage names a file this export did not open.')
         }
-        const endTicks = segment.sourceStartTicks + segmentSourceDurationTicks(segment)
-        if (endTicks > available) {
+        if (segment.kind === 'freeze-segment') {
+          if (segment.sourceTimeTicks < 0 || segment.sourceTimeTicks >= available) {
+            throw renderError('RENDER_INPUT_INVALID', 'A held frame sits outside its source recording.')
+          }
+          continue
+        }
+        const pictureEndTicks = segment.sourceStartTicks + segmentSourceDurationTicks(segment)
+        const audioEndTicks = segment.linkedAudio == null
+          ? 0
+          : segment.linkedAudio.sourceStartTicks + segment.linkedAudio.sourceDurationTicks
+        if (pictureEndTicks > available || audioEndTicks > available) {
           throw renderError('RENDER_INPUT_INVALID', 'An accepted edit extends beyond the source duration.')
         }
       }

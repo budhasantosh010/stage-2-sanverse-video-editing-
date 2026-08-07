@@ -65,7 +65,7 @@ import {
  * the revision it was computed against, and acceptance fails if the project
  * has moved on since.
  */
-export const PROJECT_SCHEMA_VERSION = 'sanverse.project/v4'
+export const PROJECT_SCHEMA_VERSION = 'sanverse.project/v5'
 
 export type EditProject = Readonly<{
   schemaVersion: typeof PROJECT_SCHEMA_VERSION

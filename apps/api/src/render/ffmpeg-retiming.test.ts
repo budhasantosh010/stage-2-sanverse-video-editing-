@@ -11,7 +11,7 @@ import {
   segmentKeepsPitch,
   segmentRate,
   segmentSourceDurationTicks,
-  segmentTransitionColor,
+  transitionColorForStyle,
   videoSpeedSteps,
 } from './ffmpeg-retiming.ts'
 
@@ -50,7 +50,7 @@ describe('a plan that says nothing about speed means exactly what it always mean
     expect(segmentIsReversed(plain)).toBe(false)
     expect(segmentKeepsPitch(plain)).toBe(true)
     expect(segmentIsRetimed(plain)).toBe(false)
-    expect(segmentTransitionColor(plain)).toBe('black')
+    expect(transitionColorForStyle('dip-to-black')).toBe('black')
     expect(panFilter(0)).toBeNull()
   })
 
@@ -211,9 +211,9 @@ describe('left and right', () => {
   })
 })
 
-describe('what colour a transition fades through', () => {
-  it('is black unless the plan says white', () => {
-    expect(segmentTransitionColor(segment())).toBe('black')
-    expect(segmentTransitionColor(segment({ transitionColor: 'white' } as Partial<Segment>))).toBe('white')
+describe('what colour a v8 transition edge fades through', () => {
+  it('derives colour from the closed transition style instead of a segment-local field', () => {
+    expect(transitionColorForStyle('dip-to-black')).toBe('black')
+    expect(transitionColorForStyle('dip-to-white')).toBe('white')
   })
 })

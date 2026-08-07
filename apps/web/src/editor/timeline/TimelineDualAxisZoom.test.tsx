@@ -6,7 +6,7 @@ import { TimelineToolbar, type TimelineToolbarAction } from './TimelineToolbar'
 
 const actions: readonly TimelineToolbarAction[] = [
   'split', 'lift', 'ripple-delete', 'copy', 'cut', 'paste', 'duplicate', 'group',
-  'ungroup', 'add-marker', 'close-gap', 'transition', 'speed',
+  'ungroup', 'add-marker', 'close-gap', 'transition', 'linked-audio', 'freeze', 'speed',
 ]
 
 const renderToolbar = (overrides: Record<string, unknown> = {}) => {

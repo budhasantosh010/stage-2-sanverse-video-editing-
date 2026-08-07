@@ -24,7 +24,7 @@ const node = {
   useOverlayAudio: false,
 }
 const plan = {
-  schemaVersion: 'sanverse.render-plan/v7',
+  schemaVersion: 'sanverse.render-plan/v8',
   projectId: 'project_aaaaaaaa',
   projectRevision: 1,
   compositionId: 'composition_aaaaaaaa',
@@ -36,6 +36,7 @@ const plan = {
     { assetId: 'asset_bbbbbbbb', mediaKind: 'video' },
   ],
   segments: [],
+  transitions: [],
   overlays: [node],
   visuals: [{
     visualId: node.nodeId,
@@ -61,7 +62,7 @@ const plan = {
 } satisfies RenderPlan
 
 describe('motion preview timing', () => {
-  it('matches an explicit clip-transition ramp and skips it for reduced motion', () => {
+  it('matches one v8 transition edge and skips it for reduced motion', () => {
     const segment = {
       nodeId: 'clip_aaaaaaaa',
       kind: 'source-segment' as const,
@@ -74,13 +75,18 @@ describe('motion preview timing', () => {
       gainDb: 0,
       fadeInTicks: 0,
       fadeOutTicks: 0,
-      videoFadeInTicks: 0,
-      videoFadeOutTicks: at(0.5).ticks,
-      transitionAudioFadeInTicks: 0,
-      transitionAudioFadeOutTicks: at(0.5).ticks,
     }
-    expect(segmentVideoOpacityAt(segment, at(9.75).ticks, false)).toBe(0.5)
-    expect(segmentVideoOpacityAt(segment, at(9.75).ticks, true)).toBe(1)
+    const transitions = [{
+      nodeId: 'transition_a_b',
+      kind: 'transition-edge' as const,
+      fromSegmentId: 'clip_aaaaaaaa',
+      toSegmentId: 'clip_bbbbbbbb',
+      style: 'dip-to-black' as const,
+      durationTicks: at(0.5).ticks,
+      audio: 'fade-through-silence' as const,
+    }]
+    expect(segmentVideoOpacityAt(segment, at(9.75).ticks, false, transitions)).toBe(0.5)
+    expect(segmentVideoOpacityAt(segment, at(9.75).ticks, true, transitions)).toBe(1)
   })
 
   it('seeks deterministically on the project clock and uses half-open visibility', () => {

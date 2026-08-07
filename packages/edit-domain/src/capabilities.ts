@@ -32,6 +32,8 @@ export const PLACE_PRIMARY_CLIP_PRIMITIVE_ID = 'sanverse.timeline.place-primary.
 export const MOVE_PRIMARY_CLIP_PRIMITIVE_ID = 'sanverse.timeline.move-primary.primitive/v1'
 export const CLIP_ENABLED_PRIMITIVE_ID = 'sanverse.timeline.enabled.primitive/v1'
 export const CLIP_AUDIO_PRIMITIVE_ID = 'sanverse.timeline.audio.primitive/v1'
+export const LINKED_AUDIO_PRIMITIVE_ID = 'sanverse.timeline.linked-audio.primitive/v1'
+export const FREEZE_FRAME_PRIMITIVE_ID = 'sanverse.timeline.freeze-frame.primitive/v1'
 export const CLIP_TRANSITION_PRIMITIVE_ID = 'sanverse.timeline.transition.primitive/v1'
 
 export const CAPTIONS_PRIMITIVE_ID = 'sanverse.captions.add.primitive/v1'
@@ -160,6 +162,22 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     level: 'primitive' as const,
     accepts: 'One piece of footage, a loudness change, and ramps at each end.',
     produces: Object.freeze(['set-clip-audio']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: LINKED_AUDIO_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One picture clip and the complete source/composition window for its still-linked sound.',
+    produces: Object.freeze(['set-linked-audio-window']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: FREEZE_FRAME_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One interior moment of footage, a bounded hold duration, and deterministic clip identifiers.',
+    produces: Object.freeze(['insert-freeze-frame']),
     requires: Object.freeze([]),
   }),
   Object.freeze({

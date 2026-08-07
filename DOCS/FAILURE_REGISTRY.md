@@ -2092,3 +2092,74 @@ real bug reads as probably fine.
 `null` must never mean two things; "I could not build this" and "there is nothing
 here" are opposite answers, and a preview that confuses them will call the user's
 own footage missing.
+
+---
+
+## FAIL-053 — Hold Frame was enabled but did not open its panel
+
+**Found:** final Gate T2 real-browser closure, 2026-08-08.
+**Status:** RESOLVED.
+
+The More menu truthfully enabled **Hold frame** for a valid primary-video clip,
+but pressing it did nothing. The freeze planner, domain operation, Preview and
+render path already existed; the command dispatcher was the missing link.
+
+### Root cause
+
+`Timeline.runToolbarAction` treated Speed, Transition and J/L Cut as
+presentation-only panel actions, but omitted `freeze` from that branch. Freeze
+therefore fell through to the generic edit action instead of setting
+`freezePanelOpen`.
+
+### Fix
+
+`freeze` now goes through the same panel-opening branch, closing the other
+mutually exclusive panels without creating a revision. The actual Freeze edit is
+still created only by **Insert held frame**.
+
+### Acceptance
+
+- `Timeline.test.tsx`: `opens the Hold frame panel from More`.
+- Final Edge workflow: 0.6 s hold accepted at revision 42; Undo removed it at 43;
+  Redo restored exactly one freeze operation at 44; reopen preserved it.
+
+### One-line solution
+
+An enabled command must route to the UI it promises before its edit can be
+considered reachable.
+
+---
+
+## FAIL-054 — Rate Stretch silently removed Reverse
+
+**Found:** final Gate T2 accepted-project inspection, 2026-08-08.
+**Status:** RESOLVED.
+
+A reversed clip could be stretched with the real Rate Stretch handle, but the
+new time-transform operation changed its direction back to forward. The duration
+was correct while the meaning of the footage was wrong.
+
+### Root cause
+
+Both `describeRateStretch` and `handleRateStretchCommit` in `StudioScreen` passed
+`direction: 'forward'` instead of carrying the selected clip's current time
+transform.
+
+### Fix
+
+Both preview and commit now pass `speedSubject?.direction ?? 'forward'`. Rate
+Stretch changes duration/rate only; it does not change direction unless the user
+explicitly changes Reverse.
+
+### Acceptance
+
+- Existing speed/Rate Stretch planner and handle suites remain green.
+- Final Edge workflow starts with Reverse, stretches the clip, and the resulting
+  accepted Timeline label is `1.63x Backwards`.
+- Accepted project inspection shows the latest time-transform operation for that
+  clip still has `direction: reverse`.
+
+### One-line solution
+
+A duration gesture must preserve every time-transform property the user did not
+ask it to change.

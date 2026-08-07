@@ -138,6 +138,14 @@ export const describeOperation = (operation: EditOperation): string => {
       if (speed === '1x') return 'Put a piece back to normal speed'
       return `Changed a piece to ${speed} speed`
     }
+    case 'set-linked-audio-window':
+      return operation.compositionOffsetTicks < 0
+        ? 'Made the sound start before the picture'
+        : operation.sourceRange.duration.ticks > 0
+          ? 'Changed where the linked sound ends'
+          : 'Reset the linked sound'
+    case 'insert-freeze-frame':
+      return 'Held one frame'
     case 'set-footage-motion':
       return operation.tracks.length > 0
         ? 'Changed how the main footage moves'

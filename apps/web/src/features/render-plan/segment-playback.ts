@@ -62,6 +62,8 @@ export type PlaybackSegment = Readonly<{
   reversed?: boolean
   /** Whether a sped-up voice keeps its normal pitch. Absent means yes. */
   maintainAudioPitch?: boolean
+  /** True only for a v8 held-frame segment. Its source tick never advances. */
+  freeze?: boolean
 }>
 
 /** How much recording a stretch uses. Absent means the same as its on-screen length. */
@@ -107,6 +109,7 @@ export const playbackSegments = (plan: RenderPlan): readonly PlaybackSegment[] =
             : 1,
         reversed: segment.direction === 'reverse',
         maintainAudioPitch: segment.maintainAudioPitch !== false,
+        freeze: segment.kind === 'freeze-segment',
       })),
   )
 
@@ -245,7 +248,9 @@ export const sourceTimeFor = (
   const segment = segments[index]
   return Object.freeze({
     segmentIndex: index,
-    sourceTicks: segment.sourceStartTicks + sourceOffsetFor(segment, compositionTicks - segment.startTicks),
+    sourceTicks: segment.freeze === true
+      ? segment.sourceStartTicks
+      : segment.sourceStartTicks + sourceOffsetFor(segment, compositionTicks - segment.startTicks),
   })
 }
 
@@ -288,6 +293,8 @@ export type PlaybackAction =
   | Readonly<{ kind: 'show'; compositionTicks: number; segmentIndex: number }>
   /** Move the recording's playhead here before showing anything. */
   | Readonly<{ kind: 'seek'; sourceTicks: number; compositionTicks: number; segmentIndex: number }>
+  /** Hold one exact source frame while the composition clock keeps moving. */
+  | Readonly<{ kind: 'hold'; sourceTicks: number; compositionTicks: number; untilTicks: number; segmentIndex: number }>
   /** Show black: this moment was deliberately left empty. */
   | Readonly<{ kind: 'hole'; compositionTicks: number; untilTicks: number }>
   /** The finished video is over. */
@@ -320,6 +327,15 @@ export const advancePlayback = (
     })
 
   const expected = segments[expectedIndex]
+  if (expected?.freeze === true) {
+    return Object.freeze({
+      kind: 'hold' as const,
+      sourceTicks: expected.sourceStartTicks,
+      compositionTicks: expected.startTicks,
+      untilTicks: endOf(expected),
+      segmentIndex: expectedIndex,
+    })
+  }
   if (expected) {
     // Measured against how much RECORDING the stretch uses, because that is
     // the clock the video element's own playhead is on. Comparing it against
@@ -333,6 +349,7 @@ export const advancePlayback = (
   // simply a different part of the finished video.
   const scrubbedInto = segments.findIndex(
     (segment) =>
+      segment.freeze !== true &&
       sourceTicks >= segment.sourceStartTicks &&
       sourceTicks < segment.sourceStartTicks + sourceSpanOf(segment),
   )
@@ -366,6 +383,16 @@ export const advancePlayback = (
 
   const target = sourceTimeFor(segments, nextVisible)
   if (!target) return Object.freeze({ kind: 'ended', compositionTicks: totalTicks })
+  const targetSegment = segments[target.segmentIndex]
+  if (targetSegment.freeze === true) {
+    return Object.freeze({
+      kind: 'hold' as const,
+      sourceTicks: target.sourceTicks,
+      compositionTicks: nextVisible,
+      untilTicks: endOf(targetSegment),
+      segmentIndex: target.segmentIndex,
+    })
+  }
   return Object.freeze({
     kind: 'seek',
     sourceTicks: target.sourceTicks,
@@ -388,5 +415,6 @@ export const isUncutPassthrough = (segments: readonly PlaybackSegment[]): boolea
   // A retimed stretch is never a straight play-through: the element has to be
   // told how fast to run, and its own clock no longer matches the timeline's.
   rateOf(segments[0]).numerator === rateOf(segments[0]).denominator &&
-  segments[0].reversed !== true
+  segments[0].reversed !== true &&
+  segments[0].freeze !== true
 

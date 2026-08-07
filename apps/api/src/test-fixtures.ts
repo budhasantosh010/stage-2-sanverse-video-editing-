@@ -1,5 +1,10 @@
 import { PROJECT_TIMESCALE } from '@sanverse/edit-domain/time'
-import type { RenderPlan, SourceSegmentNode, TextOverlayNode } from '@sanverse/render-contract'
+import {
+  RENDER_PLAN_SCHEMA_VERSION,
+  type MovingSourceSegmentNode,
+  type RenderPlan,
+  type TextOverlayNode,
+} from '@sanverse/render-contract'
 
 import type { MediaProbePort } from './media/media-probe.ts'
 import type { ProjectRepository } from './projects/project-repository.ts'
@@ -22,28 +27,56 @@ export const testOverlayNode = (overrides: Partial<TextOverlayNode> = {}): TextO
   ...overrides,
 } as TextOverlayNode)
 
-export const testSegmentNode = (overrides: Partial<SourceSegmentNode> = {}): SourceSegmentNode => ({
-  nodeId: 'clip_aaaaaaaa',
-  kind: 'source-segment',
-  interval: { start: ms(0), duration: ms(8_000) },
-  assetId: 'asset_aaaaaaaa',
-  sourceStartTicks: 0,
-  videoEnabled: true,
-  audioEnabled: true,
-  footageMotions: [],
-  gainDb: 0,
-  fadeInTicks: 0,
-  fadeOutTicks: 0,
-  videoFadeInTicks: 0,
-  videoFadeOutTicks: 0,
-  transitionAudioFadeInTicks: 0,
-  transitionAudioFadeOutTicks: 0,
-  ...overrides,
-} as SourceSegmentNode)
+/** One fully explicit v8 moving-picture segment. Tests override only the fact they exercise. */
+export const testSegmentNode = (
+  overrides: Partial<MovingSourceSegmentNode> = {},
+): MovingSourceSegmentNode => {
+  const {
+    interval: requestedInterval,
+    sourceStartTicks: requestedSourceStartTicks,
+    sourceDurationTicks: requestedSourceDurationTicks,
+    linkedAudio: requestedLinkedAudio,
+    ...rest
+  } = overrides
+  const interval = requestedInterval ?? { start: ms(0), duration: ms(8_000) }
+  const sourceStartTicks = requestedSourceStartTicks ?? 0
+  const sourceDurationTicks = requestedSourceDurationTicks ?? interval.duration.ticks
+  const linkedAudio = requestedLinkedAudio === undefined
+    ? Object.freeze({
+        interval,
+        sourceStartTicks,
+        sourceDurationTicks,
+      })
+    : requestedLinkedAudio
+  return {
+    nodeId: 'clip_aaaaaaaa',
+    kind: 'source-segment',
+    assetId: 'asset_aaaaaaaa',
+    videoEnabled: true,
+    audioEnabled: true,
+    footageMotions: [],
+    gainDb: 0,
+    fadeInTicks: 0,
+    fadeOutTicks: 0,
+    playbackRateNumerator: 1,
+    playbackRateDenominator: 1,
+    direction: 'forward',
+    maintainAudioPitch: true,
+    pan: 0,
+    ...rest,
+    // These defaults depend on the possibly-overridden interval/source range,
+    // so they are re-applied after the spread unless the test explicitly
+    // supplied its own v8 value.
+    interval,
+    sourceStartTicks,
+    sourceDurationTicks,
+    linkedAudio,
+  }
+}
 
 /** Matches the 1280x720, 8-second media the probe fixture reports. */
 export const testPlan = (overrides: Partial<RenderPlan> = {}): RenderPlan => ({
-  schemaVersion: 'sanverse.render-plan/v7',
+  schemaVersion: RENDER_PLAN_SCHEMA_VERSION,
   projectId: 'project_aaaaaaaaaaaaaaaa',
   projectRevision: 1,
   compositionId: 'composition_aaaaaaaa',
@@ -52,11 +85,12 @@ export const testPlan = (overrides: Partial<RenderPlan> = {}): RenderPlan => ({
   durationTicks: 8_000 * TICKS_PER_MS,
   sources: [{ assetId: 'asset_aaaaaaaa', mediaKind: 'video' }],
   segments: [testSegmentNode()],
+  transitions: [],
   overlays: [testOverlayNode()],
   visuals: [],
   music: [],
   ...overrides,
-} as RenderPlan)
+})
 
 /** The source facts the argument builder needs alongside a plan. */
 export const testSourceFacts = {

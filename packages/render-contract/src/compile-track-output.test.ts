@@ -121,7 +121,7 @@ describe('P1-F.1A C1.18 track output reaches the exported file', () => {
   it('moves the plan version, because the export key is built from it', () => {
     // Without this a user who muted the dialogue and pressed Export would be
     // handed the file from before the mute and have no way to tell.
-    expect(compile(fullProject()).schemaVersion).toBe('sanverse.render-plan/v7')
+    expect(compile(fullProject()).schemaVersion).toBe('sanverse.render-plan/v8')
   })
 })
 

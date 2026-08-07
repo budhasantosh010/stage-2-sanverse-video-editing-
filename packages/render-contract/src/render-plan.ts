@@ -44,7 +44,9 @@ export type FootageMotionNode = Readonly<{
  */
 export type SourceSegmentNode = Readonly<{
   nodeId: string
-  kind: 'source-segment'
+  kind: 'source-segment' | 'freeze-segment'
+  /** Present only for v8 held-frame nodes; otherwise sourceStartTicks is the moving start. */
+  sourceTimeTicks?: number
   /** When this piece plays, in finished-video time. */
   interval: TimeRange
   assetId: string
@@ -74,12 +76,11 @@ export type SourceSegmentNode = Readonly<{
   fadeInTicks: number
   /** Full-to-silence ramp at the tail of this piece, in ticks. */
   fadeOutTicks: number
-  /** Picture-only ramps created by an explicit adjacent-clip transition. */
-  videoFadeInTicks: number
-  videoFadeOutTicks: number
-  /** Additional sound ramps for that transition; zero when audio stays cut. */
-  transitionAudioFadeInTicks: number
-  transitionAudioFadeOutTicks: number
+  /** v7 compatibility only; v8 transition truth lives in `RenderPlan.transitions`. */
+  videoFadeInTicks?: number
+  videoFadeOutTicks?: number
+  transitionAudioFadeInTicks?: number
+  transitionAudioFadeOutTicks?: number
   /**
    * THE RETIMING FIELDS. Every one of them is OPTIONAL, and that is the whole
    * point.
@@ -110,8 +111,75 @@ export type SourceSegmentNode = Readonly<{
   maintainAudioPitch?: boolean
   /** -10000 full left, 0 centred, +10000 full right. Absent means centred. */
   pan?: number
-  /** What colour the picture fades through. Absent means black. */
+  /** v8 linked A1 window. Runtime validation requires it on every v8 source segment. */
+  linkedAudio?: LinkedAudioNode | null
+  /** v7 compatibility only; the v8 validator rejects this in persisted/rendered plans. */
   transitionColor?: 'black' | 'white'
+}>
+
+/** T2 v8: the still-linked A1 sound window can differ from V1 picture edges. */
+export type LinkedAudioNode = Readonly<{
+  interval: TimeRange
+  sourceStartTicks: number
+  sourceDurationTicks: number
+}>
+
+/** T2 v8 moving-picture segment. Explicit fields replace the v7 optional defaults. */
+export type MovingSourceSegmentNode = Readonly<{
+  nodeId: string
+  kind: 'source-segment'
+  interval: TimeRange
+  assetId: string
+  sourceStartTicks: number
+  sourceDurationTicks: number
+  videoEnabled: boolean
+  audioEnabled: boolean
+  linkedAudio: LinkedAudioNode | null
+  footageMotions: readonly FootageMotionNode[]
+  gainDb: number
+  fadeInTicks: number
+  fadeOutTicks: number
+  playbackRateNumerator: number
+  playbackRateDenominator: number
+  direction: 'forward' | 'reverse'
+  maintainAudioPitch: boolean
+  pan: number
+}>
+
+/** T2 v8: one exact source frame held for an authored composition duration. */
+export type FreezeSegmentNode = Readonly<{
+  nodeId: string
+  kind: 'freeze-segment'
+  interval: TimeRange
+  assetId: string
+  sourceTimeTicks: number
+  sourceStartTicks: number
+  sourceDurationTicks: 1
+  videoEnabled: boolean
+  audioEnabled: false
+  linkedAudio: null
+  footageMotions: readonly FootageMotionNode[]
+  gainDb: 0
+  fadeInTicks: 0
+  fadeOutTicks: 0
+  playbackRateNumerator: 1
+  playbackRateDenominator: 1
+  direction: 'forward'
+  maintainAudioPitch: true
+  pan: 0
+}>
+
+export type PrimarySegmentNode = MovingSourceSegmentNode | FreezeSegmentNode
+
+/** T2 v8: one closed transition authority for one adjacent picture join. */
+export type TransitionEdgeNode = Readonly<{
+  nodeId: string
+  kind: 'transition-edge'
+  fromSegmentId: string
+  toSegmentId: string
+  style: 'dip-to-black' | 'dip-to-white'
+  durationTicks: number
+  audio: 'cut' | 'fade-through-silence'
 }>
 
 export type TextOverlayNode = Readonly<{
@@ -257,8 +325,10 @@ export type RenderPlan = Readonly<{
    * the wrong file the first time B-roll appeared.
    */
   sources: readonly RenderSource[]
-  /** The footage the finished video is made of, earliest first. */
-  segments: readonly SourceSegmentNode[]
+  /** The moving and held primary picture pieces, earliest first. */
+  segments: readonly PrimarySegmentNode[]
+  /** One closed transition edge per authored adjacent join. */
+  transitions: readonly TransitionEdgeNode[]
   /** What is drawn on top of that footage. */
   overlays: readonly RenderNode[]
   /** Transform, crop, layer, mask, and time-varying properties for drawn nodes. */
@@ -293,7 +363,7 @@ export type RenderPlanError = {
  * user who muted the dialogue and pressed Export would be handed the cached
  * file from before the mute, and would have no way to tell.
  */
-export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v7'
+export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v8'
 /**
  * Raised from 512 because captions produce one node per line of speech. A
  * ten-minute talk is roughly 200 cues before cutting, and a cut through a cue
@@ -319,6 +389,7 @@ const PLAN_KEYS = [
   'durationTicks',
   'sources',
   'segments',
+  'transitions',
   'overlays',
   'visuals',
   'music',
@@ -362,13 +433,86 @@ const readInterval = (value: unknown): { start: number; duration: number } | nul
   return { start, duration }
 }
 
+const validateFootageMotions = (
+  motions: unknown,
+  segmentIndex: number,
+  assetId: unknown,
+  sourceStart: number,
+  sourceDuration: number,
+  issues: Issue[],
+): void => {
+  const path = `segments[${segmentIndex}]`
+  if (!Array.isArray(motions)) {
+    issues.push({ path: `${path}.footageMotions`, code: 'TYPE_INVALID' })
+    return
+  }
+  const sourceEnd = sourceStart + sourceDuration
+  motions.forEach((motion, motionIndex) => {
+    const motionPath = `${path}.footageMotions[${motionIndex}]`
+    if (!isRecord(motion)) {
+      issues.push({ path: motionPath, code: 'TYPE_INVALID' })
+      return
+    }
+    const motionKeys = ['motionId', 'sourceInterval', 'transform', 'crop', 'tracks']
+    if (
+      Object.keys(motion).some((key) => !motionKeys.includes(key)) ||
+      motionKeys.some((key) => !Object.hasOwn(motion, key))
+    ) {
+      issues.push({ path: motionPath, code: 'FIELD_UNKNOWN' })
+      return
+    }
+    const validated = validateFootageMotionOperation({
+      schemaVersion: 'sanverse.operation/v3',
+      operationId: `operation_render${String(segmentIndex).padStart(4, '0')}${String(motionIndex).padStart(2, '0')}`,
+      kind: 'set-footage-motion',
+      capabilityId: FOOTAGE_MOTION_CAPABILITY_ID,
+      motionId: motion.motionId,
+      assetId,
+      sourceInterval: motion.sourceInterval,
+      transform: motion.transform,
+      crop: motion.crop,
+      tracks: motion.tracks,
+      extensions: {},
+    }, motionPath)
+    if (!validated.ok) {
+      validated.error.issues.forEach((issue) => issues.push({
+        path: issue.path,
+        code: issue.code === 'TYPE_INVALID' ? 'TYPE_INVALID' : 'VALUE_OUT_OF_RANGE',
+      }))
+      return
+    }
+    const motionRange = readInterval(motion.sourceInterval)
+    if (
+      motionRange === null ||
+      sourceStart < 0 ||
+      sourceDuration <= 0 ||
+      motionRange.start >= sourceEnd ||
+      motionRange.start + motionRange.duration <= sourceStart
+    ) {
+      issues.push({ path: `${motionPath}.sourceInterval`, code: 'NODE_OUTSIDE_COMPOSITION' })
+    }
+  })
+}
+
+const SOURCE_SEGMENT_KEYS = [
+  'nodeId', 'kind', 'interval', 'assetId', 'sourceStartTicks', 'sourceDurationTicks',
+  'videoEnabled', 'audioEnabled', 'linkedAudio', 'footageMotions', 'gainDb',
+  'fadeInTicks', 'fadeOutTicks', 'playbackRateNumerator', 'playbackRateDenominator',
+  'direction', 'maintainAudioPitch', 'pan',
+] as const
+const FREEZE_SEGMENT_KEYS = [
+  'nodeId', 'kind', 'interval', 'assetId', 'sourceTimeTicks', 'sourceStartTicks', 'sourceDurationTicks',
+  'videoEnabled', 'audioEnabled', 'linkedAudio', 'footageMotions', 'gainDb', 'fadeInTicks', 'fadeOutTicks',
+  'playbackRateNumerator', 'playbackRateDenominator', 'direction', 'maintainAudioPitch', 'pan',
+] as const
+const LINKED_AUDIO_KEYS = ['interval', 'sourceStartTicks', 'sourceDurationTicks'] as const
+
 const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]): void => {
   if (!Array.isArray(input)) {
     issues.push({ path: 'segments', code: 'TYPE_INVALID' })
     return
   }
   if (input.length === 0) {
-    // A plan with no footage would export a file with no picture in it.
     issues.push({ path: 'segments', code: 'SEGMENTS_EMPTY' })
     return
   }
@@ -384,9 +528,16 @@ const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]
       issues.push({ path, code: 'TYPE_INVALID' })
       return
     }
-    if (segment.kind !== 'source-segment') {
+    if (segment.kind !== 'source-segment' && segment.kind !== 'freeze-segment') {
       issues.push({ path: `${path}.kind`, code: 'NODE_KIND_UNKNOWN' })
       return
+    }
+    const expectedKeys = segment.kind === 'source-segment' ? SOURCE_SEGMENT_KEYS : FREEZE_SEGMENT_KEYS
+    for (const key of expectedKeys) {
+      if (!Object.hasOwn(segment, key)) issues.push({ path: `${path}.${key}`, code: 'FIELD_REQUIRED' })
+    }
+    for (const key of Object.keys(segment)) {
+      if (!(expectedKeys as readonly string[]).includes(key)) issues.push({ path: `${path}.${key}`, code: 'FIELD_UNKNOWN' })
     }
     if (typeof segment.nodeId !== 'string' || segment.nodeId.length === 0) {
       issues.push({ path: `${path}.nodeId`, code: 'VALUE_OUT_OF_RANGE' })
@@ -394,129 +545,9 @@ const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]
     if (typeof segment.assetId !== 'string' || segment.assetId.length === 0) {
       issues.push({ path: `${path}.assetId`, code: 'VALUE_OUT_OF_RANGE' })
     }
-    if (!Number.isSafeInteger(segment.sourceStartTicks) || (segment.sourceStartTicks as number) < 0) {
-      issues.push({ path: `${path}.sourceStartTicks`, code: 'VALUE_OUT_OF_RANGE' })
-    }
-    if (!Array.isArray(segment.footageMotions)) {
-      issues.push({ path: `${path}.footageMotions`, code: 'TYPE_INVALID' })
-    } else {
-      const segmentSourceStart = Number.isSafeInteger(segment.sourceStartTicks)
-        ? segment.sourceStartTicks as number
-        : -1
-      const intervalCandidate = readInterval(segment.interval)
-      // How much RECORDING this piece uses. At normal speed that is the same
-      // as how long it lasts on screen, which is why a plan that says nothing
-      // about speed still measures this correctly.
-      const consumedSourceTicks = Number.isSafeInteger(segment.sourceDurationTicks)
-        ? (segment.sourceDurationTicks as number)
-        : intervalCandidate?.duration ?? -1
-      const segmentSourceEnd = intervalCandidate === null || consumedSourceTicks < 0
-        ? -1
-        : segmentSourceStart + consumedSourceTicks
-      segment.footageMotions.forEach((motion, motionIndex) => {
-        const motionPath = `${path}.footageMotions[${motionIndex}]`
-        if (!isRecord(motion)) {
-          issues.push({ path: motionPath, code: 'TYPE_INVALID' })
-          return
-        }
-        const motionKeys = ['motionId', 'sourceInterval', 'transform', 'crop', 'tracks']
-        if (
-          Object.keys(motion).some((key) => !motionKeys.includes(key)) ||
-          motionKeys.some((key) => !Object.hasOwn(motion, key))
-        ) {
-          issues.push({ path: motionPath, code: 'FIELD_UNKNOWN' })
-          return
-        }
-        const validated = validateFootageMotionOperation({
-          schemaVersion: 'sanverse.operation/v3',
-          operationId: `operation_render${String(index).padStart(4, '0')}${String(motionIndex).padStart(2, '0')}`,
-          kind: 'set-footage-motion',
-          capabilityId: FOOTAGE_MOTION_CAPABILITY_ID,
-          motionId: motion.motionId,
-          assetId: segment.assetId,
-          sourceInterval: motion.sourceInterval,
-          transform: motion.transform,
-          crop: motion.crop,
-          tracks: motion.tracks,
-          extensions: {},
-        }, motionPath)
-        if (!validated.ok) {
-          validated.error.issues.forEach((issue) => issues.push({
-            path: issue.path,
-            code: issue.code === 'TYPE_INVALID' ? 'TYPE_INVALID' : 'VALUE_OUT_OF_RANGE',
-          }))
-          return
-        }
-        const motionRange = readInterval(motion.sourceInterval)
-        if (
-          motionRange === null ||
-          segmentSourceStart < 0 ||
-          segmentSourceEnd <= segmentSourceStart ||
-          motionRange.start >= segmentSourceEnd ||
-          motionRange.start + motionRange.duration <= segmentSourceStart
-        ) {
-          issues.push({ path: `${motionPath}.sourceInterval`, code: 'NODE_OUTSIDE_COMPOSITION' })
-        }
-      })
-    }
-    if (typeof segment.gainDb !== 'number' || !Number.isFinite(segment.gainDb)) {
-      issues.push({ path: `${path}.gainDb`, code: 'VALUE_OUT_OF_RANGE' })
-    }
-    // Stated, never assumed. A missing switch would let a renderer guess, and
-    // the two renderers would eventually guess differently.
     if (typeof segment.videoEnabled !== 'boolean') {
       issues.push({ path: `${path}.videoEnabled`, code: 'TYPE_INVALID' })
     }
-    if (typeof segment.audioEnabled !== 'boolean') {
-      issues.push({ path: `${path}.audioEnabled`, code: 'TYPE_INVALID' })
-    }
-
-    // The retiming fields. Absent is always fine and always means "as it
-    // always was". Present but nonsense is refused, never repaired, because a
-    // renderer given a repaired value would produce a video the preview never
-    // showed.
-    if (Object.hasOwn(segment, 'sourceDurationTicks')) {
-      const consumed = segment.sourceDurationTicks
-      if (!Number.isSafeInteger(consumed) || (consumed as number) <= 0) {
-        issues.push({ path: `${path}.sourceDurationTicks`, code: 'VALUE_OUT_OF_RANGE' })
-      }
-    }
-    for (const key of ['playbackRateNumerator', 'playbackRateDenominator'] as const) {
-      if (!Object.hasOwn(segment, key)) continue
-      const term = segment[key]
-      if (!Number.isSafeInteger(term) || (term as number) <= 0 || (term as number) > 10_000) {
-        issues.push({ path: `${path}.${key}`, code: 'VALUE_OUT_OF_RANGE' })
-      }
-    }
-    // One term without the other would be half a fraction, which has no
-    // meaning. Both or neither.
-    if (Object.hasOwn(segment, 'playbackRateNumerator') !== Object.hasOwn(segment, 'playbackRateDenominator')) {
-      issues.push({ path: `${path}.playbackRateNumerator`, code: 'VALUE_OUT_OF_RANGE' })
-    }
-    if (
-      Object.hasOwn(segment, 'direction') &&
-      segment.direction !== 'forward' &&
-      segment.direction !== 'reverse'
-    ) {
-      issues.push({ path: `${path}.direction`, code: 'VALUE_OUT_OF_RANGE' })
-    }
-    if (Object.hasOwn(segment, 'maintainAudioPitch') && typeof segment.maintainAudioPitch !== 'boolean') {
-      issues.push({ path: `${path}.maintainAudioPitch`, code: 'TYPE_INVALID' })
-    }
-    if (Object.hasOwn(segment, 'pan')) {
-      const pan = segment.pan
-      if (!Number.isSafeInteger(pan) || (pan as number) < -10_000 || (pan as number) > 10_000) {
-        issues.push({ path: `${path}.pan`, code: 'VALUE_OUT_OF_RANGE' })
-      }
-    }
-    if (
-      Object.hasOwn(segment, 'transitionColor') &&
-      segment.transitionColor !== 'black' &&
-      segment.transitionColor !== 'white'
-    ) {
-      issues.push({ path: `${path}.transitionColor`, code: 'VALUE_OUT_OF_RANGE' })
-    }
-
     const interval = readInterval(segment.interval)
     if (interval === null) {
       issues.push({ path: `${path}.interval`, code: 'TYPE_INVALID' })
@@ -527,34 +558,102 @@ const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]
       return
     }
 
+    if (segment.kind === 'freeze-segment') {
+      const sourceTime = segment.sourceTimeTicks
+      if (!Number.isSafeInteger(sourceTime) || (sourceTime as number) < 0) {
+        issues.push({ path: `${path}.sourceTimeTicks`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      validateFootageMotions(
+        segment.footageMotions,
+        index,
+        segment.assetId,
+        Number.isSafeInteger(sourceTime) ? sourceTime as number : -1,
+        1,
+        issues,
+      )
+      spans.push({ start: interval.start, end: interval.start + interval.duration })
+      return
+    }
+
+    const sourceStart = segment.sourceStartTicks
+    const sourceDuration = segment.sourceDurationTicks
+    if (!Number.isSafeInteger(sourceStart) || (sourceStart as number) < 0) {
+      issues.push({ path: `${path}.sourceStartTicks`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    if (!Number.isSafeInteger(sourceDuration) || (sourceDuration as number) <= 0) {
+      issues.push({ path: `${path}.sourceDurationTicks`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    if (typeof segment.audioEnabled !== 'boolean') {
+      issues.push({ path: `${path}.audioEnabled`, code: 'TYPE_INVALID' })
+    }
+    for (const key of ['playbackRateNumerator', 'playbackRateDenominator'] as const) {
+      const term = segment[key]
+      if (!Number.isSafeInteger(term) || (term as number) <= 0 || (term as number) > 10_000) {
+        issues.push({ path: `${path}.${key}`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+    }
+    if (segment.direction !== 'forward' && segment.direction !== 'reverse') {
+      issues.push({ path: `${path}.direction`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    if (typeof segment.maintainAudioPitch !== 'boolean') {
+      issues.push({ path: `${path}.maintainAudioPitch`, code: 'TYPE_INVALID' })
+    }
+    const pan = segment.pan
+    if (!Number.isSafeInteger(pan) || (pan as number) < -10_000 || (pan as number) > 10_000) {
+      issues.push({ path: `${path}.pan`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    if (typeof segment.gainDb !== 'number' || !Number.isFinite(segment.gainDb)) {
+      issues.push({ path: `${path}.gainDb`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+
+    let audioDuration = 0
+    if (segment.linkedAudio !== null) {
+      if (!isRecord(segment.linkedAudio)) {
+        issues.push({ path: `${path}.linkedAudio`, code: 'TYPE_INVALID' })
+      } else {
+        for (const key of LINKED_AUDIO_KEYS) {
+          if (!Object.hasOwn(segment.linkedAudio, key)) issues.push({ path: `${path}.linkedAudio.${key}`, code: 'FIELD_REQUIRED' })
+        }
+        for (const key of Object.keys(segment.linkedAudio)) {
+          if (!(LINKED_AUDIO_KEYS as readonly string[]).includes(key)) issues.push({ path: `${path}.linkedAudio.${key}`, code: 'FIELD_UNKNOWN' })
+        }
+        const audioInterval = readInterval(segment.linkedAudio.interval)
+        if (
+          audioInterval === null || audioInterval.start < 0 || audioInterval.duration <= 0 ||
+          audioInterval.start + audioInterval.duration > durationTicks
+        ) {
+          issues.push({ path: `${path}.linkedAudio.interval`, code: 'NODE_OUTSIDE_COMPOSITION' })
+        } else {
+          audioDuration = audioInterval.duration
+        }
+        if (!Number.isSafeInteger(segment.linkedAudio.sourceStartTicks) || (segment.linkedAudio.sourceStartTicks as number) < 0) {
+          issues.push({ path: `${path}.linkedAudio.sourceStartTicks`, code: 'VALUE_OUT_OF_RANGE' })
+        }
+        if (!Number.isSafeInteger(segment.linkedAudio.sourceDurationTicks) || (segment.linkedAudio.sourceDurationTicks as number) <= 0) {
+          issues.push({ path: `${path}.linkedAudio.sourceDurationTicks`, code: 'VALUE_OUT_OF_RANGE' })
+        }
+      }
+    }
     const fadeIn = segment.fadeInTicks
     const fadeOut = segment.fadeOutTicks
     if (
       !Number.isSafeInteger(fadeIn) || (fadeIn as number) < 0 ||
       !Number.isSafeInteger(fadeOut) || (fadeOut as number) < 0 ||
-      (fadeIn as number) + (fadeOut as number) > interval.duration
+      (fadeIn as number) + (fadeOut as number) > audioDuration
     ) {
       issues.push({ path: `${path}.fadeInTicks`, code: 'VALUE_OUT_OF_RANGE' })
     }
-    const transitionFades = [
-      segment.videoFadeInTicks,
-      segment.videoFadeOutTicks,
-      segment.transitionAudioFadeInTicks,
-      segment.transitionAudioFadeOutTicks,
-    ]
-    if (
-      transitionFades.some((value) => !Number.isSafeInteger(value) || (value as number) < 0) ||
-      (segment.videoFadeInTicks as number) + (segment.videoFadeOutTicks as number) > interval.duration ||
-      (segment.transitionAudioFadeInTicks as number) +
-        (segment.transitionAudioFadeOutTicks as number) > interval.duration
-    ) {
-      issues.push({ path: `${path}.videoFadeInTicks`, code: 'VALUE_OUT_OF_RANGE' })
-    }
-
+    validateFootageMotions(
+      segment.footageMotions,
+      index,
+      segment.assetId,
+      Number.isSafeInteger(sourceStart) ? sourceStart as number : -1,
+      Number.isSafeInteger(sourceDuration) ? sourceDuration as number : -1,
+      issues,
+    )
     spans.push({ start: interval.start, end: interval.start + interval.duration })
   })
 
-  // Two pieces of footage claiming the same instant has no defined picture.
   spans.sort((left, right) => left.start - right.start)
   for (let index = 1; index < spans.length; index += 1) {
     if (spans[index].start < spans[index - 1].end) {
@@ -562,6 +661,68 @@ const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]
       break
     }
   }
+}
+
+const TRANSITION_KEYS = [
+  'nodeId', 'kind', 'fromSegmentId', 'toSegmentId', 'style', 'durationTicks', 'audio',
+] as const
+
+const validateTransitions = (input: unknown, segments: unknown, issues: Issue[]): void => {
+  if (!Array.isArray(input)) {
+    issues.push({ path: 'transitions', code: 'TYPE_INVALID' })
+    return
+  }
+  if (!Array.isArray(segments)) return
+  const orderedSegments = segments
+    .filter(isRecord)
+    .map((segment) => ({ segment, interval: readInterval(segment.interval) }))
+    .filter((entry): entry is { segment: Record<string, unknown>; interval: { start: number; duration: number } } => entry.interval !== null)
+    .sort((left, right) => left.interval.start - right.interval.start)
+  const byId = new Map<string, { index: number; duration: number }>()
+  orderedSegments.forEach((entry, index) => {
+    if (typeof entry.segment.nodeId === 'string') byId.set(entry.segment.nodeId, { index, duration: entry.interval.duration })
+  })
+  const seenJoins = new Set<string>()
+  input.forEach((transition, index) => {
+    const path = `transitions[${index}]`
+    if (!isRecord(transition)) {
+      issues.push({ path, code: 'TYPE_INVALID' })
+      return
+    }
+    for (const key of TRANSITION_KEYS) {
+      if (!Object.hasOwn(transition, key)) issues.push({ path: `${path}.${key}`, code: 'FIELD_REQUIRED' })
+    }
+    for (const key of Object.keys(transition)) {
+      if (!(TRANSITION_KEYS as readonly string[]).includes(key)) issues.push({ path: `${path}.${key}`, code: 'FIELD_UNKNOWN' })
+    }
+    if (transition.kind !== 'transition-edge') issues.push({ path: `${path}.kind`, code: 'NODE_KIND_UNKNOWN' })
+    if (typeof transition.nodeId !== 'string' || transition.nodeId.length === 0) {
+      issues.push({ path: `${path}.nodeId`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    if (transition.style !== 'dip-to-black' && transition.style !== 'dip-to-white') {
+      issues.push({ path: `${path}.style`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    if (transition.audio !== 'cut' && transition.audio !== 'fade-through-silence') {
+      issues.push({ path: `${path}.audio`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    const from = typeof transition.fromSegmentId === 'string' ? byId.get(transition.fromSegmentId) : undefined
+    const to = typeof transition.toSegmentId === 'string' ? byId.get(transition.toSegmentId) : undefined
+    const duration = transition.durationTicks
+    if (!from || !to || to.index !== from.index + 1) {
+      issues.push({ path: `${path}.fromSegmentId`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    if (
+      !Number.isSafeInteger(duration) || (duration as number) <= 0 || (duration as number) > 2_880_000 ||
+      (from && (duration as number) > from.duration) || (to && (duration as number) > to.duration)
+    ) {
+      issues.push({ path: `${path}.durationTicks`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    if (from && to) {
+      const join = `${transition.fromSegmentId}->${transition.toSegmentId}`
+      if (seenJoins.has(join)) issues.push({ path: `${path}.fromSegmentId`, code: 'VALUE_OUT_OF_RANGE' })
+      seenJoins.add(join)
+    }
+  })
 }
 
 /**
@@ -646,6 +807,7 @@ export const validateRenderPlan = (
 
   const durationTicks = Number.isSafeInteger(input.durationTicks) ? (input.durationTicks as number) : -1
   if (durationTicks > 0) validateSegments(input.segments, durationTicks, issues)
+  validateTransitions(input.transitions, input.segments, issues)
   if (Array.isArray(input.segments)) {
     input.segments.forEach((segment, index) => {
       if (isRecord(segment) && typeof segment.assetId === 'string' && !sourceIds.has(segment.assetId)) {

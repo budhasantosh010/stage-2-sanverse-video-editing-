@@ -59,14 +59,14 @@ describe('opening a project', () => {
     const { service: subject, current } = service(null)
     const project = await subject.load(PROJECT_ID)
 
-    expect(project.schemaVersion).toBe('sanverse.project/v4')
+    expect(project.schemaVersion).toBe('sanverse.project/v5')
     expect(project.revision).toBe(0)
     // The engine now knows how long the video is, which v1 never did.
     expect(project.assets[0].duration).toEqual(ms(8_000))
     expect(project.composition.width).toBe(1280)
     // The domain holds an opaque reference, never a filesystem path.
     expect(project.assets[0].storageRef).not.toContain('source.mp4')
-    expect(JSON.parse(current() ?? '{}').schemaVersion).toBe('sanverse.project/v4')
+    expect(JSON.parse(current() ?? '{}').schemaVersion).toBe('sanverse.project/v5')
   })
 
   it('produces the same IDs on every reload rather than inventing new ones', async () => {

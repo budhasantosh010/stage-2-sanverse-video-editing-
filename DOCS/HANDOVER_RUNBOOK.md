@@ -4,30 +4,33 @@ Use this runbook when a new session, agent, or context window resumes the projec
 
 ## Current handoff
 
-**P1-F.1A Gate B — Media Library V2 Essentials is complete**, with evidence in
-`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/`.
+**P1-F.1E Gate T2 is complete. T3 through T7 have not started.**
 
-The one thing to carry forward: **a user's filing of their media lives on the
-server beside the project, and is not part of the project.** Folders, sorting,
-filtering and search change nothing about the video — proved byte-identical in
-the real browser. `DOCS/decisions/ADR-MEDIA-ORGANIZATION-V1.md` holds the
-reasoning, including what was rejected and why.
+Read in this order when resuming:
 
-Media-to-Timeline drag is built and tested but switched off
-(`MEDIA_DRAG_ENABLED = false` in
-`apps/web/src/features/media/media-drag-contract.ts`). Gate C flips that one
-boolean, adds a visible affordance, and makes Timeline lanes accept
-`application/vnd.sanverse.media-drag+json`.
+1. `START_HERE.md`
+2. `DOCS/HANDOFF.md`
+3. `DOCS/CURRENT_STATE.md`
+4. `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md`
+5. `DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md`
 
-Suites: 1,283 total (web 631, edit-domain 312, api 248, render-contract 65,
-intent-domain 27). All-workspace build passes.
+Final T2 verification: **2,292/2,292 tests**, all-workspace production build
+exit 0, real Microsoft Edge workflow revision 34→44 with zero browser errors and
+zero failed HTTP responses, and a real revision-44 1920×1080 H.264/AAC export
+whose renderer SHA matches the MP4 on disk.
 
-**Gate C (Creator Timeline Core) has not started. Gate D has not started.
-P1-F.2 has not started.** Two pre-existing defects are open and recorded:
-FAIL-047 and FAIL-048.
+T2 owns constant rational speed, Rate Stretch, Reverse, Freeze Frame, direct
+gain/fades/pan, real loudness normalization, linked J/L audio windows, truthful
+transition controls and bounded advanced-placement planners. Preserve the core
+rules: one gesture = one change set = one Undo, integer ticks only, and Preview /
+export share one accepted project authority.
 
-Read in this order when resuming: `DOCS/HANDOFF.md`, `DOCS/CURRENT_STATE.md`,
-then the Gate B evidence above.
+Two closure bugs are already fixed and must not regress: Hold Frame must route to
+its panel when enabled; Rate Stretch must preserve the clip's current Reverse /
+Forward direction.
+
+**Do not start T3 without explicit owner authorization.** Do not integrate or
+modify the separately owned Motion Graphics Library workstream from this branch.
 
 ### Previous handoff
 ## Fast resume

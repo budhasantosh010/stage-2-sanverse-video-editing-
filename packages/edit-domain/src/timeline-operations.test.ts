@@ -7,9 +7,11 @@ import {
   ms,
   testAsset,
   testProject,
+  testInsertFreeze,
   testRemove,
   testReorder,
   testSetAudio,
+  testSetLinkedAudio,
   testSetEnabled,
   testSplit,
   testTransition,
@@ -82,6 +84,105 @@ describe('splitting a piece of footage', () => {
     expect(clips[0].fadeOut).toEqual(ms(0))
     expect(clips[1].fadeIn).toEqual(ms(0))
     expect(clips[1].fadeOut).toEqual(ms(4_000))
+  })
+})
+
+describe('holding one exact frame', () => {
+  it('inserts one silent freeze and ripples later footage', () => {
+    const frozen = mustApply(base, testInsertFreeze({ atClipTime: ms(10_000), duration: ms(2_000) }))
+    const clips = clipsOf(frozen)
+    expect(clips).toHaveLength(3)
+    expect(clips[0]).toMatchObject({ clipId: TEST_CLIP_ID, segmentKind: 'video', sourceRange: { start: ms(0), duration: ms(10_000) } })
+    expect(clips[1]).toMatchObject({
+      clipId: 'clip_freeze001',
+      segmentKind: 'freeze',
+      compositionStart: ms(10_000),
+      freezeDuration: ms(2_000),
+      linkedAudio: null,
+      gainDb: 0,
+      fadeIn: ms(0),
+      fadeOut: ms(0),
+      pan: 0,
+    })
+    expect(clips[1].sourceRange.start).toEqual(ms(10_000))
+    expect(clips[1].sourceRange.duration.ticks).toBe(1)
+    expect(clips[2]).toMatchObject({
+      clipId: 'clip_right0001',
+      segmentKind: 'video',
+      compositionStart: ms(12_000),
+      sourceRange: { start: ms(10_000), duration: ms(20_000) },
+    })
+    expect(compositionDuration(frozen)).toEqual(ms(32_000))
+  })
+
+  it('takes the held source instant from the visible clock of a retimed clip', () => {
+    const speed = mustApply(base, {
+      schemaVersion: 'sanverse.operation/v3',
+      operationId: 'operation_speedfrz',
+      capabilityId: 'sanverse.timeline.time-transform.primitive/v1',
+      kind: 'set-clip-time-transform',
+      clipId: TEST_CLIP_ID,
+      playbackRate: { numerator: 2, denominator: 1 },
+      direction: 'forward',
+      maintainAudioPitch: true,
+      durationPolicy: 'ripple',
+      extensions: {},
+    } as TimelineOperation)
+    const frozen = mustApply(speed, testInsertFreeze({ atClipTime: ms(5_000), duration: ms(1_000) }))
+    const freeze = clipsOf(frozen).find((clip) => clip.segmentKind === 'freeze')
+    expect(freeze?.sourceRange.start).toEqual(ms(10_000))
+    expect(compositionDuration(frozen)).toEqual(ms(16_000))
+  })
+
+  it('refuses unsupported edits on a freeze instead of pretending they worked', () => {
+    const frozen = mustApply(base, testInsertFreeze())
+    expect(apply(frozen, testInsertFreeze({ clipId: 'clip_freeze001' }))).toMatchObject({ ok: false, error: { reason: 'FREEZE_OPERATION_UNSUPPORTED' } })
+    expect(apply(frozen, testSetAudio({ clipId: 'clip_freeze001' }))).toMatchObject({ ok: false, error: { reason: 'FREEZE_OPERATION_UNSUPPORTED' } })
+  })
+})
+
+describe('one still-linked picture and sound identity', () => {
+  it('stores a J-cut as one full linked-audio window and resets to exact picture alignment', () => {
+    const split = mustApply(base, testSplit({ atClipTime: ms(10_000) }))
+    const jCut = mustApply(split, testSetLinkedAudio({
+      clipId: 'clip_bbbbbbbb',
+      sourceRange: { start: ms(8_000), duration: ms(22_000) },
+      compositionOffsetTicks: -ms(2_000).ticks,
+    }))
+    expect(findClip(jCut, 'clip_bbbbbbbb')?.linkedAudio).toEqual({
+      sourceRange: { start: ms(8_000), duration: ms(22_000) },
+      compositionOffsetTicks: -ms(2_000).ticks,
+    })
+    const reset = mustApply(jCut, testSetLinkedAudio({
+      clipId: 'clip_bbbbbbbb',
+      sourceRange: { start: ms(10_000), duration: ms(20_000) },
+      compositionOffsetTicks: 0,
+    }))
+    expect(findClip(reset, 'clip_bbbbbbbb')?.linkedAudio).toBeNull()
+  })
+
+  it('stores an L-cut without creating a second identity', () => {
+    const split = mustApply(base, testSplit({ atClipTime: ms(10_000) }))
+    const lCut = mustApply(split, testSetLinkedAudio({
+      clipId: TEST_CLIP_ID,
+      sourceRange: { start: ms(0), duration: ms(12_000) },
+      compositionOffsetTicks: 0,
+    }))
+    expect(findClip(lCut, TEST_CLIP_ID)?.linkedAudio?.sourceRange).toEqual({ start: ms(0), duration: ms(12_000) })
+    expect(clipsOf(lCut)).toHaveLength(2)
+  })
+
+  it('refuses an out-of-bounds sound window and partial unlinking edits', () => {
+    const split = mustApply(base, testSplit({ atClipTime: ms(10_000) }))
+    expect(apply(split, testSetLinkedAudio({ clipId: TEST_CLIP_ID, sourceRange: { start: ms(0), duration: ms(31_000) } }))).toMatchObject({ ok: false, error: { reason: 'LINKED_AUDIO_WINDOW_INVALID' } })
+    const jCut = mustApply(split, testSetLinkedAudio({
+      clipId: 'clip_bbbbbbbb',
+      sourceRange: { start: ms(8_000), duration: ms(22_000) },
+      compositionOffsetTicks: -ms(2_000).ticks,
+    }))
+    expect(apply(jCut, testSplit({ clipId: 'clip_bbbbbbbb', newClipId: 'clip_cccccccc' }))).toMatchObject({ ok: false, error: { reason: 'LINKED_AUDIO_WINDOW_CUSTOM' } })
+    expect(apply(jCut, testTrim({ clipId: 'clip_bbbbbbbb' }))).toMatchObject({ ok: false, error: { reason: 'LINKED_AUDIO_WINDOW_CUSTOM' } })
+    expect(apply(jCut, testInsertFreeze({ clipId: 'clip_bbbbbbbb' }))).toMatchObject({ ok: false, error: { reason: 'LINKED_AUDIO_WINDOW_CUSTOM' } })
   })
 })
 

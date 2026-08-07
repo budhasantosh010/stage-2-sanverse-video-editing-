@@ -1,6 +1,6 @@
 # Build Tracker
 
-Last updated: 2026-08-03
+Last updated: 2026-08-08
 
 | ID | Goal | Deliverable | Status | Evidence |
 |---|---|---|---|---|
@@ -130,3 +130,20 @@ Last updated: 2026-08-03
 - [x] Full suites 2,050 passing; production build exit 0
 - [x] Real browser workflow, 20 steps, four screen sizes measured
 - [ ] Owner visual acceptance
+
+## P1-F.1E Gate T2 — 2026-08-08
+
+- [x] Constant rational speed and maintain-pitch policy
+- [x] Rate Stretch real end-handle gesture; one accepted change on release
+- [x] Reverse with bounded prepared backwards Preview media and FFmpeg parity
+- [x] Freeze Frame as a distinct silent segment/edit, not zero speed
+- [x] Direct gain/fade controls, A1 pan and real loudness normalization
+- [x] Linked J/L audio windows with one clip identity
+- [x] Truthful transition chooser and bounded duration/audio behavior
+- [x] Replace, Fit source to duration, Place on Top, Ripple Overwrite, Swap and Shuffle planners
+- [x] Late closure defects fixed: Hold Frame panel routing; Rate Stretch preserving Reverse
+- [x] Final full suites **2,292/2,292**; all-workspace production build exit 0
+- [x] Real Edge revision 34→44 workflow, one video, zero browser errors, zero failed HTTP responses, responsive 1440/1024/390
+- [x] Real revision-44 export: 1920×1080 H.264 High 30fps + AAC-LC stereo 48kHz, 24.841s, renderer/file SHA match
+- [x] Final evidence: `DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md`
+- [ ] Gate T3 — not started

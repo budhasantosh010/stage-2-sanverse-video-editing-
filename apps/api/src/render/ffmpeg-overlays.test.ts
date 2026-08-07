@@ -194,7 +194,9 @@ describe('primary-footage motion', () => {
       }) as never,
     })
 
-    expect(graph).toContain('[0:a]atrim=start=2.000000000:end=5.000000000')
+    // v8 keeps A1 as one linked composition-time window, independent of the
+    // picture-only motion splits above it.
+    expect(graph).toContain('[0:a]atrim=start=0.000000000:end=8.000000000')
     expect(graph.indexOf('[motion_composited_1]')).toBeLessThan(graph.indexOf('concat=n=3'))
     expect(graph.indexOf('concat=n=3')).toBeLessThan(graph.indexOf('drawtext='))
   })
@@ -455,7 +457,7 @@ describe('music', () => {
       plan: plan({ sources: MUSIC_SOURCES, music: [musicNode()] }) as never,
     })
     expect(graph).toContain('volume=-18dB')
-    expect(graph).toContain('amix=inputs=2:duration=first:dropout_transition=0:normalize=0')
+    expect(graph).toContain('amix=inputs=3:duration=first:dropout_transition=0:normalize=0')
     expect(graph).toContain('[aout]')
   })
 
@@ -505,7 +507,8 @@ describe('music', () => {
     const command = buildFfmpegArguments({
       ...base,
       hasAudio: false,
-      plan: plan({}) as never,
+      // A genuinely silent source compiles with no linked A1 window.
+      plan: plan({ segments: [testSegmentNode({ linkedAudio: null })] }) as never,
     })
     expect(command).toContain('-an')
     expect(command).not.toContain('[aout]')

@@ -46,6 +46,9 @@ const renderTimeline = (input: Readonly<{
   onItemAction?: (itemId: string, action: unknown) => void
   onMultiGesture?: (gesture: unknown) => void
   onAction?: (action: unknown) => void
+  freezeClipLabel?: string | null
+  freezeUnavailableReason?: string | null
+  onFreezeApply?: (durationTicks: number) => void
 }> = {}) => {
   const selectedIds = input.selectedItemId ? [input.selectedItemId] : []
   const model = input.model ?? buildTimelineViewModel({
@@ -88,6 +91,9 @@ const renderTimeline = (input: Readonly<{
     onMultiGesture: input.onMultiGesture ?? vi.fn(),
     onAction: input.onAction ?? vi.fn(),
     speedSubject: null,
+    freezeClipLabel: input.freezeClipLabel ?? null,
+    freezeUnavailableReason: input.freezeUnavailableReason ?? null,
+    onFreezeApply: input.onFreezeApply ?? vi.fn(),
     onSpeedPreview: () => '',
     onSpeedChoose: vi.fn(),
     onSelectMarker: vi.fn(),
@@ -270,6 +276,24 @@ describe('Timeline V1', () => {
     expect(totalItems).toBeGreaterThan(150)
     expect(renderedItems.length).toBeGreaterThan(0)
     expect(renderedItems.length).toBeLessThan(totalItems / 2)
+  })
+
+  it('opens the Hold frame panel from More', () => {
+    const base = projectWithAllTimelineFamilies()
+    const firstClipId = base.composition.tracks[0].clips[0].clipId
+    const selectedItemId = `clip:${firstClipId}`
+    const model = buildTimelineViewModel({ project: base, selectedItemIds: [selectedItemId], pending: null })
+    const onAction = vi.fn()
+    renderTimeline({ model, selectedItemId, playheadTicks: ticks(5), onAction, freezeClipLabel: 'Video' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'More things you can do' }))
+    const hold = screen.getByRole('menuitem', { name: /^Hold frame$/i })
+    expect(hold).toBeEnabled()
+    fireEvent.click(hold)
+
+    expect(screen.getByRole('group', { name: 'Hold frame' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Hold frame duration seconds')).toBeInTheDocument()
+    expect(onAction).not.toHaveBeenCalledWith('freeze')
   })
 
   it('keeps zoom and fit as presentation-state requests, never project edits', () => {

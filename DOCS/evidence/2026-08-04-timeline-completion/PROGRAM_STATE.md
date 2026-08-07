@@ -4,14 +4,14 @@
 new session. It is updated at the end of every working block, not only at the end
 of a gate.**
 
-Last updated: 2026-08-06
-Branch: `agent/g6-g8-local-alpha`
+Last updated: 2026-08-08
+Branch: `timeline-t2-completion`
 Program start commit: `45c0c981fb869afd236f10cbea829b1859d5beb6`
 Latest pushed commit: see `git rev-parse HEAD` — this file is committed WITH the
 work it describes, so HEAD is always the commit that made these numbers true.
 Test baseline at program start: **1,723**
-Tests now: **2,215** — edit-domain 488 · render-contract 119 · intent-domain 27 ·
-api 388 · web 1,193. `npm run build` exit 0.
+Tests now: **2,292** — edit-domain 496 · render-contract 118 · intent-domain 27 ·
+api 403 · web 1,248. `npm run build` exit 0.
 
 ---
 
@@ -23,8 +23,8 @@ api 388 · web 1,193. `npm run build` exit 0.
   P0     Verify + capability inventory                DONE         ad11b07..
   T0     Correctness: preview truth, mixed export     DONE         ad11b07
   T1     Creator interaction: selection/clipboard     DONE         ef9332c
-  T2     Speed, audio, transitions                    PART DONE    (this commit)
-         └─ speed + pitch + pan + dip-to-white DONE; six parts NOT STARTED
+  T2     Speed, audio, transitions                    DONE         (this commit)
+         └─ final closure: 2,292 tests + real Edge + real revision-44 export
   T3     Precision trim: ripple/roll/slip/slide       NOT STARTED  —
   T4     Keyframe lanes + graph editor                NOT STARTED  —
   T5     Advanced tracks, expandable tracks           NOT STARTED  —
@@ -32,8 +32,9 @@ api 388 · web 1,193. `npm run build` exit 0.
   T7     Transcript + AI-ready contracts              NOT STARTED  —
 ```
 
-**Next action when a session starts:** find the first row that is not DONE, open
-its section below, and continue at the first unticked box.
+**Next action when a session starts:** T3 is the first unfinished gate, but do
+not start it until the owner explicitly authorizes T3. Until then, preserve the
+closed T2 state and its evidence.
 
 ---
 
@@ -168,72 +169,49 @@ Evidence: `T1_CREATOR_INTERACTION.md`, `TIMELINE_CAPABILITY_INVENTORY.md`,
 - a group was not proved to survive a reload; markers were, the same way
 - marker drag-to-move was not driven by hand
 
-### T2 — SPEED, AUDIO, TRANSITIONS — **PART DONE**
+### T2 — SPEED, AUDIO, TRANSITIONS — **DONE**
 
-**START HERE NEXT SESSION.** Full evidence: `T2_SPEED_EVIDENCE.md`.
-Decisions and rejected alternatives: `DOCS/decisions/ADR-CLIP-TIME-AUDIO-TRANSITIONS-V1.md`.
-What already existed before T2: `T2_EXISTING_CONTRACT_AUDIT.md`.
+**Gate closed 2026-08-08.** Final evidence:
+`T2_FINAL_CLOSURE.md`, `t2-master-browser-report.json`,
+`t2-master-screenshots/`, and `t2-export-metadata.json`.
+Decisions and rejected alternatives remain in
+`DOCS/decisions/ADR-CLIP-TIME-AUDIO-TRANSITIONS-V1.md`.
 
-**The gate rule still holds: T2 is NOT done, and is not recorded as done.** What
-landed is a complete, tested, browser-proven vertical slice — the time model
-plus everything that rides on it — and six parts that were not begun.
+#### Completed
 
-#### DONE and proved end to end
+- [x] T2.0 existing-contract audit and ADR before the time-model changes
+- [x] **T2.1 constant speed** — exact rational rate from 0.1x to 16x, maintain-pitch policy, speed badge, Preview/export parity
+- [x] **T2.2 Rate Stretch gesture** — real Timeline end handle; detached movement; one accepted change on release; preserves the current forward/reverse direction
+- [x] **T2.3 Reverse** — accepted time transform plus exact bounded backwards-preview MP4; export uses the same direction
+- [x] **T2.4 Freeze Frame** — distinct closed freeze segment, never `0x`; authored hold is silent and one Undo removes it
+- [x] **T2.5 direct audio** — gain/fade handles, A1 pan, and real local loudness normalization with explicit Apply
+- [x] **T2.6 J/L cuts** — linked sound has its own source/composition window while retaining one clip identity
+- [x] **T2.8 transition chooser** — Dip to Black / Dip to White, bounded duration controls and optional linked-audio fade-through-silence
+- [x] **T2.9 advanced placement planners** — Replace, Fit source to duration, Place on Top, Ripple Overwrite, Swap and Shuffle use bounded planners rather than React-only policy
+- [x] project schema deliberately advanced to `sanverse.project/v5` and render plan to `sanverse.render-plan/v8` for the closed freeze/linked-audio/transition shape
+- [x] final automated gate: **2,292 / 2,292** — API 403, Web 1,248, edit-domain 496, intent-domain 27, render-contract 118
+- [x] all-workspace production build exit 0
+- [x] final real Edge workflow: revision 34 → 44, one video element, transition, reverse preparation, direct gain/pan, real normalization, Rate Stretch, J-cut, Freeze, Undo/Redo, reopen, zero browser errors, zero failed HTTP responses
+- [x] responsive real-browser checks at 1440x900, 1024x768 and 390x844 with no horizontal overflow
+- [x] real revision-44 MP4 export: 1920x1080 H.264 High 30 fps + AAC-LC stereo 48 kHz, 24.841 s, renderer/file SHA match
 
-- [x] T2.0 audit of `set-clip-audio`, `set-clip-transition` and the time model
-- [x] ADR written before any time-model code
-- [x] **T2.1 constant speed** — `clip-time.ts`, a rational `{numerator,denominator}`
-      from 0.1x to 16x, never a float. 44 + 25 tests. Ripple and preserve-start,
-      with a truthful refusal instead of a silent overwrite
-- [x] **maintain pitch** — on by default; the squeaky effect offered deliberately
-- [x] **pan** — added to the EXISTING `set-clip-audio` as an optional field,
-      whole numbers in hundredths of a percent, constant-power law. 24 tests
-- [x] **dip-to-white** — one more value in the EXISTING `set-clip-transition`
-- [x] **preview and export both retimed** — `ffmpeg-retiming.ts` (24 tests),
-      `segment-playback.ts` (17 tests). One `<video>` element, still
-- [x] **the Speed panel** — 8 presets, typed speeds, pitch switch, reset. 17 tests
-- [x] **the speed badge** on the clip, and in the screen-reader label
-- [x] **render-plan version deliberately NOT moved** — every new field is
-      optional and written only when a piece is actually retimed, so an
-      untouched project keeps its finished export. Proved by test
-- [x] real browser run on the owner's project: 30 → 31 → Undo 32 → Redo 33,
-      clip 294px → 147px, next clip moved by exactly 147px, badge, reload,
-      four screen sizes
-- [x] **a real MP4 exported and probed**: 25.804 s against 25.808 s predicted,
-      774 frames at 30 fps, stereo 48 kHz. Re-export returned the same job in
-      206 ms
+#### Late defects found and fixed before closure
 
-#### NOT STARTED — each with the reason, in `T2_SPEED_EVIDENCE.md` Part 7
+1. Hold Frame was enabled but the action dispatcher omitted `freeze` from the panel-opening route. Fixed and held by a Timeline regression test.
+2. Rate Stretch passed hard-coded `forward`, silently stripping Reverse. Preview and commit now carry the selected clip's current direction; the real browser result remains `1.63x Backwards`.
 
-- [ ] **T2.2 rate-stretch GESTURE** — the arithmetic is built and tested
-      (`rateForTargetDuration`); no pointer drag is wired to it
-- [ ] **T2.3 reverse** — needs a prepared backwards copy of the footage through
-      the derived-media system. The control REFUSES in plain words today rather
-      than showing forwards footage
-- [ ] **T2.4 freeze frame** — needs its own closed segment kind. Cannot be
-      "speed zero"; that is division by zero
-- [ ] **T2.5 direct gain line and fade handles** — the values work; the dragging
-      does not exist
-- [ ] **T2.5 normalisation** — needs real loudness measurement, not waveform pixels
-- [ ] **T2.6 J-cuts and L-cuts** — needs a separate audio window that still
-      shares one identity. Shape change
-- [ ] **T2.8 transition chooser, duration handles, numeric entry**
-- [ ] **T2.9 Replace · Fit source to duration · Place on Top · Ripple Overwrite ·
-      Swap · Shuffle** — six planners, none started
+#### Deliberately refused, and why
 
-#### DELIBERATELY REFUSED, and why
+Cross Dissolve, Wipe, Slide, Push and Zoom still require two source shots visible
+at the same instant. The current one-video Preview cannot show that truthfully,
+so these transitions remain unavailable instead of allowing Preview/export
+drift.
 
-Cross Dissolve, Wipe, Slide, Push, Zoom. All five need TWO shots on screen at
-the same instant. The preview has ONE video player and that rule is not
-negotiable. The exporter could produce them; the preview could not; the user
-would watch a cut and be handed a dissolve.
+#### Limits of the final proof
 
-#### Limits of the proof
-
-- the preview's speed was proved by TEST, not driven by hand — the frame loop
-  needs sustained real playback, which this browser harness does not do
-- the pitch switch was not measured with a 440 Hz tone; the filters were read
-- clicks were dispatched as events, not made with a physical mouse
+- The real Edge Rate Stretch handle was driven by a synthetic `PointerEvent` inside the page, not a physical mouse. Component tests separately cover pointer cancellation and bounds.
+- Reverse preparation is proved by the exact network request emitted by the running app plus the returned bounded MP4; headless H.264 `currentSrc` timing is too flaky to use as the primary assertion.
+- The pitch-preservation filters are covered by implementation/tests; the final closure did not add an external 440 Hz tone measurement.
 
 ### T3 — PRECISION TRIM
 

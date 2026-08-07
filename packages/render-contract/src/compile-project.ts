@@ -13,7 +13,13 @@ import {
   placeSourceSpan,
   type EditProject,
 } from '@sanverse/edit-domain'
-import { clipCompositionDurationTicks, clipIsRetimed } from '@sanverse/edit-domain/composition'
+import {
+  clipCompositionDurationTicks,
+  isFreezeClip,
+  linkedAudioCompositionDurationTicks,
+  linkedAudioCompositionStartTicks,
+  linkedAudioSourceRange,
+} from '@sanverse/edit-domain/composition'
 
 import { NAMEPLATE_STYLE_ID } from './nameplate-style.ts'
 import { isVisualFitMode, type VisualFitMode } from './visual-normalization.ts'
@@ -43,9 +49,10 @@ import {
   type MusicNode,
   type RenderNode,
   type RenderPlan,
+  type PrimarySegmentNode,
   type RenderPlanError,
   type RenderSource,
-  type SourceSegmentNode,
+  type TransitionEdgeNode,
   type VisualPropertiesNode,
 } from './render-plan.ts'
 
@@ -123,7 +130,7 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
   const primaryAsset = project.assets.find((asset) => asset.mediaKind === 'video')
   if (primaryAsset) useSource(primaryAsset.assetId)
 
-  const segments: SourceSegmentNode[] = []
+  const segments: PrimarySegmentNode[] = []
   for (const track of composition.tracks) {
     for (const clip of track.clips) {
       // A hidden piece leaves a hole rather than shifting everything after it,
@@ -132,60 +139,88 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
       if (!useSource(clip.assetId)) {
         return { ok: false, error: { code: 'COMPILE_FAILED', reason: 'A piece of footage is missing.' } }
       }
-      // Retiming is written into the plan ONLY when the piece was actually
-      // retimed, and pan only when it was actually moved off centre. A piece
-      // nobody touched produces byte-for-byte the plan it always produced, so
-      // its finished export is still valid and is handed straight back.
-      const retimed = clipIsRetimed(clip)
-      const transition = transitionOut.get(clip.clipId) ?? transitionIn.get(clip.clipId)
-      const retiming = retimed
-        ? {
-            sourceDurationTicks: clip.sourceRange.duration.ticks,
-            playbackRateNumerator: clip.timeTransform.playbackRate.numerator,
-            playbackRateDenominator: clip.timeTransform.playbackRate.denominator,
-            direction: clip.timeTransform.direction,
-            maintainAudioPitch: clip.timeTransform.maintainAudioPitch,
-          }
-        : {}
+      const asset = findAsset(project.assets, clip.assetId)
+      if (!asset || asset.mediaKind !== 'video') {
+        return { ok: false, error: { code: 'COMPILE_FAILED', reason: 'A piece of footage is not a video.' } }
+      }
+      const motions = Object.freeze(
+        footageMotions
+          .filter((motion) =>
+            motion.assetId === clip.assetId &&
+            motion.sourceInterval.start.ticks < clip.sourceRange.start.ticks + clip.sourceRange.duration.ticks &&
+            clip.sourceRange.start.ticks < motion.sourceInterval.start.ticks + motion.sourceInterval.duration.ticks,
+          )
+          .map((motion) => Object.freeze({
+            motionId: motion.motionId,
+            sourceInterval: motion.sourceInterval,
+            transform: motion.transform,
+            crop: motion.crop,
+            tracks: motion.tracks,
+          })),
+      )
+      const interval = Object.freeze({
+        start: clip.compositionStart,
+        duration: mediaTime(clipCompositionDurationTicks(clip)),
+      })
+
+      if (isFreezeClip(clip)) {
+        segments.push(Object.freeze({
+          nodeId: clip.clipId,
+          kind: 'freeze-segment' as const,
+          interval,
+          assetId: clip.assetId,
+          sourceTimeTicks: clip.sourceRange.start.ticks,
+          sourceStartTicks: clip.sourceRange.start.ticks,
+          sourceDurationTicks: 1 as const,
+          videoEnabled: trackOutputs.V1,
+          audioEnabled: false as const,
+          linkedAudio: null,
+          footageMotions: motions,
+          gainDb: 0 as const,
+          fadeInTicks: 0 as const,
+          fadeOutTicks: 0 as const,
+          playbackRateNumerator: 1 as const,
+          playbackRateDenominator: 1 as const,
+          direction: 'forward' as const,
+          maintainAudioPitch: true as const,
+          pan: 0 as const,
+        }))
+        continue
+      }
+
+      const audioSource = linkedAudioSourceRange(clip)
+      const linkedAudio = asset.hasAudio
+        ? Object.freeze({
+            interval: Object.freeze({
+              start: mediaTime(linkedAudioCompositionStartTicks(clip)),
+              duration: mediaTime(linkedAudioCompositionDurationTicks(clip)),
+            }),
+            sourceStartTicks: audioSource.start.ticks,
+            sourceDurationTicks: audioSource.duration.ticks,
+          })
+        : null
       segments.push(Object.freeze({
         nodeId: clip.clipId,
         kind: 'source-segment' as const,
-        interval: Object.freeze({
-          start: clip.compositionStart,
-          duration: mediaTime(clipCompositionDurationTicks(clip)),
-        }),
+        interval,
         assetId: clip.assetId,
         sourceStartTicks: clip.sourceRange.start.ticks,
-        ...retiming,
-        ...(clip.pan === 0 ? {} : { pan: clip.pan }),
-        ...(transition && transition.color === 'white' ? { transitionColor: 'white' as const } : {}),
-        // V1 carries the picture, A1 the sound that came with it. Turning one
-        // off leaves the other exactly as it was, and leaves the piece the same
-        // length so nothing after it moves.
+        sourceDurationTicks: clip.sourceRange.duration.ticks,
+        playbackRateNumerator: clip.timeTransform.playbackRate.numerator,
+        playbackRateDenominator: clip.timeTransform.playbackRate.denominator,
+        direction: clip.timeTransform.direction,
+        maintainAudioPitch: clip.timeTransform.maintainAudioPitch,
+        pan: clip.pan,
+        // V1 carries the picture, A1 the still-linked sound. The sound window
+        // may start before or end after the picture, but it never becomes a
+        // second clip identity.
         videoEnabled: trackOutputs.V1,
-        audioEnabled: trackOutputs.A1,
-        footageMotions: Object.freeze(
-          footageMotions
-            .filter((motion) =>
-              motion.assetId === clip.assetId &&
-              motion.sourceInterval.start.ticks < clip.sourceRange.start.ticks + clip.sourceRange.duration.ticks &&
-              clip.sourceRange.start.ticks < motion.sourceInterval.start.ticks + motion.sourceInterval.duration.ticks,
-            )
-            .map((motion) => Object.freeze({
-              motionId: motion.motionId,
-              sourceInterval: motion.sourceInterval,
-              transform: motion.transform,
-              crop: motion.crop,
-              tracks: motion.tracks,
-            })),
-        ),
+        audioEnabled: trackOutputs.A1 && linkedAudio !== null,
+        linkedAudio,
+        footageMotions: motions,
         gainDb: clip.gainDb,
         fadeInTicks: clip.fadeIn.ticks,
         fadeOutTicks: clip.fadeOut.ticks,
-        videoFadeInTicks: transitionIn.get(clip.clipId)?.video ?? 0,
-        videoFadeOutTicks: transitionOut.get(clip.clipId)?.video ?? 0,
-        transitionAudioFadeInTicks: transitionIn.get(clip.clipId)?.audio ?? 0,
-        transitionAudioFadeOutTicks: transitionOut.get(clip.clipId)?.audio ?? 0,
       }))
     }
   }
@@ -193,6 +228,24 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
 
   if (segments.length === 0) {
     return { ok: false, error: { code: 'COMPILE_FAILED', reason: 'Every piece of footage is switched off.' } }
+  }
+
+  const segmentIndexById = new Map(segments.map((segment, index) => [segment.nodeId, index]))
+  const transitions: TransitionEdgeNode[] = []
+  for (const operation of operations) {
+    if (operation.kind !== 'set-clip-transition' || operation.style === 'none') continue
+    const fromIndex = segmentIndexById.get(operation.clipId)
+    const toIndex = segmentIndexById.get(operation.nextClipId)
+    if (fromIndex === undefined || toIndex === undefined || toIndex !== fromIndex + 1) continue
+    transitions.push(Object.freeze({
+      nodeId: `transition.${operation.clipId}.${operation.nextClipId}`,
+      kind: 'transition-edge' as const,
+      fromSegmentId: operation.clipId,
+      toSegmentId: operation.nextClipId,
+      style: operation.style,
+      durationTicks: operation.duration.ticks,
+      audio: operation.audio,
+    }))
   }
 
   const overlays: RenderNode[] = []
@@ -409,6 +462,7 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     durationTicks: duration.ticks,
     sources: Object.freeze(sources),
     segments: Object.freeze(segments),
+    transitions: Object.freeze(transitions),
     overlays: Object.freeze(overlays),
     visuals: Object.freeze(visuals),
     music: Object.freeze(music),

@@ -74,27 +74,22 @@ const planOf = (project: EditProject) => {
   return compiled.value
 }
 
-describe('a project nobody has retimed compiles EXACTLY as it always did', () => {
-  it('writes no speed fields at all, so its finished export is still valid', () => {
-    // This is the whole reason the fields are optional. Writing
-    // `playbackRateNumerator: 1` into every plan would change the fingerprint
-    // of every project ever made, and every user with a finished export would
-    // be made to wait for a byte-identical one.
+describe('v8 makes retiming and linked-audio state explicit', () => {
+  it('writes the normal-rate values explicitly so every renderer reads one closed shape', () => {
     const plan = planOf(multiClipProject())
     for (const segment of plan.segments) {
-      expect(Object.hasOwn(segment, 'sourceDurationTicks')).toBe(false)
-      expect(Object.hasOwn(segment, 'playbackRateNumerator')).toBe(false)
-      expect(Object.hasOwn(segment, 'playbackRateDenominator')).toBe(false)
-      expect(Object.hasOwn(segment, 'direction')).toBe(false)
-      expect(Object.hasOwn(segment, 'maintainAudioPitch')).toBe(false)
-      expect(Object.hasOwn(segment, 'pan')).toBe(false)
-      expect(Object.hasOwn(segment, 'transitionColor')).toBe(false)
+      expect(segment.sourceDurationTicks).toBeGreaterThan(0)
+      expect(segment.playbackRateNumerator).toBe(1)
+      expect(segment.playbackRateDenominator).toBe(1)
+      expect(segment.direction).toBe('forward')
+      expect(segment.maintainAudioPitch).toBe(true)
+      expect(segment.pan).toBe(0)
     }
   })
 
-  it('did not move the plan version, because the closed output shape is unchanged', () => {
+  it('moves exactly once to v8 for freeze, linked audio, and transition-edge truth', () => {
     expect(planOf(multiClipProject()).schemaVersion).toBe(RENDER_PLAN_SCHEMA_VERSION)
-    expect(RENDER_PLAN_SCHEMA_VERSION).toBe('sanverse.render-plan/v7')
+    expect(RENDER_PLAN_SCHEMA_VERSION).toBe('sanverse.render-plan/v8')
   })
 })
 
@@ -168,29 +163,24 @@ describe('fading through white as well as black', () => {
     }])
   }
 
-  it('says nothing about colour for the black one, because black is the default', () => {
-    const plan = planOf(withTransition('dip-to-black'))
-    for (const segment of plan.segments) {
-      expect(Object.hasOwn(segment, 'transitionColor')).toBe(false)
-    }
-  })
-
-  it('says white on BOTH sides of the join for the white one', () => {
-    const plan = planOf(withTransition('dip-to-white'))
-    const fading = plan.segments.filter(
-      (segment) => segment.videoFadeInTicks > 0 || segment.videoFadeOutTicks > 0,
-    )
-    expect(fading).toHaveLength(2)
-    for (const segment of fading) expect(segment.transitionColor).toBe('white')
-  })
-
-  it('ramps the picture on the way out and on the way in, for either colour', () => {
+  it('stores black or white once on the join instead of duplicating colour on both clips', () => {
     for (const style of ['dip-to-black', 'dip-to-white'] as const) {
       const plan = planOf(withTransition(style))
-      const ordered = [...plan.segments].sort((left, right) => left.interval.start.ticks - right.interval.start.ticks)
-      expect(ordered[0].videoFadeOutTicks, style).toBe(Math.floor(S / 2))
-      expect(ordered[1].videoFadeInTicks, style).toBe(Math.floor(S / 2))
+      expect(plan.transitions).toHaveLength(1)
+      expect(plan.transitions[0]).toMatchObject({
+        kind: 'transition-edge',
+        style,
+        durationTicks: Math.floor(S / 2),
+        audio: 'fade-through-silence',
+      })
     }
+  })
+
+  it('binds that one edge to the two adjacent segment identities', () => {
+    const plan = planOf(withTransition('dip-to-white'))
+    const ordered = [...plan.segments].sort((left, right) => left.interval.start.ticks - right.interval.start.ticks)
+    expect(plan.transitions[0].fromSegmentId).toBe(ordered[0].nodeId)
+    expect(plan.transitions[0].toSegmentId).toBe(ordered[1].nodeId)
   })
 
   it('leaves the pieces exactly as long as they were: a transition does not eat time', () => {

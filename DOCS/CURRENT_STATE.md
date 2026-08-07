@@ -1,17 +1,24 @@
 # Current State
 
-Last updated: 2026-08-05
+Last updated: 2026-08-08
 
 ## Active goal
 
-**P1-F.1E — Complete Timeline Experience.** Eight gates, T0 through T7, taking
-the timeline from "it works" to something that feels like CapCut for everyday
-work and like Resolve when you need depth. The live gate table, the per-gate
-checklist and the rules are in
+**P1-F.1E — Complete Timeline Experience.** Eight gates, T0 through T7. The live
+gate table, per-gate checklist and invariants are in
 `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md` — **read that
 file first in any new session.**
 
-**Gate T0 is DONE.** Gates T1 through T7 are NOT STARTED. Tests: **1,848**.
+**Gates T0, T1 and T2 are DONE. T3 through T7 are NOT STARTED.** Final T2 gate:
+**2,292/2,292 tests**, all-workspace production build exit 0, real Edge workflow
+34→44 with zero browser/HTTP errors, and a real revision-44 1920×1080 H.264/AAC
+export whose renderer SHA matches the MP4 on disk. T2 closure evidence is
+`DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md`.
+
+T2's final verification found and fixed two real defects before closure: Hold
+Frame was enabled but not routed to its panel, and Rate Stretch silently removed
+Reverse because the Studio adapter hard-coded `forward`. Both are now held by
+regression/browser evidence. **Do not start T3 unless explicitly authorized.**
 
 ### Gate T0, thing one: the preview stopped lying
 

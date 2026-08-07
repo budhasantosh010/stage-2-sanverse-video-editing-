@@ -8,15 +8,15 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 ## Current gate
 
-- **P1-F.0.1 — Studio Workspaces and Docking V1 is technically complete.** Evidence: `DOCS/evidence/2026-08-01-p1f01-studio-workspaces-docking-v1/`.
-- Studio exposes accessible Edit, Effects, Color, and Audio tabs only inside Studio while keeping one project, revision, history, playhead, Timeline, selection, Canvas/Inspector draft, native video, AI conversation, proposal, preview, and export authority.
-- A closed `sanverse.workspace-layout/v1` contract validates and clamps dock widths, Timeline height, collapse state, Tool/AI tab, active workspace, and Edit/Motion/Timeline/Review/AI/Audio presets before local persistence.
-- Left, right, and Timeline splitters support bounded pointer and keyboard resizing, Shift steps, Home/End, and Escape cancellation. Compact layouts use explicit Media and Tool/AI switches.
-- Effects, Color, and Audio expose only current capabilities. Primary-video Color explicitly says grading is not implemented; future mixer and grading controls are not faked.
-- Real Edge preserved one video and the same AI draft through all workspaces, presets, splitters, Point mode, tablet/mobile layouts, export, and cleanup. Presentation changes kept revision `15 → 15`, caused no horizontal overflow, and produced zero page, console, or failed-HTTP errors.
-- The exported 18.033333-second MP4 is 1920×1080 H.264 High at 30 fps with AAC-LC stereo, 10,789,990 bytes.
-- Final suites pass: web 515/515, edit-domain 299/299, API 239/239, render-contract 65/65, intent-domain 27/27 — **1,145/1,145 total** — plus the all-workspace build.
-- **P1-F.0 remains complete. P1-F.1 and P1-F.2 have not started.** Continue only after the owner chooses the next milestone.
+- **P1-F.1E Complete Timeline Experience is complete through Gate T2.** T0, T1 and T2 are DONE; T3 through T7 are NOT STARTED.
+- The authoritative gate table and invariants live in `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md`.
+- Final T2 evidence is `DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md` plus `t2-master-browser-report.json`, `t2-master-screenshots/`, and `t2-export-metadata.json` in the same folder.
+- T2 now carries constant rational speed, Rate Stretch, Reverse, Freeze Frame, direct gain/fades/pan, real loudness normalization, linked J/L audio windows, truthful transition controls and bounded advanced-placement planners through one accepted project/time authority.
+- Final suites: API 403/403, Web 1,248/1,248, edit-domain 496/496, intent-domain 27/27, render-contract 118/118 — **2,292/2,292 total** — plus an all-workspace production build with exit 0.
+- Final real Edge workflow ran revision `34 → 44`: transition, reverse preparation, direct audio, normalization, Rate Stretch still `Backwards`, J-cut, Freeze, Undo, Redo and reopen; one video element; zero browser errors; zero failed HTTP responses; no horizontal overflow at 1440×900, 1024×768 or 390×844.
+- Final revision-44 export succeeded in one attempt: 24.841 s, 1920×1080 H.264 High at 30 fps with AAC-LC stereo/48 kHz, 12,548,402 bytes. Renderer SHA and file SHA match exactly.
+- Two late T2 defects are fixed and registered: Hold Frame command routing (FAIL-053) and Rate Stretch preserving Reverse (FAIL-054).
+- **Do not start T3 unless the owner explicitly authorizes it.** A separate agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from the Timeline program.
 - Open human evidence remains human-only: repeated owner workflows, representative non-editor workflows, and agreed performance budgets.
 - Real-provider connection still requires the owner's data-leaving-machine decision and keys. Accounts and SaaS operations remain conditional.
 

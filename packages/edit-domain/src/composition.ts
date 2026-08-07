@@ -46,12 +46,33 @@ export type TimeAnchor =
  * and for every piece at normal speed it still is, to the tick. That is why no
  * saved project needed rewriting when speed arrived.
  */
+export type PrimarySegmentKind = 'video' | 'freeze'
+
+/**
+ * The sound window that remains linked to one ordinary picture clip.
+ *
+ * `compositionOffsetTicks` is signed and measured from the picture's start.
+ * A negative value is a J-cut; a window that ends after the picture is an
+ * L-cut. The source interval and the picture still share one clip identity,
+ * speed, direction, gain, fades, and pan. There is deliberately no unlink.
+ */
+export type LinkedAudioWindowV1 = Readonly<{
+  sourceRange: TimeRange
+  compositionOffsetTicks: number
+}>
+
 export type Clip = Readonly<{
   clipId: string
   assetId: string
   sourceRange: TimeRange
   compositionStart: MediaTime
   enabled: boolean
+  /** Absent in legacy/plain inputs; validation always returns an explicit value. */
+  segmentKind?: PrimarySegmentKind
+  /** Required and positive only when `segmentKind` is `freeze`; otherwise null. */
+  freezeDuration?: MediaTime | null
+  /** Optional full linked-audio window. Null means exactly the picture window. */
+  linkedAudio?: LinkedAudioWindowV1 | null
   /**
    * How this piece is played through: its speed, whether it runs backwards,
    * and whether sped-up voices keep their normal pitch.
@@ -193,7 +214,13 @@ const CLIP_KEYS = [
  * used is a bad trade. The same reasoning already governs `framing` on the
  * render plan.
  */
-const OPTIONAL_CLIP_KEYS = ['timeTransform', 'pan'] as const
+const OPTIONAL_CLIP_KEYS = [
+  'timeTransform',
+  'pan',
+  'segmentKind',
+  'freezeDuration',
+  'linkedAudio',
+] as const
 const TRACK_KEYS = ['trackId', 'kind', 'order', 'clips'] as const
 const COMPOSITION_KEYS = ['compositionId', 'width', 'height', 'tracks'] as const
 const TRACK_KINDS: readonly TrackKind[] = ['video', 'audio', 'overlay']
@@ -209,12 +236,37 @@ const TRACK_KINDS: readonly TrackKind[] = ['video', 'audio', 'overlay']
  * A piece at normal speed gets back exactly `sourceRange.duration.ticks`, with
  * no arithmetic at all, so nothing about an untouched project can shift.
  */
+export const isFreezeClip = (clip: Clip): boolean => clip.segmentKind === 'freeze'
+
 export const clipCompositionDurationTicks = (clip: Clip): number =>
-  anchoredCompositionDuration(
-    clip.sourceRange.start.ticks,
-    clip.sourceRange.duration.ticks,
-    clip.timeTransform.playbackRate,
-  )
+  isFreezeClip(clip)
+    ? clip.freezeDuration?.ticks ?? 0
+    : anchoredCompositionDuration(
+        clip.sourceRange.start.ticks,
+        clip.sourceRange.duration.ticks,
+        clip.timeTransform.playbackRate,
+      )
+
+export const linkedAudioSourceRange = (clip: Clip): TimeRange =>
+  clip.linkedAudio?.sourceRange ?? clip.sourceRange
+
+export const linkedAudioCompositionStartTicks = (clip: Clip): number =>
+  clip.compositionStart.ticks + (clip.linkedAudio?.compositionOffsetTicks ?? 0)
+
+export const linkedAudioCompositionDurationTicks = (clip: Clip): number =>
+  isFreezeClip(clip)
+    ? 0
+    : anchoredCompositionDuration(
+        linkedAudioSourceRange(clip).start.ticks,
+        linkedAudioSourceRange(clip).duration.ticks,
+        clip.timeTransform.playbackRate,
+      )
+
+export const linkedAudioCompositionRange = (clip: Clip): TimeRange =>
+  Object.freeze({
+    start: mediaTime(Math.max(0, linkedAudioCompositionStartTicks(clip))),
+    duration: mediaTime(linkedAudioCompositionDurationTicks(clip)),
+  })
 
 /** The half-open span this clip occupies in the finished video. */
 export const clipCompositionRange = (clip: Clip): TimeRange =>
@@ -253,6 +305,7 @@ export const compositionTimeToClip = (clip: Clip, compositionTime: MediaTime): M
  * seconds in means being 4 seconds before the END of the chosen stretch.
  */
 export const clipTimeToSource = (clip: Clip, clipTime: MediaTime): MediaTime => {
+  if (isFreezeClip(clip)) return clip.sourceRange.start
   const rate = clip.timeTransform.playbackRate
   const sourceOffset = sourceTicksForCompositionOffset(clipTime.ticks, rate)
   if (clip.timeTransform.direction === 'reverse') {
@@ -268,6 +321,7 @@ export const clipTimeToSource = (clip: Clip, clipTime: MediaTime): MediaTime => 
 
 /** Map a time inside the source asset back onto a clip's own timeline. */
 export const sourceTimeToClip = (clip: Clip, sourceTime: MediaTime): MediaTime => {
+  if (isFreezeClip(clip)) return ZERO_TIME
   const rate = clip.timeTransform.playbackRate
   if (clip.timeTransform.direction === 'reverse') {
     const fromEnd = clip.sourceRange.start.ticks + clip.sourceRange.duration.ticks - sourceTime.ticks
@@ -432,6 +486,69 @@ const validateClip = (
       timeTransform = validated.value
     }
   }
+
+  let segmentKind: PrimarySegmentKind = 'video'
+  if (Object.hasOwn(input, 'segmentKind')) {
+    if (input.segmentKind !== 'video' && input.segmentKind !== 'freeze') {
+      issues.push({ path: `${path}.segmentKind`, code: 'VALUE_OUT_OF_RANGE' })
+    } else {
+      segmentKind = input.segmentKind
+    }
+  }
+
+  let freezeDuration: MediaTime | null = null
+  if (Object.hasOwn(input, 'freezeDuration') && input.freezeDuration !== null) {
+    const checked = validateMediaTime(input.freezeDuration, `${path}.freezeDuration`)
+    if (!checked.ok || checked.value.ticks <= 0) {
+      issues.push({ path: `${path}.freezeDuration`, code: 'VALUE_OUT_OF_RANGE' })
+    } else {
+      freezeDuration = checked.value
+    }
+  }
+
+  let linkedAudio: LinkedAudioWindowV1 | null = null
+  if (Object.hasOwn(input, 'linkedAudio') && input.linkedAudio !== null) {
+    if (!isRecord(input.linkedAudio)) {
+      issues.push({ path: `${path}.linkedAudio`, code: 'TYPE_INVALID' })
+    } else {
+      const allowed = ['sourceRange', 'compositionOffsetTicks'] as const
+      for (const key of allowed) {
+        if (!Object.hasOwn(input.linkedAudio, key)) {
+          issues.push({ path: `${path}.linkedAudio.${key}`, code: 'FIELD_REQUIRED' })
+        }
+      }
+      for (const key of Object.keys(input.linkedAudio)) {
+        if (!(allowed as readonly string[]).includes(key)) {
+          issues.push({ path: `${path}.linkedAudio.${key}`, code: 'FIELD_UNKNOWN' })
+        }
+      }
+      const audioRange = validateTimeRange(input.linkedAudio.sourceRange, `${path}.linkedAudio.sourceRange`)
+      if (!audioRange.ok) {
+        issues.push({ path: `${path}.linkedAudio.sourceRange`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      const offset = input.linkedAudio.compositionOffsetTicks
+      if (typeof offset !== 'number' || !Number.isSafeInteger(offset)) {
+        issues.push({ path: `${path}.linkedAudio.compositionOffsetTicks`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      if (audioRange.ok && typeof offset === 'number' && Number.isSafeInteger(offset)) {
+        linkedAudio = Object.freeze({
+          sourceRange: audioRange.value,
+          compositionOffsetTicks: offset,
+        })
+      }
+    }
+  }
+
+  if (segmentKind === 'freeze') {
+    if (freezeDuration === null) issues.push({ path: `${path}.freezeDuration`, code: 'FIELD_REQUIRED' })
+    if (!isDefaultClipTimeTransform(timeTransform)) {
+      issues.push({ path: `${path}.timeTransform`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+    if (linkedAudio !== null) issues.push({ path: `${path}.linkedAudio`, code: 'VALUE_OUT_OF_RANGE' })
+  } else if (freezeDuration !== null) {
+    issues.push({ path: `${path}.freezeDuration`, code: 'VALUE_OUT_OF_RANGE' })
+  }
+
   if (typeof input.clipId !== 'string' || !CLIP_ID_PATTERN.test(input.clipId)) {
     issues.push({ path: `${path}.clipId`, code: 'VALUE_OUT_OF_RANGE' })
   }
@@ -456,6 +573,23 @@ const validateClip = (
       if (!rangeWithin(sourceRange.value, assetRange)) {
         issues.push({ path: `${path}.sourceRange`, code: 'SOURCE_RANGE_OUTSIDE_ASSET' })
       }
+      if (segmentKind === 'freeze' && sourceRange.value.duration.ticks !== 1) {
+        issues.push({ path: `${path}.sourceRange.duration`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      if (linkedAudio !== null) {
+        if (!found.hasAudio) {
+          issues.push({ path: `${path}.linkedAudio`, code: 'VALUE_OUT_OF_RANGE' })
+        }
+        if (!rangeWithin(linkedAudio.sourceRange, assetRange)) {
+          issues.push({ path: `${path}.linkedAudio.sourceRange`, code: 'SOURCE_RANGE_OUTSIDE_ASSET' })
+        }
+        if (
+          compositionStart.ok &&
+          compositionStart.value.ticks + linkedAudio.compositionOffsetTicks < 0
+        ) {
+          issues.push({ path: `${path}.linkedAudio.compositionOffsetTicks`, code: 'VALUE_OUT_OF_RANGE' })
+        }
+      }
     }
   }
 
@@ -470,32 +604,40 @@ const validateClip = (
   if (!fadeIn.ok) issues.push({ path: `${path}.fadeIn`, code: 'VALUE_OUT_OF_RANGE' })
   const fadeOut = validateMediaTime(input.fadeOut, `${path}.fadeOut`)
   if (!fadeOut.ok) issues.push({ path: `${path}.fadeOut`, code: 'VALUE_OUT_OF_RANGE' })
-  // Two ramps longer than the piece they live on would overlap and produce a
-  // loudness curve nobody asked for, so the pair is refused rather than capped.
-  if (fadeIn.ok && fadeOut.ok && sourceRange.ok) {
-    // Ramps are measured on the finished video's clock, so they are checked
-    // against how long the piece lasts ON SCREEN, not against how much
-    // recording it uses. At normal speed those are the same number.
-    const onScreenTicks = anchoredCompositionDuration(
-      sourceRange.value.start.ticks,
-      sourceRange.value.duration.ticks,
+  // Two ramps longer than the sound window would overlap and produce a curve
+  // nobody asked for, so the pair is refused rather than capped. A freeze has
+  // no linked sound at all and therefore accepts only the untouched audio state.
+  if (segmentKind === 'freeze') {
+    if (gainDb !== 0 || (fadeIn.ok && fadeIn.value.ticks !== 0) || (fadeOut.ok && fadeOut.value.ticks !== 0) || pan !== CENTRE_PAN) {
+      issues.push({ path: `${path}.gainDb`, code: 'VALUE_OUT_OF_RANGE' })
+    }
+  } else if (fadeIn.ok && fadeOut.ok && sourceRange.ok) {
+    const audioRange = linkedAudio?.sourceRange ?? sourceRange.value
+    const audioOnScreenTicks = anchoredCompositionDuration(
+      audioRange.start.ticks,
+      audioRange.duration.ticks,
       timeTransform.playbackRate,
     )
-    if (fadeIn.value.ticks + fadeOut.value.ticks > onScreenTicks) {
+    if (fadeIn.value.ticks + fadeOut.value.ticks > audioOnScreenTicks) {
       issues.push({ path: `${path}.fadeIn`, code: 'FADE_LONGER_THAN_CLIP' })
     }
   }
   // A piece that occupies no time in the finished video cannot be seen or
-  // clicked. Refused here, once, so no operation can be the path that creates
-  // one and no reader downstream has to cope with a zero-length clip.
+  // clicked. A freeze gets its authored duration; a video derives it from its
+  // source range and rational speed.
   if (sourceRange.ok && sourceRange.value.duration.ticks > 0) {
-    const onScreenTicks = anchoredCompositionDuration(
-      sourceRange.value.start.ticks,
-      sourceRange.value.duration.ticks,
-      timeTransform.playbackRate,
-    )
+    const onScreenTicks = segmentKind === 'freeze'
+      ? freezeDuration?.ticks ?? 0
+      : anchoredCompositionDuration(
+          sourceRange.value.start.ticks,
+          sourceRange.value.duration.ticks,
+          timeTransform.playbackRate,
+        )
     if (onScreenTicks <= 0) {
-      issues.push({ path: `${path}.timeTransform`, code: 'CLIP_TOO_SHORT_TO_SEE' })
+      issues.push({
+        path: segmentKind === 'freeze' ? `${path}.freezeDuration` : `${path}.timeTransform`,
+        code: 'CLIP_TOO_SHORT_TO_SEE',
+      })
     }
   }
 
@@ -517,6 +659,9 @@ const validateClip = (
     sourceRange: sourceRange.value,
     compositionStart: compositionStart.value,
     enabled: input.enabled,
+    segmentKind,
+    freezeDuration,
+    linkedAudio,
     gainDb,
     fadeIn: fadeIn.value,
     fadeOut: fadeOut.value,
@@ -627,6 +772,24 @@ export const validateComposition = (
     })
   }
 
+  const pictureDurationTicks = tracks.reduce(
+    (latest, track) => track.clips.reduce(
+      (trackLatest, clip) => Math.max(trackLatest, clipCompositionEndTicks(clip)),
+      latest,
+    ),
+    0,
+  )
+  for (const track of tracks) {
+    for (const clip of track.clips) {
+      if (clip.linkedAudio === null || clip.linkedAudio === undefined) continue
+      const start = linkedAudioCompositionStartTicks(clip)
+      const end = start + linkedAudioCompositionDurationTicks(clip)
+      if (start < 0 || end > pictureDurationTicks || end <= start) {
+        issues.push({ path: `${path}.tracks.${track.trackId}.${clip.clipId}.linkedAudio`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+    }
+  }
+
   if (issues.length > 0) return err({ code: 'COMPOSITION_INVALID', issues })
 
   return ok(Object.freeze({
@@ -661,6 +824,9 @@ export const createSingleClipComposition = (input: {
               sourceRange: { start: ZERO_TIME, duration: input.asset.duration },
               compositionStart: ZERO_TIME,
               enabled: true,
+              segmentKind: 'video',
+              freezeDuration: null,
+              linkedAudio: null,
               gainDb: 0,
               fadeIn: ZERO_TIME,
               fadeOut: ZERO_TIME,

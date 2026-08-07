@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "sanverse.t2-export-evidence/v1",
+  "projectId": "project_1ad7b832a52d6faf09da2390e97f729a",
+  "projectRevision": 44,
+  "jobId": "job_4b64c5a98804ea82399e36790255276d",
+  "exportId": "export_4cea7bfad614fb71160cc70d2b6cf6c9",
+  "status": "succeeded",
+  "attempts": 1,
+  "createdAt": "2026-08-07T21:58:10.447Z",
+  "completedAt": "2026-08-07T21:58:58.741Z",
+  "width": 1920,
+  "height": 1080,
+  "durationMs": 24841,
+  "byteLength": 12548402,
+  "sha256": "74b87648a971f4f62304ebf1532d761abc95d3a44fceef966725b1d4b90bf4d4",
+  "rendererHashMatchedFile": true,
+  "video": {
+    "codec": "h264",
+    "profile": "High",
+    "frameRate": "30/1"
+  },
+  "audio": {
+    "codec": "aac",
+    "profile": "LC",
+    "sampleRate": 48000,
+    "channels": 2,
+    "channelLayout": "stereo"
+  },
+  "visualInspection": {
+    "start": "Decoded black frame matches the existing intentional opening gap.",
+    "middle": "Decoded landscape talking-head footage correctly.",
+    "end": "Decoded portrait footage fitted into the 1920x1080 canvas with side bars."
+  },
+  "privateRuntimeMediaCommitted": false
+}

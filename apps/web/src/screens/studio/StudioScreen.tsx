@@ -46,6 +46,7 @@ import {
   planCloseGap,
   planCut,
   planDuplicate,
+  planFreezeFrame,
   planAddMarker,
   planDeleteMarker,
   planGroupItems,
@@ -86,8 +87,21 @@ import {
   previewRateStretch,
   previewSpeedChange,
 } from '../../features/timeline/timeline-speed-plan'
-import { clipCompositionDurationTicks, findClip } from '@sanverse/edit-domain/composition'
-import type { RationalPlaybackRateV1 } from '@sanverse/edit-domain/clip-time'
+import { planLinkedAudioWindow } from '../../features/timeline/timeline-linked-audio-plan'
+import {
+  currentTransitionFor,
+  planTimelineTransition,
+  type TransitionAudioV1,
+  type TransitionStyleV1,
+} from '../../features/timeline/timeline-transition-plan'
+import {
+  clipCompositionDurationTicks,
+  findClip,
+  isFreezeClip,
+  linkedAudioCompositionDurationTicks,
+  linkedAudioCompositionStartTicks,
+} from '@sanverse/edit-domain/composition'
+import { compositionTicksForSourceOffset, type RationalPlaybackRateV1 } from '@sanverse/edit-domain/clip-time'
 import {
   advancePlayback,
   assetAt,
@@ -102,6 +116,12 @@ import {
   withPreparedReversePreview,
   type PlaybackSegment,
 } from '../../features/render-plan/segment-playback'
+import {
+  compositionAudioStateAt,
+  createCompositionAudioPreviewController,
+  type BrowserAudioPreviewVoiceV1,
+  type CompositionAudioPreviewController,
+} from '../../features/render-plan/composition-audio-preview'
 import {
   primaryGapMessage,
   resolvePrimarySource,
@@ -572,9 +592,14 @@ export function StudioScreen({
   const segmentIndexRef = useRef(0)
   const totalTicksRef = useRef(0)
   const inHoleRef = useRef(false)
+  const inFreezeRef = useRef(false)
   const playheadTicksRef = useRef(0)
   const holePlaybackRef = useRef<Readonly<{
     enter(fromTicks: number, untilTicks: number): void
+    leave(): void
+  }> | null>(null)
+  const freezePlaybackRef = useRef<Readonly<{
+    enter(segmentIndex: number, fromTicks: number, untilTicks: number, sourceTicks: number, resumeAfter?: boolean): void
     leave(): void
   }> | null>(null)
   const [proposalResult, setProposalResult] = useState<string | null>(null)
@@ -684,6 +709,7 @@ export function StudioScreen({
   })
   const isAiPanelCollapsed = workspace === 'studio' && workspaceLayout.aiMode === 'collapsed'
   const videoRef = useRef<HTMLVideoElement>(null)
+  const audioPreviewRef = useRef<CompositionAudioPreviewController | null>(null)
   const footageMotionCanvasRef = useRef<HTMLCanvasElement>(null)
   const footagePlanRef = useRef<ReturnType<typeof compilePreviewPlan>>(null)
   const reducedMotionRef = useRef(false)
@@ -854,11 +880,17 @@ export function StudioScreen({
     }
 
     let holeFrameId: number | null = null
+    let freezeFrameId: number | null = null
     const leaveHole = () => {
       if (holeFrameId !== null) cancelAnimationFrame(holeFrameId)
       holeFrameId = null
       inHoleRef.current = false
       setIsShowingHole(false)
+    }
+    const leaveFreeze = () => {
+      if (freezeFrameId !== null) cancelAnimationFrame(freezeFrameId)
+      freezeFrameId = null
+      inFreezeRef.current = false
     }
 
     /**
@@ -900,6 +932,47 @@ export function StudioScreen({
       holeFrameId = requestAnimationFrame(step)
     }
 
+    /** Hold one exact source frame while the composition clock keeps moving. */
+    const enterFreeze = (
+      segmentIndex: number,
+      fromTicks: number,
+      untilTicks: number,
+      sourceTicks: number,
+      resumeAfter = !video.paused,
+    ) => {
+      if (inFreezeRef.current) return
+      inFreezeRef.current = true
+      setIsShowingHole(false)
+      const resumePlaying = resumeAfter
+      segmentIndexRef.current = segmentIndex
+      video.currentTime = sourceTicks / PROJECT_TIMESCALE
+      video.pause()
+      drawFootageMotion(fromTicks)
+      const startedAt = performance.now()
+      const step = () => {
+        if (stopped || !inFreezeRef.current) return
+        const nowTicks = fromTicks + (performance.now() - startedAt) * TICKS_PER_MS
+        if (nowTicks >= untilTicks) {
+          leaveFreeze()
+          setPlayheadMs(untilTicks / TICKS_PER_MS)
+          const target = sourceTimeFor(segmentsRef.current, untilTicks)
+          if (!target) {
+            const visible = nextVisibleTick(segmentsRef.current, untilTicks)
+            if (resumePlaying && visible !== null && visible > untilTicks) enterHole(untilTicks, visible)
+            return
+          }
+          segmentIndexRef.current = target.segmentIndex
+          video.currentTime = target.sourceTicks / PROJECT_TIMESCALE
+          if (resumePlaying) void video.play().catch(() => undefined)
+          return
+        }
+        setPlayheadMs(nowTicks / TICKS_PER_MS)
+        drawFootageMotion(nowTicks)
+        freezeFrameId = requestAnimationFrame(step)
+      }
+      freezeFrameId = requestAnimationFrame(step)
+    }
+
     /**
      * Turn "where the recording is" into "where the finished video is".
      *
@@ -919,7 +992,7 @@ export function StudioScreen({
         drawFootageMotion(compositionTicks)
         return
       }
-      if (inHoleRef.current) return
+      if (inHoleRef.current || inFreezeRef.current) return
 
       const action = advancePlayback(
         segments,
@@ -966,6 +1039,9 @@ export function StudioScreen({
           setPlayheadMs(action.compositionTicks / TICKS_PER_MS)
           drawFootageMotion(action.compositionTicks)
           return
+        case 'hold':
+          enterFreeze(action.segmentIndex, action.compositionTicks, action.untilTicks, action.sourceTicks)
+          return
         case 'hole':
           hideFootageMotion()
           enterHole(action.compositionTicks, action.untilTicks)
@@ -984,6 +1060,7 @@ export function StudioScreen({
     let videoFrameCallbackId: number | null = null
     let stopped = false
     holePlaybackRef.current = Object.freeze({ enter: enterHole, leave: leaveHole })
+    freezePlaybackRef.current = Object.freeze({ enter: enterFreeze, leave: leaveFreeze })
     const resumeTimelineHole = () => {
       if (!inHoleRef.current) return
       video.pause()
@@ -1019,7 +1096,7 @@ export function StudioScreen({
     video.addEventListener('timeupdate', refreshPlayhead)
     video.addEventListener('seeked', refreshPlayhead)
     video.addEventListener('play', resumeTimelineHole)
-    const syncPlayback = () => setMonitorPlaying(!video.paused)
+    const syncPlayback = () => setMonitorPlaying(inFreezeRef.current ? true : !video.paused)
     const syncVolume = () => {
       setMonitorMuted(video.muted)
       setMonitorVolume(video.volume)
@@ -1063,7 +1140,9 @@ export function StudioScreen({
     return () => {
       stopped = true
       leaveHole()
+      leaveFreeze()
       holePlaybackRef.current = null
+      freezePlaybackRef.current = null
       if (
         videoFrameCallbackId !== null &&
         typeof video.cancelVideoFrameCallback === 'function'
@@ -1257,6 +1336,47 @@ export function StudioScreen({
     previewProposalOperation ? withPendingProposal(editProject, previewProposalOperation) : editProject,
   )
   const playheadPreviewTicks = millisecondsToTicks(playheadMs)
+  const compositionAudio = useMemo(
+    () => footagePlan
+      ? compositionAudioStateAt(footagePlan, browserSegments, playheadPreviewTicks)
+      : Object.freeze({ primary: null, auxiliary: Object.freeze([]) }),
+    [browserSegments, footagePlan, playheadPreviewTicks],
+  )
+  const browserAudioVoices = useMemo<readonly BrowserAudioPreviewVoiceV1[]>(() => {
+    const resolveUrl = (assetId: string): string => {
+      if (
+        reversePreviewState.status === 'ready' &&
+        assetId === reversePreviewState.preparedAssetId
+      ) return reversePreviewState.url
+      return assetId === editProject.assets[0]?.assetId ? project.mediaUrl : assetUrl(assetId)
+    }
+    return Object.freeze([
+      ...(compositionAudio.primary ? [compositionAudio.primary] : []),
+      ...compositionAudio.auxiliary,
+    ].map((voice) => Object.freeze({ ...voice, url: resolveUrl(voice.assetId) })))
+  }, [assetUrl, compositionAudio, editProject.assets, project.mediaUrl, reversePreviewState])
+
+  useEffect(() => {
+    const videoElement = videoRef.current
+    if (!videoElement) return
+    const controller = createCompositionAudioPreviewController(videoElement)
+    audioPreviewRef.current = controller
+    controller.setMaster(monitorMuted, monitorVolume)
+    return () => {
+      controller.dispose()
+      if (audioPreviewRef.current === controller) audioPreviewRef.current = null
+    }
+    // One controller for the lifetime of one mounted Studio/video element.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const controller = audioPreviewRef.current
+    if (!controller?.supported) return
+    controller.setMaster(monitorMuted, monitorVolume)
+    controller.update(browserAudioVoices, monitorPlaying || isShowingHole)
+  }, [browserAudioVoices, isShowingHole, monitorMuted, monitorPlaying, monitorVolume])
+
   const previewNodes = previewPlan ? visibleNameplates(previewPlan, playheadPreviewTicks) : []
   const previewCaptions = previewPlan ? visibleCaptions(previewPlan, playheadPreviewTicks) : []
   const previewTitles = previewPlan ? visibleTitles(previewPlan, playheadPreviewTicks) : []
@@ -1309,7 +1429,7 @@ export function StudioScreen({
       playheadPreviewTicks < segment.interval.start.ticks + segment.interval.duration.ticks,
   )
   const transitionOpacity = transitionSegment
-    ? segmentVideoOpacityAt(transitionSegment, playheadPreviewTicks, reducedMotion)
+    ? segmentVideoOpacityAt(transitionSegment, playheadPreviewTicks, reducedMotion, footagePlan?.transitions ?? [])
     : 1
   const nameplateVariables = nameplateCssVariables(composition.width, composition.height, previewScale)
   // Only one caption is ever on screen, so one set of variables is enough. Two
@@ -1843,6 +1963,7 @@ export function StudioScreen({
     const videoElement = videoRef.current
     if (!videoElement) return
     holePlaybackRef.current?.leave()
+    freezePlaybackRef.current?.leave()
 
     if (nextTicks >= compositionDurationTicks) {
       videoElement.pause()
@@ -1851,6 +1972,15 @@ export function StudioScreen({
 
     const canonicalSegmentIndex = segmentIndexAt(previewSegments, nextTicks)
     const canonicalSegment = canonicalSegmentIndex >= 0 ? previewSegments[canonicalSegmentIndex] : null
+    if (canonicalSegment?.freeze === true) {
+      videoElement.pause()
+      inHoleRef.current = false
+      inFreezeRef.current = false
+      setIsShowingHole(false)
+      segmentIndexRef.current = canonicalSegmentIndex
+      videoElement.currentTime = canonicalSegment.sourceStartTicks / PROJECT_TIMESCALE
+      return
+    }
     if (
       canonicalSegment?.reversed === true &&
       preparedReverse?.segmentIndex !== canonicalSegmentIndex
@@ -1887,6 +2017,24 @@ export function StudioScreen({
   function toggleMonitorPlayback() {
     const videoElement = videoRef.current
     if (!videoElement) return
+    if (inFreezeRef.current) {
+      freezePlaybackRef.current?.leave()
+      setMonitorPlaying(false)
+      return
+    }
+    const segmentIndex = segmentIndexAt(browserSegments, playheadTicksRef.current)
+    const segment = segmentIndex >= 0 ? browserSegments[segmentIndex] : null
+    if (segment?.freeze === true) {
+      freezePlaybackRef.current?.enter(
+        segmentIndex,
+        playheadTicksRef.current,
+        segment.startTicks + segment.durationTicks,
+        segment.sourceStartTicks,
+        true,
+      )
+      setMonitorPlaying(true)
+      return
+    }
     if (videoElement.paused) void videoElement.play()
     else videoElement.pause()
   }
@@ -1897,15 +2045,19 @@ export function StudioScreen({
   }
 
   function setMonitorMutedState(muted: boolean) {
+    const controller = audioPreviewRef.current
     const videoElement = videoRef.current
-    if (videoElement) videoElement.muted = muted
+    if (controller?.supported) controller.setMaster(muted, monitorVolume)
+    else if (videoElement) videoElement.muted = muted
     setMonitorMuted(muted)
   }
 
   function setMonitorVolumeState(volume: number) {
     const next = Math.min(1, Math.max(0, Number.isFinite(volume) ? volume : 0))
+    const controller = audioPreviewRef.current
     const videoElement = videoRef.current
-    if (videoElement) videoElement.volume = next
+    if (controller?.supported) controller.setMaster(monitorMuted, next)
+    else if (videoElement) videoElement.volume = next
     setMonitorVolume(next)
   }
 
@@ -2092,6 +2244,149 @@ export function StudioScreen({
     }
   }, [editProject, timelineModel, timelineSelection])
 
+  const transitionSubject = useMemo(() => {
+    const itemId = primarySelectedItemId(timelineSelection)
+    if (itemId === null) return null
+    const item = timelineModel.lanes.flatMap((lane) => lane.items).find((candidate) => candidate.id === itemId)
+    const clipId = item?.clipId ?? null
+    if (clipId === null) return null
+    const composition = effectiveComposition(editProject)
+    const track = composition.tracks.find((candidate) => candidate.clips.some((clip) => clip.clipId === clipId))
+    if (!track) return null
+    const ordered = track.clips.slice().sort((left, right) => left.compositionStart.ticks - right.compositionStart.ticks)
+    const index = ordered.findIndex((clip) => clip.clipId === clipId)
+    const next = index >= 0 ? ordered[index + 1] : undefined
+    if (!next) return null
+    const current = currentTransitionFor(editProject, clipId, next.clipId)
+    const nextItem = timelineModel.lanes.flatMap((lane) => lane.items).find((candidate) => candidate.clipId === next.clipId)
+    return Object.freeze({
+      clipId,
+      nextClipId: next.clipId,
+      clipLabel: item?.label ?? 'This piece',
+      nextClipLabel: nextItem?.label ?? 'Next piece',
+      style: current.style,
+      durationTicks: current.durationTicks,
+      audio: current.audio,
+    })
+  }, [editProject, timelineModel, timelineSelection])
+
+  const linkedAudioSubject = useMemo(() => {
+    const itemId = primarySelectedItemId(timelineSelection)
+    if (itemId === null) return null
+    const item = timelineModel.lanes.flatMap((lane) => lane.items).find((candidate) => candidate.id === itemId)
+    const clipId = item?.clipId ?? item?.linkedClipId ?? null
+    if (clipId === null) return null
+    const composition = effectiveComposition(editProject)
+    const clip = findClip(composition, clipId)
+    if (!clip || isFreezeClip(clip)) return null
+    const asset = editProject.assets.find((candidate) => candidate.assetId === clip.assetId)
+    if (!asset || asset.mediaKind !== 'video' || !asset.hasAudio) return null
+    const pictureStart = clip.compositionStart.ticks
+    const pictureDuration = clipCompositionDurationTicks(clip)
+    const pictureEnd = pictureStart + pictureDuration
+    const audioStart = linkedAudioCompositionStartTicks(clip)
+    const audioEnd = audioStart + linkedAudioCompositionDurationTicks(clip)
+    const sourceStart = clip.sourceRange.start.ticks
+    const sourceEnd = sourceStart + clip.sourceRange.duration.ticks
+    const earlierSource = sourceStart
+    const laterSource = Math.max(0, asset.duration.ticks - sourceEnd)
+    const leadSource = clip.timeTransform.direction === 'forward' ? earlierSource : laterSource
+    const tailSource = clip.timeTransform.direction === 'forward' ? laterSource : earlierSource
+    const maxLeadBySource = compositionTicksForSourceOffset(leadSource, clip.timeTransform.playbackRate)
+    const maxTailBySource = compositionTicksForSourceOffset(tailSource, clip.timeTransform.playbackRate)
+    const total = compositionDuration(composition).ticks
+    return Object.freeze({
+      clipId,
+      clipLabel: item?.label ?? 'This piece',
+      leadTicks: Math.max(0, pictureStart - audioStart),
+      tailTicks: Math.max(0, audioEnd - pictureEnd),
+      maxLeadTicks: Math.max(0, Math.min(maxLeadBySource, pictureStart)),
+      maxTailTicks: Math.max(0, Math.min(maxTailBySource, total - pictureEnd)),
+    })
+  }, [editProject, timelineModel, timelineSelection])
+
+  const freezeSubject = useMemo(() => {
+    const itemId = primarySelectedItemId(timelineSelection)
+    if (itemId === null) return null
+    const item = timelineModel.lanes.flatMap((lane) => lane.items).find((candidate) => candidate.id === itemId)
+    if (!item?.clipId) return null
+    const clip = findClip(effectiveComposition(editProject), item.clipId)
+    if (!clip || isFreezeClip(clip) || clip.linkedAudio != null) return null
+    const start = clip.compositionStart.ticks
+    const end = start + clipCompositionDurationTicks(clip)
+    if (playheadTicks <= start || playheadTicks >= end) return null
+    return Object.freeze({ clipId: clip.clipId, clipLabel: item.label })
+  }, [editProject, playheadTicks, timelineModel, timelineSelection])
+
+  const freezeUnavailableReason = freezeSubject !== null
+    ? null
+    : 'Choose a main-video piece, move the playhead inside it, and reset any J/L cut before holding a frame.'
+
+  function handleTransitionApply(style: TransitionStyleV1, durationTicks: number, audio: TransitionAudioV1) {
+    if (!transitionSubject) return
+    const changeSetId = createChangeSetId()
+    const planned = planTimelineTransition({
+      project: editProject,
+      clipId: transitionSubject.clipId,
+      nextClipId: transitionSubject.nextClipId,
+      style,
+      durationTicks,
+      audio,
+      operationId: createIdFactory(changeSetId).operation(0),
+    })
+    if (!planned.ok) {
+      setTimelineNotice(planned.message)
+      return
+    }
+    setTimelineNotice(null)
+    void (async () => {
+      const failure = await onApplyOperations([planned.operation], changeSetId)
+      if (failure) setTimelineNotice(failure)
+    })()
+  }
+
+  function handleLinkedAudioApply(leadTicks: number, tailTicks: number) {
+    if (!linkedAudioSubject) return
+    const changeSetId = createChangeSetId()
+    const planned = planLinkedAudioWindow({
+      project: editProject,
+      clipId: linkedAudioSubject.clipId,
+      leadTicks,
+      tailTicks,
+      operationId: createIdFactory(changeSetId).operation(0),
+    })
+    if (!planned.ok) {
+      setTimelineNotice(planned.message)
+      return
+    }
+    setTimelineNotice(null)
+    void (async () => {
+      const failure = await onApplyOperations([planned.operation], changeSetId)
+      if (failure) setTimelineNotice(failure)
+    })()
+  }
+
+  function handleFreezeApply(durationTicks: number) {
+    if (!freezeSubject) return
+    const changeSetId = createChangeSetId()
+    const planned = planFreezeFrame({
+      project: editProject,
+      clipId: freezeSubject.clipId,
+      atCompositionTicks: playheadTicks,
+      durationTicks,
+      ids: createIdFactory(changeSetId),
+    })
+    if (!planned.ok) {
+      setTimelineNotice(planned.message)
+      return
+    }
+    setTimelineNotice(null)
+    void (async () => {
+      const failure = await onApplyOperations([planned.operation], changeSetId)
+      if (failure) setTimelineNotice(failure)
+    })()
+  }
+
   /**
    * Ask the ONE planner what a speed would do, and turn its answer into a
    * sentence for the button's tooltip.
@@ -2155,7 +2450,7 @@ export function StudioScreen({
       composition: effectiveComposition(editProject),
       clipId: speedSubject?.clipId ?? null,
       targetDurationTicks,
-      direction: 'forward',
+      direction: speedSubject?.direction ?? 'forward',
       maintainAudioPitch: speedSubject?.maintainAudioPitch ?? true,
       durationPolicy: 'ripple',
       lockedTrackIds,
@@ -2183,7 +2478,7 @@ export function StudioScreen({
       composition: effectiveComposition(editProject),
       clipId: speedSubject?.clipId ?? null,
       targetDurationTicks,
-      direction: 'forward',
+      direction: speedSubject?.direction ?? 'forward',
       maintainAudioPitch: speedSubject?.maintainAudioPitch ?? true,
       durationPolicy: 'ripple',
       lockedTrackIds,
@@ -3604,6 +3899,13 @@ export function StudioScreen({
           onSpeedChoose={handleSpeedChoose}
           onRateStretchPreview={describeRateStretch}
           onRateStretchCommit={handleRateStretchCommit}
+          transitionSubject={transitionSubject}
+          onTransitionApply={handleTransitionApply}
+          linkedAudioSubject={linkedAudioSubject}
+          onLinkedAudioApply={handleLinkedAudioApply}
+          freezeClipLabel={freezeSubject?.clipLabel ?? null}
+          freezeUnavailableReason={freezeUnavailableReason}
+          onFreezeApply={handleFreezeApply}
           onSelectMarker={setSelectedMarkerId}
           onMoveMarker={handleMoveMarker}
           onDeleteMarker={handleDeleteMarker}

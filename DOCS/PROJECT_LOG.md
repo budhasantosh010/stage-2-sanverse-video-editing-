@@ -674,3 +674,35 @@ separate questions, and a written refusal of veed-engine-cli on licence grounds
 with four hard rules so nobody has to work it out again.
 
 Tests 1,848 → 2,050. Build exit 0.
+
+## 2026-08-08 — Gate T2 closed: speed, reverse, freeze and audio now share one clock
+
+T2 is complete. The same integer-tick project authority now carries constant
+rational speed, Rate Stretch, Reverse, Freeze Frame, direct clip audio,
+normalization, linked J/L audio windows, bounded transitions and the advanced
+placement planners through Preview, history, Undo/Redo, reopen and export.
+
+The final real-browser closure found two product bugs that broad tests had not
+caught. First, Hold Frame was enabled in the More menu but the action dispatcher
+forgot to put `freeze` through the panel-opening branch, so pressing it did
+nothing. Second, Rate Stretch hard-coded `forward` in the Studio adapter, so
+stretching backwards footage silently made it forwards again. The first now has
+a Timeline routing regression; the second carries the selected clip's current
+direction through both preview and commit. In the final Edge run the stretched
+clip visibly remains `1.63x Backwards`.
+
+The final private real-media workflow ran revision 34→44: Dip to White, Reverse
+with a real bounded backwards-preview MP4, direct gain, pan, real LUFS
+normalization, Rate Stretch, a 200 ms J-cut, Freeze, Undo, Redo and reopen. It
+kept one video element, had zero browser errors and zero failed HTTP responses,
+and had no horizontal overflow at 1440×900, 1024×768 or 390×844.
+
+Export from revision 44 succeeded in one attempt: 24.841 s, 1920×1080 H.264
+High/30fps plus AAC-LC stereo/48 kHz. The renderer's SHA-256 exactly matched the
+12,548,402-byte MP4 on disk. Start/middle/end frames decoded and were visually
+inspected. Tests 2,291 → **2,292/2,292** after adding the Hold Frame regression;
+all-workspace production build exit 0.
+
+Evidence: `DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md`.
+Gate T3 was not started, and the separately owned Motion Graphics Library
+workstream was not integrated or modified.

@@ -136,7 +136,7 @@ describe('render-plan v6 visual properties', () => {
     }])
 
     const plan = compile(project)
-    expect(plan.schemaVersion).toBe('sanverse.render-plan/v7')
+    expect(plan.schemaVersion).toBe('sanverse.render-plan/v8')
     expect(plan.visuals).toHaveLength(1)
     expect(plan.visuals[0]).toMatchObject({
       visualId: 'title_visual01',
@@ -152,19 +152,21 @@ describe('render-plan v6 visual properties', () => {
 })
 
 describe('what a cut does to each family', () => {
-  it('compiles an adjacent dip-to-black with explicit video and audio ramps', () => {
+  it('compiles an adjacent dip-to-black as one closed transition edge', () => {
     let project = testMultiAssetProject()
     project = accept(project, 'changeset_split001', [testSplit({ atClipTime: ms(10_000) })])
     project = accept(project, 'changeset_trans001', [testTransition()])
     const plan = compile(project)
-    expect(plan.segments[0]).toMatchObject({
-      videoFadeOutTicks: ms(500).ticks,
-      transitionAudioFadeOutTicks: ms(500).ticks,
-    })
-    expect(plan.segments[1]).toMatchObject({
-      videoFadeInTicks: ms(500).ticks,
-      transitionAudioFadeInTicks: ms(500).ticks,
-    })
+    expect(plan.transitions).toEqual([
+      expect.objectContaining({
+        kind: 'transition-edge',
+        fromSegmentId: plan.segments[0].nodeId,
+        toSegmentId: plan.segments[1].nodeId,
+        style: 'dip-to-black',
+        durationTicks: ms(500).ticks,
+        audio: 'fade-through-silence',
+      }),
+    ])
   })
 
   it('moves a title with the footage it was pinned to', () => {

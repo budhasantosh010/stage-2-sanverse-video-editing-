@@ -1,0 +1,232 @@
+{
+  "date": "2026-08-07T21:57:18.466Z",
+  "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36 Edg/151.0.0.0",
+  "projectId": "project_1ad7b832a52d6faf09da2390e97f729a",
+  "startRevision": 34,
+  "steps": [
+    {
+      "name": "studio-open",
+      "revision": 34,
+      "videos": 1,
+      "audioContext": true
+    },
+    {
+      "name": "select-first",
+      "ok": true,
+      "count": 3,
+      "aria": "clip, primary-30s.mp4, playing at 2x, starts 00:01.270, duration 00:01.472, in your video",
+      "item": "clip:clip_95c4ccc54dafc275",
+      "clientX": 366.625,
+      "clientY": 829.375
+    },
+    {
+      "name": "transition-white-250ms",
+      "revision": 35,
+      "body": false
+    },
+    {
+      "name": "reverse-proxy",
+      "revision": 36,
+      "sawPreparing": true,
+      "requestUrl": "http://127.0.0.1:2000/api/projects/project_1ad7b832a52d6faf09da2390e97f729a/media-analysis/reverse?assetId=asset_1ad7b832a52d&assetVersion=f77489118ffa7a3d&sourceStartTicks=13039876&sourceEndTicks=17280000",
+      "prepared": {
+        "status": 200,
+        "type": "video/mp4",
+        "size": 114597
+      },
+      "video": {
+        "src": "http://127.0.0.1:2000/api/projects/project_1ad7b832a52d6faf09da2390e97f729a/assets/asset_d6358c66df59c03071f3203e9599cef1/media",
+        "currentSrc": "http://127.0.0.1:2000/api/projects/project_1ad7b832a52d6faf09da2390e97f729a/assets/asset_d6358c66df59c03071f3203e9599cef1/media",
+        "muted": true,
+        "rate": 1,
+        "paused": true
+      }
+    },
+    {
+      "name": "direct-gain-keyboard",
+      "revision": 37,
+      "clipId": "clip_f52a7f3cce89f800",
+      "gainDb": 1
+    },
+    {
+      "name": "pan-keyboard",
+      "revision": 38,
+      "clipId": "clip_f52a7f3cce89f800",
+      "pan": 100
+    },
+    {
+      "name": "normalization",
+      "revision": 39,
+      "clipId": "clip_f52a7f3cce89f800",
+      "evidence": "-14.0 LUFS · peak -1.5 dB · use -2.0 dB",
+      "gainDb": -2.02
+    },
+    {
+      "name": "rate-stretch-drag",
+      "revision": 40,
+      "label": "clip, primary-30s.mp4, playing at 1.63x Backwards, starts 00:01.270, duration 00:01.802, in your video"
+    },
+    {
+      "name": "linked-jl",
+      "revision": 41,
+      "leadMs": 200,
+      "tailMs": 0,
+      "caps": {
+        "leadMax": 3072,
+        "tailMax": 0
+      },
+      "dialogueItems": 3
+    },
+    {
+      "name": "freeze",
+      "revision": 42,
+      "freezeCount": 1,
+      "subject": "clip, Video 2, starts 00:21.106, duration 00:03.074, in your video"
+    },
+    {
+      "name": "freeze-undo-redo",
+      "undoRevision": 43,
+      "redoRevision": 44,
+      "afterUndoFreeze": 0,
+      "afterRedoFreeze": 1
+    },
+    {
+      "name": "reopen",
+      "revision": 44,
+      "videos": 1,
+      "freezeOperations": 1
+    }
+  ],
+  "errors": [],
+  "failedResponses": [],
+  "activeT2Operations": [
+    {
+      "kind": "set-clip-time-transform",
+      "clipId": "clip_95c4ccc54dafc275",
+      "direction": "forward",
+      "gainDb": null,
+      "pan": null,
+      "durationTicks": null,
+      "compositionOffsetTicks": null,
+      "style": null
+    },
+    {
+      "kind": "set-clip-transition",
+      "clipId": "clip_95c4ccc54dafc275",
+      "direction": null,
+      "gainDb": null,
+      "pan": null,
+      "durationTicks": 360000,
+      "compositionOffsetTicks": null,
+      "style": "dip-to-white"
+    },
+    {
+      "kind": "set-clip-time-transform",
+      "clipId": "clip_95c4ccc54dafc275",
+      "direction": "reverse",
+      "gainDb": null,
+      "pan": null,
+      "durationTicks": null,
+      "compositionOffsetTicks": null,
+      "style": null
+    },
+    {
+      "kind": "set-clip-audio",
+      "clipId": "clip_f52a7f3cce89f800",
+      "direction": null,
+      "gainDb": 1,
+      "pan": 0,
+      "durationTicks": null,
+      "compositionOffsetTicks": null,
+      "style": null
+    },
+    {
+      "kind": "set-clip-audio",
+      "clipId": "clip_f52a7f3cce89f800",
+      "direction": null,
+      "gainDb": 0,
+      "pan": 100,
+      "durationTicks": null,
+      "compositionOffsetTicks": null,
+      "style": null
+    },
+    {
+      "kind": "set-clip-audio",
+      "clipId": "clip_f52a7f3cce89f800",
+      "direction": null,
+      "gainDb": -2.02,
+      "pan": 0,
+      "durationTicks": null,
+      "compositionOffsetTicks": null,
+      "style": null
+    },
+    {
+      "kind": "set-clip-time-transform",
+      "clipId": "clip_95c4ccc54dafc275",
+      "direction": "reverse",
+      "gainDb": null,
+      "pan": null,
+      "durationTicks": null,
+      "compositionOffsetTicks": null,
+      "style": null
+    },
+    {
+      "kind": "set-linked-audio-window",
+      "clipId": "clip_f52a7f3cce89f800",
+      "direction": null,
+      "gainDb": null,
+      "pan": null,
+      "durationTicks": null,
+      "compositionOffsetTicks": -288000,
+      "style": null
+    },
+    {
+      "kind": "insert-freeze-frame",
+      "clipId": "clip_portrait00001",
+      "direction": null,
+      "gainDb": null,
+      "pan": null,
+      "durationTicks": 864000,
+      "compositionOffsetTicks": null,
+      "style": null
+    }
+  ],
+  "responsive": [
+    {
+      "width": 1440,
+      "height": 900,
+      "scrollWidth": 1440,
+      "scrollHeight": 900,
+      "requested": {
+        "w": 1440,
+        "h": 900
+      },
+      "horizontalOverflow": false
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "scrollWidth": 1024,
+      "scrollHeight": 768,
+      "requested": {
+        "w": 1024,
+        "h": 768
+      },
+      "horizontalOverflow": false
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 375,
+      "scrollHeight": 1485,
+      "requested": {
+        "w": 390,
+        "h": 844
+      },
+      "horizontalOverflow": false
+    }
+  ],
+  "finalRevision": 44,
+  "videoCount": 1,
+  "pageTextTail": "←\nS\nSANVERSE\nprimary-30s.mp4\nAssist\nStudio\nSaved on this computer · up to change 44\n↶\n↷\nExport\nEdit\nEffects\nColor\nAudio\nSkip to video editor\nWORKSPACE PRESET\nEdit\nMotion\nTimeline\nReview\nAI\nAudio\nReset workspace\nHide Media\nHide Tool\nAI\nExpand AI\nMedia\n5 assets\n5\n+\n⇅\n▾\n⋯\nSearch media\n⚟\n\nAll media\n\nVIDEO\nprimary-30s.mp4\nVideo · 30 sec\n1920×1080 · Used 2 times\n⋯\nVIDEO\nVideo 2\nVideo · 45 sec\n714×1280 · Used 3 times\n⋯\nVIDEO\nVideo 3\nVideo · 15 sec\n1920×1080 · Unused\n⋯\nImage 1\nImage · Still image\n1440×900 · Unused\n⋯\nAUDIO\nAudio 1\nAudio · 20 sec\nSound only · Used 1 time\n⋯\nPreview\nLocal source available\nViewer mode\nFit\nFill\n100%\n•••\n\nLoading frame…\n\nPreview diagnostics (development only)\n00:00:00:00\n│◀\n▶\n▶│\nMuted\n03\nInspector\nTIMELINE ITEM\nInspector\nRead only\nNothing selected\n\nSelect an item in the timeline to inspect its settings.\n\nTIMELINE\nNormal\nInsert\nOverwrite\nAppend\n−\n+\n100 px/s\n−\n+\n100%\nFit Timeline\nFit Tracks\nReset height\n\n00:24\n\nTIME\nV2\nOverlay\n▾\nHow Tall V2 Is\nShort\nNormal\nTall\n🔓\n👁\nV1\nVideo\n▾\nHow Tall V1 Is\nShort\nNormal\nTall\n🔓\n👁\nC1\nCaptions\n▾\nHow Tall C1 Is\nShort\nNormal\nTall\n🔓\n👁\nA1\nDialogue\n▾\nHow Tall A1 Is\nShort\nNormal\nTall\n🔓\n🔊\nA2\nMusic\n▾\nHow Tall A2 Is\nShort\nNormal\nTall\n🔓\n🔊\nNote\nNote\nYour notes (2)\n00:00\n00:01\n00:02\n00:03\n00:04\n00:05\n00:06\n00:07\n00:08\n00:09\n00:10\n00:11\n00:12\nEmpty\nGap\nHIDDEN\nprimary-30s.mp4\n1.63x Backwards\nprimary-30s.mp4\nVideo 2\nVideo 2\nVideo 2\nEmpty\nDialogue · primary-30s.mp4\n1.63x Backwards\nDialogue · primary-30s.mp4\nDialogue · Video 2\nSilent hold\nFreeze\nHIDDEN\nDialogue · Video 2\nAudio 1\n\nShowed another clip for 5.0s — the part of the video it was on has been cut out, so it is not shown.\n\nChanged its position or appearance — the thing it was changing is no longer here, so it is not shown.\n\nChanged its position or appearance — the thing it was changing is no longer here, so it is not shown.\n\nChanged its position or appearance — the thing it was changing is no longer here, so it is not shown.\n\nNo timeline item selected.\n\nAdvanced direct controls"
+}

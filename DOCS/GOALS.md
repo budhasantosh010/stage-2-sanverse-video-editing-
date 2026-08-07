@@ -112,4 +112,4 @@ Never publish one invented percentage-complete number. A box closes only when it
 - [x] Writing a note, or grouping clips, does not throw away a finished export —
       Gate T1. An export is identified by what it will produce, not by how many
       times the project was touched.
-- [ ] Speed, reverse and freeze frame — Gate T2, not started
+- [x] Speed, reverse and freeze frame — Gate T2, complete 2026-08-08

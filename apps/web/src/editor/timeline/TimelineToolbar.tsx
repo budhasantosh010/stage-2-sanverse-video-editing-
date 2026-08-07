@@ -59,6 +59,8 @@ export type TimelineToolbarAction =
   | 'add-marker'
   | 'close-gap'
   | 'transition'
+  | 'linked-audio'
+  | 'freeze'
   | 'speed'
 
 /** The tool the pointer is currently holding. Only Select is a real mode today. */
@@ -142,6 +144,8 @@ const ICONS = Object.freeze({
   marker: 'M5 3v14M5 3h9l-2.2 3L14 9H5',
   speed: 'M3 14a7 7 0 1114 0M10 11l4-3',
   transition: 'M3 4h6v12H3zM11 4h6v12h-6zM9 10h2',
+  linkedAudio: 'M3 10h2l2-4 3 8 3-8 2 4h2M4 16h12',
+  freeze: 'M4 4h4v12H4zM12 4h4v12h-4z',
   more: 'M5 10h.01M10 10h.01M15 10h.01',
   copy: 'M7 7h8v9H7zM5 13V4h9',
   cut: 'M5 3l10 10M15 3L5 13M4 15.5a2 2 0 104 0 2 2 0 10-4 0M12 15.5a2 2 0 104 0 2 2 0 10-4 0',
@@ -192,6 +196,8 @@ const OVERFLOW_BUTTONS: readonly ButtonSpec[] = Object.freeze([
   { action: 'ungroup', label: 'Ungroup', hint: 'Stop these moving together', icon: ICONS.ungroup },
   { action: 'close-gap', label: 'Close gap', hint: 'Pull everything after the empty space back', icon: ICONS.gap },
   { action: 'transition', label: 'Transition', hint: 'Fade between this clip and the next', icon: ICONS.transition },
+  { action: 'linked-audio', label: 'J/L cut', hint: 'Start the sound early or let it run late while it stays linked', icon: ICONS.linkedAudio },
+  { action: 'freeze', label: 'Hold frame', hint: 'Pause on the frame at the playhead without using zero speed', icon: ICONS.freeze },
   { action: 'speed', label: 'Speed', hint: 'Change how fast this plays', icon: ICONS.speed },
 ])
 

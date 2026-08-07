@@ -124,22 +124,27 @@ export const visibleMediaOverlays = (plan: RenderPlan, ticks: number): readonly 
     (node): node is MediaOverlayNode => node.kind === 'media-overlay' && isNodeVisible(node, ticks),
   )
 
-/** Picture opacity for one explicit dip-to-black transition at an exact tick. */
+/** Picture opacity for one explicit dip transition at an exact composition tick. */
 export const segmentVideoOpacityAt = (
   segment: SourceSegmentNode,
   compositionTicks: number,
   reducedMotion: boolean,
+  transitions: RenderPlan['transitions'] = [],
 ): number => {
   if (reducedMotion) return 1
   const relative = compositionTicks - segment.interval.start.ticks
   if (relative < 0 || relative >= segment.interval.duration.ticks) return 1
+  const incoming = transitions.find((transition) => transition.toSegmentId === segment.nodeId)
+  const outgoing = transitions.find((transition) => transition.fromSegmentId === segment.nodeId)
+  const fadeInTicks = incoming?.durationTicks ?? segment.videoFadeInTicks ?? 0
+  const fadeOutTicks = outgoing?.durationTicks ?? segment.videoFadeOutTicks ?? 0
   let opacity = 1
-  if (segment.videoFadeInTicks > 0 && relative < segment.videoFadeInTicks) {
-    opacity = Math.min(opacity, relative / segment.videoFadeInTicks)
+  if (fadeInTicks > 0 && relative < fadeInTicks) {
+    opacity = Math.min(opacity, relative / fadeInTicks)
   }
-  const fadeOutStart = segment.interval.duration.ticks - segment.videoFadeOutTicks
-  if (segment.videoFadeOutTicks > 0 && relative > fadeOutStart) {
-    opacity = Math.min(opacity, (segment.interval.duration.ticks - relative) / segment.videoFadeOutTicks)
+  const fadeOutStart = segment.interval.duration.ticks - fadeOutTicks
+  if (fadeOutTicks > 0 && relative > fadeOutStart) {
+    opacity = Math.min(opacity, (segment.interval.duration.ticks - relative) / fadeOutTicks)
   }
   return Math.min(1, Math.max(0, opacity))
 }

@@ -73,6 +73,10 @@ import { timelinePointerToTicks } from './timeline-ruler-model'
 import { snapTimelineTicks, timelineSnapCandidates, type TimelineSnapResult } from './timeline-snap'
 import { TimelineToolbar, type TimelineTool, type TimelineToolbarAction } from './TimelineToolbar'
 import { TimelineSpeedPanel } from './TimelineSpeedPanel'
+import { TimelineTransitionPanel } from './TimelineTransitionPanel'
+import { TimelineLinkedAudioPanel, type TimelineLinkedAudioSubject } from './TimelineLinkedAudioPanel'
+import { TimelineFreezePanel } from './TimelineFreezePanel'
+import type { TimelineTransitionSubject, TransitionAudioV1, TransitionStyleV1 } from '../../features/timeline/timeline-transition-plan'
 import type { RateStretchPreview } from './TimelineRateStretchHandle'
 import { NORMAL_PLAYBACK_RATE, type RationalPlaybackRateV1 } from '@sanverse/edit-domain/clip-time'
 import './Timeline.css'
@@ -137,6 +141,13 @@ export type TimelineProps = Readonly<{
   onSpeedChoose(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean, direction: 'forward' | 'reverse'): void
   onRateStretchPreview?(targetDurationTicks: number): RateStretchPreview
   onRateStretchCommit?(targetDurationTicks: number): void
+  transitionSubject?: TimelineTransitionSubject | null
+  onTransitionApply?(style: TransitionStyleV1, durationTicks: number, audio: TransitionAudioV1): void
+  linkedAudioSubject?: TimelineLinkedAudioSubject | null
+  onLinkedAudioApply?(leadTicks: number, tailTicks: number): void
+  freezeClipLabel?: string | null
+  freezeUnavailableReason?: string | null
+  onFreezeApply?(durationTicks: number): void
   onSelectMarker(markerId: string | null): void
   onMoveMarker(markerId: string, toStartTicks: number): void
   onDeleteMarker(markerId: string): void
@@ -218,6 +229,13 @@ export function Timeline({
   onSpeedChoose,
   onRateStretchPreview = NO_RATE_STRETCH_PREVIEW,
   onRateStretchCommit = IGNORE_RATE_STRETCH,
+  transitionSubject = null,
+  onTransitionApply = () => undefined,
+  linkedAudioSubject = null,
+  onLinkedAudioApply = () => undefined,
+  freezeClipLabel = null,
+  freezeUnavailableReason = null,
+  onFreezeApply = () => undefined,
   onSelectMarker,
   onMoveMarker,
   onDeleteMarker,
@@ -245,6 +263,9 @@ export function Timeline({
    * revision, nothing saved. Same reasoning as the More menu.
    */
   const [speedPanelOpen, setSpeedPanelOpen] = useState(false)
+  const [transitionPanelOpen, setTransitionPanelOpen] = useState(false)
+  const [linkedAudioPanelOpen, setLinkedAudioPanelOpen] = useState(false)
+  const [freezePanelOpen, setFreezePanelOpen] = useState(false)
   const [rateStretchActive, setRateStretchActive] = useState(false)
 
   useEffect(() => () => {
@@ -514,9 +535,13 @@ export function Timeline({
     'close-gap': selectedGap === null
       ? 'Choose an empty space on the video track first.'
       : lockedTrackIds.includes('V1') ? 'Track V1 is locked. Unlock it to change anything on it.' : null,
-    transition: !selectedItem || selectedItem.kind !== 'clip' || selectedItem.clipId === null
-      ? 'Choose a piece of the main video first.'
+    transition: transitionSubject === null
+      ? 'Choose a main-video piece that has another piece directly after it.'
       : lockedReason,
+    'linked-audio': linkedAudioSubject === null
+      ? 'Choose a main-video or dialogue piece that contains linked sound.'
+      : lockedReason,
+    freeze: freezeUnavailableReason ?? lockedReason,
     // Speed works on a piece of the MAIN video. B-roll, pictures and music are
     // not pieces of the video's own body — they are laid on top of it — and
     // retiming them needs a different mechanism, so this says so plainly
@@ -546,10 +571,29 @@ export function Timeline({
    */
   const runToolbarAction = (action: TimelineToolbarAction) => {
     if (disabledReasons[action] !== null || busy) return
-    if (action === 'speed') {
+    if (action === 'speed' || action === 'transition' || action === 'linked-audio' || action === 'freeze') {
       // Opening and closing a panel is not an edit. No operation, no change
       // set, no revision, no Undo step — exactly like folding a row away.
-      setSpeedPanelOpen((wasOpen) => !wasOpen)
+      if (action === 'speed') {
+        setSpeedPanelOpen((wasOpen) => !wasOpen)
+        setTransitionPanelOpen(false)
+        setLinkedAudioPanelOpen(false)
+      } else if (action === 'transition') {
+        setTransitionPanelOpen((wasOpen) => !wasOpen)
+        setSpeedPanelOpen(false)
+        setLinkedAudioPanelOpen(false)
+        setFreezePanelOpen(false)
+      } else if (action === 'linked-audio') {
+        setLinkedAudioPanelOpen((wasOpen) => !wasOpen)
+        setSpeedPanelOpen(false)
+        setTransitionPanelOpen(false)
+        setFreezePanelOpen(false)
+      } else {
+        setFreezePanelOpen((wasOpen) => !wasOpen)
+        setSpeedPanelOpen(false)
+        setTransitionPanelOpen(false)
+        setLinkedAudioPanelOpen(false)
+      }
       return
     }
     if (action !== 'split' && action !== 'lift' && action !== 'ripple-delete') {
@@ -959,6 +1003,40 @@ export function Timeline({
           setSpeedPanelOpen(false)
         }}
         onClose={() => setSpeedPanelOpen(false)}
+      />
+
+      <TimelineTransitionPanel
+        open={transitionPanelOpen}
+        subject={transitionSubject}
+        busy={busy}
+        onApply={(style, durationTicks, audio) => {
+          onTransitionApply(style, durationTicks, audio)
+          setTransitionPanelOpen(false)
+        }}
+        onClose={() => setTransitionPanelOpen(false)}
+      />
+
+      <TimelineLinkedAudioPanel
+        open={linkedAudioPanelOpen}
+        subject={linkedAudioSubject}
+        busy={busy}
+        onApply={(leadTicks, tailTicks) => {
+          onLinkedAudioApply(leadTicks, tailTicks)
+          setLinkedAudioPanelOpen(false)
+        }}
+        onClose={() => setLinkedAudioPanelOpen(false)}
+      />
+
+      <TimelineFreezePanel
+        open={freezePanelOpen}
+        clipLabel={freezeClipLabel}
+        unavailableReason={freezeUnavailableReason}
+        busy={busy}
+        onApply={(durationTicks) => {
+          onFreezeApply(durationTicks)
+          setFreezePanelOpen(false)
+        }}
+        onClose={() => setFreezePanelOpen(false)}
       />
 
       <div ref={viewportGridRef} className="timeline-v1__viewport-grid">

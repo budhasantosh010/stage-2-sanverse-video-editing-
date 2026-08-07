@@ -16,7 +16,13 @@ import {
   type TimeRange,
   type Track,
 } from '@sanverse/edit-domain'
-import { clipCompositionDurationTicks } from '@sanverse/edit-domain/composition'
+import {
+  clipCompositionDurationTicks,
+  isFreezeClip,
+  linkedAudioCompositionDurationTicks,
+  linkedAudioCompositionStartTicks,
+  linkedAudioSourceRange,
+} from '@sanverse/edit-domain/composition'
 import {
   formatPlaybackRate,
   isDefaultClipTimeTransform,
@@ -459,34 +465,47 @@ export const buildTimelineViewModel = (
         proposalBaseRevision: null,
       }, selectedItemIds))
 
+      const freeze = isFreezeClip(clip)
+      const audioSource = linkedAudioSourceRange(clip)
+      const pictureEnd = clip.compositionStart.ticks + clipCompositionDurationTicks(clip)
+      const audioStart = linkedAudioCompositionStartTicks(clip)
+      const audioDuration = linkedAudioCompositionDurationTicks(clip)
+      const audioEnd = audioStart + audioDuration
+      const audioDetail = freeze
+        ? 'Silent hold'
+        : clip.linkedAudio === null
+          ? null
+          : audioStart < clip.compositionStart.ticks
+            ? `J-cut · starts ${Math.round((clip.compositionStart.ticks - audioStart) / 1_440)} ms early`
+            : audioEnd > pictureEnd
+              ? `L-cut · ends ${Math.round((audioEnd - pictureEnd) / 1_440)} ms late`
+              : 'Linked audio adjusted'
       addItem(dialogueLane, makeItem({
         id: `dialogue:${clip.clipId}`,
         laneId: dialogueLane.id,
         kind: 'clip',
         state: 'committed',
-        label: `Dialogue · ${displayAsset(
+        label: freeze ? 'Silent hold' : `Dialogue · ${displayAsset(
           clip.assetId,
           orderedClips.length === 1 ? 'Video' : `Video ${clipIndex + 1}`,
         )}`,
-        detail: null,
-        startTicks: clip.compositionStart.ticks,
-        // The recorded sound is the same length on screen as its own picture,
-        // always, because it is the same piece of footage.
-        durationTicks: clipCompositionDurationTicks(clip),
-        enabled: clip.enabled,
+        detail: audioDetail,
+        startTicks: freeze ? clip.compositionStart.ticks : audioStart,
+        durationTicks: freeze ? clipCompositionDurationTicks(clip) : audioDuration,
+        enabled: freeze ? false : clip.enabled,
         blockedReason: null,
         clipId: null,
         linkedClipId: clip.clipId,
         assetId: clip.assetId,
         operationId: null,
         changeSetId: null,
-        sourceStartTicks: clip.sourceRange.start.ticks,
-        sourceDurationTicks: clip.sourceRange.duration.ticks,
-        gainDb: clip.gainDb,
-        fadeInTicks: clip.fadeIn.ticks,
-        fadeOutTicks: clip.fadeOut.ticks,
-        pan: clip.pan,
-        speedBadge: speedBadgeFor(clip.timeTransform),
+        sourceStartTicks: freeze ? clip.sourceRange.start.ticks : audioSource.start.ticks,
+        sourceDurationTicks: freeze ? 1 : audioSource.duration.ticks,
+        gainDb: freeze ? null : clip.gainDb,
+        fadeInTicks: freeze ? null : clip.fadeIn.ticks,
+        fadeOutTicks: freeze ? null : clip.fadeOut.ticks,
+        pan: freeze ? null : clip.pan,
+        speedBadge: freeze ? 'Freeze' : speedBadgeFor(clip.timeTransform),
         proposalId: null,
         proposalBaseRevision: null,
       }, selectedItemIds))

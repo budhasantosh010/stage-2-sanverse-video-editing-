@@ -21,6 +21,8 @@ import {
   MUSIC_COMPONENT_ID,
   TITLE_COMPONENT_ID,
   CLIP_AUDIO_PRIMITIVE_ID,
+  FREEZE_FRAME_PRIMITIVE_ID,
+  LINKED_AUDIO_PRIMITIVE_ID,
   CLIP_TIME_TRANSFORM_PRIMITIVE_ID,
   CLIP_TRANSITION_PRIMITIVE_ID,
   CLIP_ENABLED_PRIMITIVE_ID,
@@ -246,6 +248,28 @@ export const testSetAudio = (
   fadeIn: ms(500),
   fadeOut: ms(500),
   pan: 0,
+  ...overrides,
+})
+
+export const testSetLinkedAudio = (
+  overrides: Partial<Extract<TimelineOperation, { kind: 'set-linked-audio-window' }>> = {},
+): TimelineOperation => ({
+  ...timelineDefaults('operation_linkaudio1', LINKED_AUDIO_PRIMITIVE_ID),
+  kind: 'set-linked-audio-window',
+  sourceRange: { start: ms(0), duration: ms(30_000) },
+  compositionOffsetTicks: 0,
+  ...overrides,
+})
+
+export const testInsertFreeze = (
+  overrides: Partial<Extract<TimelineOperation, { kind: 'insert-freeze-frame' }>> = {},
+): TimelineOperation => ({
+  ...timelineDefaults('operation_freeze01', FREEZE_FRAME_PRIMITIVE_ID),
+  kind: 'insert-freeze-frame',
+  atClipTime: ms(10_000),
+  duration: ms(2_000),
+  freezeClipId: 'clip_freeze001',
+  rightClipId: 'clip_right0001',
   ...overrides,
 })
 

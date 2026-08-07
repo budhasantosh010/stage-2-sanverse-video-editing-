@@ -9,6 +9,9 @@ import {
   TRACK_ID_PATTERN,
   clipCompositionDurationTicks,
   clipCompositionEndTicks,
+  clipTimeToSource,
+  isFreezeClip,
+  linkedAudioCompositionDurationTicks,
   validateComposition,
   type Clip,
   type Composition,
@@ -133,6 +136,30 @@ export type SetClipAudioOperation = Common &
     fadeOut: MediaTime
     /** -10000 full left, 0 centred, +10000 full right. See `Clip.pan`. */
     pan: number
+  }>
+
+/** One complete, still-linked sound window for a picture clip. */
+export type SetLinkedAudioWindowOperation = Common &
+  Readonly<{
+    kind: 'set-linked-audio-window'
+    clipId: string
+    sourceRange: TimeRange
+    /** Signed offset from the picture's composition start. */
+    compositionOffsetTicks: number
+  }>
+
+export const MIN_FREEZE_FRAME_TICKS = 144_000
+export const MAX_FREEZE_FRAME_TICKS = 43_200_000
+
+/** Insert one silent held frame at an interior moment, rippling later picture. */
+export type InsertFreezeFrameOperation = Common &
+  Readonly<{
+    kind: 'insert-freeze-frame'
+    clipId: string
+    atClipTime: MediaTime
+    duration: MediaTime
+    freezeClipId: string
+    rightClipId: string
   }>
 
 /**
@@ -279,6 +306,8 @@ export type TimelineOperation =
   | ReorderClipOperation
   | SetClipEnabledOperation
   | SetClipAudioOperation
+  | SetLinkedAudioWindowOperation
+  | InsertFreezeFrameOperation
   | SetClipTransitionOperation
   | SetClipTimeTransformOperation
   | PlacePrimaryClipOperation
@@ -292,6 +321,8 @@ export const TIMELINE_OPERATION_KINDS: readonly string[] = Object.freeze([
   'reorder-clip',
   'set-clip-enabled',
   'set-clip-audio',
+  'set-linked-audio-window',
+  'insert-freeze-frame',
   'set-clip-transition',
   'place-primary-clip',
   'move-primary-clip',
@@ -322,6 +353,12 @@ const KEYS_BY_KIND: Readonly<Record<string, readonly string[]>> = Object.freeze(
   'reorder-clip': Object.freeze([...COMMON_KEYS, 'clipId', 'toIndex']),
   'set-clip-enabled': Object.freeze([...COMMON_KEYS, 'clipId', 'enabled']),
   'set-clip-audio': Object.freeze([...COMMON_KEYS, 'clipId', 'gainDb', 'fadeIn', 'fadeOut']),
+  'set-linked-audio-window': Object.freeze([
+    ...COMMON_KEYS, 'clipId', 'sourceRange', 'compositionOffsetTicks',
+  ]),
+  'insert-freeze-frame': Object.freeze([
+    ...COMMON_KEYS, 'clipId', 'atClipTime', 'duration', 'freezeClipId', 'rightClipId',
+  ]),
   'set-clip-time-transform': Object.freeze([
     ...COMMON_KEYS,
     'clipId',
@@ -488,6 +525,56 @@ export const validateTimelineOperation = (
       extra = { gainDb, fadeIn, fadeOut, pan }
       break
     }
+    case 'set-linked-audio-window': {
+      const sourceRange = validateTimeRange(input.sourceRange, `${path}.sourceRange`)
+      if (!sourceRange.ok || sourceRange.value.duration.ticks <= 0) {
+        issues.push({ path: `${path}.sourceRange`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      if (
+        typeof input.compositionOffsetTicks !== 'number' ||
+        !Number.isSafeInteger(input.compositionOffsetTicks)
+      ) {
+        issues.push({ path: `${path}.compositionOffsetTicks`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      extra = {
+        sourceRange: sourceRange.ok ? sourceRange.value : null,
+        compositionOffsetTicks: input.compositionOffsetTicks,
+      }
+      break
+    }
+    case 'insert-freeze-frame': {
+      const atClipTime = time(input.atClipTime, 'atClipTime')
+      const duration = time(input.duration, 'duration')
+      if (atClipTime !== null && atClipTime.ticks <= 0) {
+        issues.push({ path: `${path}.atClipTime`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      if (
+        duration !== null &&
+        (duration.ticks < MIN_FREEZE_FRAME_TICKS || duration.ticks > MAX_FREEZE_FRAME_TICKS)
+      ) {
+        issues.push({ path: `${path}.duration`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      for (const key of ['freezeClipId', 'rightClipId'] as const) {
+        const value = input[key]
+        if (typeof value !== 'string' || !CLIP_ID_PATTERN.test(value)) {
+          issues.push({ path: `${path}.${key}`, code: 'VALUE_OUT_OF_RANGE' })
+        }
+      }
+      if (
+        input.freezeClipId === input.clipId ||
+        input.rightClipId === input.clipId ||
+        input.freezeClipId === input.rightClipId
+      ) {
+        issues.push({ path: `${path}.freezeClipId`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      extra = {
+        atClipTime,
+        duration,
+        freezeClipId: input.freezeClipId,
+        rightClipId: input.rightClipId,
+      }
+      break
+    }
     case 'set-clip-time-transform': {
       const rate = validatePlaybackRate(input.playbackRate, `${path}.playbackRate`)
       if (!rate.ok) issues.push({ path: rate.error.path, code: 'VALUE_OUT_OF_RANGE' })
@@ -587,6 +674,9 @@ export type TimelineApplyCode =
   | 'TRACK_HAS_GAPS'
   | 'INDEX_OUT_OF_RANGE'
   | 'FADE_LONGER_THAN_CLIP'
+  | 'FREEZE_OPERATION_UNSUPPORTED'
+  | 'LINKED_AUDIO_WINDOW_CUSTOM'
+  | 'LINKED_AUDIO_WINDOW_INVALID'
   | 'TRANSITION_TARGET_INVALID'
   | 'TRANSITION_LONGER_THAN_CLIP'
   | 'COMPOSITION_WOULD_BE_EMPTY'
@@ -650,7 +740,7 @@ const clampFades = (clip: Clip): Clip => {
   // Measured on the finished video's clock, because that is where a ramp is
   // heard. A 2x clip made from four seconds of recording lasts two seconds on
   // screen, so a two-and-a-half-second fade no longer fits and is pulled in.
-  const duration = clipCompositionDurationTicks(clip)
+  const duration = linkedAudioCompositionDurationTicks(clip)
   const fadeIn = Math.min(clip.fadeIn.ticks, duration)
   const fadeOut = Math.min(clip.fadeOut.ticks, duration - fadeIn)
   if (fadeIn === clip.fadeIn.ticks && fadeOut === clip.fadeOut.ticks) return clip
@@ -692,6 +782,9 @@ export const applyTimelineOperation = (
       sourceRange: operation.sourceRange,
       compositionStart: operation.compositionStart,
       enabled: true,
+      segmentKind: 'video',
+      freezeDuration: null,
+      linkedAudio: null,
       gainDb: 0,
       fadeIn: ZERO_TIME,
       fadeOut: ZERO_TIME,
@@ -720,6 +813,10 @@ export const applyTimelineOperation = (
 
   switch (operation.kind) {
     case 'split-clip': {
+      if (isFreezeClip(clip)) return err(fail('FREEZE_OPERATION_UNSUPPORTED'))
+      if (clip.linkedAudio !== null && clip.linkedAudio !== undefined) {
+        return err(fail('LINKED_AUDIO_WINDOW_CUSTOM'))
+      }
       const at = operation.atClipTime.ticks
       if (at <= 0 || at >= clip.sourceRange.duration.ticks) return err(fail('SPLIT_TIME_OUTSIDE_CLIP'))
       const idInUse = composition.tracks.some((candidate) =>
@@ -762,6 +859,10 @@ export const applyTimelineOperation = (
     }
 
     case 'trim-clip': {
+      if (isFreezeClip(clip)) return err(fail('FREEZE_OPERATION_UNSUPPORTED'))
+      if (clip.linkedAudio !== null && clip.linkedAudio !== undefined) {
+        return err(fail('LINKED_AUDIO_WINDOW_CUSTOM'))
+      }
       const removed = operation.trimStart.ticks + operation.trimEnd.ticks
       const remaining = clip.sourceRange.duration.ticks - removed
       if (remaining <= 0) return err(fail('TRIM_LEAVES_NOTHING'))
@@ -862,9 +963,11 @@ export const applyTimelineOperation = (
     }
 
     case 'set-clip-audio': {
+      if (isFreezeClip(clip)) return err(fail('FREEZE_OPERATION_UNSUPPORTED'))
       // Ramps are heard on the finished video's clock, so they are checked
-      // against how long the piece lasts on screen.
-      if (operation.fadeIn.ticks + operation.fadeOut.ticks > clipCompositionDurationTicks(clip)) {
+      // against the linked sound window, which may begin before or end after
+      // the picture in a J-cut or L-cut.
+      if (operation.fadeIn.ticks + operation.fadeOut.ticks > linkedAudioCompositionDurationTicks(clip)) {
         return err(fail('FADE_LONGER_THAN_CLIP'))
       }
       nextClips = track.clips.map((candidate) =>
@@ -881,7 +984,110 @@ export const applyTimelineOperation = (
       break
     }
 
+    case 'set-linked-audio-window': {
+      if (isFreezeClip(clip)) return err(fail('FREEZE_OPERATION_UNSUPPORTED'))
+      const matchesPicture =
+        operation.compositionOffsetTicks === 0 &&
+        operation.sourceRange.start.ticks === clip.sourceRange.start.ticks &&
+        operation.sourceRange.duration.ticks === clip.sourceRange.duration.ticks
+      const changed = clampFades({
+        ...clip,
+        linkedAudio: matchesPicture
+          ? null
+          : Object.freeze({
+              sourceRange: operation.sourceRange,
+              compositionOffsetTicks: operation.compositionOffsetTicks,
+            }),
+      })
+      nextClips = track.clips.map((candidate) =>
+        candidate.clipId === clip.clipId ? changed : candidate,
+      )
+      break
+    }
+
+    case 'insert-freeze-frame': {
+      if (isFreezeClip(clip)) return err(fail('FREEZE_OPERATION_UNSUPPORTED'))
+      if (clip.linkedAudio !== null && clip.linkedAudio !== undefined) {
+        return err(fail('LINKED_AUDIO_WINDOW_CUSTOM'))
+      }
+      const at = operation.atClipTime.ticks
+      const pictureDuration = clipCompositionDurationTicks(clip)
+      if (at <= 0 || at >= pictureDuration) return err(fail('SPLIT_TIME_OUTSIDE_CLIP'))
+      const identifiers = new Set([operation.freezeClipId, operation.rightClipId])
+      if (identifiers.size !== 2) return err(fail('CLIP_ID_IN_USE'))
+      const idInUse = composition.tracks.some((candidate) =>
+        candidate.clips.some((existing) => identifiers.has(existing.clipId)),
+      )
+      if (idInUse) return err(fail('CLIP_ID_IN_USE'))
+      if (track.clips.length + 2 > MAX_CLIPS_PER_TRACK) return err(fail('TOO_MANY_CLIPS'))
+
+      const sourceMoment = clipTimeToSource(clip, mediaTime(at)).ticks
+      const sourceStart = clip.sourceRange.start.ticks
+      const sourceEnd = sourceStart + clip.sourceRange.duration.ticks
+      const backwards = clip.timeTransform.direction === 'reverse'
+      const leftSourceStart = backwards ? sourceMoment : sourceStart
+      const leftSourceDuration = backwards ? sourceEnd - sourceMoment : sourceMoment - sourceStart
+      const rightSourceStart = backwards ? sourceStart : sourceMoment
+      const rightSourceDuration = backwards ? sourceMoment - sourceStart : sourceEnd - sourceMoment
+      if (leftSourceDuration <= 0 || rightSourceDuration <= 0) {
+        return err(fail('SPLIT_TIME_OUTSIDE_CLIP'))
+      }
+
+      const left = clampFades({
+        ...clip,
+        segmentKind: 'video',
+        freezeDuration: null,
+        linkedAudio: null,
+        sourceRange: {
+          start: mediaTime(leftSourceStart),
+          duration: mediaTime(leftSourceDuration),
+        },
+        fadeOut: ZERO_TIME,
+      })
+      const freezeStart = clipCompositionEndTicks(left)
+      const freeze: Clip = Object.freeze({
+        clipId: operation.freezeClipId,
+        assetId: clip.assetId,
+        sourceRange: Object.freeze({ start: mediaTime(sourceMoment), duration: mediaTime(1) }),
+        compositionStart: mediaTime(freezeStart),
+        enabled: clip.enabled,
+        segmentKind: 'freeze',
+        freezeDuration: operation.duration,
+        linkedAudio: null,
+        gainDb: 0,
+        fadeIn: ZERO_TIME,
+        fadeOut: ZERO_TIME,
+        pan: 0,
+        timeTransform: DEFAULT_CLIP_TIME_TRANSFORM,
+      })
+      const right: Clip = clampFades({
+        ...clip,
+        clipId: operation.rightClipId,
+        segmentKind: 'video',
+        freezeDuration: null,
+        linkedAudio: null,
+        sourceRange: {
+          start: mediaTime(rightSourceStart),
+          duration: mediaTime(rightSourceDuration),
+        },
+        compositionStart: mediaTime(freezeStart + operation.duration.ticks),
+        fadeIn: ZERO_TIME,
+      })
+      const originalEnd = clipCompositionEndTicks(clip)
+      nextClips = track.clips.flatMap((candidate) => {
+        if (candidate.clipId === clip.clipId) return [left, freeze, right]
+        return [candidate.compositionStart.ticks >= originalEnd
+          ? {
+              ...candidate,
+              compositionStart: mediaTime(candidate.compositionStart.ticks + operation.duration.ticks),
+            }
+          : candidate]
+      })
+      break
+    }
+
     case 'set-clip-time-transform': {
+      if (isFreezeClip(clip)) return err(fail('FREEZE_OPERATION_UNSUPPORTED'))
       const nextTransform: ClipTimeTransformV1 = Object.freeze({
         playbackRate: operation.playbackRate,
         direction: operation.direction,
@@ -930,6 +1136,13 @@ export const applyTimelineOperation = (
       ) {
         return err(fail('TRANSITION_TARGET_INVALID'))
       }
+      // A J/L edit deliberately lets A1 cross this picture join. Applying a
+      // transition audio policy at the same join would create two authorities
+      // for the same sound edge, so the user must restore linked alignment or
+      // remove the transition first. Picture-only ambiguity is not hidden.
+      if (clip.linkedAudio !== null || next.linkedAudio !== null) {
+        return err(fail('LINKED_AUDIO_WINDOW_CUSTOM'))
+      }
       // A transition's length is time on screen, so it is measured against how
       // long each piece lasts on screen. A two-second dip cannot sit on a
       // one-second clip even if that clip was made from four seconds of
@@ -956,6 +1169,12 @@ export const applyTimelineOperation = (
   }
 
   const rebuilt = validateComposition(replaceTrack(composition, track.trackId, nextClips), assets, 'composition')
-  if (!rebuilt.ok) return err(fail('RESULT_INVALID'))
+  if (!rebuilt.ok) {
+    return err(fail(
+      operation.kind === 'set-linked-audio-window'
+        ? 'LINKED_AUDIO_WINDOW_INVALID'
+        : 'RESULT_INVALID',
+    ))
+  }
   return ok(rebuilt.value)
 }

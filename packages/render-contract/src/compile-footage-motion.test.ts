@@ -75,7 +75,7 @@ const compile = (source: EditProject) => {
 describe('render-plan v6 primary-footage motion', () => {
   it('leaves existing projects unchanged except for an empty segment motion list', () => {
     const plan = compile(project())
-    expect(plan.schemaVersion).toBe('sanverse.render-plan/v7')
+    expect(plan.schemaVersion).toBe('sanverse.render-plan/v8')
     expect(plan.segments).toHaveLength(1)
     expect(plan.segments[0].footageMotions).toEqual([])
     expect(plan.sources).toHaveLength(1)

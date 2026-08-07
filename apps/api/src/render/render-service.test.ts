@@ -83,7 +83,7 @@ describe('render service', () => {
 
     expect(result.outputPath).toBe('export.mp4')
     const request = (renderer.render as ReturnType<typeof vi.fn>).mock.calls[0][0]
-    expect(request.plan.schemaVersion).toBe('sanverse.render-plan/v7')
+    expect(request.plan.schemaVersion).toBe('sanverse.render-plan/v8')
     expect(request.plan.overlays).toHaveLength(1)
     expect(request.plan.overlays[0].primaryText).toBe('Santosh')
     // The footage itself is described too, not just what is drawn on it.

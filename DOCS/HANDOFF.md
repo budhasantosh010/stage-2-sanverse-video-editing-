@@ -2,52 +2,44 @@
 
 ## Current checkpoint
 
-**P1-F.1A is COMPLETE (Gates A, B, B1, C0, C1, C2, D — commit `45c0c98`).**
+**P1-F.1E — Complete Timeline Experience is complete through Gate T2.**
 
-**The active program is P1-F.1E — Complete Timeline Experience**, eight gates
-T0 through T7. Its live state — gate table, per-gate checklist, program rules
-and traps — is in:
+The live gate table, per-gate checklist, program rules and traps are in:
 
 ```
 DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md
 ```
 
-**Read that file before anything else.** It is updated at the end of every
-working block and is the truth about where the work stands. Do not re-derive the
-plan from chat history.
+**Read that file before anything else.** Do not reconstruct state from chat.
 
-**Gate T0 is DONE. T1 through T7 are NOT STARTED.** Tests: 1,848. Build: exit 0.
+**Gates T0, T1 and T2 are DONE. T3 through T7 are NOT STARTED.** Final T2 gate:
+**2,292/2,292 tests**, all-workspace production build exit 0, a clean real Edge
+workflow from revision 34→44, and a real revision-44 MP4 whose renderer SHA
+matches the file on disk.
 
-Two things a user could see were broken, and both are now fixed and proven in the
-running app on the owner's real project:
+Final T2 closure evidence:
 
-1. **The preview called real footage empty.** "The plan could not be built" and
-   "the timeline is empty" were both expressed as `null`, so one broken thing
-   anywhere made the preview report every moment as a gap. Fixed by
-   `apps/web/src/features/render-plan/primary-source.ts` — footage existence is
-   read from the user's edit, never from a build that can fail as a whole. The
-   **same mistake was then found in a second place** (which file the one video
-   element points at) and fixed the same way. FAIL-052, closed.
+```
+DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md
+DOCS/evidence/2026-08-04-timeline-completion/t2-master-browser-report.json
+DOCS/evidence/2026-08-04-timeline-completion/t2-master-screenshots/
+DOCS/evidence/2026-08-04-timeline-completion/t2-export-metadata.json
+```
 
-2. **Mixed-shape footage could not be exported at all.** FFmpeg's `concat` step
-   refuses unless every piece is already the same size, and nothing made that
-   true. Recorded as FAIL-051 "portrait footage cannot export", but any two clips
-   of different sizes failed. Fixed by
-   `packages/render-contract/src/visual-normalization.ts` — one geometry
-   authority that the browser preview and FFmpeg both read. FAIL-051, closed.
+T2 now includes constant rational speed, Rate Stretch, Reverse, Freeze Frame,
+direct gain/fades/pan, real loudness normalization, linked J/L audio windows,
+truthful transition controls and the advanced placement planners. Preview,
+accepted history, Undo/Redo, reopen and FFmpeg export share the same project/time
+authority.
 
-Also in T0: an explicit save state with recovery (no more "Local save needs
-attention"); proposals carried forward across an edit (no more "Reopen it and try
-again"); and our own vocabulary taken off the user's screen.
+Two late browser-found defects were fixed before closure: Hold Frame was enabled
+but omitted from the panel-opening dispatcher; Rate Stretch hard-coded `forward`
+and stripped Reverse. The final real browser run proves the stretched clip stays
+`1.63x Backwards` and Freeze survives Undo→Redo→reopen.
 
-Evidence: `DOCS/evidence/2026-08-04-timeline-completion/` — `T0_*.md` and
-`screenshots/`. Read `PROGRAM_STATE.md` first.
-
-**Two traps that cost real time in T0, both now in PROGRAM_STATE:** the API
-loads TypeScript at boot, so a change to the exporter does nothing until the
-server is restarted (a correct fix that appears not to work); and a failed export
-is cached against the project revision, so pressing Export again returns the old
-failure instantly.
+**Do not start T3 without explicit owner instruction.** A separate coding agent
+owns the Motion Graphics Library workstream; do not integrate or modify its
+protected paths from this timeline program.
 
 ## Completed: P1-F.1A
 

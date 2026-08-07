@@ -97,7 +97,7 @@ const compile = (project: EditProject) => {
 describe('P1-F.0 render-contract footage motion', () => {
   it('keeps an old project identical apart from v7 and explicit empty motion arrays', () => {
     const plan = compile(baseProject())
-    expect(plan.schemaVersion).toBe('sanverse.render-plan/v7')
+    expect(plan.schemaVersion).toBe('sanverse.render-plan/v8')
     expect(plan.segments).toHaveLength(1)
     expect(plan.segments[0].footageMotions).toEqual([])
     expect(plan.overlays).toEqual([])

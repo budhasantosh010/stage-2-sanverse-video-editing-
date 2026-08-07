@@ -78,6 +78,7 @@ export type MigrationInput = Readonly<{
 
 export const LEGACY_PROJECT_V2_VERSION = 'sanverse.project/v2'
 export const LEGACY_PROJECT_V3_VERSION = 'sanverse.project/v3'
+export const LEGACY_PROJECT_V4_VERSION = 'sanverse.project/v4'
 
 /**
  * Deterministic ID derived from the v1 action ID, so running the migration
@@ -409,6 +410,59 @@ const migrateFromV2Shape = (input: MigrationInput): Result<Record<string, unknow
 }
 
 /**
+ * v4 to v5: every primary clip receives the two new closed T2 branches.
+ *
+ * Every v4 clip is ordinary moving video with its sound exactly aligned to the
+ * picture. Stamping `segmentKind: video`, no freeze duration, and no linked
+ * audio override is therefore a byte-for-byte restatement of what it already
+ * meant. No timing, audio, edit, or history entry changes.
+ */
+const migrateFromV4 = (input: MigrationInput): Result<MigrationResult, MigrationError> => {
+  const saved = input.saved
+  if (!isRecord(saved)) return err({ code: 'V2_PROJECT_INVALID', reason: 'NOT_AN_OBJECT' })
+  const composition = saved.composition
+  if (!isRecord(composition) || !Array.isArray(composition.tracks)) {
+    return err({ code: 'V2_PROJECT_INVALID', reason: 'COMPOSITION_INVALID' })
+  }
+  const tracks = composition.tracks.map((track) => {
+    if (!isRecord(track) || !Array.isArray(track.clips)) return track
+    return {
+      ...track,
+      clips: track.clips.map((clip) => isRecord(clip)
+        ? {
+            ...clip,
+            segmentKind: 'video' as const,
+            freezeDuration: null,
+            linkedAudio: null,
+          }
+        : clip),
+    }
+  })
+  const candidate = {
+    ...saved,
+    schemaVersion: PROJECT_SCHEMA_VERSION,
+    composition: { ...composition, tracks },
+    extensions: {
+      ...(isRecord(saved.extensions) ? saved.extensions : {}),
+      'sanverse.migration/from': LEGACY_PROJECT_V4_VERSION,
+    },
+  }
+  const project = validateProject(candidate)
+  if (!project.ok) return project
+  if (project.value.projectId !== input.projectId) return err({ code: 'PROJECT_ID_MISMATCH' })
+  return ok(Object.freeze({
+    project: project.value,
+    report: Object.freeze({
+      fromVersion: LEGACY_PROJECT_V4_VERSION,
+      changed: true,
+      migratedChangeSets: project.value.changeSets.length,
+      blocked: Object.freeze([]),
+      migratedRedoEntries: project.value.redoStack.length,
+    }),
+  }))
+}
+
+/**
  * v3 to v4: a project used to hold only videos, so an asset did not have to say
  * what kind of media it was. Now it can also hold pictures and music, so every
  * asset states its kind.
@@ -432,29 +486,20 @@ const migrateFromV3 = (input: MigrationInput): Result<MigrationResult, Migration
     }
   })
 
-  const candidate = {
+  const v4Shape = {
     ...saved,
-    schemaVersion: PROJECT_SCHEMA_VERSION,
+    schemaVersion: LEGACY_PROJECT_V4_VERSION,
     assets,
     extensions: {
       ...(isRecord(saved.extensions) ? saved.extensions : {}),
       'sanverse.migration/from': LEGACY_PROJECT_V3_VERSION,
     },
   }
-
-  const project = validateProject(candidate)
-  if (!project.ok) return project
-  if (project.value.projectId !== input.projectId) return err({ code: 'PROJECT_ID_MISMATCH' })
-
+  const v5 = migrateFromV4({ ...input, saved: v4Shape })
+  if (!v5.ok) return v5
   return ok(Object.freeze({
-    project: project.value,
-    report: Object.freeze({
-      fromVersion: LEGACY_PROJECT_V3_VERSION,
-      changed: true,
-      migratedChangeSets: project.value.changeSets.length,
-      blocked: Object.freeze([]),
-      migratedRedoEntries: project.value.redoStack.length,
-    }),
+    project: v5.value.project,
+    report: Object.freeze({ ...v5.value.report, fromVersion: LEGACY_PROJECT_V3_VERSION }),
   }))
 }
 
@@ -484,6 +529,10 @@ export const upgradeSavedProject = (input: MigrationInput): Result<MigrationResu
 
   if (isRecord(input.saved) && input.saved.schemaVersion === LEGACY_PROJECT_V3_VERSION) {
     return migrateFromV3(input)
+  }
+
+  if (isRecord(input.saved) && input.saved.schemaVersion === LEGACY_PROJECT_V4_VERSION) {
+    return migrateFromV4(input)
   }
 
   const project = validateProject(input.saved)

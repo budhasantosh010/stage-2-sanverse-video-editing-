@@ -234,5 +234,9 @@ export const panFilter = (pan: number): string | null => {
  * The colour a transition fades through. Absent means black, which is what
  * every project made before white existed already did.
  */
-export const segmentTransitionColor = (segment: Segment): 'black' | 'white' =>
-  segment.transitionColor === 'white' ? 'white' : 'black'
+export const transitionColorForStyle = (
+  style: 'dip-to-black' | 'dip-to-white',
+): 'black' | 'white' => style === 'dip-to-white' ? 'white' : 'black'
+
+/** @deprecated v8 transition colour lives on the transition edge, not a segment. */
+export const segmentTransitionColor = (_segment: Segment): 'black' => 'black'

@@ -2,8 +2,16 @@ import { describe, expect, it } from 'vitest'
 
 import type { AddNameplateAction } from '../actions'
 import { accept, createHistory } from '../history'
-import { activeOperations, blockedChangeSets, serializeProject } from '../project'
-import { TEST_CLIP_ID, TEST_COMPOSITION_ID, TEST_PROJECT_ID, TEST_TRACK_ID, ms, testAsset } from '../test-fixtures'
+import { PROJECT_SCHEMA_VERSION, activeOperations, blockedChangeSets, serializeProject } from '../project'
+import {
+  TEST_CLIP_ID,
+  TEST_COMPOSITION_ID,
+  TEST_PROJECT_ID,
+  TEST_TRACK_ID,
+  ms,
+  testAsset,
+  testProject,
+} from '../test-fixtures'
 import { upgradeSavedProject } from './upgrade-project'
 
 const action = (overrides: Partial<AddNameplateAction> = {}): AddNameplateAction => ({
@@ -133,5 +141,65 @@ describe('upgrading a saved v1 project', () => {
     const result = migrate([action()])
     if (!result.ok) throw new Error('setup failed')
     expect(serializeProject(result.value.project)).toMatchObject({ ok: true })
+  })
+})
+
+describe('upgrading a saved v4 project to the T2 primary-segment schema', () => {
+  it('stamps ordinary video and matched linked audio without changing any timing or history', () => {
+    const current = testProject()
+    const legacy = {
+      ...current,
+      schemaVersion: 'sanverse.project/v4',
+      composition: {
+        ...current.composition,
+        tracks: current.composition.tracks.map((track) => ({
+          ...track,
+          clips: track.clips.map(({ segmentKind: _kind, freezeDuration: _freeze, linkedAudio: _audio, ...clip }) => clip),
+        })),
+      },
+    }
+    const result = upgradeSavedProject({
+      saved: legacy,
+      asset: testAsset(),
+      projectId: TEST_PROJECT_ID,
+      compositionId: TEST_COMPOSITION_ID,
+      trackId: TEST_TRACK_ID,
+      clipId: TEST_CLIP_ID,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.report).toMatchObject({
+      fromVersion: 'sanverse.project/v4',
+      changed: true,
+      migratedChangeSets: current.changeSets.length,
+      migratedRedoEntries: current.redoStack.length,
+    })
+    expect(result.value.project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION)
+    expect(result.value.project.revision).toBe(current.revision)
+    expect(result.value.project.changeSets).toEqual(current.changeSets)
+    const migrated = result.value.project.composition.tracks[0].clips[0]
+    const before = current.composition.tracks[0].clips[0]
+    expect(migrated).toMatchObject({
+      segmentKind: 'video',
+      freezeDuration: null,
+      linkedAudio: null,
+      sourceRange: before.sourceRange,
+      compositionStart: before.compositionStart,
+      timeTransform: before.timeTransform,
+    })
+  })
+
+  it('is idempotent once the project is v5', () => {
+    const current = testProject()
+    const result = upgradeSavedProject({
+      saved: current,
+      asset: testAsset(),
+      projectId: TEST_PROJECT_ID,
+      compositionId: TEST_COMPOSITION_ID,
+      trackId: TEST_TRACK_ID,
+      clipId: TEST_CLIP_ID,
+    })
+    expect(result).toMatchObject({ ok: true, value: { report: { changed: false } } })
+    if (result.ok) expect(result.value.project).toEqual(current)
   })
 })
