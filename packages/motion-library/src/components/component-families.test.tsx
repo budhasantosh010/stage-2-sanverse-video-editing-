@@ -3,19 +3,39 @@ import { evaluateScene, validateCompositorReadiness, validateMotionScene } from 
 import { SANVERSE_TICKS_PER_SECOND } from '@sanverse/motion-primitives'
 import { RATIO_COMPOSITIONS, renderComponentMarkup, validateDefinition, validateFixture } from '@sanverse/motion-testing'
 import { FAMILY_COMPONENT_MODULES, FAMILY_VARIANT_CONFIGS, familyComponentStyleFromPack } from './component-families.tsx'
-import { CREATOR_ENERGETIC_STYLE, SANVERSE_CLEAN_STYLE } from '../style-packs.ts'
+import { CREATOR_ENERGETIC_STYLE, INITIAL_MOTION_STYLE_PACKS, SANVERSE_CLEAN_STYLE } from '../style-packs.ts'
 import { FAMILY_COMPONENT_FIXTURES } from '../fixtures/component-families.ts'
 
 const durationTicks = SANVERSE_TICKS_PER_SECOND * 4
 const context = (localTicks: number, ratio: keyof typeof RATIO_COMPOSITIONS = '16:9', reducedMotion = false) => ({ localTicks, durationTicks, ticksPerSecond: SANVERSE_TICKS_PER_SECOND, composition: RATIO_COMPOSITIONS[ratio], reducedMotion })
+const NEW_COMPONENT_IDS = Object.freeze([
+  'sanverse.comment-highlight',
+  'sanverse.client-proof-strip',
+  'sanverse.social-proof-stack',
+  'sanverse.myth-fact',
+  'sanverse.problem-solution',
+  'sanverse.source-citation',
+  'sanverse.browser-demo',
+  'sanverse.chat-thread',
+  'sanverse.dashboard-snapshot',
+  'sanverse.search-results',
+  'sanverse.upload-status',
+  'sanverse.cursor-callout',
+] as const)
 
 describe('horizontal family catalog', () => {
-  it('contains 43 distinct complete family modules with the intended category distribution', () => {
-    expect(FAMILY_COMPONENT_MODULES).toHaveLength(43)
+  it('contains 55 distinct complete family modules with the intended category distribution', () => {
+    expect(FAMILY_COMPONENT_MODULES).toHaveLength(55)
     const ids = FAMILY_COMPONENT_MODULES.map((module) => module.definition.id)
-    expect(new Set(ids).size).toBe(43)
+    expect(new Set(ids).size).toBe(55)
     const families = FAMILY_VARIANT_CONFIGS.reduce<Record<string, number>>((counts, config) => ({ ...counts, [config.family]: (counts[config.family] ?? 0) + 1 }), {})
-    expect(families).toEqual({ title: 9, value: 7, list: 7, status: 5, diagram: 5, quote: 4, cta: 6 })
+    expect(families).toEqual({ title: 9, value: 10, list: 10, status: 7, diagram: 5, quote: 8, cta: 6 })
+  })
+
+  it('adds exactly the 12 selected uncovered communication scenarios without duplicate IDs', () => {
+    const ids = new Set(FAMILY_COMPONENT_MODULES.map((module) => module.definition.id))
+    for (const id of NEW_COMPONENT_IDS) expect(ids.has(id), id).toBe(true)
+    expect(NEW_COMPONENT_IDS).toHaveLength(12)
   })
 
   it('validates every definition, default props and default style', () => {
@@ -27,8 +47,8 @@ describe('horizontal family catalog', () => {
   })
 
   it('publishes one stable first-class fixture per horizontal module', () => {
-    expect(FAMILY_COMPONENT_FIXTURES).toHaveLength(43)
-    expect(new Set(FAMILY_COMPONENT_FIXTURES.map((fixture) => fixture.componentId)).size).toBe(43)
+    expect(FAMILY_COMPONENT_FIXTURES).toHaveLength(55)
+    expect(new Set(FAMILY_COMPONENT_FIXTURES.map((fixture) => fixture.componentId)).size).toBe(55)
     for (const fixture of FAMILY_COMPONENT_FIXTURES) expect(validateFixture(fixture), fixture.id).toEqual([])
   })
 
@@ -73,6 +93,19 @@ describe('horizontal family catalog', () => {
       const normalText = Object.values(normal.nodes).filter((node) => node.type === 'text').map((node) => node.type === 'text' ? node.text : '')
       const reducedText = Object.values(reduced.nodes).filter((node) => node.type === 'text').map((node) => node.type === 'text' ? node.text : '')
       expect(reducedText, module.definition.id).toEqual(normalText)
+    }
+  })
+
+  it('renders every new component through all eight shared style packs without module duplication', () => {
+    const modules = FAMILY_COMPONENT_MODULES.filter((module) => NEW_COMPONENT_IDS.includes(module.definition.id as (typeof NEW_COMPONENT_IDS)[number]))
+    expect(modules).toHaveLength(12)
+    for (const module of modules) for (const pack of INITIAL_MOTION_STYLE_PACKS) {
+      const style = familyComponentStyleFromPack(pack)
+      expect(module.validateStyle(style).ok, `${module.definition.id} ${pack.id}`).toBe(true)
+      const markup = renderComponentMarkup(module, module.defaultProps, style, context(Math.round(durationTicks * .56), '4:5'))
+      expect(markup, `${module.definition.id} ${pack.id}`).toContain(`data-motion-module-id="${module.definition.id}"`)
+      const scene = module.createScene(module.defaultProps, style, context(Math.round(durationTicks * .56), '4:5'))
+      expect(validateCompositorReadiness(scene).ready, `${module.definition.id} ${pack.id}`).toBe(true)
     }
   })
 

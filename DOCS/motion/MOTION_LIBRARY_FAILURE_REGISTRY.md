@@ -94,3 +94,26 @@ ATTEMPTS: Kept the failing assertion, inspected the patch dispatcher, and implem
 
 ONE-LINE SOLUTION: mask insertion and reordering now use deterministic ordered-array updates, and the complete graph suite passes 49/49.
 
+## MOTION-FAIL-005 — Visual baseline batch captured browser connection-refused pages
+
+- Status: FIXED / invalid evidence deleted
+- Severity: low for product, high for evidence integrity
+- Milestone: Plan A continuation component batch
+- Date: 2026-08-08
+
+WHAT: the first 12-shot A17 browser-baseline batch wrote Edge connection-refused pages instead of Motion Lab renders.
+
+WHERE: local Edge headless capture pipeline, not component/runtime source.
+
+WHEN/HOW: every generated PNG had the exact same byte size. Manual inspection of the first file showed `127.0.0.1 refused to connect`.
+
+WHY: the dedicated Motion Lab dev process had exited before the screenshot batch started. The capture command initially checked only file existence, so a valid PNG did not necessarily mean valid Motion evidence.
+
+IMPACT: Had the files been accepted blindly, visual evidence could have been false even though tests/builds were green.
+
+ROOT CAUSE: capture pipeline did not prove Lab availability before each screenshot.
+
+ATTEMPTS: Deleted all invalid A17 screenshots, restarted the dedicated-worktree Vite server, verified strict port 2010 and HTTP 200, then recaptured with an HTTP-200 preflight before each case and manually inspected all 12 final images.
+
+ONE-LINE SOLUTION: visual baseline capture now requires a live Motion Lab HTTP preflight plus manual image inspection; the invalid connection-refused PNGs were removed and never committed as evidence.
+

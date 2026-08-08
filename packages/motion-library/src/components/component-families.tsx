@@ -176,7 +176,7 @@ export const createFamilyScene = (config: FamilyVariantConfig, props: FamilyComp
 
 const categoryForFamily = (family: FamilyKind): MotionComponentDefinitionV1['category'] => family === 'title' ? 'typography' : family === 'value' ? 'comparison' : family === 'list' ? 'card' : family === 'status' ? 'ui' : family === 'diagram' ? 'diagram' : family === 'quote' ? 'callout' : 'cta'
 const familySurfaceVisible = (family: FamilyKind, variant: string) => !(family === 'title' && ['minimal', 'chapter', 'highlight'].includes(variant))
-const alignmentFor = (config: FamilyVariantConfig): 'left' | 'center' => ['lower-third', 'definition', 'label', 'metric-delta', 'price-breakdown', 'agenda', 'feature-stack', 'notification', 'sequence', 'testimonial', 'review'].includes(config.variant) ? 'left' : 'center'
+const alignmentFor = (config: FamilyVariantConfig): 'left' | 'center' => ['lower-third', 'definition', 'label', 'metric-delta', 'price-breakdown', 'agenda', 'feature-stack', 'notification', 'sequence', 'testimonial', 'review', 'comment', 'client-strip', 'citation', 'dashboard', 'browser', 'chat', 'search', 'upload'].includes(config.variant) ? 'left' : 'center'
 
 const renderFamilyVisual = (config: FamilyVariantConfig, props: FamilyComponentProps, style: FamilyComponentStyle, state: FamilyComponentState, graphStyle: (id: string, base: CSSProperties) => CSSProperties, graphScene: ReturnType<typeof useMotionGraphPresentation>['scene']) => {
   const prefix = nodePrefix(config)
@@ -197,16 +197,39 @@ const renderFamilyVisual = (config: FamilyVariantConfig, props: FamilyComponentP
   }
   if (config.family === 'value') {
     const compare = config.variant === 'before-after'
+    if (config.variant === 'myth-fact' || config.variant === 'problem-solution') {
+      const left = props.items[0] ?? 'Problem'
+      const right = props.items[1] ?? props.value
+      return <div style={{ display: 'grid', gap: 18, textAlign: 'center' }}>{eyebrow}{title}{subtitle}<div style={{ display: 'grid', gridTemplateColumns: state.layout === 'wide' ? '1fr auto 1fr' : '1fr', gap: 14, alignItems: 'stretch' }}><div data-motion-node-id={`${prefix}.item:1`} style={graphStyle(`${prefix}.item:1`, { padding: 20, borderRadius: style.radius, border: `1px solid ${style.dangerColor}55`, background: `${style.dangerColor}0c`, color: style.textColor, fontSize: state.layout === 'wide' ? 28 : 23, fontWeight: style.bodyWeight, lineHeight: 1.22 })}>{left}</div><div data-motion-node-id={`${prefix}.accent`} style={graphStyle(`${prefix}.accent`, { alignSelf: 'center', color: style.accentColor, fontSize: 38, fontWeight: 900 })}>→</div><div data-motion-node-id={`${prefix}.item:2`} style={graphStyle(`${prefix}.item:2`, { padding: 20, borderRadius: style.radius, border: `1px solid ${style.successColor}55`, background: `${style.successColor}0c`, color: style.textColor, fontSize: state.layout === 'wide' ? 28 : 23, fontWeight: style.bodyWeight, lineHeight: 1.22 })}>{right}</div></div>{value ? <div data-motion-node-id={`${prefix}.value`} style={graphStyle(`${prefix}.value`, { color: style.accentColor, fontSize: state.layout === 'wide' ? 30 : 24, fontWeight: 900, letterSpacing: '.08em' })}>{props.value}</div> : null}</div>
+    }
+    if (config.variant === 'dashboard') {
+      return <div style={{ display: 'grid', gap: 18, textAlign: 'left' }}>{eyebrow}<div style={{ display: 'grid', gridTemplateColumns: state.layout === 'wide' ? '1fr auto' : '1fr', gap: 16, alignItems: 'end' }}><div>{title}{subtitle}</div>{value}</div><div style={{ display: 'grid', gridTemplateColumns: state.layout === 'wide' ? `repeat(${Math.max(1, props.items.length)}, minmax(0, 1fr))` : '1fr', gap: 10 }}>{props.items.map((entry, index) => item(entry, index, { padding: '14px 16px', borderRadius: style.radius * .7, border: `1px solid ${style.accentColor}2e`, background: `${style.textColor}08`, fontVariantNumeric: 'tabular-nums' }))}</div></div>
+    }
     return <div style={{ display: 'grid', gap: 18, textAlign: alignmentFor(config) }}>{eyebrow}{title}{compare ? <div style={{ display: 'grid', gridTemplateColumns: state.layout === 'wide' ? '1fr auto 1fr' : '1fr', gap: 18, alignItems: 'center' }}><div style={{ ...valueStyle, color: style.dangerColor }}>{props.items[0] ?? 'Before'}</div><div style={{ color: style.accentColor, fontSize: 44 }}>→</div><div style={{ ...valueStyle, color: style.successColor }}>{props.value}</div></div> : value}{subtitle}{props.items.length ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: alignmentFor(config) === 'left' ? 'flex-start' : 'center' }}>{props.items.slice(compare ? 1 : 0).map((entry, index) => item(entry, compare ? index + 1 : index, { padding: '10px 14px', borderRadius: 999, background: `${style.textColor}0d` }))}</div> : null}</div>
   }
   if (config.family === 'list') {
     const tags = config.variant === 'tag-cloud'
     const two = config.variant === 'pros-cons'
+    if (config.variant === 'browser') {
+      return <div style={{ display: 'grid', gap: 14, textAlign: 'left' }}><div data-motion-node-id={`${prefix}.accent`} style={graphStyle(`${prefix}.accent`, { display: 'flex', alignItems: 'center', gap: 8, minHeight: 38, padding: '8px 12px', borderRadius: 10, background: `${style.textColor}0b`, border: `1px solid ${style.textColor}18`, color: style.mutedColor, fontSize: 18 })}><span style={{ color: style.dangerColor }}>●</span><span style={{ color: '#ffd166' }}>●</span><span style={{ color: style.successColor }}>●</span><span style={{ marginLeft: 8, flex: 1, padding: '5px 10px', borderRadius: 8, background: `${style.textColor}08`, fontFamily: 'Consolas, monospace', fontSize: 16 }}>{props.subtitle}</span></div>{eyebrow}{title}<div style={{ display: 'grid', gridTemplateColumns: state.layout === 'wide' ? `repeat(${Math.max(1, props.items.length)}, minmax(0, 1fr))` : '1fr', gap: 10 }}>{props.items.map((entry, index) => item(entry, index, { padding: '16px', borderRadius: style.radius * .65, border: `1px solid ${style.accentColor}33`, background: `${style.accentColor}08` }))}</div></div>
+    }
+    if (config.variant === 'chat') {
+      return <div style={{ display: 'grid', gap: 14, textAlign: 'left' }}>{eyebrow}{title}{subtitle}<div style={{ display: 'grid', gap: 10 }}>{props.items.map((entry, index) => item(entry, index, { justifySelf: index % 2 === 0 ? 'end' : 'start', maxWidth: '82%', padding: '13px 16px', borderRadius: index % 2 === 0 ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: index % 2 === 0 ? `${style.accentColor}22` : `${style.textColor}0d`, border: `1px solid ${index % 2 === 0 ? style.accentColor : style.textColor}28` }))}</div></div>
+    }
+    if (config.variant === 'search') {
+      return <div style={{ display: 'grid', gap: 14, textAlign: 'left' }}>{eyebrow}<div data-motion-node-id={`${prefix}.accent`} style={graphStyle(`${prefix}.accent`, { padding: '13px 16px', borderRadius: 999, border: `1px solid ${style.textColor}24`, background: `${style.textColor}08`, color: style.textColor, fontSize: state.layout === 'wide' ? 28 : 23, fontWeight: 650 })}>⌕&nbsp;&nbsp;{props.title}</div><div style={{ color: style.mutedColor, fontSize: 18 }}>{props.subtitle}</div><div style={{ display: 'grid', gap: 8 }}>{props.items.map((entry, index) => item(`${index + 1}. ${entry}`, index, { padding: '11px 0', borderBottom: `1px solid ${style.textColor}12` }))}</div></div>
+    }
     return <div style={{ display: 'grid', gap: 18, textAlign: alignmentFor(config) }}>{eyebrow}{title}{subtitle}{tags ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>{props.items.map((entry, index) => item(entry, index, { padding: '10px 16px', border: `1px solid ${style.accentColor}55`, borderRadius: 999, background: `${style.accentColor}0c` }))}</div> : two ? <div style={{ display: 'grid', gridTemplateColumns: state.layout === 'wide' ? '1fr 1fr' : '1fr', gap: 14 }}>{props.items.map((entry, index) => item(entry, index, { padding: 16, borderRadius: style.radius * .7, border: `1px solid ${index % 2 === 0 ? style.successColor : style.dangerColor}44` }))}</div> : <div style={{ display: 'grid', gap: 10 }}>{props.items.map((entry, index) => item(`${config.variant === 'numbered' || config.variant === 'steps' ? `${index + 1}. ` : '• '}${entry}`, index, { padding: '8px 0' }))}</div>}</div>
   }
   if (config.family === 'status') {
     const progress = config.variant === 'progress'
     const urgent = config.variant === 'urgency'
+    if (config.variant === 'upload') {
+      return <div style={{ display: 'grid', gap: 16, textAlign: 'left' }}>{eyebrow}<div style={{ display: 'grid', gridTemplateColumns: state.layout === 'wide' ? '1fr auto' : '1fr', gap: 14, alignItems: 'end' }}><div>{title}{subtitle}</div>{value}</div><div style={{ height: 16, borderRadius: 999, background: `${style.textColor}14`, overflow: 'hidden' }}><div data-motion-node-id={`${prefix}.accent`} style={graphStyle(`${prefix}.accent`, { width: props.value || '72%', height: '100%', borderRadius: 999, background: `linear-gradient(90deg, ${style.accentColor}, ${style.successColor})` })} /></div>{props.items.map((entry, index) => item(entry, index, { color: style.mutedColor, fontSize: state.layout === 'wide' ? 20 : 18 }))}</div>
+    }
+    if (config.variant === 'cursor') {
+      return <div style={{ display: 'grid', gap: 16, textAlign: 'center', justifyItems: 'center' }}>{eyebrow}<div data-motion-node-id={`${prefix}.accent`} style={graphStyle(`${prefix}.accent`, { color: style.accentColor, fontSize: state.layout === 'wide' ? 68 : 54, lineHeight: .9, filter: `drop-shadow(0 8px 18px ${style.accentColor}55)` })}>↖</div><div style={{ padding: '16px 20px', borderRadius: style.radius, border: `2px solid ${style.accentColor}66`, background: `${style.accentColor}0b` }}>{title}</div>{value}{subtitle}{props.items.map((entry, index) => item(entry, index, { color: style.mutedColor }))}</div>
+    }
     return <div style={{ display: 'grid', gap: 18, textAlign: alignmentFor(config) }}>{eyebrow}<div style={{ display: 'flex', alignItems: 'center', gap: 14, justifyContent: alignmentFor(config) === 'left' ? 'flex-start' : 'center' }}><span style={{ width: 14, height: 14, borderRadius: '50%', background: urgent ? style.dangerColor : style.accentColor, boxShadow: `0 0 24px ${urgent ? style.dangerColor : style.accentColor}88` }} />{title}</div>{value}{subtitle}{progress ? <div style={{ height: 14, borderRadius: 999, background: `${style.textColor}14`, overflow: 'hidden' }}><div style={{ width: props.value || '68%', height: '100%', background: style.accentColor }} /></div> : null}</div>
   }
   if (config.family === 'diagram') {
@@ -215,6 +238,48 @@ const renderFamilyVisual = (config: FamilyVariantConfig, props: FamilyComponentP
     return <div style={{ display: 'grid', gap: 22, textAlign: 'center' }}>{eyebrow}{title}{subtitle}<div style={flywheel ? { display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center' } : { display: 'grid', gridTemplateColumns: state.layout === 'wide' && !funnel ? `repeat(${Math.max(1, props.items.length)}, minmax(0,1fr))` : '1fr', gap: 12, alignItems: 'center' }}>{props.items.map((entry, index) => <div key={entry} style={{ display: 'contents' }}>{item(entry, index, { padding: 16, borderRadius: flywheel ? 999 : style.radius, background: `${style.accentColor}${funnel ? (18 + index * 10).toString(16).padStart(2, '0') : '10'}`, border: `1px solid ${style.accentColor}44` })}{!flywheel && !funnel && index < props.items.length - 1 ? <span style={{ color: style.accentColor, fontSize: 28 }}>→</span> : null}</div>)}</div></div>
   }
   if (config.family === 'quote') {
+    if (config.variant === 'comment') {
+      return <div style={{ display: 'grid', gap: 14, textAlign: 'left' }}><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div data-motion-node-id={`${prefix}.accent`} style={graphStyle(`${prefix}.accent`, { width: 44, height: 44, display: 'grid', placeItems: 'center', borderRadius: '50%', background: style.accentColor, color: '#070707', fontWeight: 900 })}>C</div><div>{eyebrow}<div style={{ color: style.mutedColor, fontSize: 16 }}>{props.subtitle}</div></div></div>{title}<div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>{value}{props.items.map((entry, index) => item(entry, index, { color: style.mutedColor, fontSize: 18 }))}</div></div>
+    }
+    if (config.variant === 'client-strip') {
+      return <div style={{ display: 'grid', gap: 18, textAlign: 'left' }}>{eyebrow}{title}{subtitle}<div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>{props.items.map((entry, index) => item(entry, index, { padding: '12px 16px', borderRadius: 12, border: `1px solid ${style.textColor}20`, background: `${style.textColor}08`, fontWeight: 800, letterSpacing: '.04em' }))}</div>{value ? <div style={{ color: style.accentColor, fontSize: 18, fontWeight: 900, letterSpacing: '.08em' }}>{props.value}</div> : null}</div>
+    }
+    if (config.variant === 'social-proof') {
+      return <div style={{ display: 'grid', gap: 18, textAlign: 'center' }}>{eyebrow}{title}<div data-motion-node-id={`${prefix}.value`} style={graphStyle(`${prefix}.value`, valueStyle)}>{props.value}</div>{subtitle}<div style={{ display: 'grid', gridTemplateColumns: state.layout === 'wide' ? `repeat(${Math.max(1, props.items.length)}, minmax(0, 1fr))` : '1fr', gap: 10 }}>{props.items.map((entry, index) => item(entry, index, { padding: '14px 16px', borderRadius: style.radius * .7, border: `1px solid ${style.accentColor}35`, background: `${style.accentColor}09` }))}</div></div>
+    }
+    if (config.variant === 'citation') {
+      return (
+        <div style={{ display: 'grid', gap: 13, textAlign: 'left' }}>
+          {eyebrow}
+          <div
+            data-motion-node-id={`${prefix}.accent`}
+            style={graphStyle(`${prefix}.accent`, {
+              width: 8,
+              height: 54,
+              borderRadius: 999,
+              background: style.accentColor,
+            })}
+          />
+          {title}
+          <div style={{ color: style.mutedColor, fontSize: state.layout === 'wide' ? 22 : 19 }}>{props.subtitle}</div>
+          <div
+            data-motion-node-id={`${prefix}.value`}
+            style={graphStyle(`${prefix}.value`, {
+              padding: '11px 14px',
+              borderRadius: 10,
+              background: `${style.textColor}08`,
+              color: style.accentColor,
+              fontFamily: 'Consolas, monospace',
+              fontSize: state.layout === 'wide' ? 19 : 16,
+              overflowWrap: 'anywhere',
+            })}
+          >
+            {props.value}
+          </div>
+          {props.items.map((entry, index) => item(entry, index, { color: style.mutedColor, fontSize: 18 }))}
+        </div>
+      )
+    }
     return <div style={{ display: 'grid', gap: 18, textAlign: alignmentFor(config) }}><div style={{ color: style.accentColor, fontSize: 86, lineHeight: .6, fontFamily: 'Georgia, serif' }}>“</div>{title}{subtitle}{value ? <div style={{ color: style.accentColor, fontSize: 22, fontWeight: 800 }}>{props.value}</div> : null}{props.items.map((entry, index) => item(entry, index, { color: style.mutedColor }))}</div>
   }
   return <div style={{ display: 'grid', gap: 18, textAlign: 'center', justifyItems: 'center' }}>{eyebrow}{title}{subtitle}{value ? <div data-motion-node-id={`${prefix}.value`} style={graphStyle(`${prefix}.value`, { padding: '14px 24px', borderRadius: 999, background: style.accentColor, color: '#080808', fontSize: 24, fontWeight: 900 })}>{props.value}</div> : null}{props.items.length ? <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>{props.items.map((entry, index) => item(entry, index, { color: style.mutedColor }))}</div> : null}</div>
@@ -303,6 +368,19 @@ const configs = Object.freeze([
   { id:'sanverse.promo-card', name:'Promo Card', purpose:'Promote a product, newsletter or resource without a full-screen ad.', family:'cta', variant:'promo', eyebrow:'FREE RESOURCE', title:'The creator operating system', subtitle:'Templates, workflows and weekly updates.', value:'GET IT FREE', items:['No spam','Actionable only'] },
   { id:'sanverse.chapter-break', name:'Chapter Break', purpose:'Create a clean transition between major sections.', family:'cta', variant:'chapter-break', eyebrow:'UP NEXT', title:'From architecture to execution', subtitle:'', value:'', items:[] },
   { id:'sanverse.end-card', name:'End Card', purpose:'Close a video with one next action and supporting destinations.', family:'cta', variant:'end-card', eyebrow:'THANKS FOR WATCHING', title:'Keep building', subtitle:'One next video. One useful resource.', value:'WATCH NEXT', items:['Newsletter','Community'] },
+  // Plan A continuation — 12 uncovered creator/social/editorial/software scenarios.
+  { id:'sanverse.comment-highlight', name:'Comment Highlight', purpose:'Highlight one social comment with author context and lightweight reaction proof.', family:'quote', variant:'comment', eyebrow:'COMMENT', title:'This is the first workflow that actually made our publishing week feel simple.', subtitle:'@creator_ops · 2h', value:'♥ 1.2K', items:['Pinned by creator','Reply'] },
+  { id:'sanverse.client-proof-strip', name:'Client Proof Strip', purpose:'Show a compact row of client or team names as social proof without copying proprietary logo artwork.', family:'quote', variant:'client-strip', eyebrow:'TRUSTED BY', title:'Teams building repeatable content systems', subtitle:'Original text marks only — no imported commercial logos.', value:'5 TEAMS', items:['Northstar','Flowline','Orbit','Atlas','Signal'] },
+  { id:'sanverse.social-proof-stack', name:'Social Proof Stack', purpose:'Combine several distinct social proof signals in one concise hierarchy.', family:'quote', variant:'social-proof', eyebrow:'SOCIAL PROOF', title:'Creators are shipping more consistently', subtitle:'Different proof types reinforce the same claim.', value:'12.4K followers', items:['4.9★ average rating','28-day publish streak','+42% qualified replies'] },
+  { id:'sanverse.myth-fact', name:'Myth vs Fact', purpose:'Correct a common belief with an explicit myth-versus-fact comparison.', family:'value', variant:'myth-fact', eyebrow:'MYTH → FACT', title:'Automation removes human judgment', subtitle:'Good systems remove repeated work while protecting the decisions that matter.', value:'FACT', items:['MYTH · More automation means less human input','FACT · Better automation protects human judgment'] },
+  { id:'sanverse.problem-solution', name:'Problem → Solution', purpose:'Move from a concrete pain to a clear resolution in one comparison graphic.', family:'value', variant:'problem-solution', eyebrow:'PROBLEM → SOLUTION', title:'Content takes too long to repeat', subtitle:'Keep the judgment. Remove the repeated setup.', value:'45 min', items:['PROBLEM · 4h manual setup','SOLUTION · 45m guided workflow'] },
+  { id:'sanverse.source-citation', name:'Source / Citation Card', purpose:'Attribute a claim to a source with publisher, date and reference detail.', family:'quote', variant:'citation', eyebrow:'SOURCE', title:'The state of AI-enabled work', subtitle:'McKinsey & Company · 2026', value:'mckinsey.com/featured-insights', items:['Referenced in section 3'] },
+  { id:'sanverse.browser-demo', name:'Browser Demo', purpose:'Frame a software or website explanation inside an original browser-window graphic.', family:'list', variant:'browser', eyebrow:'BROWSER DEMO', title:'Research workspace', subtitle:'app.sanverse.ai/research', value:'', items:['Outlier topics','Saved sources','Publish queue'] },
+  { id:'sanverse.chat-thread', name:'Chat Thread', purpose:'Show a short deterministic conversation between a creator and an assistant or teammate.', family:'list', variant:'chat', eyebrow:'REVIEW THREAD', title:'Creator + AI', subtitle:'Editing plan discussion', value:'', items:['YOU · Make the hook sharper','AI · Tightened the first 8 seconds','YOU · Keep the proof line'] },
+  { id:'sanverse.dashboard-snapshot', name:'Dashboard Snapshot', purpose:'Show one primary software metric with several supporting dashboard KPIs.', family:'value', variant:'dashboard', eyebrow:'DASHBOARD', title:'Channel growth', subtitle:'Qualified views this month', value:'+42%', items:['Views · 128K','CTR · 7.8%','Watch · 6:14'] },
+  { id:'sanverse.search-results', name:'Search Results', purpose:'Show a query with a concise ranked set of software or web search results.', family:'list', variant:'search', eyebrow:'SEARCH', title:'AI workflow automation', subtitle:'3 relevant results', value:'', items:['Best AI workflow tools for creator teams','How creators automate research without losing judgment','Case study · 4× weekly output'] },
+  { id:'sanverse.upload-status', name:'Upload Status', purpose:'Show file upload progress with filename, transfer state and supporting detail.', family:'status', variant:'upload', eyebrow:'UPLOAD', title:'Episode 12.mp4', subtitle:'Uploading master file · 1.8 GB of 2.5 GB', value:'72%', items:['Encoding starts automatically after upload'] },
+  { id:'sanverse.cursor-callout', name:'Cursor Callout', purpose:'Point to one software UI target with a labeled cursor-style emphasis.', family:'status', variant:'cursor', eyebrow:'CLICK HERE', title:'Choose the winning format', subtitle:'This row drove the highest retention in the current batch.', value:'OUTLIER 8.9', items:['Highest 30-second retention'] },
 ] satisfies readonly FamilyVariantConfig[])
 
 export const FAMILY_VARIANT_CONFIGS = configs

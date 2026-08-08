@@ -26,3 +26,15 @@ Review conclusions:
 - no Plan A component owns an autonomous animation loop;
 - no Plan A component retains growing render history;
 - exact-tick graph evaluation remains bounded by component node count rather than elapsed playback time.
+
+## Plan A continuation measured review — 60-component catalog
+
+After the 12-scenario A17 expansion, a fresh warm-cache local sweep covered all 60 public modules across all four reference ratios:
+
+- Motion Graph scene creation + exact-tick evaluation: 2,400 operations in 354.693 ms; 0.1478 ms average per operation.
+- Server-side markup generation: 720 operations in 771.317 ms; 1.0713 ms average per render.
+- Mean generated markup size: 2,154 bytes.
+
+Method: one warm-up pass, then 10 graph loops and 3 markup loops over 60 modules × 4 ratios using varied exact-tick samples. This is a local engineering measurement from the current development machine, not a universal browser-frame or production-memory guarantee.
+
+The expanded catalog remains bounded by per-component node/item count; no new component introduces elapsed-time allocation, autonomous render loops, network work, or unseeded randomness.

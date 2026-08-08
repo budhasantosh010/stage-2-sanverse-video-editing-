@@ -3,11 +3,11 @@ import { MOTION_COMPONENT_CATALOG, MOTION_COMPONENT_MODULES } from './catalog.ts
 import { INITIAL_MOTION_STYLE_PACKS, motionStylePackById } from './style-packs.ts'
 
 describe('Plan A public catalog acceptance', () => {
-  it('publishes 48 unique complete component definitions and modules', () => {
-    expect(MOTION_COMPONENT_CATALOG).toHaveLength(48)
+  it('publishes 60 unique complete component definitions and modules', () => {
+    expect(MOTION_COMPONENT_CATALOG).toHaveLength(60)
     const ids = MOTION_COMPONENT_CATALOG.map((definition) => definition.id)
-    expect(new Set(ids).size).toBe(48)
-    expect(Object.keys(MOTION_COMPONENT_MODULES)).toHaveLength(48)
+    expect(new Set(ids).size).toBe(60)
+    expect(Object.keys(MOTION_COMPONENT_MODULES)).toHaveLength(60)
     for (const definition of MOTION_COMPONENT_CATALOG) expect(MOTION_COMPONENT_MODULES[definition.id]?.definition.id).toBe(definition.id)
   })
 

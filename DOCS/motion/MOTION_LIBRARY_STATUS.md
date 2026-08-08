@@ -2,11 +2,15 @@
 
 Last updated: 2026-08-08
 
-## Physical project location
+## Repository / worktree location
 
-All active Plan A files are being created under:
+Canonical Sanverse repository root:
 
 `C:\Users\Lenovo\Music\Startups\YT Automations\A1 Talking Head Youtube Video\Sanverse YT Channel\Stage 2 Sanverse Editing Workflow`
+
+Active Plan A + Plan C continuation worktree:
+
+`C:\Users\Lenovo\.chatgpt-code-harness\worktrees\Stage 2 Sanverse Editing Workflow-a95ba61b\motion-program-p0-c1`
 
 ## Milestone status
 
@@ -23,7 +27,7 @@ All active Plan A files are being created under:
 - MOTION-A15 — **complete**. Mechanical, stress, originality/provenance and measured performance review passed. Evidence: `DOCS/motion/evidence/MOTION-A15.md`.
 - MOTION-A16 — **complete**. Final release-candidate test/build matrix, authority/dependency/production-isolation scans, browser evidence, documentation and Git-boundary review all passed. Evidence: `DOCS/motion/evidence/MOTION-A16.md`.
 
-## Plan A final state
+## Plan A V1 baseline state
 
 ```text
 48 complete components
@@ -44,10 +48,9 @@ Implementation and verification are complete.
 - MOTION-P0 — **complete**. Plan A V1 was moved into a dedicated Motion worktree/branch, re-verified at 178/178 tests and 7/7 Motion builds, committed as `7a36ae4fee39d086780c50d80fd1e7967212bd57`, pushed with matching remote SHA, and protected by pushed rollback tag `motion-plan-a-v1`.
 - MOTION-C0 — **complete**. Five proof components pass the Level-4 readiness audit and the graph-only Cost Card structural mutation proof. One blocking structural-reference failure was found and fixed without weakening validation. Audit: `DOCS/motion/COMPOSITOR_READINESS_AUDIT.md`. Failure: `MOTION-FAIL-003`.
 - MOTION-C1 — **complete**. Universal typed immutable graph operations now cover node/property/effect/mask/blend edits, deterministic duplication, grouping, typed failures/results, inverse readiness and atomic batches. Motion Lab Advanced mode and the developer operation playground use the same operation API. Evidence: `DOCS/motion/evidence/MOTION-C1.md`.
-- Plan A continuation inventory / next component batch — **next active milestone**. Inventory all 48 existing components by communication scenario, document overlap/gaps, then add only 8–12 genuinely missing high-value graph-native components before stopping this cycle ahead of C2.
+- Component coverage inventory — **complete**. All 48 baseline components were mapped by communication scenario, customization level, visual-evidence confidence and overlap risk. Matrix: `DOCS/motion/COMPONENT_COVERAGE_MATRIX.md`.
+- MOTION-A17 — **complete**. Twelve genuinely missing social-proof, editorial, explainer and software-demo scenarios were added graph-native, taking the public catalog from 48 to **60 components**. Every new component passes four-ratio and eight-style automated coverage and has a retained manually inspected browser baseline. Evidence: `DOCS/motion/evidence/MOTION-A17.md`.
+- First Plan-A + Plan-C continuation cycle — **implementation/verification complete** at **207/207 Motion tests** and **7/7 Motion workspace builds**. The cycle ends after remote Git verification and reporting; no further engineering milestone is started here.
+- MOTION-C2 — **not started**. It is the next proposed milestone only after this completed cycle is reported and explicitly authorized.
 
-Dedicated continuation worktree:
-
-`C:\Users\Lenovo\.chatgpt-code-harness\worktrees\Stage 2 Sanverse Editing Workflow-a95ba61b\motion-program-p0-c1`
-
-Production `apps/web` is not a Plan A/C target in this cycle and must remain untouched by Motion implementation.
+Production `apps/web` remained untouched by Plan A/C in this cycle. No Plan-B AI decision logic was added.
