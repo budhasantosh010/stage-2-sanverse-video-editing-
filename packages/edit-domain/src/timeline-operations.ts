@@ -15,6 +15,7 @@ import {
   validateComposition,
   type Clip,
   type Composition,
+  type LinkedAudioWindowV1,
   type Track,
 } from './composition.ts'
 import {
@@ -253,6 +254,35 @@ export type SetClipTransitionOperation = Common &
     audio: 'cut' | 'fade-through-silence'
   }>
 
+/** Complete timing state for one V1 clip inside one precision edit. */
+export type PrimaryClipTimingChangeV1 = Readonly<{
+  clipId: string
+  sourceRange: TimeRange
+  compositionStart: MediaTime
+  linkedAudio: LinkedAudioWindowV1 | null
+}>
+
+/** The most pieces one track may hold, so a runaway proposal cannot exhaust memory. */
+export const MAX_CLIPS_PER_TRACK = 512
+
+// A precision ripple may legitimately move every clip on the primary track.
+// Keep the operation bounded by the same ceiling as the track itself so a
+// 60-minute edit with many short cuts does not become mysteriously un-rippleable.
+export const MAX_PRECISION_TIMING_CHANGES = MAX_CLIPS_PER_TRACK
+
+/**
+ * Roll, Slip and Slide may need several source windows to change together.
+ * The complete final states are applied simultaneously, then the rebuilt
+ * composition is validated once. No intermediate overlap/gap is accepted.
+ */
+export type SetPrimaryClipTimingsOperation = Common &
+  Readonly<{
+    kind: 'set-primary-clip-timings'
+    /** Anchor/subject of the gesture. Must also occur in `changes`. */
+    clipId: string
+    changes: readonly PrimaryClipTimingChangeV1[]
+  }>
+
 /**
  * Put a NEW piece of footage into the main sequence.
  *
@@ -309,6 +339,7 @@ export type TimelineOperation =
   | SetLinkedAudioWindowOperation
   | InsertFreezeFrameOperation
   | SetClipTransitionOperation
+  | SetPrimaryClipTimingsOperation
   | SetClipTimeTransformOperation
   | PlacePrimaryClipOperation
   | MovePrimaryClipOperation
@@ -324,6 +355,7 @@ export const TIMELINE_OPERATION_KINDS: readonly string[] = Object.freeze([
   'set-linked-audio-window',
   'insert-freeze-frame',
   'set-clip-transition',
+  'set-primary-clip-timings',
   'place-primary-clip',
   'move-primary-clip',
 ])
@@ -375,6 +407,7 @@ const KEYS_BY_KIND: Readonly<Record<string, readonly string[]>> = Object.freeze(
     'duration',
     'audio',
   ]),
+  'set-primary-clip-timings': Object.freeze([...COMMON_KEYS, 'clipId', 'changes']),
   'place-primary-clip': Object.freeze([
     ...COMMON_KEYS, 'clipId', 'trackId', 'assetId', 'sourceRange', 'compositionStart',
   ]),
@@ -392,9 +425,6 @@ const OPTIONAL_KEYS_BY_KIND: Readonly<Record<string, readonly string[]>> = Objec
 })
 
 export const OPERATION_ID_PATTERN = /^operation_[a-z0-9]{8,64}$/
-
-/** The most pieces one track may hold, so a runaway proposal cannot exhaust memory. */
-export const MAX_CLIPS_PER_TRACK = 512
 
 type Issue = TimelineOperationError['issues'][number]
 
@@ -647,6 +677,85 @@ export const validateTimelineOperation = (
         duration,
         audio: input.audio,
       }
+      break
+    }
+    case 'set-primary-clip-timings': {
+      const changes: PrimaryClipTimingChangeV1[] = []
+      if (!Array.isArray(input.changes) || input.changes.length < 1 || input.changes.length > MAX_PRECISION_TIMING_CHANGES) {
+        issues.push({ path: `${path}.changes`, code: 'VALUE_OUT_OF_RANGE' })
+      } else {
+        const seen = new Set<string>()
+        input.changes.forEach((candidate, index) => {
+          const changePath = `${path}.changes[${index}]`
+          if (!isRecord(candidate)) {
+            issues.push({ path: changePath, code: 'TYPE_INVALID' })
+            return
+          }
+          const allowed = ['clipId', 'sourceRange', 'compositionStart', 'linkedAudio'] as const
+          for (const key of allowed) {
+            if (!Object.hasOwn(candidate, key)) issues.push({ path: `${changePath}.${key}`, code: 'FIELD_REQUIRED' })
+          }
+          for (const key of Object.keys(candidate)) {
+            if (!(allowed as readonly string[]).includes(key)) issues.push({ path: `${changePath}.${key}`, code: 'FIELD_UNKNOWN' })
+          }
+          if (typeof candidate.clipId !== 'string' || !CLIP_ID_PATTERN.test(candidate.clipId)) {
+            issues.push({ path: `${changePath}.clipId`, code: 'VALUE_OUT_OF_RANGE' })
+            return
+          }
+          if (seen.has(candidate.clipId)) {
+            issues.push({ path: `${changePath}.clipId`, code: 'VALUE_OUT_OF_RANGE' })
+            return
+          }
+          seen.add(candidate.clipId)
+          const sourceRange = validateTimeRange(candidate.sourceRange, `${changePath}.sourceRange`)
+          if (!sourceRange.ok || sourceRange.value.duration.ticks <= 0) {
+            issues.push({ path: `${changePath}.sourceRange`, code: 'VALUE_OUT_OF_RANGE' })
+          }
+          const compositionStart = validateMediaTime(candidate.compositionStart, `${changePath}.compositionStart`)
+          if (!compositionStart.ok) issues.push({ path: `${changePath}.compositionStart`, code: 'VALUE_OUT_OF_RANGE' })
+          let linkedAudio: LinkedAudioWindowV1 | null = null
+          if (candidate.linkedAudio !== null) {
+            if (!isRecord(candidate.linkedAudio)) {
+              issues.push({ path: `${changePath}.linkedAudio`, code: 'TYPE_INVALID' })
+            } else {
+              const audioKeys = ['sourceRange', 'compositionOffsetTicks'] as const
+              for (const key of audioKeys) {
+                if (!Object.hasOwn(candidate.linkedAudio, key)) {
+                  issues.push({ path: `${changePath}.linkedAudio.${key}`, code: 'FIELD_REQUIRED' })
+                }
+              }
+              for (const key of Object.keys(candidate.linkedAudio)) {
+                if (!(audioKeys as readonly string[]).includes(key)) {
+                  issues.push({ path: `${changePath}.linkedAudio.${key}`, code: 'FIELD_UNKNOWN' })
+                }
+              }
+              const audioRange = validateTimeRange(candidate.linkedAudio.sourceRange, `${changePath}.linkedAudio.sourceRange`)
+              const offset = candidate.linkedAudio.compositionOffsetTicks
+              if (!audioRange.ok || audioRange.value.duration.ticks <= 0) {
+                issues.push({ path: `${changePath}.linkedAudio.sourceRange`, code: 'VALUE_OUT_OF_RANGE' })
+              }
+              if (!Number.isSafeInteger(offset)) {
+                issues.push({ path: `${changePath}.linkedAudio.compositionOffsetTicks`, code: 'VALUE_OUT_OF_RANGE' })
+              }
+              if (audioRange.ok && audioRange.value.duration.ticks > 0 && Number.isSafeInteger(offset)) {
+                linkedAudio = Object.freeze({ sourceRange: audioRange.value, compositionOffsetTicks: offset as number })
+              }
+            }
+          }
+          if (sourceRange.ok && sourceRange.value.duration.ticks > 0 && compositionStart.ok) {
+            changes.push(Object.freeze({
+              clipId: candidate.clipId,
+              sourceRange: sourceRange.value,
+              compositionStart: compositionStart.value,
+              linkedAudio,
+            }))
+          }
+        })
+        if (typeof input.clipId === 'string' && !seen.has(input.clipId)) {
+          issues.push({ path: `${path}.changes`, code: 'VALUE_OUT_OF_RANGE' })
+        }
+      }
+      extra = { changes: Object.freeze(changes) }
       break
     }
     default:
@@ -1122,6 +1231,33 @@ export const applyTimelineOperation = (
           ? { ...candidate, compositionStart: operation.compositionStart }
           : candidate,
       )
+      break
+    }
+
+    case 'set-primary-clip-timings': {
+      const changes = new Map(operation.changes.map((change) => [change.clipId, change] as const))
+      for (const change of operation.changes) {
+        const existing = track.clips.find((candidate) => candidate.clipId === change.clipId)
+        if (!existing) return err(fail('CLIP_UNKNOWN'))
+        if (isFreezeClip(existing)) {
+          const sourceUnchanged =
+            change.sourceRange.start.ticks === existing.sourceRange.start.ticks &&
+            change.sourceRange.duration.ticks === existing.sourceRange.duration.ticks
+          if (!sourceUnchanged || change.linkedAudio !== null) {
+            return err(fail('FREEZE_OPERATION_UNSUPPORTED'))
+          }
+        }
+      }
+      nextClips = track.clips.map((candidate) => {
+        const change = changes.get(candidate.clipId)
+        if (!change) return candidate
+        return clampFades({
+          ...candidate,
+          sourceRange: change.sourceRange,
+          compositionStart: change.compositionStart,
+          linkedAudio: change.linkedAudio,
+        })
+      })
       break
     }
 

@@ -35,6 +35,8 @@ export const CLIP_AUDIO_PRIMITIVE_ID = 'sanverse.timeline.audio.primitive/v1'
 export const LINKED_AUDIO_PRIMITIVE_ID = 'sanverse.timeline.linked-audio.primitive/v1'
 export const FREEZE_FRAME_PRIMITIVE_ID = 'sanverse.timeline.freeze-frame.primitive/v1'
 export const CLIP_TRANSITION_PRIMITIVE_ID = 'sanverse.timeline.transition.primitive/v1'
+/** One atomic full-state timing answer for professional precision edits. */
+export const PRECISION_TIMING_PRIMITIVE_ID = 'sanverse.timeline.precision-timing.primitive/v1'
 
 export const CAPTIONS_PRIMITIVE_ID = 'sanverse.captions.add.primitive/v1'
 export const CAPTION_CUE_PRIMITIVE_ID = 'sanverse.captions.cue.primitive/v1'
@@ -250,6 +252,14 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     level: 'primitive' as const,
     accepts: 'Two adjacent clips, a bounded transition duration, and explicit audio behavior.',
     produces: Object.freeze(['set-clip-transition']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: PRECISION_TIMING_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One primary edit and the complete source/composition timing state for every affected clip.',
+    produces: Object.freeze(['set-primary-clip-timings']),
     requires: Object.freeze([]),
   }),
   Object.freeze({

@@ -146,6 +146,10 @@ export const describeOperation = (operation: EditOperation): string => {
           : 'Reset the linked sound'
     case 'insert-freeze-frame':
       return 'Held one frame'
+    case 'set-primary-clip-timings':
+      return operation.changes.length === 1
+        ? 'Made a precision timing edit'
+        : `Made one precision edit across ${operation.changes.length} pieces`
     case 'set-footage-motion':
       return operation.tracks.length > 0
         ? 'Changed how the main footage moves'
