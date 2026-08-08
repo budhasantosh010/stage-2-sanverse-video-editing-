@@ -32,6 +32,42 @@ export interface DerivedMotionComponentV1 {
 const replaceChild = (node: MotionNodeV1, childIds: readonly string[]): MotionNodeV1 => node.type === 'group' ? Object.freeze({ ...node, childIds: Object.freeze(childIds) }) : node
 const insertAt = <T>(values: readonly T[], value: T, index = values.length): readonly T[] => { const next = [...values]; next.splice(Math.max(0, Math.min(index, next.length)), 0, value); return Object.freeze(next) }
 
+const semanticPartsWithAddedNode = (scene: MotionSceneV1, parentId: string, node: MotionNodeV1): MotionSceneV1['semanticParts'] => {
+  const inherited = scene.semanticParts.filter((part) => part.nodeIds.includes(parentId))
+  if (inherited.length === 0) {
+    return Object.freeze([
+      ...scene.semanticParts,
+      Object.freeze({ id: `custom:${node.id}`, label: node.name, role: 'content-group' as const, nodeIds: Object.freeze([node.id]) }),
+    ])
+  }
+  const inheritedIds = new Set(inherited.map((part) => part.id))
+  return Object.freeze(scene.semanticParts.map((part) => inheritedIds.has(part.id)
+    ? Object.freeze({ ...part, nodeIds: Object.freeze([...part.nodeIds, node.id]) })
+    : part))
+}
+
+const pruneRemovedNodeReferences = (
+  scene: MotionSceneV1,
+  removedNodeIds: ReadonlySet<string>,
+): Pick<MotionSceneV1, 'semanticParts' | 'exposures' | 'layout'> => {
+  const semanticParts = Object.freeze(scene.semanticParts
+    .map((part) => Object.freeze({ ...part, nodeIds: Object.freeze(part.nodeIds.filter((nodeId) => !removedNodeIds.has(nodeId))) }))
+    .filter((part) => part.nodeIds.length > 0))
+  const remainingPartIds = new Set(semanticParts.map((part) => part.id))
+  const exposures = Object.freeze(scene.exposures.filter((exposure) => {
+    const target = exposure.target
+    if (target.kind === 'node' || target.kind === 'effect') return !removedNodeIds.has(target.nodeId)
+    if (target.kind === 'part') return remainingPartIds.has(target.semanticPartId)
+    return true
+  }))
+  const layout = Object.freeze({
+    ...scene.layout,
+    ownership: Object.freeze(scene.layout.ownership.filter((entry) => !removedNodeIds.has(entry.target.nodeId))),
+    formatOverrides: Object.freeze(scene.layout.formatOverrides.filter((entry) => !removedNodeIds.has(entry.target.nodeId))),
+  })
+  return { semanticParts, exposures, layout }
+}
+
 const setProperty = (node: MotionNodeV1, property: MotionNodePropertyPathV1['property'], value: Animatable<MotionPropertyPrimitiveV1>): MotionNodeV1 => {
   if (property === 'visible') return Object.freeze({ ...node, visible: value as Animatable<boolean> })
   if (property === 'opacity') return Object.freeze({ ...node, opacity: value as Animatable<number> })
@@ -63,6 +99,9 @@ const setProperty = (node: MotionNodeV1, property: MotionNodePropertyPathV1['pro
 
 export const applyMotionGraphPatch = (scene: MotionSceneV1, patch: MotionGraphPatchV1): MotionSceneV1 => {
   const nodes: Record<string, MotionNodeV1> = { ...scene.nodes }
+  let semanticParts = scene.semanticParts
+  let exposures = scene.exposures
+  let layout = scene.layout
   const requireNode = (id: string): MotionNodeV1 => { const node = nodes[id]; if (!node) throw new RangeError(`Unknown node: ${id}`); return node }
   if (patch.op === 'set-property') nodes[patch.target.nodeId] = setProperty(requireNode(patch.target.nodeId), patch.target.property, patch.value)
   else if (patch.op === 'set-blend-mode') nodes[patch.nodeId] = Object.freeze({ ...requireNode(patch.nodeId), blendMode: patch.blendMode })
@@ -86,11 +125,11 @@ export const applyMotionGraphPatch = (scene: MotionSceneV1, patch: MotionGraphPa
     if (!found) throw new RangeError(`Unknown mask: ${patch.maskId}`)
     nodes[patch.nodeId] = Object.freeze({ ...node, masks: Object.freeze(masks) })
   }
-  else if (patch.op === 'add-node') { if (nodes[patch.node.id]) throw new RangeError(`Node already exists: ${patch.node.id}`); const parent = requireNode(patch.parentId); if (parent.type !== 'group') throw new RangeError('New node parent must be a group.'); nodes[patch.node.id] = Object.freeze({ ...patch.node, parentId: patch.parentId }); nodes[parent.id] = replaceChild(parent, insertAt(parent.childIds, patch.node.id, patch.index)) }
-  else if (patch.op === 'remove-node') { if (patch.nodeId === scene.rootNodeId) throw new RangeError('Cannot remove the scene root.'); const node = requireNode(patch.nodeId); const descendants = new Set<string>([node.id]); let changed = true; while (changed) { changed = false; for (const candidate of Object.values(nodes)) if (candidate.parentId && descendants.has(candidate.parentId) && !descendants.has(candidate.id)) { descendants.add(candidate.id); changed = true } } for (const id of descendants) delete nodes[id]; if (node.parentId) { const parent = requireNode(node.parentId); nodes[parent.id] = replaceChild(parent, parent.type === 'group' ? parent.childIds.filter((id) => !descendants.has(id)) : []) } }
+  else if (patch.op === 'add-node') { if (nodes[patch.node.id]) throw new RangeError(`Node already exists: ${patch.node.id}`); const parent = requireNode(patch.parentId); if (parent.type !== 'group') throw new RangeError('New node parent must be a group.'); const addedNode = Object.freeze({ ...patch.node, parentId: patch.parentId }) as MotionNodeV1; nodes[patch.node.id] = addedNode; nodes[parent.id] = replaceChild(parent, insertAt(parent.childIds, patch.node.id, patch.index)); semanticParts = semanticPartsWithAddedNode(scene, parent.id, addedNode) }
+  else if (patch.op === 'remove-node') { if (patch.nodeId === scene.rootNodeId) throw new RangeError('Cannot remove the scene root.'); const node = requireNode(patch.nodeId); const descendants = new Set<string>([node.id]); let changed = true; while (changed) { changed = false; for (const candidate of Object.values(nodes)) if (candidate.parentId && descendants.has(candidate.parentId) && !descendants.has(candidate.id)) { descendants.add(candidate.id); changed = true } } for (const id of descendants) delete nodes[id]; if (node.parentId) { const parent = requireNode(node.parentId); nodes[parent.id] = replaceChild(parent, parent.type === 'group' ? parent.childIds.filter((id) => !descendants.has(id)) : []) } const reconciled = pruneRemovedNodeReferences(scene, descendants); semanticParts = reconciled.semanticParts; exposures = reconciled.exposures; layout = reconciled.layout }
   else if (patch.op === 'reparent-node') { if (patch.nodeId === scene.rootNodeId) throw new RangeError('Cannot reparent root.'); const node = requireNode(patch.nodeId); const nextParent = requireNode(patch.parentId); if (nextParent.type !== 'group') throw new RangeError('New parent must be a group.'); if (node.parentId) { const oldParent = requireNode(node.parentId); if (oldParent.type === 'group') nodes[oldParent.id] = replaceChild(oldParent, oldParent.childIds.filter((id) => id !== node.id)) } nodes[node.id] = Object.freeze({ ...node, parentId: nextParent.id }); nodes[nextParent.id] = replaceChild(nextParent, insertAt(nextParent.childIds.filter((id) => id !== node.id), node.id, patch.index)) }
   else { const node = requireNode(patch.nodeId); if (!node.parentId) throw new RangeError('Root cannot be reordered.'); const parent = requireNode(node.parentId); if (parent.type !== 'group') throw new RangeError('Parent must be a group.'); nodes[parent.id] = replaceChild(parent, insertAt(parent.childIds.filter((id) => id !== node.id), node.id, patch.index)) }
-  return assertValidMotionScene(Object.freeze({ ...scene, nodes: Object.freeze(nodes) }))
+  return assertValidMotionScene(Object.freeze({ ...scene, nodes: Object.freeze(nodes), semanticParts, exposures, layout }))
 }
 export const applyMotionGraphPatches = (scene: MotionSceneV1, patches: readonly MotionGraphPatchV1[]): MotionSceneV1 => patches.reduce(applyMotionGraphPatch, scene)
 export const constantPropertyPatch = (target: MotionNodePropertyPathV1, value: MotionPropertyPrimitiveV1): MotionGraphPatchV1 => ({ op: 'set-property', target, value: constant(value) })

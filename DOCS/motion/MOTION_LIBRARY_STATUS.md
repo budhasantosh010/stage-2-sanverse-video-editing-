@@ -37,6 +37,16 @@ All active Plan A files are being created under:
 0 production apps/web imports of Plan A
 ```
 
-Implementation and verification are complete. Commit/push is intentionally deferred only because the same checkout still contains active unrelated production edits from another agent; changing shared HEAD at this moment would violate the concurrency-safety rule.
+Implementation and verification are complete.
 
-Production `apps/web` is not a Plan A target and must remain untouched by Motion implementation.
+## Plan A + Plan C continuation
+
+- MOTION-P0 — **complete**. Plan A V1 was moved into a dedicated Motion worktree/branch, re-verified at 178/178 tests and 7/7 Motion builds, committed as `7a36ae4fee39d086780c50d80fd1e7967212bd57`, pushed with matching remote SHA, and protected by pushed rollback tag `motion-plan-a-v1`.
+- MOTION-C0 — **complete**. Five proof components pass the Level-4 readiness audit and the graph-only Cost Card structural mutation proof. One blocking structural-reference failure was found and fixed without weakening validation. Audit: `DOCS/motion/COMPOSITOR_READINESS_AUDIT.md`. Failure: `MOTION-FAIL-003`.
+- MOTION-C1 — **next active milestone**. Build the universal typed immutable graph-operation vocabulary, typed errors/results, atomic batches and developer-only operation playground.
+
+Dedicated continuation worktree:
+
+`C:\Users\Lenovo\.chatgpt-code-harness\worktrees\Stage 2 Sanverse Editing Workflow-a95ba61b\motion-program-p0-c1`
+
+Production `apps/web` is not a Plan A/C target in this cycle and must remain untouched by Motion implementation.

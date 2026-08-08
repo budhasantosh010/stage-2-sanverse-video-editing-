@@ -48,3 +48,26 @@ ATTEMPTS: Verified the rendered component existed with `data-motion-graph-backed
 
 ONE-LINE SOLUTION: `.motion-lab` now owns `height: 100vh`, `grid-template-rows: auto minmax(0, 1fr)` and `overflow: hidden`, so Browser/Inspector scroll internally while Stage and transport remain visible.
 
+## MOTION-FAIL-003 — Structural node removal left stale semantic references
+
+- Status: FIXED
+- Severity: high
+- Milestone: MOTION-C0
+- Date: 2026-08-08
+
+WHAT: `remove-node` could delete a visual node from `scene.nodes` and its parent hierarchy but leave the removed node ID inside semantic parts, exposures, or responsive-layout metadata.
+
+WHERE: `packages/motion-graph/src/patches.ts` structural patch application.
+
+WHEN/HOW: Found while executing the required C0 Cost Card mutation proof: removing `cost-card.direction-indicator` caused the resulting scene to fail validation because semantic part `directionIndicator` still referenced the deleted node.
+
+WHY: The original patch layer treated normalized nodes and hierarchy as the only structural references. It did not reconcile other graph records that address nodes by stable ID.
+
+IMPACT: Published graph-backed components could not safely support Level-4 structural deletion even though basic add/remove patch types existed. This was a real compositor-readiness blocker.
+
+ROOT CAUSE: Structural reference reconciliation was missing from add/remove patch application.
+
+ATTEMPTS: Reproduced with the Cost / Value Card, confirmed validation correctly refused the stale reference, then fixed the patch layer rather than weakening validation.
+
+ONE-LINE SOLUTION: structural add/remove now maintain semantic coverage and prune removed-node references from semantic parts, exposures and layout metadata before the resulting scene is revalidated.
+
