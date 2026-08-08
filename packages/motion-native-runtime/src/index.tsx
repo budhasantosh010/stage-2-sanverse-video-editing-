@@ -1,8 +1,8 @@
 import { createContext, useContext } from 'react'
 import type { CSSProperties, PropsWithChildren, ReactNode } from 'react'
 import type { MotionComponentModuleV1, MotionCompositionV1, MotionRenderContextV1 } from '@sanverse/motion-contract'
-import type { MotionGraphBackedComponentModuleV1, MotionGraphPatchV1, ResolvedMotionNodeV1, ResolvedMotionSceneV1 } from '@sanverse/motion-graph'
-import { applyMotionGraphPatches, evaluateScene } from '@sanverse/motion-graph'
+import type { MotionGraphBackedComponentModuleV1, MotionGraphOperationV1, MotionGraphPatchV1, ResolvedMotionNodeV1, ResolvedMotionSceneV1 } from '@sanverse/motion-graph'
+import { applyMotionGraphPatches, applyMotionOperations, evaluateScene } from '@sanverse/motion-graph'
 
 export interface MotionCompositionFrameProps extends PropsWithChildren {
   readonly composition: MotionCompositionV1
@@ -34,13 +34,19 @@ export interface MotionComponentHostProps<Props, Style> {
   readonly style: Style
   readonly context: MotionRenderContextV1
   readonly graphPatches?: readonly MotionGraphPatchV1[]
+  readonly graphOperations?: readonly MotionGraphOperationV1[]
   readonly selectedGraphNodeId?: string | null
 }
 
-export function MotionComponentHost<Props, Style>({ module, props, style, context, graphPatches = [], selectedGraphNodeId = null }: MotionComponentHostProps<Props, Style>) {
+export function MotionComponentHost<Props, Style>({ module, props, style, context, graphPatches = [], graphOperations = [], selectedGraphNodeId = null }: MotionComponentHostProps<Props, Style>) {
   const Component = module.Component
   const resolvedScene = isGraphBackedModule(module)
-    ? evaluateScene(applyMotionGraphPatches(module.createScene(props, style, context), graphPatches), context)
+    ? (() => {
+        const patchedScene = applyMotionGraphPatches(module.createScene(props, style, context), graphPatches)
+        const operated = applyMotionOperations(patchedScene, graphOperations)
+        if (!operated.ok) throw new RangeError(`Motion operation ${operated.error.operationId} failed in component host: ${operated.error.message}`)
+        return evaluateScene(operated.scene, context)
+      })()
     : null
   const component = <Component props={props} style={style} context={context} />
   return (

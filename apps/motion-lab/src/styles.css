@@ -168,6 +168,12 @@ button { cursor: pointer; }
 .motion-lab__node-debug { display: grid; gap: 5px; padding: 9px; border: 1px solid #2e2e33; border-radius: 8px; background: #151517; }
 .motion-lab__node-debug strong { font-size: 10px; }
 .motion-lab__node-debug span { color: #797982; font: 9px/1.35 Consolas, monospace; overflow-wrap: anywhere; }
+.motion-lab__operation-playground { background: #111214; }
+.motion-lab__operation-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.motion-lab__operation-grid button { min-height: 31px; padding: 6px 8px; border: 1px solid #35353b; border-radius: 7px; color: #c9c9ce; background: #1b1b1f; font-size: 10px; text-align: left; }
+.motion-lab__operation-grid button:hover:not(:disabled) { border-color: #5fff52; }
+.motion-lab__operation-grid button:disabled { cursor: default; opacity: .32; }
+.motion-lab__operation-error { padding: 8px; border: 1px solid #743b41; border-radius: 7px; color: #ffadb6; background: #241315; font: 9px/1.4 Consolas, monospace; overflow-wrap: anywhere; }
 
 @media (max-width: 1120px) {
   .motion-lab__body { grid-template-columns: 190px minmax(440px, 1fr) 245px; }

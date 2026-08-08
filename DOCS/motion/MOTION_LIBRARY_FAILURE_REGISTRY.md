@@ -71,3 +71,26 @@ ATTEMPTS: Reproduced with the Cost / Value Card, confirmed validation correctly 
 
 ONE-LINE SOLUTION: structural add/remove now maintain semantic coverage and prune removed-node references from semantic parts, exposures and layout metadata before the resulting scene is revalidated.
 
+## MOTION-FAIL-004 — Mask reorder operation was typed but not executed
+
+- Status: FIXED
+- Severity: medium
+- Milestone: MOTION-C1
+- Date: 2026-08-08
+
+WHAT: the C1 operation contract and low-level patch union included `reorder-mask`, but the patch application switch initially lacked the corresponding branch.
+
+WHERE: `packages/motion-graph/src/patches.ts`.
+
+WHEN/HOW: The first exhaustive C1 operation test run passed 48/49 tests and failed only the deterministic mask-order assertion. The operation fell through to the generic sibling-node reorder branch, so mask order stayed unchanged.
+
+WHY: The patch type expansion landed before the implementation branch was completed.
+
+IMPACT: A future mask stack UI could report a valid operation while leaving the ordered mask stack unchanged.
+
+ROOT CAUSE: Missing `reorder-mask` application branch and indexed mask insertion support.
+
+ATTEMPTS: Kept the failing assertion, inspected the patch dispatcher, and implemented ordered `add-mask` plus `reorder-mask` through the existing immutable `insertAt` primitive.
+
+ONE-LINE SOLUTION: mask insertion and reordering now use deterministic ordered-array updates, and the complete graph suite passes 49/49.
+

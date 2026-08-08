@@ -49,7 +49,7 @@ describe('GraphInspector schema-driven editing levels', () => {
       writeExposure: vi.fn(),
       selectedNodeId: 'kinetic-headline.background',
       onSelectNode: vi.fn(),
-      onPatch: vi.fn(),
+      onOperation: vi.fn(),
     } as const
 
     act(() => root.render(<GraphInspector {...common} level="creator" onLevelChange={vi.fn()} />))
@@ -66,8 +66,8 @@ describe('GraphInspector schema-driven editing levels', () => {
     expect(container.textContent).toContain('Node / effect debug')
   })
 
-  it('emits typed graph patches for effect, mask and blend edits', () => {
-    const onPatch = vi.fn()
+  it('emits typed universal graph operations for effect, mask and blend edits', () => {
+    const onOperation = vi.fn()
     act(() => root.render(
       <GraphInspector
         level="advanced"
@@ -79,15 +79,15 @@ describe('GraphInspector schema-driven editing levels', () => {
         writeExposure={vi.fn()}
         selectedNodeId="kinetic-headline.background"
         onSelectNode={vi.fn()}
-        onPatch={onPatch}
+        onOperation={onOperation}
       />,
     ))
 
     act(() => clickButton('+ Add'))
-    expect(onPatch).toHaveBeenCalledWith(expect.objectContaining({ op: 'add-effect', nodeId: 'kinetic-headline.background' }))
+    expect(onOperation).toHaveBeenCalledWith(expect.objectContaining({ operationId: expect.any(String), type: 'add-effect', nodeId: 'kinetic-headline.background' }))
 
     act(() => clickButton('+ Rectangle'))
-    expect(onPatch).toHaveBeenCalledWith(expect.objectContaining({ op: 'add-mask', nodeId: 'kinetic-headline.background' }))
+    expect(onOperation).toHaveBeenCalledWith(expect.objectContaining({ operationId: expect.any(String), type: 'add-mask', nodeId: 'kinetic-headline.background' }))
 
     const blend = [...container.querySelectorAll('select')].find((candidate) => [...candidate.options].some((option) => option.value === 'multiply'))
     if (!blend) throw new Error('Blend selector not found')
@@ -95,6 +95,6 @@ describe('GraphInspector schema-driven editing levels', () => {
       blend.value = 'multiply'
       blend.dispatchEvent(new Event('change', { bubbles: true }))
     })
-    expect(onPatch).toHaveBeenCalledWith({ op: 'set-blend-mode', nodeId: 'kinetic-headline.background', blendMode: 'multiply' })
+    expect(onOperation).toHaveBeenCalledWith(expect.objectContaining({ operationId: expect.any(String), type: 'set-blend-mode', nodeId: 'kinetic-headline.background', blendMode: 'multiply' }))
   })
 })

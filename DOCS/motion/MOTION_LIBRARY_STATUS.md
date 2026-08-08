@@ -43,7 +43,8 @@ Implementation and verification are complete.
 
 - MOTION-P0 — **complete**. Plan A V1 was moved into a dedicated Motion worktree/branch, re-verified at 178/178 tests and 7/7 Motion builds, committed as `7a36ae4fee39d086780c50d80fd1e7967212bd57`, pushed with matching remote SHA, and protected by pushed rollback tag `motion-plan-a-v1`.
 - MOTION-C0 — **complete**. Five proof components pass the Level-4 readiness audit and the graph-only Cost Card structural mutation proof. One blocking structural-reference failure was found and fixed without weakening validation. Audit: `DOCS/motion/COMPOSITOR_READINESS_AUDIT.md`. Failure: `MOTION-FAIL-003`.
-- MOTION-C1 — **next active milestone**. Build the universal typed immutable graph-operation vocabulary, typed errors/results, atomic batches and developer-only operation playground.
+- MOTION-C1 — **complete**. Universal typed immutable graph operations now cover node/property/effect/mask/blend edits, deterministic duplication, grouping, typed failures/results, inverse readiness and atomic batches. Motion Lab Advanced mode and the developer operation playground use the same operation API. Evidence: `DOCS/motion/evidence/MOTION-C1.md`.
+- Plan A continuation inventory / next component batch — **next active milestone**. Inventory all 48 existing components by communication scenario, document overlap/gaps, then add only 8–12 genuinely missing high-value graph-native components before stopping this cycle ahead of C2.
 
 Dedicated continuation worktree:
 

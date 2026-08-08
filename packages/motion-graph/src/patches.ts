@@ -10,6 +10,7 @@ export type MotionGraphPatchV1 =
   | Readonly<{ op: 'set-property'; target: MotionNodePropertyPathV1; value: Animatable<MotionPropertyPrimitiveV1> }>
   | Readonly<{ op: 'add-node'; node: MotionNodeV1; parentId: string; index?: number }>
   | Readonly<{ op: 'remove-node'; nodeId: string }>
+  | Readonly<{ op: 'rename-node'; nodeId: string; name: string }>
   | Readonly<{ op: 'reparent-node'; nodeId: string; parentId: string; index?: number }>
   | Readonly<{ op: 'reorder-node'; nodeId: string; index: number }>
   | Readonly<{ op: 'add-effect'; nodeId: string; effect: MotionEffectInstanceV1; index?: number }>
@@ -18,8 +19,9 @@ export type MotionGraphPatchV1 =
   | Readonly<{ op: 'duplicate-effect'; nodeId: string; effectId: string; duplicateId: string; index?: number }>
   | Readonly<{ op: 'reorder-effect'; nodeId: string; effectId: string; index: number }>
   | Readonly<{ op: 'set-effect-property'; nodeId: string; effectId: string; parameter: string; value: Animatable<number | string> }>
-  | Readonly<{ op: 'add-mask'; nodeId: string; mask: MotionMaskInstanceV1 }>
+  | Readonly<{ op: 'add-mask'; nodeId: string; mask: MotionMaskInstanceV1; index?: number }>
   | Readonly<{ op: 'remove-mask'; nodeId: string; maskId: string }>
+  | Readonly<{ op: 'reorder-mask'; nodeId: string; maskId: string; index: number }>
   | Readonly<{ op: 'set-mask-property'; nodeId: string; maskId: string; property: 'enabled' | 'invert' | 'opacity' | 'feather' | 'expansion' | 'x' | 'y' | 'width' | 'height' | 'radius'; value: boolean | Animatable<number> }>
   | Readonly<{ op: 'set-blend-mode'; nodeId: string; blendMode: MotionNodeV1['blendMode'] }>
 
@@ -111,8 +113,9 @@ export const applyMotionGraphPatch = (scene: MotionSceneV1, patch: MotionGraphPa
   else if (patch.op === 'duplicate-effect') { const node = requireNode(patch.nodeId); const effect = node.effects.find((candidate) => candidate.id === patch.effectId); if (!effect) throw new RangeError(`Unknown effect: ${patch.effectId}`); if (node.effects.some((candidate) => candidate.id === patch.duplicateId)) throw new RangeError(`Effect already exists: ${patch.duplicateId}`); const duplicate = Object.freeze({ ...effect, id: patch.duplicateId, parameters: Object.freeze({ ...effect.parameters }) }); nodes[patch.nodeId] = Object.freeze({ ...node, effects: insertAt(node.effects, duplicate, patch.index ?? node.effects.indexOf(effect) + 1) }) }
   else if (patch.op === 'reorder-effect') { const node = requireNode(patch.nodeId); const effect = node.effects.find((candidate) => candidate.id === patch.effectId); if (!effect) throw new RangeError(`Unknown effect: ${patch.effectId}`); nodes[patch.nodeId] = Object.freeze({ ...node, effects: insertAt(node.effects.filter((candidate) => candidate.id !== patch.effectId), effect, patch.index) }) }
   else if (patch.op === 'set-effect-property') { const node = requireNode(patch.nodeId); let found = false; const effects = node.effects.map((effect) => effect.id === patch.effectId ? (found = true, Object.freeze({ ...effect, parameters: Object.freeze({ ...effect.parameters, [patch.parameter]: patch.value }) })) : effect); if (!found) throw new RangeError(`Unknown effect: ${patch.effectId}`); nodes[patch.nodeId] = Object.freeze({ ...node, effects: Object.freeze(effects) }) }
-  else if (patch.op === 'add-mask') { const node = requireNode(patch.nodeId); nodes[patch.nodeId] = Object.freeze({ ...node, masks: Object.freeze([...node.masks, patch.mask]) }) }
+  else if (patch.op === 'add-mask') { const node = requireNode(patch.nodeId); nodes[patch.nodeId] = Object.freeze({ ...node, masks: insertAt(node.masks, patch.mask, patch.index) }) }
   else if (patch.op === 'remove-mask') { const node = requireNode(patch.nodeId); nodes[patch.nodeId] = Object.freeze({ ...node, masks: Object.freeze(node.masks.filter((mask) => mask.id !== patch.maskId)) }) }
+  else if (patch.op === 'reorder-mask') { const node = requireNode(patch.nodeId); const mask = node.masks.find((candidate) => candidate.id === patch.maskId); if (!mask) throw new RangeError(`Unknown mask: ${patch.maskId}`); nodes[patch.nodeId] = Object.freeze({ ...node, masks: insertAt(node.masks.filter((candidate) => candidate.id !== patch.maskId), mask, patch.index) }) }
   else if (patch.op === 'set-mask-property') {
     const node = requireNode(patch.nodeId)
     let found = false
@@ -125,6 +128,7 @@ export const applyMotionGraphPatch = (scene: MotionSceneV1, patch: MotionGraphPa
     if (!found) throw new RangeError(`Unknown mask: ${patch.maskId}`)
     nodes[patch.nodeId] = Object.freeze({ ...node, masks: Object.freeze(masks) })
   }
+  else if (patch.op === 'rename-node') { const node = requireNode(patch.nodeId); nodes[patch.nodeId] = Object.freeze({ ...node, name: patch.name }) }
   else if (patch.op === 'add-node') { if (nodes[patch.node.id]) throw new RangeError(`Node already exists: ${patch.node.id}`); const parent = requireNode(patch.parentId); if (parent.type !== 'group') throw new RangeError('New node parent must be a group.'); const addedNode = Object.freeze({ ...patch.node, parentId: patch.parentId }) as MotionNodeV1; nodes[patch.node.id] = addedNode; nodes[parent.id] = replaceChild(parent, insertAt(parent.childIds, patch.node.id, patch.index)); semanticParts = semanticPartsWithAddedNode(scene, parent.id, addedNode) }
   else if (patch.op === 'remove-node') { if (patch.nodeId === scene.rootNodeId) throw new RangeError('Cannot remove the scene root.'); const node = requireNode(patch.nodeId); const descendants = new Set<string>([node.id]); let changed = true; while (changed) { changed = false; for (const candidate of Object.values(nodes)) if (candidate.parentId && descendants.has(candidate.parentId) && !descendants.has(candidate.id)) { descendants.add(candidate.id); changed = true } } for (const id of descendants) delete nodes[id]; if (node.parentId) { const parent = requireNode(node.parentId); nodes[parent.id] = replaceChild(parent, parent.type === 'group' ? parent.childIds.filter((id) => !descendants.has(id)) : []) } const reconciled = pruneRemovedNodeReferences(scene, descendants); semanticParts = reconciled.semanticParts; exposures = reconciled.exposures; layout = reconciled.layout }
   else if (patch.op === 'reparent-node') { if (patch.nodeId === scene.rootNodeId) throw new RangeError('Cannot reparent root.'); const node = requireNode(patch.nodeId); const nextParent = requireNode(patch.parentId); if (nextParent.type !== 'group') throw new RangeError('New parent must be a group.'); if (node.parentId) { const oldParent = requireNode(node.parentId); if (oldParent.type === 'group') nodes[oldParent.id] = replaceChild(oldParent, oldParent.childIds.filter((id) => id !== node.id)) } nodes[node.id] = Object.freeze({ ...node, parentId: nextParent.id }); nodes[nextParent.id] = replaceChild(nextParent, insertAt(nextParent.childIds.filter((id) => id !== node.id), node.id, patch.index)) }

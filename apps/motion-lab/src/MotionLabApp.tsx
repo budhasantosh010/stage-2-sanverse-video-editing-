@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ChangeEvent, ReactNode } from 'react'
 import type { MotionAspectRatio, MotionExposureLevel, MotionStylePackV1 } from '@sanverse/motion-contract'
-import { constant, evaluateScene } from '@sanverse/motion-graph'
-import type { MotionExposureV1, MotionGraphPatchV1, MotionNodePropertyNameV1, MotionPropertyPrimitiveV1, MotionSceneV1, ResolvedMotionNodeV1 } from '@sanverse/motion-graph'
+import { applyMotionOperations, constant, evaluateScene } from '@sanverse/motion-graph'
+import type { MotionExposureV1, MotionGraphOperationV1, MotionNodePropertyNameV1, MotionPropertyPrimitiveV1, MotionSceneV1, ResolvedMotionNodeV1 } from '@sanverse/motion-graph'
 import {
   CHECKLIST_CARD_DEFINITION,
   ChecklistCardModule,
@@ -65,7 +65,8 @@ import {
 import { SANVERSE_TICKS_PER_SECOND, frameForTicks } from '@sanverse/motion-primitives'
 import { PLAYBACK_SPEEDS, advancePlaybackTicks, clampExactTick, resolveInitialTick, stepFrame } from './transport.ts'
 import type { PlaybackSpeed } from './transport.ts'
-import { GraphInspector, previewPatchedScene } from './GraphInspector.tsx'
+import { GraphInspector, previewOperatedScene } from './GraphInspector.tsx'
+import { OperationPlayground } from './OperationPlayground.tsx'
 
 const ratioOrder: readonly MotionAspectRatio[] = ['16:9', '9:16', '1:1', '4:5']
 const backgroundOptions = ['black', 'white', 'neutral', 'busy'] as const
@@ -231,13 +232,15 @@ const resolvedNodeProperty = (node: ResolvedMotionNodeV1, property: MotionNodePr
   return null
 }
 
-const patchIdentity = (patch: MotionGraphPatchV1): string | null => {
-  if (patch.op === 'set-property') return `property:${patch.target.nodeId}:${patch.target.property}`
-  if (patch.op === 'set-effect-property') return `effect-property:${patch.nodeId}:${patch.effectId}:${patch.parameter}`
-  if (patch.op === 'set-effect-enabled') return `effect-enabled:${patch.nodeId}:${patch.effectId}`
-  if (patch.op === 'set-mask-property') return `mask-property:${patch.nodeId}:${patch.maskId}:${patch.property}`
-  if (patch.op === 'set-blend-mode') return `blend:${patch.nodeId}`
-  if (patch.op === 'reorder-effect') return `effect-order:${patch.nodeId}:${patch.effectId}`
+const operationIdentity = (operation: MotionGraphOperationV1): string | null => {
+  if (operation.type === 'set-property' || operation.type === 'reset-property') return `property:${operation.target.nodeId}:${operation.target.property}`
+  if (operation.type === 'set-effect-property') return `effect-property:${operation.nodeId}:${operation.effectId}:${operation.parameter}`
+  if (operation.type === 'set-effect-enabled') return `effect-enabled:${operation.nodeId}:${operation.effectId}`
+  if (operation.type === 'set-mask-property') return `mask-property:${operation.nodeId}:${operation.maskId}:${operation.property}`
+  if (operation.type === 'set-blend-mode') return `blend:${operation.nodeId}`
+  if (operation.type === 'reorder-effect') return `effect-order:${operation.nodeId}:${operation.effectId}`
+  if (operation.type === 'reorder-mask') return `mask-order:${operation.nodeId}:${operation.maskId}`
+  if (operation.type === 'reorder-node') return `node-order:${operation.nodeId}`
   return null
 }
 
@@ -268,7 +271,10 @@ export function MotionLabApp() {
   const [reducedMotion, setReducedMotion] = useState(initialReducedMotion)
   const [background, setBackground] = useState<PreviewBackground>(initialBackground)
   const [exposureLevel, setExposureLevel] = useState<MotionExposureLevel>(initialSearch.get('level') === 'advanced' ? 'advanced' : initialSearch.get('level') === 'designer' ? 'designer' : 'creator')
-  const [graphPatches, setGraphPatches] = useState<readonly MotionGraphPatchV1[]>([])
+  const [graphOperations, setGraphOperations] = useState<readonly MotionGraphOperationV1[]>([])
+  const [graphOperationError, setGraphOperationError] = useState<string | null>(null)
+  const graphOperationCounterRef = useRef(1)
+  const nextGraphOperationId = (kind: string): string => `lab:${kind}:${graphOperationCounterRef.current++}`
   const [selectedGraphNodeId, setSelectedGraphNodeId] = useState<string | null>(null)
 
   const [text, setText] = useState(initialText)
@@ -618,9 +624,9 @@ export function MotionLabApp() {
           : isTeamNetwork && teamNetworkRenderable && validatedTeamNetworkProps && validatedTeamNetworkStyle
             ? TeamNetworkDiagramModule.createScene(validatedTeamNetworkProps, validatedTeamNetworkStyle, context)
             : null
-  const patchedGraphPreview = baseGraphScene ? previewPatchedScene(baseGraphScene, graphPatches) : null
-  const currentGraphScene = patchedGraphPreview?.scene ?? null
-  const applicableGraphPatches = patchedGraphPreview?.patches ?? []
+  const operatedGraphPreview = baseGraphScene ? previewOperatedScene(baseGraphScene, graphOperations) : null
+  const currentGraphScene = operatedGraphPreview?.scene ?? null
+  const applicableGraphOperations = operatedGraphPreview?.operations ?? []
   const resolvedGraphScene = currentGraphScene ? evaluateScene(currentGraphScene, context) : null
   const graphExposures: readonly MotionExposureV1[] = currentGraphScene
     ? Object.freeze([
@@ -699,17 +705,25 @@ export function MotionLabApp() {
     if (nextFamilyModule) setFamilyProps(nextFamilyModule.defaultProps)
     setDurationSeconds(nextDurationSeconds)
     setLocalTicks(Math.round(nextDurationSeconds * SANVERSE_TICKS_PER_SECOND * nextProgress))
-    setGraphPatches([])
+    setGraphOperations([])
+    setGraphOperationError(null)
     setSelectedGraphNodeId(null)
   }
 
-  const appendGraphPatches = (patches: readonly MotionGraphPatchV1[]) => {
-    setGraphPatches((current) => {
+  const appendGraphOperations = (operations: readonly MotionGraphOperationV1[]) => {
+    if (operations.length === 0 || !currentGraphScene) return
+    const preview = applyMotionOperations(currentGraphScene, operations)
+    if (!preview.ok) {
+      setGraphOperationError(`${preview.error.code}: ${preview.error.message}`)
+      return
+    }
+    setGraphOperationError(null)
+    setGraphOperations((current) => {
       let next = [...current]
-      for (const patch of patches) {
-        const identity = patchIdentity(patch)
-        if (identity) next = next.filter((candidate) => patchIdentity(candidate) !== identity)
-        next.push(patch)
+      for (const operation of operations) {
+        const identity = operationIdentity(operation)
+        if (identity) next = next.filter((candidate) => operationIdentity(candidate) !== identity)
+        next.push(operation)
       }
       return Object.freeze(next)
     })
@@ -861,19 +875,19 @@ export function MotionLabApp() {
   const writeExposure = (exposure: MotionExposureV1, value: MotionPropertyPrimitiveV1) => {
     if (exposure.target.kind === 'component') { writeComponentExposure(exposure.target.propertyId, value); return }
     if (exposure.target.kind === 'node') {
-      appendGraphPatches([{ op: 'set-property', target: { nodeId: exposure.target.nodeId, property: exposure.target.property }, value: constant(value) }])
+      appendGraphOperations([{ operationId: nextGraphOperationId('exposure-property'), type: 'set-property', target: { nodeId: exposure.target.nodeId, property: exposure.target.property }, value: constant(value) }])
       return
     }
     if (exposure.target.kind === 'part' && currentGraphScene && resolvedGraphScene) {
       const target = exposure.target
       const part = currentGraphScene.semanticParts.find((candidate) => candidate.id === target.semanticPartId)
-      const patches = part?.nodeIds
+      const operations = part?.nodeIds
         .filter((nodeId) => {
           const node = resolvedGraphScene.nodes[nodeId]
           return Boolean(node) && nodeSupportsProperty(node!, target.property)
         })
-        .map((nodeId): MotionGraphPatchV1 => ({ op: 'set-property', target: { nodeId, property: target.property }, value: constant(value) })) ?? []
-      appendGraphPatches(patches)
+        .map((nodeId): MotionGraphOperationV1 => ({ operationId: nextGraphOperationId('part-property'), type: 'set-property', target: { nodeId, property: target.property }, value: constant(value) })) ?? []
+      appendGraphOperations(operations)
     }
   }
 
@@ -954,17 +968,17 @@ export function MotionLabApp() {
             >
               <div style={{ position: 'absolute', inset: 0, ...previewBackgroundStyle(background) }} />
               {isFamily && familyRenderable && familyModule && validatedFamilyProps && validatedFamilyStyle ? (
-                <MotionComponentHost module={familyModule} props={validatedFamilyProps} style={validatedFamilyStyle} context={context} graphPatches={applicableGraphPatches} selectedGraphNodeId={selectedGraphNodeId} />
+                <MotionComponentHost module={familyModule} props={validatedFamilyProps} style={validatedFamilyStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} />
               ) : isHeadline && headlineRenderable && validatedHeadlineProps && validatedHeadlineStyle ? (
-                <MotionComponentHost module={KineticHeadlineModule} props={validatedHeadlineProps} style={validatedHeadlineStyle} context={context} graphPatches={applicableGraphPatches} selectedGraphNodeId={selectedGraphNodeId} />
+                <MotionComponentHost module={KineticHeadlineModule} props={validatedHeadlineProps} style={validatedHeadlineStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} />
               ) : isChecklist && checklistRenderable && validatedChecklistProps && validatedChecklistStyle ? (
-                <MotionComponentHost module={ChecklistCardModule} props={validatedChecklistProps} style={validatedChecklistStyle} context={context} graphPatches={applicableGraphPatches} selectedGraphNodeId={selectedGraphNodeId} />
+                <MotionComponentHost module={ChecklistCardModule} props={validatedChecklistProps} style={validatedChecklistStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} />
               ) : isCostValue && costValueRenderable && validatedCostValueProps && validatedCostValueStyle ? (
-                <MotionComponentHost module={CostValueCardModule} props={validatedCostValueProps} style={validatedCostValueStyle} context={context} graphPatches={applicableGraphPatches} selectedGraphNodeId={selectedGraphNodeId} />
+                <MotionComponentHost module={CostValueCardModule} props={validatedCostValueProps} style={validatedCostValueStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} />
               ) : isTimer && timerRenderable && validatedTimerProps && validatedTimerStyle ? (
-                <MotionComponentHost module={TimerStatusPillModule} props={validatedTimerProps} style={validatedTimerStyle} context={context} graphPatches={applicableGraphPatches} selectedGraphNodeId={selectedGraphNodeId} />
+                <MotionComponentHost module={TimerStatusPillModule} props={validatedTimerProps} style={validatedTimerStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} />
               ) : isTeamNetwork && teamNetworkRenderable && validatedTeamNetworkProps && validatedTeamNetworkStyle ? (
-                <MotionComponentHost module={TeamNetworkDiagramModule} props={validatedTeamNetworkProps} style={validatedTeamNetworkStyle} context={context} graphPatches={applicableGraphPatches} selectedGraphNodeId={selectedGraphNodeId} />
+                <MotionComponentHost module={TeamNetworkDiagramModule} props={validatedTeamNetworkProps} style={validatedTeamNetworkStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} />
               ) : (
                 <div className="motion-lab__refusal" style={{ position: 'absolute', inset: 0 }}>
                   <div>
@@ -1041,8 +1055,17 @@ export function MotionLabApp() {
             writeExposure={writeExposure}
             selectedNodeId={selectedGraphNodeId}
             onSelectNode={setSelectedGraphNodeId}
-            onPatch={(patch) => appendGraphPatches([patch])}
+            onOperation={(operation) => appendGraphOperations([operation])}
           />
+          {exposureLevel === 'advanced' ? (
+            <OperationPlayground
+              scene={currentGraphScene}
+              selectedNodeId={selectedGraphNodeId}
+              onOperation={(operation) => appendGraphOperations([operation])}
+              onSelectNode={setSelectedGraphNodeId}
+              errorMessage={graphOperationError}
+            />
+          ) : null}
           {!renderable ? (
             <section className="motion-lab__issues" aria-live="polite">
               <strong>Typed refusal</strong>

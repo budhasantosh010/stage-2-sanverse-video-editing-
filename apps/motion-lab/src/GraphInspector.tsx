@@ -4,7 +4,7 @@ import {
   MOTION_BLEND_MODES,
   MOTION_EFFECT_REGISTRY,
   MOTION_EFFECT_TYPES,
-  applyMotionGraphPatch,
+  applyMotionOperation,
   constant,
   createDefaultEffect,
   createDefaultMask,
@@ -15,7 +15,7 @@ import {
 import type {
   MotionEffectTypeV1,
   MotionExposureV1,
-  MotionGraphPatchV1,
+  MotionGraphOperationV1,
   MotionLayerTreeNodeV1,
   MotionPropertyPrimitiveV1,
   MotionSceneV1,
@@ -36,7 +36,7 @@ interface GraphInspectorProps {
   readonly writeExposure: (exposure: MotionExposureV1, value: MotionPropertyPrimitiveV1) => void
   readonly selectedNodeId: string | null
   readonly onSelectNode: (nodeId: string | null) => void
-  readonly onPatch: (patch: MotionGraphPatchV1) => void
+  readonly onOperation: (operation: MotionGraphOperationV1) => void
 }
 
 const colorInputValue = (value: unknown): string => typeof value === 'string' && /^#[0-9a-f]{6}$/iu.test(value) ? value : '#ffffff'
@@ -87,10 +87,12 @@ function LayerTree({ node, selectedNodeId, onSelectNode }: Readonly<{ node: Moti
   )
 }
 
-export function GraphInspector({ level, onLevelChange, exposures, scene, resolvedScene, readExposure, writeExposure, selectedNodeId, onSelectNode, onPatch }: GraphInspectorProps) {
+export function GraphInspector({ level, onLevelChange, exposures, scene, resolvedScene, readExposure, writeExposure, selectedNodeId, onSelectNode, onOperation }: GraphInspectorProps) {
   const [effectType, setEffectType] = useState<MotionEffectTypeV1>('glow')
   const effectCounter = useRef(1)
   const maskCounter = useRef(1)
+  const operationCounter = useRef(1)
+  const nextOperationId = (kind: string): string => `lab-inspector:${kind}:${operationCounter.current++}`
   const visibleExposures = exposuresForLevel(exposures, level)
   const groups = [...new Set(visibleExposures.map((exposure) => exposure.group))]
   const selectedNode = selectedNodeId && scene ? scene.nodes[selectedNodeId] ?? null : null
@@ -102,13 +104,13 @@ export function GraphInspector({ level, onLevelChange, exposures, scene, resolve
   const addEffect = () => {
     if (!selectedNodeId) return
     const id = `lab-${effectType}-${effectCounter.current++}`
-    onPatch({ op: 'add-effect', nodeId: selectedNodeId, effect: createDefaultEffect(id, effectType) })
+    onOperation({ operationId: nextOperationId('add-effect'), type: 'add-effect', nodeId: selectedNodeId, effect: createDefaultEffect(id, effectType) })
   }
 
   const addMask = (type: 'rectangle' | 'rounded-rectangle' | 'ellipse') => {
     if (!selectedNodeId) return
     const id = `lab-${type}-mask-${maskCounter.current++}`
-    onPatch({ op: 'add-mask', nodeId: selectedNodeId, mask: createDefaultMask(id, type) })
+    onOperation({ operationId: nextOperationId('add-mask'), type: 'add-mask', nodeId: selectedNodeId, mask: createDefaultMask(id, type) })
   }
 
   return (
@@ -161,7 +163,7 @@ export function GraphInspector({ level, onLevelChange, exposures, scene, resolve
                 <div className="motion-lab__node-summary"><strong>{selectedNode.name}</strong><span>{selectedNode.id}</span><small>{selectedNode.type}</small></div>
                 <label>
                   <span className="motion-lab__field-label">Blend mode</span>
-                  <select value={selectedNode.blendMode} onChange={(event) => onPatch({ op: 'set-blend-mode', nodeId: selectedNode.id, blendMode: event.target.value as typeof selectedNode.blendMode })}>
+                  <select value={selectedNode.blendMode} onChange={(event) => onOperation({ operationId: nextOperationId('blend'), type: 'set-blend-mode', nodeId: selectedNode.id, blendMode: event.target.value as typeof selectedNode.blendMode })}>
                     {MOTION_BLEND_MODES.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
                   </select>
                 </label>
@@ -183,8 +185,8 @@ export function GraphInspector({ level, onLevelChange, exposures, scene, resolve
                   return (
                     <div key={effect.id} className="motion-lab__advanced-card">
                       <div className="motion-lab__advanced-card-header">
-                        <label className="motion-lab__toggle"><input type="checkbox" checked={effect.enabled} onChange={(event) => onPatch({ op: 'set-effect-enabled', nodeId: selectedNode.id, effectId: effect.id, enabled: event.target.checked })} /><span>{definition.name}</span></label>
-                        <div><button type="button" disabled={index === 0} onClick={() => onPatch({ op: 'reorder-effect', nodeId: selectedNode.id, effectId: effect.id, index: index - 1 })}>↑</button><button type="button" disabled={index === selectedNode.effects.length - 1} onClick={() => onPatch({ op: 'reorder-effect', nodeId: selectedNode.id, effectId: effect.id, index: index + 1 })}>↓</button><button type="button" onClick={() => onPatch({ op: 'remove-effect', nodeId: selectedNode.id, effectId: effect.id })}>×</button></div>
+                        <label className="motion-lab__toggle"><input type="checkbox" checked={effect.enabled} onChange={(event) => onOperation({ operationId: nextOperationId('effect-enabled'), type: 'set-effect-enabled', nodeId: selectedNode.id, effectId: effect.id, enabled: event.target.checked })} /><span>{definition.name}</span></label>
+                        <div><button type="button" disabled={index === 0} onClick={() => onOperation({ operationId: nextOperationId('effect-up'), type: 'reorder-effect', nodeId: selectedNode.id, effectId: effect.id, index: index - 1 })}>↑</button><button type="button" disabled={index === selectedNode.effects.length - 1} onClick={() => onOperation({ operationId: nextOperationId('effect-down'), type: 'reorder-effect', nodeId: selectedNode.id, effectId: effect.id, index: index + 1 })}>↓</button><button type="button" onClick={() => onOperation({ operationId: nextOperationId('remove-effect'), type: 'remove-effect', nodeId: selectedNode.id, effectId: effect.id })}>×</button></div>
                       </div>
                       {definition.parameters.map((parameter) => {
                         const current = resolvedEffect?.parameters[parameter.id] ?? parameter.defaultValue
@@ -192,8 +194,8 @@ export function GraphInspector({ level, onLevelChange, exposures, scene, resolve
                           <label key={parameter.id}>
                             <span className="motion-lab__field-label">{parameter.id}</span>
                             {parameter.type === 'color'
-                              ? <input type="color" value={colorInputValue(current)} onChange={(event) => onPatch({ op: 'set-effect-property', nodeId: selectedNode.id, effectId: effect.id, parameter: parameter.id, value: constant(event.target.value) })} />
-                              : <input type="range" min={parameter.minimum} max={parameter.maximum} step={parameter.step ?? 0.01} value={typeof current === 'number' ? current : Number(parameter.defaultValue)} onChange={(event) => onPatch({ op: 'set-effect-property', nodeId: selectedNode.id, effectId: effect.id, parameter: parameter.id, value: constant(Number(event.target.value)) })} />}
+                              ? <input type="color" value={colorInputValue(current)} onChange={(event) => onOperation({ operationId: nextOperationId('effect-property'), type: 'set-effect-property', nodeId: selectedNode.id, effectId: effect.id, parameter: parameter.id, value: constant(event.target.value) })} />
+                              : <input type="range" min={parameter.minimum} max={parameter.maximum} step={parameter.step ?? 0.01} value={typeof current === 'number' ? current : Number(parameter.defaultValue)} onChange={(event) => onOperation({ operationId: nextOperationId('effect-property'), type: 'set-effect-property', nodeId: selectedNode.id, effectId: effect.id, parameter: parameter.id, value: constant(Number(event.target.value)) })} />}
                             {parameter.type === 'number' ? <small>{String(current)}</small> : null}
                           </label>
                         )
@@ -218,11 +220,11 @@ export function GraphInspector({ level, onLevelChange, exposures, scene, resolve
                   const resolvedMask = resolvedSelectedNode?.masks.find((candidate) => candidate.id === mask.id)
                   return (
                     <div key={mask.id} className="motion-lab__advanced-card">
-                      <div className="motion-lab__advanced-card-header"><strong>{mask.type}</strong><button type="button" onClick={() => onPatch({ op: 'remove-mask', nodeId: selectedNode.id, maskId: mask.id })}>×</button></div>
-                      <label className="motion-lab__toggle"><input type="checkbox" checked={mask.invert} onChange={(event) => onPatch({ op: 'set-mask-property', nodeId: selectedNode.id, maskId: mask.id, property: 'invert', value: event.target.checked })} /><span>Invert</span></label>
+                      <div className="motion-lab__advanced-card-header"><strong>{mask.type}</strong><button type="button" onClick={() => onOperation({ operationId: nextOperationId('remove-mask'), type: 'remove-mask', nodeId: selectedNode.id, maskId: mask.id })}>×</button></div>
+                      <label className="motion-lab__toggle"><input type="checkbox" checked={mask.invert} onChange={(event) => onOperation({ operationId: nextOperationId('mask-invert'), type: 'set-mask-property', nodeId: selectedNode.id, maskId: mask.id, property: 'invert', value: event.target.checked })} /><span>Invert</span></label>
                       {(['opacity', 'feather', 'expansion'] as const).map((property) => {
                         const current = resolvedMask?.[property] ?? (property === 'opacity' ? 1 : 0)
-                        return <label key={property}><span className="motion-lab__field-label">{property}</span><input type="range" min={property === 'expansion' ? -0.5 : 0} max={property === 'expansion' ? 0.5 : 1} step={0.01} value={current} onChange={(event) => onPatch({ op: 'set-mask-property', nodeId: selectedNode.id, maskId: mask.id, property, value: constant(Number(event.target.value)) })} /><small>{current.toFixed(2)}</small></label>
+                        return <label key={property}><span className="motion-lab__field-label">{property}</span><input type="range" min={property === 'expansion' ? -0.5 : 0} max={property === 'expansion' ? 0.5 : 1} step={0.01} value={current} onChange={(event) => onOperation({ operationId: nextOperationId('mask-property'), type: 'set-mask-property', nodeId: selectedNode.id, maskId: mask.id, property, value: constant(Number(event.target.value)) })} /><small>{current.toFixed(2)}</small></label>
                       })}
                     </div>
                   )
@@ -241,16 +243,14 @@ export function GraphInspector({ level, onLevelChange, exposures, scene, resolve
   )
 }
 
-export const previewPatchedScene = (scene: MotionSceneV1, patches: readonly MotionGraphPatchV1[]): Readonly<{ scene: MotionSceneV1; patches: readonly MotionGraphPatchV1[] }> => {
+export const previewOperatedScene = (scene: MotionSceneV1, operations: readonly MotionGraphOperationV1[]): Readonly<{ scene: MotionSceneV1; operations: readonly MotionGraphOperationV1[] }> => {
   let current = scene
-  const applied: MotionGraphPatchV1[] = []
-  for (const patch of patches) {
-    try {
-      current = applyMotionGraphPatch(current, patch)
-      applied.push(patch)
-    } catch {
-      // A content edit can remove a previously targeted semantic node. Stale Lab-only patches are ignored rather than breaking preview.
-    }
+  const applied: MotionGraphOperationV1[] = []
+  for (const operation of operations) {
+    const result = applyMotionOperation(current, operation)
+    if (!result.ok) continue
+    current = result.scene
+    applied.push(operation)
   }
-  return { scene: current, patches: applied }
+  return { scene: current, operations: Object.freeze(applied) }
 }
