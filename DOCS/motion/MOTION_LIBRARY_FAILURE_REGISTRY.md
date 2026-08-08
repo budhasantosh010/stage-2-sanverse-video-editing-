@@ -117,3 +117,37 @@ ATTEMPTS: Deleted all invalid A17 screenshots, restarted the dedicated-worktree 
 
 ONE-LINE SOLUTION: visual baseline capture now requires a live Motion Lab HTTP preflight plus manual image inspection; the invalid connection-refused PNGs were removed and never committed as evidence.
 
+## MOTION-FAIL-006 — First C2 performance harness mixed unrelated stress paths and timed out
+
+- Status: FIXED / invalid measurement discarded
+- Severity: low for product, medium for evidence quality
+- Milestone: MOTION-C2
+- Date: 2026-08-08
+
+WHAT: the first C2 benchmark attempted the required 4,000,000 direct keyframe-property evaluations and, in the same run, 1,000 repeated full-scene evaluations of a synthetic 100-node / 100-keyframe-per-property scene plus 1,000 validated graph mutations. The Harness command timed out before returning a complete result.
+
+WHERE: temporary local C2 benchmark harness, not product source.
+
+WHY: the measurement combined three different costs and made full scene validation dominate the run, so the timeout could not be attributed to the keyframe evaluator.
+
+IMPACT: no valid performance number existed from that attempt; accepting a partial/assumed number would have been misleading.
+
+ONE-LINE SOLUTION: benchmark paths were separated: the required direct keyframe evaluator stress remained at 100 properties × 10,000 arbitrary ticks for each representative keyframe count, while full-scene and graph-operation measurements use smaller independently labelled samples.
+
+## MOTION-FAIL-007 — Headless Edge throttled the first next-paint Lab benchmark
+
+- Status: FIXED / metric redefined honestly
+- Severity: low for product, medium for evidence quality
+- Milestone: MOTION-C2
+- Date: 2026-08-08
+
+WHAT: the first real-browser Motion Lab performance script waited on `requestAnimationFrame` after every exact-tick edit and timed out in headless/background Edge.
+
+WHERE: temporary C2 browser measurement harness.
+
+WHY: background/headless browser scheduling can throttle animation-frame callbacks independently of Motion Graph evaluation or React commit cost.
+
+IMPACT: the run could not be used as a preview-frame-time or FPS measurement.
+
+ONE-LINE SOLUTION: the retained browser metric measures exact-tick input dispatch to the next macrotask/DOM commit and is labelled that way; no FPS or paint claim is inferred from it.
+

@@ -243,11 +243,11 @@ export function GraphInspector({ level, onLevelChange, exposures, scene, resolve
   )
 }
 
-export const previewOperatedScene = (scene: MotionSceneV1, operations: readonly MotionGraphOperationV1[]): Readonly<{ scene: MotionSceneV1; operations: readonly MotionGraphOperationV1[] }> => {
+export const previewOperatedScene = (scene: MotionSceneV1, operations: readonly MotionGraphOperationV1[], durationTicks?: number): Readonly<{ scene: MotionSceneV1; operations: readonly MotionGraphOperationV1[] }> => {
   let current = scene
   const applied: MotionGraphOperationV1[] = []
   for (const operation of operations) {
-    const result = applyMotionOperation(current, operation)
+    const result = applyMotionOperation(current, operation, { durationTicks })
     if (!result.ok) continue
     current = result.scene
     applied.push(operation)

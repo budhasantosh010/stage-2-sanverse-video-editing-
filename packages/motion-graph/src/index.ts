@@ -1,4 +1,5 @@
 export * from './properties.ts'
+export * from './animatable-targets.ts'
 export * from './effects.ts'
 export * from './masks.ts'
 export * from './nodes.ts'

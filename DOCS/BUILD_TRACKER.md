@@ -55,6 +55,8 @@ Last updated: 2026-08-03
 | P1F02-01 | Nested Studio Layout Engine V2 | Exact-version nested panel adapter with typed migration, persistence, presets, responsive overlay, and one editor authority | Complete | 1,158/1,158; real edit/Undo/Redo/export; build passes; screenshot-compositor exception recorded |
 | P1F021-01 | Nested Layout Stabilization | One desktop height authority; full-height AI rail; protected Preview/Timeline; panel queries; laptop AI fallback; tablet/mobile drawers | Complete — owner visual approval open | Real browser: one video, preserved draft, 10 stable 1440×900 expand/collapse cycles, laptop overlay fallback, keyboard resize, 1440/1280/1238/1024/390 geometry, edit/Undo/Redo/export; 1,164/1,164; build passes |
 
+| MOTION-C2 | Parallel Motion Program | Deterministic first-class keyframes, universal keyframe operations, timeline projection and Advanced Motion Lab authoring proof | Complete | 253/253 Motion tests; 7/7 Motion builds; real Edge exact/backward/random direct-seek equality; `DOCS/motion/evidence/MOTION-C2.md`; preserved by `motion-compositor-c2` checkpoint |
+
 ## Status rules
 
 | P1F022-01 | Media panel and Editor Monitor V1 | Container-responsive Media shell/cards and one custom monitor with Point, transport, viewer modes, guides, shared geometry, and fullscreen fallback | Complete — owner visual approval open | 1,174/1,174 full suite plus 31/31 post-review affected gate; current inventory 1,176; real browser across Media 420/304/239/220 px and 1440/1280/1238/1024/390 regimes; one video; edit/Undo/Redo; export runtime timeout recorded; builds pass |

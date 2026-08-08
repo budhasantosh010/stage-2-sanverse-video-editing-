@@ -2,7 +2,8 @@ import type { MotionValidationIssueV1, MotionValidationResultV1 } from '@sanvers
 import { motionValidationError, motionValidationOk } from '@sanverse/motion-contract'
 import { MOTION_BLEND_MODES, MOTION_EFFECT_REGISTRY, MOTION_EFFECT_TYPES } from './effects.ts'
 import { MOTION_MASK_TYPES } from './masks.ts'
-import type { Animatable, MotionNodePropertyPathV1, MotionPropertyPathV1, MotionScalarExpressionV1 } from './properties.ts'
+import { motionBezierHandleIssue } from './animation.ts'
+import type { Animatable, MotionKeyframeInterpolationV1, MotionNodePropertyNameV1, MotionNodePropertyPathV1, MotionPropertyPathV1, MotionScalarExpressionV1 } from './properties.ts'
 import type { MotionNodeV1 } from './nodes.ts'
 import type { MotionSceneV1 } from './scene.ts'
 
@@ -29,14 +30,36 @@ const validateScalarExpression = (raw: unknown, path: string, issues: MotionVali
   issues.push(issue(`${path}.kind`, `Unsupported formula expression kind: ${String((raw as Record<string, unknown>).kind)}`))
 }
 
-const validateAnimatable = (value: unknown, path: string, issues: MotionValidationIssueV1[]): void => {
+interface AnimatableConstraintV1 {
+  readonly valueType?: 'number' | 'string' | 'boolean'
+  readonly minimum?: number
+  readonly maximum?: number
+  readonly interpolation?: readonly MotionKeyframeInterpolationV1[]
+}
+
+const validateLiteral = (value: unknown, path: string, issues: MotionValidationIssueV1[], constraint?: AnimatableConstraintV1): void => {
+  const valueType = typeof value
+  if (!['string', 'boolean', 'number'].includes(valueType) || (valueType === 'number' && !Number.isFinite(value))) {
+    issues.push(issue(path, 'Animatable literal must be a finite number, string or boolean.'))
+    return
+  }
+  if (constraint?.valueType && valueType !== constraint.valueType) issues.push(issue(path, `Expected ${constraint.valueType} animatable value.`))
+  if (typeof value === 'number') {
+    if (constraint?.minimum !== undefined && value < constraint.minimum) issues.push(issue(path, `Numeric value must be >= ${constraint.minimum}.`))
+    if (constraint?.maximum !== undefined && value > constraint.maximum) issues.push(issue(path, `Numeric value must be <= ${constraint.maximum}.`))
+  }
+  if (typeof value === 'string' && value.length > 4096) issues.push(issue(path, 'String animatable value exceeds the 4096-character bound.'))
+}
+
+const validateAnimatable = (value: unknown, path: string, issues: MotionValidationIssueV1[], constraint?: AnimatableConstraintV1): void => {
   if (!isRecord(value) || typeof value.kind !== 'string') { issues.push(issue(path, 'Animatable value must be a tagged object.')); return }
   if (value.kind === 'constant') {
-    if (!['string', 'boolean', 'number'].includes(typeof value.value) || (typeof value.value === 'number' && !Number.isFinite(value.value))) issues.push(issue(path, 'Constant value must be a finite number, string or boolean.'))
+    validateLiteral(value.value, `${path}.value`, issues, constraint)
     return
   }
   if (value.kind === 'motion') {
     if (!isRecord(value.driver) || typeof value.driver.kind !== 'string') { issues.push(issue(path, 'Motion driver is invalid.')); return }
+    if (constraint?.valueType && value.valueType !== constraint.valueType) issues.push(issue(`${path}.valueType`, `Motion driver must resolve ${constraint.valueType}.`))
     const driver = value.driver
     const numbers = Object.entries(driver).filter(([key]) => !['kind', 'easing', 'positiveOnly', 'before', 'after'].includes(key)).map(([, entry]) => entry).filter((entry) => typeof entry === 'number')
     if (numbers.some((entry) => !Number.isFinite(entry))) issues.push(issue(path, 'Motion driver contains a non-finite number.'))
@@ -65,13 +88,32 @@ const validateAnimatable = (value: unknown, path: string, issues: MotionValidati
   }
   if (value.kind === 'keyframes') {
     if (!Array.isArray(value.keyframes) || value.keyframes.length === 0) { issues.push(issue(path, 'Keyframed value needs at least one keyframe.')); return }
-    const ids = new Set<string>(); let previous = -1
+    const ids = new Set<string>()
+    let previous = -1
+    let inferredValueType: 'number' | 'string' | 'boolean' | null = constraint?.valueType ?? null
     value.keyframes.forEach((raw, index) => {
-      if (!isRecord(raw)) { issues.push(issue(`${path}.keyframes[${index}]`, 'Keyframe must be an object.')); return }
-      if (typeof raw.id !== 'string' || !raw.id || ids.has(raw.id)) issues.push(issue(`${path}.keyframes[${index}].id`, 'Keyframe id must be unique and non-empty.')); else ids.add(raw.id)
-      if (!Number.isSafeInteger(raw.tick) || Number(raw.tick) < 0 || Number(raw.tick) <= previous) issues.push(issue(`${path}.keyframes[${index}].tick`, 'Keyframe ticks must be unique, non-negative safe integers in ascending order.')); else previous = Number(raw.tick)
-      if (!['hold', 'linear', 'bezier'].includes(String(raw.interpolation))) issues.push(issue(`${path}.keyframes[${index}].interpolation`, 'Unsupported keyframe interpolation.'))
-      if (typeof raw.value === 'number' && !Number.isFinite(raw.value)) issues.push(issue(`${path}.keyframes[${index}].value`, 'Keyframe number must be finite.'))
+      const keyframePath = `${path}.keyframes[${index}]`
+      if (!isRecord(raw)) { issues.push(issue(keyframePath, 'Keyframe must be an object.')); return }
+      if (typeof raw.id !== 'string' || raw.id.trim().length === 0 || raw.id.length > 240 || ids.has(raw.id)) issues.push(issue(`${keyframePath}.id`, 'Keyframe id must be unique, non-empty and bounded.')); else ids.add(raw.id)
+      if (!Number.isSafeInteger(raw.tick) || Number(raw.tick) < 0 || Number(raw.tick) <= previous) issues.push(issue(`${keyframePath}.tick`, 'Keyframe ticks must be unique, non-negative safe integers in ascending order.')); else previous = Number(raw.tick)
+      const interpolation = raw.interpolation as MotionKeyframeInterpolationV1
+      if (!['hold', 'linear', 'bezier'].includes(String(raw.interpolation))) issues.push(issue(`${keyframePath}.interpolation`, 'Unsupported keyframe interpolation.'))
+      const currentType = typeof raw.value
+      if (['number', 'string', 'boolean'].includes(currentType)) {
+        inferredValueType ??= currentType as 'number' | 'string' | 'boolean'
+        if (currentType !== inferredValueType) issues.push(issue(`${keyframePath}.value`, 'All keyframes on one property must use the same value type.'))
+      }
+      validateLiteral(raw.value, `${keyframePath}.value`, issues, constraint)
+      const allowed = constraint?.interpolation ?? (inferredValueType === 'number' ? ['hold', 'linear', 'bezier'] : ['hold'])
+      if (['hold', 'linear', 'bezier'].includes(String(interpolation)) && !allowed.includes(interpolation)) issues.push(issue(`${keyframePath}.interpolation`, `${inferredValueType ?? 'This'} property supports ${allowed.join(', ')} interpolation only.`))
+      if (raw.bezier !== undefined) {
+        if (!isRecord(raw.bezier)) issues.push(issue(`${keyframePath}.bezier`, 'Bezier handles must be an object.'))
+        else {
+          const handles = raw.bezier as unknown as { inX: number; inY: number; outX: number; outY: number }
+          const handleIssue = motionBezierHandleIssue(handles)
+          if (handleIssue) issues.push(issue(`${keyframePath}.bezier`, handleIssue))
+        }
+      }
     })
     return
   }
@@ -82,8 +124,26 @@ const validateAnimatable = (value: unknown, path: string, issues: MotionValidati
   issues.push(issue(path, `Unsupported animatable kind: ${String(value.kind)}`))
 }
 
-const nodeAnimatables = (node: MotionNodeV1): readonly [string, Animatable<string | number | boolean>][] => {
-  const base: [string, Animatable<string | number | boolean>][] = [
+const numericConstraint = (minimum?: number, maximum?: number): AnimatableConstraintV1 => ({ valueType: 'number', interpolation: ['hold', 'linear', 'bezier'], ...(minimum !== undefined ? { minimum } : {}), ...(maximum !== undefined ? { maximum } : {}) })
+const holdStringConstraint = (): AnimatableConstraintV1 => ({ valueType: 'string', interpolation: ['hold'] })
+const maskAnimatableConstraint = (property: 'opacity' | 'feather' | 'expansion' | 'x' | 'y' | 'width' | 'height' | 'radius'): AnimatableConstraintV1 => {
+  if (property === 'opacity' || property === 'feather' || property === 'radius') return numericConstraint(0, 1)
+  if (property === 'expansion') return numericConstraint(-1, 1)
+  if (property === 'width' || property === 'height') return numericConstraint(0, 4)
+  return numericConstraint(-2, 2)
+}
+const nodeAnimatableConstraint = (property: MotionNodePropertyNameV1): AnimatableConstraintV1 => {
+  if (property === 'visible') return { valueType: 'boolean', interpolation: ['hold'] }
+  if (property === 'opacity' || property === 'image.opacity' || property === 'path.trimProgress' || property === 'transform.anchorX' || property === 'transform.anchorY') return numericConstraint(0, 1)
+  if (property === 'text.text' || property.endsWith('fillColor') || property.endsWith('strokeColor')) return holdStringConstraint()
+  if (property === 'text.fontSize') return numericConstraint(1, 4096)
+  if (property === 'text.fontWeight') return numericConstraint(1, 1000)
+  if (property === 'shape.width' || property === 'shape.height' || property === 'shape.strokeWidth' || property === 'shape.radius' || property === 'path.strokeWidth' || property === 'image.width' || property === 'image.height') return numericConstraint(0)
+  return numericConstraint()
+}
+
+const nodeAnimatables = (node: MotionNodeV1): readonly [MotionNodePropertyNameV1, Animatable<string | number | boolean>][] => {
+  const base: [MotionNodePropertyNameV1, Animatable<string | number | boolean>][] = [
     ['visible', node.visible], ['opacity', node.opacity],
     ['transform.positionX', node.transform.positionX], ['transform.positionY', node.transform.positionY], ['transform.scaleX', node.transform.scaleX], ['transform.scaleY', node.transform.scaleY], ['transform.rotationDeg', node.transform.rotationDeg], ['transform.anchorX', node.transform.anchorX], ['transform.anchorY', node.transform.anchorY],
   ]
@@ -100,6 +160,7 @@ const targetExists = (scene: MotionSceneV1, target: MotionPropertyPathV1): boole
   const node = scene.nodes[target.nodeId]
   if (!node) return false
   if (target.kind === 'effect') return node.effects.some((effect) => effect.id === target.effectId && target.parameter in effect.parameters)
+  if (target.kind === 'mask') return node.masks.some((mask) => mask.id === target.maskId && target.property in mask)
   return true
 }
 
@@ -127,7 +188,7 @@ export const validateMotionScene = (input: unknown): MotionValidationResultV1<Mo
     if (node.parentId !== null && !scene.nodes[node.parentId]) issues.push(issue(`$.nodes.${key}.parentId`, 'Parent node does not exist.'))
     if (parentCycle(scene, node.id)) issues.push(issue(`$.nodes.${key}.parentId`, 'Parent hierarchy contains a cycle.'))
     if (!MOTION_BLEND_MODES.includes(node.blendMode)) issues.push(issue(`$.nodes.${key}.blendMode`, 'Unsupported blend mode.'))
-    nodeAnimatables(node).forEach(([property, value]) => validateAnimatable(value, `$.nodes.${key}.${property}`, issues))
+    nodeAnimatables(node).forEach(([property, value]) => validateAnimatable(value, `$.nodes.${key}.${property}`, issues, nodeAnimatableConstraint(property)))
     if (node.type === 'group') {
       const childIds = new Set<string>()
       node.childIds.forEach((childId, index) => {
@@ -139,16 +200,28 @@ export const validateMotionScene = (input: unknown): MotionValidationResultV1<Mo
     }
     const effectIds = new Set<string>()
     node.effects.forEach((effect, index) => {
-      if (!effect.id || effectIds.has(effect.id)) issues.push(issue(`$.nodes.${key}.effects[${index}].id`, 'Effect id must be unique and non-empty.')); else effectIds.add(effect.id)
-      if (!MOTION_EFFECT_TYPES.includes(effect.effectType) || !MOTION_EFFECT_REGISTRY[effect.effectType]) issues.push(issue(`$.nodes.${key}.effects[${index}].effectType`, 'Unsupported effect type.'))
-      else if (!MOTION_EFFECT_REGISTRY[effect.effectType].supportedNodeTypes.includes(node.type)) issues.push(issue(`$.nodes.${key}.effects[${index}]`, 'Effect does not support this node type.'))
-      Object.entries(effect.parameters).forEach(([parameter, value]) => validateAnimatable(value, `$.nodes.${key}.effects[${index}].parameters.${parameter}`, issues))
+      const effectPath = `$.nodes.${key}.effects[${index}]`
+      if (!effect.id || effectIds.has(effect.id)) issues.push(issue(`${effectPath}.id`, 'Effect id must be unique and non-empty.')); else effectIds.add(effect.id)
+      if (!MOTION_EFFECT_TYPES.includes(effect.effectType) || !MOTION_EFFECT_REGISTRY[effect.effectType]) {
+        issues.push(issue(`${effectPath}.effectType`, 'Unsupported effect type.'))
+        return
+      }
+      const definition = MOTION_EFFECT_REGISTRY[effect.effectType]
+      if (!definition.supportedNodeTypes.includes(node.type)) issues.push(issue(effectPath, 'Effect does not support this node type.'))
+      const parameterIds = new Set(definition.parameters.map((parameter) => parameter.id))
+      for (const parameter of Object.keys(effect.parameters)) if (!parameterIds.has(parameter)) issues.push(issue(`${effectPath}.parameters.${parameter}`, 'Unknown effect parameter.'))
+      for (const parameter of definition.parameters) {
+        const value = effect.parameters[parameter.id]
+        if (!value) { issues.push(issue(`${effectPath}.parameters.${parameter.id}`, 'Required effect parameter is missing.')); continue }
+        const constraint = parameter.type === 'number' ? numericConstraint(parameter.minimum, parameter.maximum) : holdStringConstraint()
+        validateAnimatable(value, `${effectPath}.parameters.${parameter.id}`, issues, constraint)
+      }
     })
     const maskIds = new Set<string>()
     node.masks.forEach((mask, index) => {
       if (!mask.id || maskIds.has(mask.id)) issues.push(issue(`$.nodes.${key}.masks[${index}].id`, 'Mask id must be unique and non-empty.')); else maskIds.add(mask.id)
       if (!MOTION_MASK_TYPES.includes(mask.type)) issues.push(issue(`$.nodes.${key}.masks[${index}].type`, 'Unsupported mask type.'))
-      for (const [property, value] of Object.entries({ opacity: mask.opacity, feather: mask.feather, expansion: mask.expansion, x: mask.x, y: mask.y, width: mask.width, height: mask.height, radius: mask.radius })) validateAnimatable(value, `$.nodes.${key}.masks[${index}].${property}`, issues)
+      for (const property of ['opacity', 'feather', 'expansion', 'x', 'y', 'width', 'height', 'radius'] as const) validateAnimatable(mask[property], `$.nodes.${key}.masks[${index}].${property}`, issues, maskAnimatableConstraint(property))
     })
   })
   if (root && root.parentId !== null) issues.push(issue('$.rootNodeId', 'Root node must not have a parent.'))

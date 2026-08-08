@@ -1,5 +1,17 @@
 # Project Log
 
+## 2026-08-08 — Parallel Motion Program MOTION-C2 deterministic keyframes complete
+
+- Preserved the existing one-property/one-`Animatable` authority: constants may convert directly to keyframes; existing keyframe tracks remain editable; motion drivers and bindings refuse implicit replacement and require a later explicit bake/reset.
+- Formalized stable-ID `MotionKeyframeV1` tracks with exact integer ticks, Hold/Linear/Bezier interpolation, bounded professional cubic-Bezier handles, typed node/effect/mask target capabilities, property/effect/mask range validation, and binary exact-tick segment lookup.
+- Expanded universal graph operations from 21 to 28 with add/remove/move/value/interpolation/Bezier/clear keyframe operations, typed failures, atomic batch participation and inverse readiness.
+- Upgraded Timeline projection to expose full typed keyframes for node, effect and mask tracks grouped by their real layer node, preparing later Layers/Dope Sheet work without introducing a second animation store.
+- Added a developer-only Advanced Motion Lab keyframe timeline with property selection, `◇/◆` current-tick state, add/remove/move/value/interpolation/Bezier controls and the existing exact-tick transport. No auto-key or production Studio integration was added.
+- Built the Cost / Value Card C2 proof entirely through graph operations: Surface opacity, Value X/Y scale, Arrow rotation, Glow intensity and whole-card Y position. Existing 60 component implementation files were not changed by C2.
+- Real Edge edited a live `transform.scaleX` track, preserved stable keyframe identity through a move to tick 3,500,000, and proved identical DOM-resolved state after `3,500,000 → 120,000 → 6,800,000 → 3,500,000` direct/backward/random seeking.
+- Performance evidence is separated by subsystem: required direct evaluator stress remains sub-millisecond per 100-property batch even at 1,000 keyframes/property in this local run; full-scene validation, graph-operation and Advanced Lab DOM-commit costs are recorded independently in `DOCS/motion/evidence/MOTION-C2.md`.
+- Final C2 release-candidate gate: **253/253 Motion tests**, **7/7 Motion workspace builds**, clean authority/dependency scans, zero `apps/web` changes/imports, and zero Plan-B AI decision logic. C3 remains not started; A18 begins only after the separate C2 Git checkpoint.
+
 ## 2026-08-03 — P1-F.1A Gate B: Media Library V2 Essentials complete
 
 - Media organization is a **server-owned sidecar**, `media-organization.json` beside the project, never in `EditProject` and never in the browser. Rejected localStorage (per-browser, silently cleared, invisible to the server) and rejected `EditProject` (Undo would step through folder renames, and moving the revision would move the export key so a rename would re-encode an identical MP4 for 60–90 s). Decision: `DOCS/decisions/ADR-MEDIA-ORGANIZATION-V1.md`.

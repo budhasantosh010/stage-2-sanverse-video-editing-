@@ -39,15 +39,28 @@ export type MotionDriverV1 = MotionNumberDriverV1 | MotionBooleanDriverV1 | Moti
 
 export interface MotionDrivenValueV1<T> { readonly kind: 'motion'; readonly valueType: 'number' | 'boolean' | 'string'; readonly driver: MotionDriverV1 }
 
-export interface KeyframeBezierV1 { readonly inX: number; readonly inY: number; readonly outX: number; readonly outY: number }
-export interface KeyframeV1<T> {
+/**
+ * Bezier handles are normalized to one keyframe segment. `out*` is the
+ * outgoing control point owned by this keyframe. `in*` is the incoming
+ * control point used when this keyframe is the right side of a segment.
+ * X is normalized time and must stay in [0,1]. Y is normalized value and may
+ * overshoot within the bounded C2 validation range.
+ */
+export interface MotionBezierHandlesV1 { readonly inX: number; readonly inY: number; readonly outX: number; readonly outY: number }
+/** @deprecated C2 canonical name is MotionBezierHandlesV1. */
+export type KeyframeBezierV1 = MotionBezierHandlesV1
+
+export type MotionKeyframeInterpolationV1 = 'hold' | 'linear' | 'bezier'
+export interface MotionKeyframeV1<T> {
   readonly id: string
   readonly tick: number
   readonly value: T
-  readonly interpolation: 'hold' | 'linear' | 'bezier'
-  readonly bezier?: KeyframeBezierV1
+  readonly interpolation: MotionKeyframeInterpolationV1
+  readonly bezier?: MotionBezierHandlesV1
 }
-export interface KeyframedValueV1<T> { readonly kind: 'keyframes'; readonly keyframes: readonly KeyframeV1<T>[] }
+/** @deprecated C2 canonical name is MotionKeyframeV1. */
+export type KeyframeV1<T> = MotionKeyframeV1<T>
+export interface KeyframedValueV1<T> { readonly kind: 'keyframes'; readonly keyframes: readonly MotionKeyframeV1<T>[] }
 
 export type MotionNodePropertyNameV1 =
   | 'visible'
@@ -63,6 +76,8 @@ export type MotionNodePropertyNameV1 =
   | 'text.fillColor'
   | 'text.fontSize'
   | 'text.fontWeight'
+  | 'shape.width'
+  | 'shape.height'
   | 'shape.fillColor'
   | 'shape.strokeColor'
   | 'shape.strokeWidth'
@@ -71,6 +86,8 @@ export type MotionNodePropertyNameV1 =
   | 'path.strokeColor'
   | 'path.strokeWidth'
   | 'path.trimProgress'
+  | 'image.width'
+  | 'image.height'
   | 'image.opacity'
 
 export interface MotionNodePropertyPathV1 { readonly nodeId: MotionNodeId; readonly property: MotionNodePropertyNameV1 }
@@ -85,12 +102,19 @@ export const constant = <T>(value: T): ConstantValueV1<T> => Object.freeze({ kin
 export const motionNumber = (driver: MotionNumberDriverV1): MotionDrivenValueV1<number> => Object.freeze({ kind: 'motion', valueType: 'number', driver })
 export const motionBoolean = (driver: MotionBooleanDriverV1): MotionDrivenValueV1<boolean> => Object.freeze({ kind: 'motion', valueType: 'boolean', driver })
 export const motionString = (driver: MotionStringDriverV1): MotionDrivenValueV1<string> => Object.freeze({ kind: 'motion', valueType: 'string', driver })
+export const keyframed = <T,>(keyframes: readonly MotionKeyframeV1<T>[]): KeyframedValueV1<T> => Object.freeze({
+  kind: 'keyframes',
+  keyframes: Object.freeze([...keyframes].sort((a, b) => a.tick - b.tick).map((keyframe) => Object.freeze({ ...keyframe, ...(keyframe.bezier ? { bezier: Object.freeze({ ...keyframe.bezier }) } : {}) }))),
+})
 
 export interface MotionPropertyPathV1Node { readonly kind: 'node'; readonly nodeId: MotionNodeId; readonly property: MotionNodePropertyNameV1 }
 export interface MotionPropertyPathV1Part { readonly kind: 'part'; readonly semanticPartId: string; readonly property: MotionNodePropertyNameV1 }
 export interface MotionPropertyPathV1Component { readonly kind: 'component'; readonly propertyId: string }
 export interface MotionPropertyPathV1Effect { readonly kind: 'effect'; readonly nodeId: MotionNodeId; readonly effectId: string; readonly parameter: string }
-export type MotionPropertyPathV1 = MotionPropertyPathV1Node | MotionPropertyPathV1Part | MotionPropertyPathV1Component | MotionPropertyPathV1Effect
+export type MotionMaskNumericPropertyNameV1 = 'opacity' | 'feather' | 'expansion' | 'x' | 'y' | 'width' | 'height' | 'radius'
+export interface MotionPropertyPathV1Mask { readonly kind: 'mask'; readonly nodeId: MotionNodeId; readonly maskId: string; readonly property: MotionMaskNumericPropertyNameV1 }
+export type MotionPropertyPathV1 = MotionPropertyPathV1Node | MotionPropertyPathV1Part | MotionPropertyPathV1Component | MotionPropertyPathV1Effect | MotionPropertyPathV1Mask
+export type MotionKeyframeTargetV1 = MotionPropertyPathV1Node | MotionPropertyPathV1Effect | MotionPropertyPathV1Mask
 
 export interface MotionLayoutOwnershipV1 {
   readonly target: MotionNodePropertyPathV1

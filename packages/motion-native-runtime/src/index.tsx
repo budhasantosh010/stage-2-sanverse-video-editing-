@@ -43,7 +43,7 @@ export function MotionComponentHost<Props, Style>({ module, props, style, contex
   const resolvedScene = isGraphBackedModule(module)
     ? (() => {
         const patchedScene = applyMotionGraphPatches(module.createScene(props, style, context), graphPatches)
-        const operated = applyMotionOperations(patchedScene, graphOperations)
+        const operated = applyMotionOperations(patchedScene, graphOperations, { durationTicks: context.durationTicks })
         if (!operated.ok) throw new RangeError(`Motion operation ${operated.error.operationId} failed in component host: ${operated.error.message}`)
         return evaluateScene(operated.scene, context)
       })()

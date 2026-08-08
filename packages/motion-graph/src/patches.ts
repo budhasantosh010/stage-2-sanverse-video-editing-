@@ -58,7 +58,7 @@ const pruneRemovedNodeReferences = (
   const remainingPartIds = new Set(semanticParts.map((part) => part.id))
   const exposures = Object.freeze(scene.exposures.filter((exposure) => {
     const target = exposure.target
-    if (target.kind === 'node' || target.kind === 'effect') return !removedNodeIds.has(target.nodeId)
+    if (target.kind === 'node' || target.kind === 'effect' || target.kind === 'mask') return !removedNodeIds.has(target.nodeId)
     if (target.kind === 'part') return remainingPartIds.has(target.semanticPartId)
     return true
   }))
@@ -84,6 +84,8 @@ const setProperty = (node: MotionNodeV1, property: MotionNodePropertyPathV1['pro
     if (property === 'text.fontWeight') return Object.freeze({ ...node, fontWeight: value as Animatable<number> })
   }
   if (node.type === 'shape') {
+    if (property === 'shape.width') return Object.freeze({ ...node, width: value as Animatable<number> })
+    if (property === 'shape.height') return Object.freeze({ ...node, height: value as Animatable<number> })
     if (property === 'shape.fillColor') return Object.freeze({ ...node, fillColor: value as Animatable<string> })
     if (property === 'shape.strokeColor') return Object.freeze({ ...node, strokeColor: value as Animatable<string> })
     if (property === 'shape.strokeWidth') return Object.freeze({ ...node, strokeWidth: value as Animatable<number> })
@@ -95,7 +97,11 @@ const setProperty = (node: MotionNodeV1, property: MotionNodePropertyPathV1['pro
     if (property === 'path.strokeWidth') return Object.freeze({ ...node, strokeWidth: value as Animatable<number> })
     if (property === 'path.trimProgress') return Object.freeze({ ...node, trimProgress: value as Animatable<number> })
   }
-  if (node.type === 'image' && property === 'image.opacity') return Object.freeze({ ...node, imageOpacity: value as Animatable<number> })
+  if (node.type === 'image') {
+    if (property === 'image.width') return Object.freeze({ ...node, width: value as Animatable<number> })
+    if (property === 'image.height') return Object.freeze({ ...node, height: value as Animatable<number> })
+    if (property === 'image.opacity') return Object.freeze({ ...node, imageOpacity: value as Animatable<number> })
+  }
   throw new RangeError(`Property ${property} is not supported by node ${node.id}.`)
 }
 

@@ -4,9 +4,12 @@ import { MOTION_MASK_TYPES } from './masks.ts'
 import type { MotionMaskInstanceV1 } from './masks.ts'
 import { nodeBase } from './nodes.ts'
 import type { MotionGroupNodeV1, MotionNodeV1 } from './nodes.ts'
+import { evaluateKeyframedValue, motionBezierHandleIssue } from './animation.ts'
+import { readMotionAnimatableTarget, replaceMotionAnimatableTarget, validateMotionTargetInterpolation, validateMotionTargetLiteral } from './animatable-targets.ts'
 import { applyMotionGraphPatch } from './patches.ts'
 import type { MotionGraphPatchV1 } from './patches.ts'
-import type { Animatable, MotionNodePropertyNameV1, MotionNodePropertyPathV1, MotionPropertyPrimitiveV1 } from './properties.ts'
+import { constant, keyframed } from './properties.ts'
+import type { Animatable, MotionBezierHandlesV1, MotionKeyframeInterpolationV1, MotionKeyframeTargetV1, MotionNodePropertyNameV1, MotionNodePropertyPathV1, MotionPropertyPrimitiveV1 } from './properties.ts'
 import type { MotionSceneV1 } from './scene.ts'
 import { validateMotionScene } from './validation.ts'
 
@@ -19,6 +22,13 @@ interface MotionOperationBaseV1 {
 export type MotionGraphOperationV1 =
   | (MotionOperationBaseV1 & Readonly<{ type: 'set-property'; target: MotionNodePropertyPathV1; value: Animatable<MotionPropertyPrimitiveV1> }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'reset-property'; target: MotionNodePropertyPathV1; value: Animatable<MotionPropertyPrimitiveV1> }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'add-keyframe'; target: MotionKeyframeTargetV1; keyframeId: string; tick: number; value?: MotionPropertyPrimitiveV1; interpolation: MotionKeyframeInterpolationV1; bezier?: MotionBezierHandlesV1 }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'remove-keyframe'; target: MotionKeyframeTargetV1; keyframeId: string }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'move-keyframe'; target: MotionKeyframeTargetV1; keyframeId: string; tick: number }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'set-keyframe-value'; target: MotionKeyframeTargetV1; keyframeId: string; value: MotionPropertyPrimitiveV1 }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'set-keyframe-interpolation'; target: MotionKeyframeTargetV1; keyframeId: string; interpolation: MotionKeyframeInterpolationV1 }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'set-keyframe-bezier'; target: MotionKeyframeTargetV1; keyframeId: string; bezier: MotionBezierHandlesV1 | null }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'clear-keyframes'; target: MotionKeyframeTargetV1; fallbackValue: MotionPropertyPrimitiveV1 }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'add-node'; node: MotionNodeV1; parentId: string; index?: number }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'remove-node'; nodeId: string; mode: 'subtree' }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'duplicate-node'; nodeId: string; duplicateId: string; parentId?: string; index?: number }>)
@@ -41,6 +51,7 @@ export type MotionGraphOperationV1 =
 
 export const MOTION_GRAPH_OPERATION_TYPES = Object.freeze([
   'set-property', 'reset-property',
+  'add-keyframe', 'remove-keyframe', 'move-keyframe', 'set-keyframe-value', 'set-keyframe-interpolation', 'set-keyframe-bezier', 'clear-keyframes',
   'add-node', 'remove-node', 'duplicate-node', 'rename-node', 'reparent-node', 'reorder-node', 'group-nodes', 'ungroup-nodes',
   'add-effect', 'remove-effect', 'duplicate-effect', 'reorder-effect', 'set-effect-property', 'set-effect-enabled',
   'add-mask', 'remove-mask', 'reorder-mask', 'set-mask-property',
@@ -52,6 +63,10 @@ export type MotionOperationErrorCodeV1 =
   | 'SCENE_INVALID'
   | 'TARGET_NOT_FOUND'
   | 'PROPERTY_INVALID'
+  | 'KEYFRAME_INVALID'
+  | 'KEYFRAME_UNSUPPORTED'
+  | 'KEYFRAME_COLLISION'
+  | 'KEYFRAME_CONVERSION_REQUIRED'
   | 'DUPLICATE_ID'
   | 'PARENT_INVALID'
   | 'CYCLE_DETECTED'
@@ -97,12 +112,25 @@ export interface MotionOperationIdRequestV1 {
 
 export interface MotionOperationApplyOptionsV1 {
   readonly idFactory?: (request: MotionOperationIdRequestV1) => string
+  /** Optional owning composition duration. When supplied, keyframe mutations refuse ticks beyond it. */
+  readonly durationTicks?: number
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const boundedId = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0 && value.length <= 240
 const boundedName = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0 && value.length <= 240
 const validIndex = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) >= 0
+const validTick = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) >= 0
+const primitive = (value: unknown): value is MotionPropertyPrimitiveV1 => ['number', 'string', 'boolean'].includes(typeof value) && (typeof value !== 'number' || Number.isFinite(value))
+const validKeyframeTargetSyntax = (value: unknown): value is MotionKeyframeTargetV1 => {
+  if (!isRecord(value) || !boundedId(value.nodeId) || typeof value.kind !== 'string') return false
+  if (value.kind === 'node') return typeof value.property === 'string'
+  if (value.kind === 'effect') return boundedId(value.effectId) && boundedId(value.parameter)
+  if (value.kind === 'mask') return boundedId(value.maskId) && ['opacity', 'feather', 'expansion', 'x', 'y', 'width', 'height', 'radius'].includes(String(value.property))
+  return false
+}
+const validInterpolation = (value: unknown): value is MotionKeyframeInterpolationV1 => ['hold', 'linear', 'bezier'].includes(String(value))
+const validBezierSyntax = (value: unknown): value is MotionBezierHandlesV1 => isRecord(value) && ['inX', 'inY', 'outX', 'outY'].every((key) => typeof value[key] === 'number')
 
 const fail = (
   operationId: string,
@@ -127,6 +155,17 @@ export const validateMotionGraphOperation = (input: unknown): MotionOperationErr
   if (!isRecord(input)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, message: 'Motion operation must be an object.' })
   if (!boundedId(input.operationId)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.operationId', message: 'operationId must be a bounded non-empty string.' })
   if (typeof input.type !== 'string' || !MOTION_GRAPH_OPERATION_TYPES.includes(input.type as MotionGraphOperationV1['type'])) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.type', message: 'Operation type is unsupported.' })
+  const keyframeTypes = ['add-keyframe', 'remove-keyframe', 'move-keyframe', 'set-keyframe-value', 'set-keyframe-interpolation', 'set-keyframe-bezier', 'clear-keyframes']
+  if (keyframeTypes.includes(input.type)) {
+    if (!validKeyframeTargetSyntax(input.target)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.target', message: 'Keyframe operation needs a valid node/effect/mask target.' })
+    if (input.type !== 'clear-keyframes' && !boundedId(input.keyframeId)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.keyframeId', message: 'Keyframe operation needs a bounded keyframeId.' })
+    if ((input.type === 'add-keyframe' || input.type === 'move-keyframe') && !validTick(input.tick)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.tick', message: 'Keyframe tick must be a non-negative safe integer.' })
+    if (input.type === 'add-keyframe' && (!validInterpolation(input.interpolation) || (input.value !== undefined && !primitive(input.value)) || (input.bezier !== undefined && !validBezierSyntax(input.bezier)))) return Object.freeze({ code: 'OPERATION_INVALID', operationId, message: 'add-keyframe has invalid interpolation, value or Bezier data.' })
+    if (input.type === 'set-keyframe-value' && !primitive(input.value)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.value', message: 'Keyframe value must be a finite primitive.' })
+    if (input.type === 'set-keyframe-interpolation' && !validInterpolation(input.interpolation)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.interpolation', message: 'Keyframe interpolation is unsupported.' })
+    if (input.type === 'set-keyframe-bezier' && input.bezier !== null && !validBezierSyntax(input.bezier)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.bezier', message: 'Keyframe Bezier handles are invalid.' })
+    if (input.type === 'clear-keyframes' && !primitive(input.fallbackValue)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.fallbackValue', message: 'clear-keyframes requires an explicit finite fallbackValue.' })
+  }
   const needsNodeId = ['remove-node', 'duplicate-node', 'rename-node', 'reparent-node', 'reorder-node', 'add-effect', 'remove-effect', 'duplicate-effect', 'reorder-effect', 'set-effect-property', 'set-effect-enabled', 'add-mask', 'remove-mask', 'reorder-mask', 'set-mask-property', 'set-blend-mode']
   if (needsNodeId.includes(input.type) && !boundedId(input.nodeId)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.nodeId', message: 'nodeId must be a bounded non-empty string.' })
   if ((input.type === 'set-property' || input.type === 'reset-property') && (!isRecord(input.target) || !boundedId(input.target.nodeId) || typeof input.target.property !== 'string' || !isRecord(input.value))) return Object.freeze({ code: 'OPERATION_INVALID', operationId, message: 'Property operation needs a typed target and animatable value.' })
@@ -154,9 +193,9 @@ export const validateMotionGraphOperation = (input: unknown): MotionOperationErr
 const nodeSupportsProperty = (node: MotionNodeV1, property: MotionNodePropertyNameV1): boolean => {
   if (property === 'visible' || property === 'opacity' || property.startsWith('transform.')) return true
   if (node.type === 'text') return ['text.text', 'text.fillColor', 'text.fontSize', 'text.fontWeight'].includes(property)
-  if (node.type === 'shape') return ['shape.fillColor', 'shape.strokeColor', 'shape.strokeWidth', 'shape.radius'].includes(property)
+  if (node.type === 'shape') return ['shape.width', 'shape.height', 'shape.fillColor', 'shape.strokeColor', 'shape.strokeWidth', 'shape.radius'].includes(property)
   if (node.type === 'path') return ['path.fillColor', 'path.strokeColor', 'path.strokeWidth', 'path.trimProgress'].includes(property)
-  return node.type === 'image' && property === 'image.opacity'
+  return node.type === 'image' && ['image.width', 'image.height', 'image.opacity'].includes(property)
 }
 
 const nodeProperty = (node: MotionNodeV1, property: MotionNodePropertyNameV1): Animatable<MotionPropertyPrimitiveV1> => {
@@ -170,6 +209,8 @@ const nodeProperty = (node: MotionNodeV1, property: MotionNodePropertyNameV1): A
     if (property === 'text.fontWeight') return node.fontWeight
   }
   if (node.type === 'shape') {
+    if (property === 'shape.width') return node.width
+    if (property === 'shape.height') return node.height
     if (property === 'shape.fillColor') return node.fillColor
     if (property === 'shape.strokeColor') return node.strokeColor
     if (property === 'shape.strokeWidth') return node.strokeWidth
@@ -181,7 +222,11 @@ const nodeProperty = (node: MotionNodeV1, property: MotionNodePropertyNameV1): A
     if (property === 'path.strokeWidth') return node.strokeWidth
     if (property === 'path.trimProgress') return node.trimProgress
   }
-  if (node.type === 'image' && property === 'image.opacity') return node.imageOpacity
+  if (node.type === 'image') {
+    if (property === 'image.width') return node.width
+    if (property === 'image.height') return node.height
+    if (property === 'image.opacity') return node.imageOpacity
+  }
   throw new RangeError(`Property ${property} is not supported by node ${node.id}.`)
 }
 
@@ -301,6 +346,124 @@ const mapThrownError = (operationId: string, error: unknown): MotionOperationFai
 
 const operationInverseId = (operationId: string, suffix = 'inverse'): string => `${operationId}:${suffix}`
 
+type MotionKeyframeOperationV1 = Extract<MotionGraphOperationV1, Readonly<{ type: 'add-keyframe' | 'remove-keyframe' | 'move-keyframe' | 'set-keyframe-value' | 'set-keyframe-interpolation' | 'set-keyframe-bezier' | 'clear-keyframes' }>>
+
+const keyframeTickFailure = (operationId: string, tick: number, options?: MotionOperationApplyOptionsV1): MotionOperationFailureV1 | null => {
+  if (!validTick(tick)) return fail(operationId, 'KEYFRAME_INVALID', 'Keyframe tick must be a non-negative safe integer.', { path: '$.tick' })
+  if (options?.durationTicks !== undefined) {
+    if (!Number.isSafeInteger(options.durationTicks) || options.durationTicks <= 0) return fail(operationId, 'KEYFRAME_INVALID', 'durationTicks option must be a positive safe integer.')
+    if (tick > options.durationTicks) return fail(operationId, 'KEYFRAME_INVALID', `Keyframe tick ${tick} exceeds owning duration ${options.durationTicks}.`, { path: '$.tick' })
+  }
+  return null
+}
+
+const applyKeyframeOperation = (
+  scene: MotionSceneV1,
+  operation: MotionKeyframeOperationV1,
+  options?: MotionOperationApplyOptionsV1,
+): MotionOperationResultV1 => {
+  const operationId = operation.operationId
+  let record: ReturnType<typeof readMotionAnimatableTarget>
+  try {
+    record = readMotionAnimatableTarget(scene, operation.target)
+  } catch (error) {
+    return fail(operationId, 'TARGET_NOT_FOUND', error instanceof Error ? error.message : 'Keyframe target does not exist.', { path: '$.target' })
+  }
+  const interpolationFailure = (interpolation: MotionKeyframeInterpolationV1): MotionOperationFailureV1 | null => {
+    const message = validateMotionTargetInterpolation(record.capability, interpolation)
+    return message ? fail(operationId, 'KEYFRAME_UNSUPPORTED', message, { path: '$.interpolation' }) : null
+  }
+  const valueFailure = (value: MotionPropertyPrimitiveV1, path = '$.value'): MotionOperationFailureV1 | null => {
+    const message = validateMotionTargetLiteral(record.capability, value)
+    return message ? fail(operationId, 'KEYFRAME_INVALID', message, { path }) : null
+  }
+  const replace = (value: Animatable<MotionPropertyPrimitiveV1>, inverseOperations: readonly MotionGraphOperationV1[]): MotionOperationResultV1 => {
+    const candidate = replaceMotionAnimatableTarget(scene, operation.target, value)
+    const resultIssue = ensureValidResult(operationId, candidate)
+    return resultIssue ?? success(candidate, [record.nodeId], inverseOperations)
+  }
+
+  if (operation.type === 'add-keyframe') {
+    const tickIssue = keyframeTickFailure(operationId, operation.tick, options)
+    if (tickIssue) return tickIssue
+    const interpolationIssue = interpolationFailure(operation.interpolation)
+    if (interpolationIssue) return interpolationIssue
+    if (operation.bezier) {
+      const bezierIssue = motionBezierHandleIssue(operation.bezier)
+      if (bezierIssue) return fail(operationId, 'KEYFRAME_INVALID', bezierIssue, { path: '$.bezier' })
+    }
+    if (record.animatable.kind === 'motion' || record.animatable.kind === 'binding') return fail(operationId, 'KEYFRAME_CONVERSION_REQUIRED', `Cannot replace ${record.animatable.kind} authority with keyframes implicitly. Bake or reset the property explicitly first.`)
+    const existing = record.animatable.kind === 'keyframes' ? record.animatable.keyframes : Object.freeze([])
+    if (existing.some((keyframe) => keyframe.id === operation.keyframeId)) return fail(operationId, 'DUPLICATE_ID', `Keyframe ID already exists: ${operation.keyframeId}`, { path: '$.keyframeId' })
+    if (existing.some((keyframe) => keyframe.tick === operation.tick)) return fail(operationId, 'KEYFRAME_COLLISION', `A keyframe already exists at tick ${operation.tick}.`, { path: '$.tick' })
+    const value = operation.value ?? (record.animatable.kind === 'constant' ? record.animatable.value : evaluateKeyframedValue(record.animatable, operation.tick))
+    const literalIssue = valueFailure(value)
+    if (literalIssue) return literalIssue
+    const nextKeyframe = Object.freeze({ id: operation.keyframeId, tick: operation.tick, value, interpolation: operation.interpolation, ...(operation.bezier ? { bezier: Object.freeze({ ...operation.bezier }) } : {}) })
+    return replace(keyframed([...existing, nextKeyframe]) as Animatable<MotionPropertyPrimitiveV1>, [Object.freeze({ operationId: operationInverseId(operationId), type: 'remove-keyframe', target: operation.target, keyframeId: operation.keyframeId })])
+  }
+
+  if (record.animatable.kind !== 'keyframes') return fail(operationId, 'KEYFRAME_UNSUPPORTED', `Target ${record.label} is not currently keyframed.`)
+  const track = record.animatable
+  const keyframeIndex = operation.type === 'clear-keyframes' ? -1 : track.keyframes.findIndex((keyframe) => keyframe.id === operation.keyframeId)
+  if (operation.type !== 'clear-keyframes' && keyframeIndex < 0) return fail(operationId, 'KEYFRAME_INVALID', `Unknown keyframe: ${operation.keyframeId}`, { path: '$.keyframeId' })
+
+  if (operation.type === 'remove-keyframe') {
+    const removed = track.keyframes[keyframeIndex]!
+    const next = track.keyframes.filter((keyframe) => keyframe.id !== removed.id)
+    const replacement: Animatable<MotionPropertyPrimitiveV1> = next.length === 0 ? constant(removed.value) : keyframed(next)
+    const inverse = Object.freeze({ operationId: operationInverseId(operationId), type: 'add-keyframe' as const, target: operation.target, keyframeId: removed.id, tick: removed.tick, value: removed.value, interpolation: removed.interpolation, ...(removed.bezier ? { bezier: removed.bezier } : {}) })
+    return replace(replacement, [inverse])
+  }
+
+  if (operation.type === 'move-keyframe') {
+    const tickIssue = keyframeTickFailure(operationId, operation.tick, options)
+    if (tickIssue) return tickIssue
+    const moving = track.keyframes[keyframeIndex]!
+    if (track.keyframes.some((keyframe) => keyframe.id !== moving.id && keyframe.tick === operation.tick)) return fail(operationId, 'KEYFRAME_COLLISION', `A keyframe already exists at tick ${operation.tick}.`, { path: '$.tick' })
+    const replacement = keyframed(track.keyframes.map((keyframe) => keyframe.id === moving.id ? Object.freeze({ ...keyframe, tick: operation.tick }) : keyframe))
+    return replace(replacement, [Object.freeze({ operationId: operationInverseId(operationId), type: 'move-keyframe', target: operation.target, keyframeId: moving.id, tick: moving.tick })])
+  }
+
+  if (operation.type === 'set-keyframe-value') {
+    const literalIssue = valueFailure(operation.value)
+    if (literalIssue) return literalIssue
+    const current = track.keyframes[keyframeIndex]!
+    const replacement = keyframed(track.keyframes.map((keyframe) => keyframe.id === current.id ? Object.freeze({ ...keyframe, value: operation.value }) : keyframe))
+    return replace(replacement, [Object.freeze({ operationId: operationInverseId(operationId), type: 'set-keyframe-value', target: operation.target, keyframeId: current.id, value: current.value })])
+  }
+
+  if (operation.type === 'set-keyframe-interpolation') {
+    const interpolationIssue = interpolationFailure(operation.interpolation)
+    if (interpolationIssue) return interpolationIssue
+    const current = track.keyframes[keyframeIndex]!
+    const replacement = keyframed(track.keyframes.map((keyframe) => keyframe.id === current.id ? Object.freeze({ ...keyframe, interpolation: operation.interpolation }) : keyframe))
+    return replace(replacement, [Object.freeze({ operationId: operationInverseId(operationId), type: 'set-keyframe-interpolation', target: operation.target, keyframeId: current.id, interpolation: current.interpolation })])
+  }
+
+  if (operation.type === 'set-keyframe-bezier') {
+    if (!record.capability.interpolation.includes('bezier')) return fail(operationId, 'KEYFRAME_UNSUPPORTED', `${record.capability.semanticType} properties do not support Bezier handles.`)
+    if (operation.bezier) {
+      const bezierIssue = motionBezierHandleIssue(operation.bezier)
+      if (bezierIssue) return fail(operationId, 'KEYFRAME_INVALID', bezierIssue, { path: '$.bezier' })
+    }
+    const current = track.keyframes[keyframeIndex]!
+    const replacement = keyframed(track.keyframes.map((keyframe) => {
+      if (keyframe.id !== current.id) return keyframe
+      const { bezier: _previous, ...rest } = keyframe
+      return Object.freeze({ ...rest, ...(operation.bezier ? { bezier: Object.freeze({ ...operation.bezier }) } : {}) })
+    }))
+    return replace(replacement, [Object.freeze({ operationId: operationInverseId(operationId), type: 'set-keyframe-bezier', target: operation.target, keyframeId: current.id, bezier: current.bezier ?? null })])
+  }
+
+  const fallbackIssue = valueFailure(operation.fallbackValue, '$.fallbackValue')
+  if (fallbackIssue) return fallbackIssue
+  const inverse = track.keyframes.map((keyframe, index): MotionGraphOperationV1 => Object.freeze({
+    operationId: operationInverseId(operationId, `restore-${index}`), type: 'add-keyframe', target: operation.target, keyframeId: keyframe.id, tick: keyframe.tick, value: keyframe.value, interpolation: keyframe.interpolation, ...(keyframe.bezier ? { bezier: keyframe.bezier } : {}),
+  }))
+  return replace(constant(operation.fallbackValue), inverse)
+}
+
 export const applyMotionOperation = (
   scene: MotionSceneV1,
   operation: MotionGraphOperationV1,
@@ -313,6 +476,8 @@ export const applyMotionOperation = (
   const operationId = operation.operationId
 
   try {
+    if (operation.type === 'add-keyframe' || operation.type === 'remove-keyframe' || operation.type === 'move-keyframe' || operation.type === 'set-keyframe-value' || operation.type === 'set-keyframe-interpolation' || operation.type === 'set-keyframe-bezier' || operation.type === 'clear-keyframes') return applyKeyframeOperation(scene, operation, options)
+
     if (operation.type === 'set-property' || operation.type === 'reset-property') {
       const node = findNode(scene, operation.target.nodeId)
       if (!node) return fail(operationId, 'TARGET_NOT_FOUND', `Unknown node: ${operation.target.nodeId}`, { path: '$.target.nodeId' })

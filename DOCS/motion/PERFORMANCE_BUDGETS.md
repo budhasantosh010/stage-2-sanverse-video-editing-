@@ -38,3 +38,28 @@ After the 12-scenario A17 expansion, a fresh warm-cache local sweep covered all 
 Method: one warm-up pass, then 10 graph loops and 3 markup loops over 60 modules × 4 ratios using varied exact-tick samples. This is a local engineering measurement from the current development machine, not a universal browser-frame or production-memory guarantee.
 
 The expanded catalog remains bounded by per-component node/item count; no new component introduces elapsed-time allocation, autonomous render loops, network work, or unseeded randomness.
+
+## MOTION-C2 deterministic keyframe review — 2026-08-08
+
+C2 performance was measured separately by subsystem rather than collapsing evaluator, scene-validation, graph-operation and Motion Lab UI costs into one number.
+
+Direct exact-tick keyframe evaluator stress used 100 properties × 10,000 arbitrary ticks for each representative track size (1,000,000 property evaluations per case):
+
+| Keyframes / property | Avg / property | Avg 100-property batch | Worst observed batch |
+|---:|---:|---:|---:|
+| 2 | 6.7664 µs | 0.6766 ms | 24.0034 ms |
+| 10 | 2.7968 µs | 0.2797 ms | 9.2893 ms |
+| 100 | 3.0152 µs | 0.3015 ms | 4.2691 ms |
+| 1000 | 4.1808 µs | 0.4181 ms | 15.3759 ms |
+
+The evaluator uses binary keyframe-segment lookup, so 1,000-keyframe tracks remain exact-seek deterministic without replay history.
+
+Separate full-scene synthetic stress (100 keyframed properties × 100 keyframes/property, including full scene validation on each pass): 100 evaluations in 1649.977 ms, 16.4998 ms average, 92.4144 ms worst local sample.
+
+Separate graph-operation stress on a synthetic 100-node scene: 200 `move-keyframe` operations in 947.439 ms, 4.7372 ms average, 19.223 ms worst local sample.
+
+End-of-benchmark process observation: RSS 166,100,992 bytes, heap used 38,786,328 bytes. This includes runtime/JIT/GC context and is not a product-memory guarantee.
+
+Real headless Edge, full Advanced Motion Lab C2 Cost Card proof, 100 exact-tick input changes: 75.771 ms average dispatch→next-macrotask DOM commit, p95 125.6 ms, worst 143.1 ms. This is a development-workshop React/DOM metric, not paint time, renderer FPS or pure Motion Graph cost.
+
+Two invalid benchmark attempts are retained in the failure registry: `MOTION-FAIL-006` (mixed oversized benchmark timed out) and `MOTION-FAIL-007` (`requestAnimationFrame` was throttled in headless/background Edge). No numbers from those failed runs are treated as evidence.

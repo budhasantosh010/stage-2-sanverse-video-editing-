@@ -8,6 +8,8 @@ import {
   ChecklistCardModule,
   DEFAULT_TEAM_NETWORK_PROPS,
   COST_VALUE_CARD_DEFINITION,
+  C2_COST_CARD_KEYFRAME_PROOF_OPERATIONS,
+  C2_COST_CARD_PROOF_DURATION_TICKS,
   CostValueCardModule,
   CREATOR_ENERGETIC_STYLE,
   INITIAL_MOTION_STYLE_PACKS,
@@ -66,6 +68,7 @@ import { SANVERSE_TICKS_PER_SECOND, frameForTicks } from '@sanverse/motion-primi
 import { PLAYBACK_SPEEDS, advancePlaybackTicks, clampExactTick, resolveInitialTick, stepFrame } from './transport.ts'
 import type { PlaybackSpeed } from './transport.ts'
 import { GraphInspector, previewOperatedScene } from './GraphInspector.tsx'
+import { KeyframeTimeline } from './KeyframeTimeline.tsx'
 import { OperationPlayground } from './OperationPlayground.tsx'
 
 const ratioOrder: readonly MotionAspectRatio[] = ['16:9', '9:16', '1:1', '4:5']
@@ -81,7 +84,10 @@ const initialComponentId: MotionLabComponentId = requestedComponentId && MOTION_
   ? requestedComponentId
   : 'sanverse.kinetic-headline'
 const initialDefinition = MOTION_COMPONENT_CATALOG.find((component) => component.id === initialComponentId) ?? KINETIC_HEADLINE_DEFINITION
-const initialDurationSeconds = Math.max(1, Math.round(initialDefinition.defaultDurationTicks / SANVERSE_TICKS_PER_SECOND))
+const initialC2CostProof = initialSearch.get('proof') === 'c2-cost' && initialComponentId === 'sanverse.cost-value-card'
+const initialDurationSeconds = initialC2CostProof ? C2_COST_CARD_PROOF_DURATION_TICKS / SANVERSE_TICKS_PER_SECOND : Math.max(1, Math.round(initialDefinition.defaultDurationTicks / SANVERSE_TICKS_PER_SECOND))
+const initialGraphOperations: readonly MotionGraphOperationV1[] = initialC2CostProof ? C2_COST_CARD_KEYFRAME_PROOF_OPERATIONS : Object.freeze([])
+const initialSelectedGraphNodeId = initialSearch.get('node') || null
 const initialRatio = ((): MotionAspectRatio => {
   const value = initialSearch.get('ratio')
   return ratioOrder.includes(value as MotionAspectRatio) ? value as MotionAspectRatio : '16:9'
@@ -271,11 +277,11 @@ export function MotionLabApp() {
   const [reducedMotion, setReducedMotion] = useState(initialReducedMotion)
   const [background, setBackground] = useState<PreviewBackground>(initialBackground)
   const [exposureLevel, setExposureLevel] = useState<MotionExposureLevel>(initialSearch.get('level') === 'advanced' ? 'advanced' : initialSearch.get('level') === 'designer' ? 'designer' : 'creator')
-  const [graphOperations, setGraphOperations] = useState<readonly MotionGraphOperationV1[]>([])
+  const [graphOperations, setGraphOperations] = useState<readonly MotionGraphOperationV1[]>(initialGraphOperations)
   const [graphOperationError, setGraphOperationError] = useState<string | null>(null)
   const graphOperationCounterRef = useRef(1)
   const nextGraphOperationId = (kind: string): string => `lab:${kind}:${graphOperationCounterRef.current++}`
-  const [selectedGraphNodeId, setSelectedGraphNodeId] = useState<string | null>(null)
+  const [selectedGraphNodeId, setSelectedGraphNodeId] = useState<string | null>(initialSelectedGraphNodeId)
 
   const [text, setText] = useState(initialText)
   const [emphasisText, setEmphasisText] = useState(initialEmphasisText)
@@ -624,7 +630,7 @@ export function MotionLabApp() {
           : isTeamNetwork && teamNetworkRenderable && validatedTeamNetworkProps && validatedTeamNetworkStyle
             ? TeamNetworkDiagramModule.createScene(validatedTeamNetworkProps, validatedTeamNetworkStyle, context)
             : null
-  const operatedGraphPreview = baseGraphScene ? previewOperatedScene(baseGraphScene, graphOperations) : null
+  const operatedGraphPreview = baseGraphScene ? previewOperatedScene(baseGraphScene, graphOperations, durationTicks) : null
   const currentGraphScene = operatedGraphPreview?.scene ?? null
   const applicableGraphOperations = operatedGraphPreview?.operations ?? []
   const resolvedGraphScene = currentGraphScene ? evaluateScene(currentGraphScene, context) : null
@@ -712,7 +718,7 @@ export function MotionLabApp() {
 
   const appendGraphOperations = (operations: readonly MotionGraphOperationV1[]) => {
     if (operations.length === 0 || !currentGraphScene) return
-    const preview = applyMotionOperations(currentGraphScene, operations)
+    const preview = applyMotionOperations(currentGraphScene, operations, { durationTicks })
     if (!preview.ok) {
       setGraphOperationError(`${preview.error.code}: ${preview.error.message}`)
       return
@@ -1058,13 +1064,25 @@ export function MotionLabApp() {
             onOperation={(operation) => appendGraphOperations([operation])}
           />
           {exposureLevel === 'advanced' ? (
-            <OperationPlayground
-              scene={currentGraphScene}
-              selectedNodeId={selectedGraphNodeId}
-              onOperation={(operation) => appendGraphOperations([operation])}
-              onSelectNode={setSelectedGraphNodeId}
-              errorMessage={graphOperationError}
-            />
+            <>
+              <KeyframeTimeline
+                scene={currentGraphScene}
+                selectedNodeId={selectedGraphNodeId}
+                localTicks={localTicks}
+                durationTicks={durationTicks}
+                context={context}
+                onSeek={seek}
+                onOperation={(operation) => appendGraphOperations([operation])}
+                errorMessage={graphOperationError}
+              />
+              <OperationPlayground
+                scene={currentGraphScene}
+                selectedNodeId={selectedGraphNodeId}
+                onOperation={(operation) => appendGraphOperations([operation])}
+                onSelectNode={setSelectedGraphNodeId}
+                errorMessage={graphOperationError}
+              />
+            </>
           ) : null}
           {!renderable ? (
             <section className="motion-lab__issues" aria-live="polite">

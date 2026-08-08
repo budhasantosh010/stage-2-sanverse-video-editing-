@@ -174,6 +174,19 @@ button { cursor: pointer; }
 .motion-lab__operation-grid button:hover:not(:disabled) { border-color: #5fff52; }
 .motion-lab__operation-grid button:disabled { cursor: default; opacity: .32; }
 .motion-lab__operation-error { padding: 8px; border: 1px solid #743b41; border-radius: 7px; color: #ffadb6; background: #241315; font: 9px/1.4 Consolas, monospace; overflow-wrap: anywhere; }
+.motion-lab__keyframe-timeline { background: #101114; }
+.motion-lab__keyframe-readout { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 9px; padding: 9px; border: 1px solid #2d2d32; border-radius: 8px; background: #151517; }
+.motion-lab__keyframe-readout strong { display: block; color: #c9c9ce; font-size: 10px; }
+.motion-lab__diamond { color: #5fff52; font-size: 20px; line-height: 1; }
+.motion-lab__keyframe-readout button,
+.motion-lab__keyframe-inline button,
+.motion-lab__keyframe-bezier button { padding: 6px 8px; border: 1px solid #35353b; border-radius: 6px; color: #c5c5ca; background: #1b1b1e; font-size: 10px; }
+.motion-lab__keyframe-strip { position: relative; height: 30px; margin: 3px 7px 8px; border-top: 1px solid #333338; border-bottom: 1px solid #222226; }
+.motion-lab__keyframe-strip button { position: absolute; top: 50%; width: 20px; height: 24px; margin-left: -10px; transform: translateY(-50%); padding: 0; border: 0; color: #77777f; background: transparent; font-size: 16px; }
+.motion-lab__keyframe-strip button[aria-pressed="true"] { color: #5fff52; }
+.motion-lab__keyframe-inline { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 7px; }
+.motion-lab__keyframe-bezier { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.motion-lab__keyframe-bezier > button { grid-column: 1 / -1; }
 
 @media (max-width: 1120px) {
   .motion-lab__body { grid-template-columns: 190px minmax(440px, 1fr) 245px; }

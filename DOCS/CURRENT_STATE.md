@@ -13,6 +13,10 @@ file first in any new session.**
 
 **Gate T0 is DONE.** Gates T1 through T7 are NOT STARTED. Tests: **1,848**.
 
+### Parallel Motion Program checkpoint — MOTION-C2
+
+The separate Motion worktree has completed the implementation and release-candidate verification of **MOTION-C2 deterministic keyframes** without changing `apps/web` or the production editor goal above. C2 keeps one `Animatable` authority per graph property, adds stable-ID Hold/Linear/Bezier keyframe tracks, typed node/effect/mask keyframe operations, atomic transactions/inverse readiness, serialization, timeline-track projection, and a developer-only Advanced Motion Lab keyframe timeline. The Cost / Value Card proof is graph-operation-only; real Edge direct/backward/random exact-seek equality passed. Motion-only release-candidate suites are **253/253** with **7/7 Motion workspace builds**. Evidence: `DOCS/motion/evidence/MOTION-C2.md`. C3 is not started; A18 follows only after the separate C2 Git checkpoint.
+
 ### Gate T0, thing one: the preview stopped lying
 
 The monitor used to say **"No media at this time"** while footage was plainly

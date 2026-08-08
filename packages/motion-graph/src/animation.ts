@@ -1,9 +1,24 @@
 import type { MotionRenderContextV1 } from '@sanverse/motion-contract'
 import { clamp01, cubicBezier, easeInCubic, easeInOutCubic, easeOutCubic, formatClockSeconds, formatCompactNumber, interpolateNumber, linear, normalizedProgress, sequenceProgress, springProgress, staggerProgress } from '@sanverse/motion-primitives'
-import type { Animatable, KeyframedValueV1, MotionDriverV1, MotionEasingIdV1, MotionPropertyPrimitiveV1, MotionScalarExpressionV1 } from './properties.ts'
+import type { Animatable, BoundValueV1, KeyframedValueV1, MotionBezierHandlesV1, MotionDriverV1, MotionEasingIdV1, MotionPropertyPrimitiveV1, MotionScalarExpressionV1 } from './properties.ts'
 
 const easingFor = (id: MotionEasingIdV1) => id === 'linear' ? linear : id === 'ease-in-cubic' ? easeInCubic : id === 'ease-out-cubic' ? easeOutCubic : easeInOutCubic
 const lerp = (from: number, to: number, progress: number): number => from + (to - from) * progress
+
+/**
+ * Missing Bezier handles intentionally fall back to a mathematically linear
+ * cubic segment. This keeps legacy serialized keyframes deterministic while
+ * C2 operations can opt into explicit professional handles.
+ */
+export const DEFAULT_MOTION_BEZIER_HANDLES: MotionBezierHandlesV1 = Object.freeze({ inX: 2 / 3, inY: 2 / 3, outX: 1 / 3, outY: 1 / 3 })
+export const MOTION_BEZIER_Y_LIMIT = 4
+
+export const motionBezierHandleIssue = (handles: MotionBezierHandlesV1): string | null => {
+  for (const [name, value] of Object.entries(handles)) if (typeof value !== 'number' || !Number.isFinite(value)) return `Bezier ${name} must be finite.`
+  if (handles.inX < 0 || handles.inX > 1 || handles.outX < 0 || handles.outX > 1) return 'Bezier X handles must stay inside [0,1].'
+  if (Math.abs(handles.inY) > MOTION_BEZIER_Y_LIMIT || Math.abs(handles.outY) > MOTION_BEZIER_Y_LIMIT) return `Bezier Y handles must stay inside [-${MOTION_BEZIER_Y_LIMIT},${MOTION_BEZIER_Y_LIMIT}].`
+  return null
+}
 
 export const evaluateScalarExpression = (expression: MotionScalarExpressionV1, context: MotionRenderContextV1): number => {
   if (expression.kind === 'constant') return expression.value
@@ -53,25 +68,54 @@ export const evaluateMotionDriver = (driver: MotionDriverV1, context: MotionRend
   return lerp(driver.from, driver.to, easingFor(driver.easing)(window))
 }
 
+const rightKeyframeIndex = <T extends MotionPropertyPrimitiveV1>(value: KeyframedValueV1<T>, localTicks: number): number => {
+  let low = 1
+  let high = value.keyframes.length - 1
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2)
+    if (value.keyframes[middle]!.tick <= localTicks) low = middle + 1
+    else high = middle
+  }
+  return low
+}
+
 export const evaluateKeyframedValue = <T extends MotionPropertyPrimitiveV1>(value: KeyframedValueV1<T>, localTicks: number): T => {
+  if (!Number.isSafeInteger(localTicks) || localTicks < 0) throw new RangeError('Keyframe evaluation tick must be a non-negative safe integer.')
   const keyframes = value.keyframes
   if (keyframes.length === 0) throw new RangeError('Keyframed value needs at least one keyframe.')
   if (localTicks <= keyframes[0]!.tick) return keyframes[0]!.value
   if (localTicks >= keyframes[keyframes.length - 1]!.tick) return keyframes[keyframes.length - 1]!.value
-  const leftIndex = keyframes.findIndex((keyframe, index) => index < keyframes.length - 1 && localTicks >= keyframe.tick && localTicks < keyframes[index + 1]!.tick)
-  const left = keyframes[Math.max(0, leftIndex)]!
-  const right = keyframes[Math.max(1, leftIndex + 1)]!
-  if (left.interpolation === 'hold' || typeof left.value !== 'number' || typeof right.value !== 'number') return left.value
+  const rightIndex = rightKeyframeIndex(value, localTicks)
+  const left = keyframes[rightIndex - 1]!
+  const right = keyframes[rightIndex]!
+  if (localTicks === left.tick) return left.value
+  if (left.interpolation === 'hold') return left.value
+  if (typeof left.value !== 'number' || typeof right.value !== 'number') throw new RangeError(`${left.interpolation} interpolation requires numeric keyframe values.`)
   const raw = clamp01((localTicks - left.tick) / (right.tick - left.tick))
-  const eased = left.interpolation === 'bezier' && left.bezier
-    ? cubicBezier(left.bezier.outX, left.bezier.outY, right.bezier?.inX ?? 1, right.bezier?.inY ?? 1)(raw)
-    : raw
+  if (left.interpolation === 'linear') return lerp(left.value, right.value, raw) as T
+  const leftHandles = left.bezier ?? DEFAULT_MOTION_BEZIER_HANDLES
+  const rightHandles = right.bezier ?? DEFAULT_MOTION_BEZIER_HANDLES
+  const eased = cubicBezier(leftHandles.outX, leftHandles.outY, rightHandles.inX, rightHandles.inY)(raw)
   return lerp(left.value, right.value, eased) as T
 }
 
-export const evaluateUnboundAnimatable = <T extends MotionPropertyPrimitiveV1>(value: Animatable<T>, context: MotionRenderContextV1): T => {
+export type MotionBindingResolverV1 = (binding: BoundValueV1<MotionPropertyPrimitiveV1>, key: string) => MotionPropertyPrimitiveV1
+
+/**
+ * C2's single Animatable router. Renderers consume only resolved values; they
+ * never interpret drivers, keyframes or bindings themselves.
+ */
+export const evaluateAnimatable = <T extends MotionPropertyPrimitiveV1>(
+  value: Animatable<T>,
+  context: MotionRenderContextV1,
+  key = 'animatable',
+  resolveBinding?: MotionBindingResolverV1,
+): T => {
   if (value.kind === 'constant') return value.value
   if (value.kind === 'motion') return evaluateMotionDriver(value.driver, context) as T
   if (value.kind === 'keyframes') return evaluateKeyframedValue(value, context.localTicks)
-  throw new RangeError('Bound values require scene-level evaluation.')
+  if (!resolveBinding) throw new RangeError(`Bound value ${key} requires scene-level evaluation.`)
+  return resolveBinding(value as BoundValueV1<MotionPropertyPrimitiveV1>, key) as T
 }
+
+export const evaluateUnboundAnimatable = <T extends MotionPropertyPrimitiveV1>(value: Animatable<T>, context: MotionRenderContextV1): T => evaluateAnimatable(value, context)
