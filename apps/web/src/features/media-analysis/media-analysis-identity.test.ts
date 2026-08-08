@@ -9,6 +9,7 @@ import {
   MEDIA_ANALYSIS_KINDS,
   mediaAnalysisKeyId,
   parseMediaAnalysisKey,
+  precisionFrameKey,
   waveformBlockKey,
 } from './media-analysis-key'
 import {
@@ -70,6 +71,16 @@ describe('which bytes a name refers to', () => {
     const before = filmstripFrameKey({ assetId: 'asset_x', assetVersion: A, sourceTicks: T, widthPx: 64 })
     const after = filmstripFrameKey({ assetId: 'asset_x', assetVersion: B, sourceTicks: T, widthPx: 64 })
     expect(mediaAnalysisKeyId(before)).not.toBe(mediaAnalysisKeyId(after))
+  })
+
+  it('keeps an exact precision-trim frame exact while filmstrip sampling stays coarse', () => {
+    const requested = 5 * T + 17_321
+    const trimFrame = precisionFrameKey({ assetId: 'asset_aaaaaaaa', assetVersion: A, sourceTicks: requested, widthPx: 224 })
+    const filmstrip = filmstripFrameKey({ assetId: 'asset_aaaaaaaa', assetVersion: A, sourceTicks: requested, widthPx: 224 })
+    expect(trimFrame.sourceTicks).toBe(requested)
+    expect(filmstrip.sourceTicks).not.toBe(requested)
+    expect(trimFrame.kind).toBe('filmstrip-frame')
+    expect(parseMediaAnalysisKey(trimFrame)).toEqual(trimFrame)
   })
 })
 

@@ -5,6 +5,8 @@ import {
   DEFAULT_KEYMAP,
   DEFAULT_TRACK_PRESENTATION,
   buildTimelineViewModel,
+  type PrecisionTrimPlan,
+  type PrecisionTrimRequestV1,
   type TimelineGesture,
   type TimelineSelectionV2,
   type TimelineViewportState,
@@ -14,6 +16,7 @@ import {
   largeTimelineProject,
   nameplate,
   projectWithAllTimelineFamilies,
+  splitProject,
   ticks,
 } from '../../features/timeline/timeline-test-fixtures'
 import { Timeline } from './Timeline'
@@ -46,6 +49,10 @@ const renderTimeline = (input: Readonly<{
   onItemAction?: (itemId: string, action: unknown) => void
   onMultiGesture?: (gesture: unknown) => void
   onAction?: (action: unknown) => void
+  onPrecisionPreview?: (request: PrecisionTrimRequestV1) => PrecisionTrimPlan
+  onPrecisionCommit?: (plan: Extract<PrecisionTrimPlan, { ok: true }>) => void
+  shuttleState?: Readonly<{ direction: -1 | 0 | 1; rate: 0 | 1 | 2 | 4 | 8 }>
+  onShuttleKey?: (key: 'J' | 'K' | 'L') => void
   freezeClipLabel?: string | null
   freezeUnavailableReason?: string | null
   onFreezeApply?: (durationTicks: number) => void
@@ -96,6 +103,10 @@ const renderTimeline = (input: Readonly<{
     onFreezeApply: input.onFreezeApply ?? vi.fn(),
     onSpeedPreview: () => '',
     onSpeedChoose: vi.fn(),
+    onPrecisionPreview: input.onPrecisionPreview,
+    onPrecisionCommit: input.onPrecisionCommit,
+    shuttleState: input.shuttleState,
+    onShuttleKey: input.onShuttleKey,
     onSelectMarker: vi.fn(),
     onMoveMarker: vi.fn(),
     onDeleteMarker: vi.fn(),
@@ -307,5 +318,76 @@ describe('Timeline V1', () => {
 
     expect(onViewportChange).toHaveBeenCalledTimes(2)
     expect(onGesture).not.toHaveBeenCalled()
+  })
+
+  it('makes the T3 precision-tool keyboard shortcuts change the real Trim tool mode', () => {
+    renderTimeline()
+    const timeline = screen.getByRole('region', { name: 'Project timeline' })
+
+    fireEvent.keyDown(timeline, { key: 'r' })
+    expect(screen.getByRole('radio', { name: /Trim tool\. Active: Roll/i })).toBeChecked()
+
+    fireEvent.keyDown(timeline, { key: 'y' })
+    expect(screen.getByRole('radio', { name: /Trim tool\. Active: Slip/i })).toBeChecked()
+
+    fireEvent.keyDown(timeline, { key: 'r', shiftKey: true })
+    expect(screen.getByRole('radio', { name: /Trim tool\. Active: Rate Stretch/i })).toBeChecked()
+  })
+
+  it('drives Dynamic Trim from the one J/K/L playhead and accepts only on Enter', () => {
+    const project = splitProject(projectWithAllTimelineFamilies(), 10, createIds(100))
+    const model = buildTimelineViewModel({ project, selectedItemIds: [], pending: null })
+    const onSeek = vi.fn()
+    const onShuttleKey = vi.fn()
+    const onPrecisionCommit = vi.fn()
+    const onPrecisionPreview = vi.fn((request: PrecisionTrimRequestV1): PrecisionTrimPlan => Object.freeze({
+      ok: true as const,
+      operation: Object.freeze({}) as never,
+      operations: Object.freeze([]),
+      feedback: Object.freeze({
+        mode: 'roll' as const,
+        requestedDeltaTicks: request.deltaTicks,
+        appliedDeltaTicks: request.deltaTicks,
+        changes: Object.freeze([]),
+        affectedClipIds: Object.freeze([]),
+        selectedStartTicks: ticks(10),
+        selectedDurationTicks: ticks(10),
+        selectedSourceInTicks: ticks(0),
+        selectedSourceOutTicks: ticks(10),
+      }),
+      description: 'Roll preview',
+    }))
+    const rendered = renderTimeline({
+      model,
+      playheadTicks: 0,
+      currentViewport: viewport({ pixelsPerSecond: 30, viewportWidthPx: 600 }),
+      onSeek,
+      onShuttleKey,
+      onPrecisionPreview,
+      onPrecisionCommit,
+    })
+    const timeline = screen.getByRole('region', { name: 'Project timeline' })
+
+    fireEvent.keyDown(timeline, { key: 'r' })
+    fireEvent.click(screen.getByRole('button', { name: /Edit point at/i }))
+    fireEvent.keyDown(timeline, { key: 'd' })
+
+    expect(onSeek).toHaveBeenLastCalledWith(ticks(10))
+    expect(onShuttleKey).toHaveBeenCalledWith('K')
+    expect(onPrecisionCommit).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(timeline, { key: 'l' })
+    expect(onShuttleKey).toHaveBeenLastCalledWith('L')
+
+    rendered.rerender(<Timeline {...rendered.props} playheadTicks={ticks(10.5)} />)
+    expect(onPrecisionPreview).toHaveBeenCalledWith(expect.objectContaining({
+      mode: 'roll',
+      deltaTicks: ticks(0.5),
+    }))
+    expect(onPrecisionCommit).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(screen.getByRole('region', { name: 'Project timeline' }), { key: 'Enter' })
+    expect(onPrecisionCommit).toHaveBeenCalledTimes(1)
+    expect(onShuttleKey).toHaveBeenLastCalledWith('K')
   })
 })

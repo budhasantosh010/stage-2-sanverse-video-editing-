@@ -39,7 +39,9 @@ import {
   EMPTY_SELECTION,
   TIMELINE_LOCK_SCHEMA_VERSION,
   adaptTimelineGesture,
+  advanceShuttle,
   buildTimelineViewModel,
+  createAudioScrubScheduler,
   clipboardIsEmpty,
   copySelectionToClipboard,
   laneSpans,
@@ -52,6 +54,7 @@ import {
   planGroupItems,
   planMultiItemGesture,
   planPaste,
+  planPrecisionTrimRequest,
   planTimelineItemAction,
   planTimelinePlacement,
   planUngroupItem,
@@ -60,6 +63,8 @@ import {
   readTimelineLockState,
   readTrackPresentation,
   readTimelineZoomPresentation,
+  shuttleDeltaTicks,
+  STOPPED_SHUTTLE,
   reconcileSelectionV2,
   primarySelectedItemId,
   trackIdForLane,
@@ -68,10 +73,15 @@ import {
   writeTimelineZoomPresentation,
   DEFAULT_TIMELINE_ZOOM_PRESENTATION,
   TIMELINE_ZOOM_PRESENTATION_SCHEMA_VERSION,
+  type AudioScrubSchedulerV1,
   type KeymapV1,
   type MultiItemGesture,
   type PlacementMode,
+  type PrecisionTrimPlan,
+  type PrecisionTrimRequestV1,
+  type ShuttleKeyV1,
   type TimelineClipboardV1,
+  type TimelineShuttleStateV1,
   type TimelineGesture,
   type TimelineItemAction,
   type TimelineSelectionV2,
@@ -573,6 +583,14 @@ export function StudioScreen({
   const [monitorPlaying, setMonitorPlaying] = useState(false)
   const [monitorMuted, setMonitorMuted] = useState(false)
   const [monitorVolume, setMonitorVolume] = useState(1)
+  const [shuttleState, setShuttleState] = useState<TimelineShuttleStateV1>(STOPPED_SHUTTLE)
+  const shuttleStateRef = useRef<TimelineShuttleStateV1>(STOPPED_SHUTTLE)
+  const shuttleFrameRef = useRef<number | null>(null)
+  const shuttleLastTimeRef = useRef<number | null>(null)
+  const [audioScrubbingEnabled, setAudioScrubbingEnabled] = useState(() => {
+    try { return globalThis.localStorage?.getItem('sanverse.timeline-audio-scrubbing') === 'true' } catch { return false }
+  })
+  const audioScrubRef = useRef<AudioScrubSchedulerV1 | null>(null)
   /** True while the finished video is sitting on a deliberately empty stretch. */
   const [isShowingHole, setIsShowingHole] = useState(false)
   /**
@@ -1361,9 +1379,13 @@ export function StudioScreen({
     if (!videoElement) return
     const controller = createCompositionAudioPreviewController(videoElement)
     audioPreviewRef.current = controller
+    const scrubber = createAudioScrubScheduler(controller)
+    audioScrubRef.current = scrubber
     controller.setMaster(monitorMuted, monitorVolume)
     return () => {
+      scrubber.dispose()
       controller.dispose()
+      if (audioScrubRef.current === scrubber) audioScrubRef.current = null
       if (audioPreviewRef.current === controller) audioPreviewRef.current = null
     }
     // One controller for the lifetime of one mounted Studio/video element.
@@ -1376,6 +1398,18 @@ export function StudioScreen({
     controller.setMaster(monitorMuted, monitorVolume)
     controller.update(browserAudioVoices, monitorPlaying || isShowingHole)
   }, [browserAudioVoices, isShowingHole, monitorMuted, monitorPlaying, monitorVolume])
+
+  useEffect(() => {
+    try { globalThis.localStorage?.setItem('sanverse.timeline-audio-scrubbing', String(audioScrubbingEnabled)) } catch { /* preference only */ }
+    const scrubber = audioScrubRef.current
+    if (!scrubber) return
+    if (!audioScrubbingEnabled || monitorPlaying) {
+      scrubber.stop()
+      return
+    }
+    if (browserAudioVoices.length > 0) scrubber.scrub(browserAudioVoices)
+    else scrubber.stop()
+  }, [audioScrubbingEnabled, browserAudioVoices, monitorPlaying, playheadPreviewTicks])
 
   const previewNodes = previewPlan ? visibleNameplates(previewPlan, playheadPreviewTicks) : []
   const previewCaptions = previewPlan ? visibleCaptions(previewPlan, playheadPreviewTicks) : []
@@ -1463,6 +1497,39 @@ export function StudioScreen({
   )
 
   const compositionDurationTicks = compositionDuration(composition).ticks
+
+  useEffect(() => {
+    shuttleStateRef.current = shuttleState
+    if (shuttleFrameRef.current !== null) cancelAnimationFrame(shuttleFrameRef.current)
+    shuttleFrameRef.current = null
+    shuttleLastTimeRef.current = null
+    if (shuttleState.direction === 0 || shuttleState.rate === 0) return
+
+    videoRef.current?.pause()
+    const step = (now: number) => {
+      const current = shuttleStateRef.current
+      if (current.direction === 0 || current.rate === 0) return
+      const previous = shuttleLastTimeRef.current
+      shuttleLastTimeRef.current = now
+      if (previous !== null) {
+        const delta = shuttleDeltaTicks(current, now - previous, PROJECT_TIMESCALE)
+        const next = Math.min(compositionDurationTicks, Math.max(0, playheadTicksRef.current + delta))
+        seekCompositionTicks(next)
+        if (next === 0 || next === compositionDurationTicks) {
+          shuttleStateRef.current = STOPPED_SHUTTLE
+          setShuttleState(STOPPED_SHUTTLE)
+          return
+        }
+      }
+      shuttleFrameRef.current = requestAnimationFrame(step)
+    }
+    shuttleFrameRef.current = requestAnimationFrame(step)
+    return () => {
+      if (shuttleFrameRef.current !== null) cancelAnimationFrame(shuttleFrameRef.current)
+      shuttleFrameRef.current = null
+      shuttleLastTimeRef.current = null
+    }
+  }, [compositionDurationTicks, shuttleState])
 
   // The media effect is attached once and reads these through refs, so they are
   // refreshed here rather than by re-subscribing every listener on every cut.
@@ -2044,6 +2111,13 @@ export function StudioScreen({
     seekCompositionTicks(playheadTicksRef.current + direction * frameStepTicks(primaryVideoAsset?.frameRate ?? null))
   }
 
+  function handleShuttleKey(key: ShuttleKeyV1) {
+    videoRef.current?.pause()
+    const next = advanceShuttle(shuttleStateRef.current, key)
+    shuttleStateRef.current = next
+    setShuttleState(next)
+  }
+
   function setMonitorMutedState(muted: boolean) {
     const controller = audioPreviewRef.current
     const videoElement = videoRef.current
@@ -2383,6 +2457,29 @@ export function StudioScreen({
     setTimelineNotice(null)
     void (async () => {
       const failure = await onApplyOperations([planned.operation], changeSetId)
+      if (failure) setTimelineNotice(failure)
+    })()
+  }
+
+  /**
+   * T3 precision preview. Pointer movement calls this exact planner and keeps
+   * the returned object detached. Pointer release hands the SAME successful
+   * object to `handlePrecisionCommit`; there is no second commit calculation.
+   */
+  function handlePrecisionPreview(request: PrecisionTrimRequestV1): PrecisionTrimPlan {
+    return planPrecisionTrimRequest({
+      project: editProject,
+      operationId: createOperationId(),
+      lockedTrackIds,
+      existingItemIds: timelineModel.lanes.flatMap((lane) => lane.items.map((item) => item.id)),
+    }, request)
+  }
+
+  function handlePrecisionCommit(plan: Extract<PrecisionTrimPlan, { ok: true }>) {
+    const changeSetId = createChangeSetId()
+    setTimelineNotice(null)
+    void (async () => {
+      const failure = await onApplyOperations(plan.operations, changeSetId)
       if (failure) setTimelineNotice(failure)
     })()
   }
@@ -3862,6 +3959,7 @@ export function StudioScreen({
           model={timelineModel}
           assetFacts={assetFacts}
           playheadTicks={playheadTicks}
+          frameRate={primaryVideoAsset?.frameRate ?? Object.freeze({ numerator: 30, denominator: 1 })}
           viewport={timelineViewport}
           selection={timelineSelection}
           groups={timelineGroups}
@@ -3897,6 +3995,12 @@ export function StudioScreen({
           speedSubject={speedSubject}
           onSpeedPreview={describeSpeedChoice}
           onSpeedChoose={handleSpeedChoose}
+          onPrecisionPreview={handlePrecisionPreview}
+          onPrecisionCommit={handlePrecisionCommit}
+          shuttleState={shuttleState}
+          onShuttleKey={handleShuttleKey}
+          audioScrubbingEnabled={audioScrubbingEnabled}
+          onAudioScrubbingChange={setAudioScrubbingEnabled}
           onRateStretchPreview={describeRateStretch}
           onRateStretchCommit={handleRateStretchCommit}
           transitionSubject={transitionSubject}

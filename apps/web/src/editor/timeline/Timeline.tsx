@@ -3,10 +3,13 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNod
 import type { TimelineGroupV1, TimelineMarkerV1, TimelineTrackId, TrackOutputState, MarkerColor } from '@sanverse/edit-domain'
 import {
   EMPTY_SELECTION,
+  EMPTY_DYNAMIC_TRIM,
   applyMarquee,
+  beginDynamicTrim,
   beginMarquee,
   cancelMarquee,
   extendSelection,
+  frameDeltaToTicks,
   calculateHorizontalZoomScroll,
   effectiveTrackHeightPx,
   fitTimelineToViewport,
@@ -36,10 +39,18 @@ import {
   type MarqueeSession,
   type MultiItemGesture,
   type PlacementMode,
+  type PrecisionFrameRateV1,
+  type PrecisionTrimPlan,
+  type PrecisionTrimRequestV1,
+  type TimelineEditPointRefV1,
   type TimelineGesture,
   type TimelineItemAction,
   type TimelineItemView,
+  type ShuttleKeyV1,
+  type TimelinePrecisionToolV1,
   type TimelineSelectionV2,
+  type TimelineShuttleStateV1,
+  updateDynamicTrim,
   type TimelineViewModel,
   type TimelineViewportState,
   type TimelineVerticalZoomV1,
@@ -57,6 +68,7 @@ import type { MediaDragPayloadV1 } from '../../features/media'
 import {
   ANALYSIS_PRIORITY,
   derivedMediaClipFor,
+  mediaAnalysisKeyId,
   planTimelineAnalysis,
   useMediaAnalysisController,
   type AssetFacts,
@@ -71,11 +83,14 @@ import { TimelineRuler } from './TimelineRuler'
 import { TimelineTrackHeader } from './TimelineTrackHeader'
 import { timelinePointerToTicks } from './timeline-ruler-model'
 import { snapTimelineTicks, timelineSnapCandidates, type TimelineSnapResult } from './timeline-snap'
-import { TimelineToolbar, type TimelineTool, type TimelineToolbarAction } from './TimelineToolbar'
+import { TimelineToolbar, type TimelinePrecisionCommand, type TimelineTool, type TimelineToolbarAction } from './TimelineToolbar'
 import { TimelineSpeedPanel } from './TimelineSpeedPanel'
 import { TimelineTransitionPanel } from './TimelineTransitionPanel'
 import { TimelineLinkedAudioPanel, type TimelineLinkedAudioSubject } from './TimelineLinkedAudioPanel'
 import { TimelineFreezePanel } from './TimelineFreezePanel'
+import { TimelinePrecisionPopover, type NumericPrecisionIntentV1 } from './TimelinePrecisionPopover'
+import { TimelineTrimView } from './TimelineTrimView'
+import { planTimelineTrimViewFrames } from './timeline-trim-view-plan'
 import type { TimelineTransitionSubject, TransitionAudioV1, TransitionStyleV1 } from '../../features/timeline/timeline-transition-plan'
 import type { RateStretchPreview } from './TimelineRateStretchHandle'
 import { NORMAL_PLAYBACK_RATE, type RationalPlaybackRateV1 } from '@sanverse/edit-domain/clip-time'
@@ -84,6 +99,7 @@ import './Timeline.css'
 export type TimelineProps = Readonly<{
   model: TimelineViewModel
   playheadTicks: number
+  frameRate?: PrecisionFrameRateV1
   viewport: TimelineViewportState
   /** Everything picked, and where a Shift range measures from. */
   selection: TimelineSelectionV2
@@ -139,6 +155,13 @@ export type TimelineProps = Readonly<{
   /** One sentence describing what a speed/direction would do. Comes from the one planner. */
   onSpeedPreview(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean, direction: 'forward' | 'reverse'): string
   onSpeedChoose(rate: RationalPlaybackRateV1, maintainAudioPitch: boolean, direction: 'forward' | 'reverse'): void
+  /** The exact T3 planner result used by both the detached ghost and release. */
+  onPrecisionPreview?(request: PrecisionTrimRequestV1): PrecisionTrimPlan
+  onPrecisionCommit?(plan: Extract<PrecisionTrimPlan, { ok: true }>): void
+  shuttleState?: TimelineShuttleStateV1
+  onShuttleKey?(key: ShuttleKeyV1): void
+  audioScrubbingEnabled?: boolean
+  onAudioScrubbingChange?(enabled: boolean): void
   onRateStretchPreview?(targetDurationTicks: number): RateStretchPreview
   onRateStretchCommit?(targetDurationTicks: number): void
   transitionSubject?: TimelineTransitionSubject | null
@@ -172,8 +195,6 @@ const isTypingTarget = (target: EventTarget | null): boolean => {
   )
 }
 
-/** One frame at 30 per second, in ticks. Used by the arrow keys. */
-const FRAME_TICKS = 48_000
 const DEFAULT_VERTICAL_ZOOM = createVerticalZoom(DEFAULT_VERTICAL_ZOOM_BASIS_POINTS)
 const IGNORE_VERTICAL_ZOOM = (_state: TimelineVerticalZoomV1): void => undefined
 const NO_RATE_STRETCH_PREVIEW = (_targetDurationTicks: number): RateStretchPreview => Object.freeze({
@@ -181,6 +202,17 @@ const NO_RATE_STRETCH_PREVIEW = (_targetDurationTicks: number): RateStretchPrevi
   message: 'Rate Stretch is unavailable for this selection.',
 })
 const IGNORE_RATE_STRETCH = (_targetDurationTicks: number): void => undefined
+const NO_PRECISION_PREVIEW = (_request: PrecisionTrimRequestV1): PrecisionTrimPlan => Object.freeze({
+  ok: false,
+  refusal: Object.freeze({
+    code: 'ITEM_TYPE_UNSUPPORTED' as const,
+    message: 'Precision trimming is unavailable for this selection.',
+    blockingItemId: null,
+    requestedTicks: null,
+    availableTicks: null,
+  }),
+})
+const IGNORE_PRECISION_COMMIT = (_plan: Extract<PrecisionTrimPlan, { ok: true }>): void => undefined
 
 /** A stable empty object, so a project without files does not remount every lane. */
 const EMPTY_ASSET_FACTS: Readonly<Record<string, AssetFacts>> = Object.freeze({})
@@ -191,6 +223,7 @@ const isMacPlatform = (): boolean =>
 export function Timeline({
   model,
   playheadTicks,
+  frameRate = Object.freeze({ numerator: 30, denominator: 1 }),
   viewport,
   selection,
   groups,
@@ -227,6 +260,12 @@ export function Timeline({
   speedSubject,
   onSpeedPreview,
   onSpeedChoose,
+  onPrecisionPreview = NO_PRECISION_PREVIEW,
+  onPrecisionCommit = IGNORE_PRECISION_COMMIT,
+  shuttleState = Object.freeze({ direction: 0, rate: 0 }),
+  onShuttleKey = () => undefined,
+  audioScrubbingEnabled = false,
+  onAudioScrubbingChange = () => undefined,
   onRateStretchPreview = NO_RATE_STRETCH_PREVIEW,
   onRateStretchCommit = IGNORE_RATE_STRETCH,
   transitionSubject = null,
@@ -266,6 +305,12 @@ export function Timeline({
   const [transitionPanelOpen, setTransitionPanelOpen] = useState(false)
   const [linkedAudioPanelOpen, setLinkedAudioPanelOpen] = useState(false)
   const [freezePanelOpen, setFreezePanelOpen] = useState(false)
+  const frameTicks = Math.max(1, Math.abs(frameDeltaToTicks(1, model.timescale, frameRate)))
+  const [precisionTool, setPrecisionTool] = useState<TimelinePrecisionToolV1>('standard-trim')
+  const [precisionDraft, setPrecisionDraft] = useState<PrecisionTrimPlan | null>(null)
+  const [selectedEditPoints, setSelectedEditPoints] = useState<readonly TimelineEditPointRefV1[]>(Object.freeze([]))
+  const [dynamicTrim, setDynamicTrim] = useState(EMPTY_DYNAMIC_TRIM)
+  const [dynamicTrimPlan, setDynamicTrimPlan] = useState<PrecisionTrimPlan | null>(null)
   const [rateStretchActive, setRateStretchActive] = useState(false)
 
   useEffect(() => () => {
@@ -321,6 +366,10 @@ export function Timeline({
    * single piece of code would know the user had scrolled away.
    */
   const analysis = useMediaAnalysisController()
+  const trimViewFrames = useMemo(() => {
+    if (!assetFacts || !precisionDraft?.ok) return Object.freeze([])
+    return planTimelineTrimViewFrames({ model, assetFacts, plan: precisionDraft })
+  }, [assetFacts, model, precisionDraft])
 
   /*
    * How wide the WINDOW is — not how wide the timeline is.
@@ -373,16 +422,26 @@ export function Timeline({
       }
     }
 
-    return planTimelineAnalysis({
+    const base = planTimelineAnalysis({
       clips,
       timescale: model.timescale,
       pixelsPerSecond: viewport.pixelsPerSecond,
+    })
+    if (trimViewFrames.length === 0) return base
+    const precisionIds = new Set(trimViewFrames.map((frame) => frame.keyId))
+    return Object.freeze({
+      wanted: Object.freeze([
+        ...trimViewFrames.map((frame) => Object.freeze({ key: frame.key, priority: ANALYSIS_PRIORITY.selected })),
+        ...base.wanted.filter((entry) => !precisionIds.has(mediaAnalysisKeyId(entry.key))),
+      ]),
+      truncated: base.truncated,
     })
   }, [
     assetFacts,
     model.lanes,
     model.timescale,
     overscanTicks,
+    trimViewFrames,
     viewport.pixelsPerSecond,
     windowWidthPx,
     visibleRange.startTicks,
@@ -430,6 +489,123 @@ export function Timeline({
    * Which modifier means what, decided in ONE place so a click on a clip, a
    * click in the marquee and a keyboard shortcut cannot disagree.
    */
+  const clipIdForItemId = (itemId: string | null): string | null => {
+    if (itemId === null) return null
+    for (const lane of model.lanes) {
+      const item = lane.items.find((candidate) => candidate.id === itemId)
+      if (item?.clipId) return item.clipId
+    }
+    return null
+  }
+
+  const previewPrecisionRequest = (request: PrecisionTrimRequestV1): PrecisionTrimPlan => {
+    if (request.mode === 'roll' && selectedEditPoints.length > 1) {
+      const draggedSelected = selectedEditPoints.some((point) =>
+        clipIdForItemId(point.leftItemId) === request.leftClipId
+        && clipIdForItemId(point.rightItemId) === request.rightClipId)
+      if (draggedSelected) {
+        const editPoints = selectedEditPoints.flatMap((point) => {
+          const leftClipId = clipIdForItemId(point.leftItemId)
+          const rightClipId = clipIdForItemId(point.rightItemId)
+          return leftClipId && rightClipId ? [Object.freeze({ leftClipId, rightClipId })] : []
+        })
+        if (editPoints.length === selectedEditPoints.length) {
+          return onPrecisionPreview(Object.freeze({ mode: 'multi-roll', editPoints: Object.freeze(editPoints), deltaTicks: request.deltaTicks }))
+        }
+      }
+    }
+    return onPrecisionPreview(request)
+  }
+
+  const dynamicPointRequest = (deltaTicks: number): PrecisionTrimRequestV1 | null => {
+    if (selectedEditPoints.length !== 1 || deltaTicks === 0) return null
+    const point = selectedEditPoints[0]
+    const leftClipId = clipIdForItemId(point.leftItemId)
+    const rightClipId = clipIdForItemId(point.rightItemId)
+    if (!leftClipId || !rightClipId) return null
+    return Object.freeze({ mode: 'roll' as const, leftClipId, rightClipId, deltaTicks })
+  }
+
+  const previewDynamicDelta = (deltaTicks: number) => {
+    const request = dynamicPointRequest(deltaTicks)
+    if (!request) return
+    const plan = previewPrecisionRequest(request)
+    setDynamicTrimPlan(plan)
+    setDynamicTrim((current) => updateDynamicTrim(
+      current,
+      deltaTicks,
+      plan.ok,
+      plan.ok ? `Roll preview: ${deltaTicks > 0 ? '+' : ''}${deltaTicks} ticks` : plan.refusal.message,
+    ))
+  }
+
+  const toggleDynamicTrim = () => {
+    if (dynamicTrim.active) {
+      setDynamicTrim(EMPTY_DYNAMIC_TRIM)
+      setDynamicTrimPlan(null)
+      onShuttleKey('K')
+      return
+    }
+    if (selectedEditPoints.length !== 1) return
+    const point = selectedEditPoints[0]
+    const key = `${point.trackId}:${point.leftItemId ?? ''}:${point.rightItemId ?? ''}:${point.compositionTicks}`
+    onShuttleKey('K')
+    onSeek(point.compositionTicks)
+    setDynamicTrim(beginDynamicTrim(key, point.compositionTicks))
+    setDynamicTrimPlan(null)
+  }
+
+  const commitDynamicTrim = () => {
+    if (!dynamicTrim.active || !dynamicTrimPlan?.ok) return
+    onPrecisionCommit(dynamicTrimPlan)
+    setDynamicTrim(EMPTY_DYNAMIC_TRIM)
+    setDynamicTrimPlan(null)
+    onShuttleKey('K')
+  }
+
+  // Dynamic Trim deliberately owns no second transport. J/K/L moves Studio's
+  // one composition playhead; while a detached trim session is active, that
+  // movement is translated into the exact same Roll planner used by pointer
+  // drags. Enter accepts one plan. Escape accepts nothing.
+  useEffect(() => {
+    if (!dynamicTrim.active || dynamicTrim.originalCompositionTicks === null) return
+    const deltaTicks = playheadTicks - dynamicTrim.originalCompositionTicks
+    if (deltaTicks === 0 || deltaTicks === dynamicTrim.previewDeltaTicks) return
+    const request = dynamicPointRequest(deltaTicks)
+    if (!request) return
+    const plan = previewPrecisionRequest(request)
+    setDynamicTrimPlan(plan)
+    setDynamicTrim((current) => current.active
+      ? updateDynamicTrim(
+          current,
+          deltaTicks,
+          plan.ok,
+          plan.ok ? `Roll preview: ${deltaTicks > 0 ? '+' : ''}${deltaTicks} ticks` : plan.refusal.message,
+        )
+      : current)
+    // The planner callbacks describe the mounted editor authority. Only the
+    // explicit playhead/session values should advance this detached preview.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dynamicTrim.active, dynamicTrim.originalCompositionTicks, dynamicTrim.previewDeltaTicks, playheadTicks])
+
+  const selectEditPoint = (
+    editPoint: TimelineEditPointRefV1,
+    modifiers: Readonly<{ ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }>,
+  ) => {
+    const same = (candidate: TimelineEditPointRefV1) =>
+      candidate.trackId === editPoint.trackId
+      && candidate.leftItemId === editPoint.leftItemId
+      && candidate.rightItemId === editPoint.rightItemId
+      && candidate.compositionTicks === editPoint.compositionTicks
+    if (modifiers.ctrlKey || modifiers.metaKey) {
+      setSelectedEditPoints((current) => current.some(same)
+        ? Object.freeze(current.filter((candidate) => !same(candidate)))
+        : Object.freeze([...current, editPoint]))
+      return
+    }
+    setSelectedEditPoints(Object.freeze([editPoint]))
+  }
+
   const selectItem = (
     itemId: string,
     modifiers?: Readonly<{ ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }>,
@@ -811,6 +987,107 @@ export function Timeline({
     }
   }
 
+  const commitPrecisionRequest = (request: PrecisionTrimRequestV1): boolean => {
+    if (busy) return false
+    const plan = onPrecisionPreview(request)
+    if (!plan.ok) return false
+    onPrecisionCommit(plan)
+    return true
+  }
+
+  const trimSelectionToPlayhead = (mode: 'standard-trim' | 'ripple-trim', edge: 'start' | 'end'): boolean => {
+    if (!selectedItem || selectedItem.kind !== 'clip' || selectedItem.clipId === null) return false
+    const start = selectedItem.startTicks
+    const end = start + selectedItem.durationTicks
+    if (playheadTicks <= start || playheadTicks >= end) return false
+    const deltaTicks = edge === 'start' ? playheadTicks - start : playheadTicks - end
+    return commitPrecisionRequest(Object.freeze({ mode, clipId: selectedItem.clipId, edge, deltaTicks }))
+  }
+
+  const extendNearestEditToPlayhead = (): boolean => {
+    const video = model.lanes.find((lane) => lane.kind === 'video')
+    if (!video) return false
+    const clips = [...video.items]
+      .filter((item) => item.kind === 'clip' && item.clipId !== null && item.state === 'committed')
+      .sort((a, b) => a.startTicks - b.startTicks || a.id.localeCompare(b.id))
+    const cuts = clips.flatMap((left, index) => {
+      const right = clips[index + 1]
+      if (!right || left.startTicks + left.durationTicks !== right.startTicks) return []
+      return [Object.freeze({ left, right, ticks: right.startTicks })]
+    })
+    const nearest = cuts
+      .map((cut) => Object.freeze({ ...cut, distance: Math.abs(cut.ticks - playheadTicks) }))
+      .sort((a, b) => a.distance - b.distance || a.ticks - b.ticks)[0]
+    if (!nearest || nearest.ticks === playheadTicks) return false
+    const editPoint = Object.freeze({
+      trackId: video.id,
+      leftItemId: nearest.left.id,
+      rightItemId: nearest.right.id,
+      compositionTicks: nearest.ticks,
+    }) satisfies TimelineEditPointRefV1
+    setSelectedEditPoints(Object.freeze([editPoint]))
+    return commitPrecisionRequest(Object.freeze({
+      mode: 'roll',
+      leftClipId: nearest.left.clipId as string,
+      rightClipId: nearest.right.clipId as string,
+      deltaTicks: playheadTicks - nearest.ticks,
+    }))
+  }
+
+  const runPrecisionCommand = (command: TimelinePrecisionCommand) => {
+    switch (command) {
+      case 'trim-start-playhead':
+        trimSelectionToPlayhead('standard-trim', 'start')
+        return
+      case 'trim-end-playhead':
+        trimSelectionToPlayhead('standard-trim', 'end')
+        return
+      case 'ripple-trim-start-playhead':
+        trimSelectionToPlayhead('ripple-trim', 'start')
+        return
+      case 'ripple-trim-end-playhead':
+        trimSelectionToPlayhead('ripple-trim', 'end')
+        return
+      case 'extend-edit':
+        extendNearestEditToPlayhead()
+    }
+  }
+
+  const applyNumericPrecision = (intent: NumericPrecisionIntentV1): string | null => {
+    let request: PrecisionTrimRequestV1 | null = null
+    if (precisionTool === 'roll') {
+      if (selectedEditPoints.length !== 1) return 'Select one Roll edit point first.'
+      const point = selectedEditPoints[0]
+      const leftClipId = clipIdForItemId(point.leftItemId)
+      const rightClipId = clipIdForItemId(point.rightItemId)
+      if (!leftClipId || !rightClipId) return 'That edit point is no longer available.'
+      request = Object.freeze({ mode: 'roll', leftClipId, rightClipId, deltaTicks: intent.resolvedTicks })
+    } else if (precisionTool === 'slip' || precisionTool === 'slide') {
+      if (!selectedItem?.clipId) return 'Select one main-video piece first.'
+      const deltaTicks = intent.field === 'composition-start'
+        ? intent.resolvedTicks - selectedItem.startTicks
+        : intent.resolvedTicks
+      request = Object.freeze({ mode: precisionTool, clipId: selectedItem.clipId, deltaTicks })
+    } else if (precisionTool === 'standard-trim' || precisionTool === 'ripple-trim') {
+      if (!selectedItem?.clipId) return 'Select one main-video piece first.'
+      const currentEnd = selectedItem.startTicks + selectedItem.durationTicks
+      const edge = intent.field === 'composition-start' ? 'start' as const : 'end' as const
+      const deltaTicks = intent.field === 'composition-start'
+        ? intent.resolvedTicks - selectedItem.startTicks
+        : intent.field === 'composition-end'
+          ? intent.resolvedTicks - currentEnd
+          : intent.resolvedTicks
+      request = Object.freeze({ mode: precisionTool, clipId: selectedItem.clipId, edge, deltaTicks })
+    } else {
+      return 'Rate Stretch keeps its own exact speed controls in the existing Speed panel.'
+    }
+    if (request.deltaTicks === 0) return 'That value would not change the edit.'
+    const plan = previewPrecisionRequest(request)
+    if (!plan.ok) return plan.refusal.message
+    onPrecisionCommit(plan)
+    return null
+  }
+
   /**
    * The keyboard.
    *
@@ -828,9 +1105,19 @@ export function Timeline({
       event.preventDefault()
       // In order: cancel what is happening, then close what is open, then let
       // go of what is chosen. Escape never creates anything and never undoes.
-      if (marquee) endMarquee(false)
+      if (dynamicTrim.active) {
+        setDynamicTrim(EMPTY_DYNAMIC_TRIM)
+        setDynamicTrimPlan(null)
+        onShuttleKey('K')
+      } else if (marquee) endMarquee(false)
       else if (contextMenu) setContextMenu(null)
       else onSelectionChange(EMPTY_SELECTION)
+      return
+    }
+
+    if (dynamicTrim.active && event.key === 'Enter') {
+      event.preventDefault()
+      commitDynamicTrim()
       return
     }
 
@@ -850,13 +1137,13 @@ export function Timeline({
       event.preventDefault()
       if (busy || selection.itemIds.length === 0) return
       if (selection.itemIds.length > 1) {
-        onMultiGesture({ type: 'move', deltaTicks: direction * FRAME_TICKS })
+        onMultiGesture({ type: 'move', deltaTicks: direction * frameTicks })
         return
       }
       if (selectedItem) {
         onItemAction(selectedItem.id, {
           type: 'move',
-          toStartTicks: Math.max(0, selectedItem.startTicks + direction * FRAME_TICKS),
+          toStartTicks: Math.max(0, selectedItem.startTicks + direction * frameTicks),
         })
       }
       return
@@ -890,11 +1177,65 @@ export function Timeline({
       case 'go-to-end':
         onSeek(model.durationTicks)
         return
+      case 'tool-standard-trim':
+      case 'tool-ripple-trim':
+      case 'tool-roll':
+      case 'tool-slip':
+      case 'tool-slide':
+      case 'tool-rate-stretch': {
+        const next: TimelinePrecisionToolV1 = command === 'tool-standard-trim'
+          ? 'standard-trim'
+          : command === 'tool-ripple-trim'
+            ? 'ripple-trim'
+            : command === 'tool-roll'
+              ? 'roll'
+              : command === 'tool-slip'
+                ? 'slip'
+                : command === 'tool-slide'
+                  ? 'slide'
+                  : 'rate-stretch'
+        setPrecisionTool(next)
+        setRateStretchActive(next === 'rate-stretch')
+        setTool('trim')
+        return
+      }
+      case 'trim-start-playhead':
+        trimSelectionToPlayhead('standard-trim', 'start')
+        return
+      case 'trim-end-playhead':
+        trimSelectionToPlayhead('standard-trim', 'end')
+        return
+      case 'ripple-trim-start-playhead':
+        trimSelectionToPlayhead('ripple-trim', 'start')
+        return
+      case 'ripple-trim-end-playhead':
+        trimSelectionToPlayhead('ripple-trim', 'end')
+        return
+      case 'extend-edit':
+        extendNearestEditToPlayhead()
+        return
+      case 'shuttle-reverse':
+        onShuttleKey('J')
+        return
+      case 'shuttle-stop':
+        onShuttleKey('K')
+        return
+      case 'shuttle-forward':
+        onShuttleKey('L')
+        return
+      case 'dynamic-trim':
+        toggleDynamicTrim()
+        return
+      case 'toggle-audio-scrubbing':
+        onAudioScrubbingChange(!audioScrubbingEnabled)
+        return
       case 'nudge-left':
-        onSeek(Math.max(0, playheadTicks - FRAME_TICKS))
+        if (dynamicTrim.active) previewDynamicDelta(dynamicTrim.previewDeltaTicks - frameTicks)
+        else onSeek(Math.max(0, playheadTicks - frameTicks))
         return
       case 'nudge-right':
-        onSeek(Math.min(model.durationTicks, playheadTicks + FRAME_TICKS))
+        if (dynamicTrim.active) previewDynamicDelta(dynamicTrim.previewDeltaTicks + frameTicks)
+        else onSeek(Math.min(model.durationTicks, playheadTicks + frameTicks))
         return
       case 'next-marker': {
         // Navigation only: it moves the playhead and changes nothing.
@@ -966,10 +1307,17 @@ export function Timeline({
         disabledReasons={disabledReasons}
         shortcuts={shortcuts}
         tool={tool}
+        precisionTool={precisionTool}
         snappingEnabled={snappingEnabled}
         placementMode={placementMode}
         busy={busy}
         onTool={setTool}
+        onPrecisionTool={(next) => {
+          setPrecisionTool(next)
+          setRateStretchActive(next === 'rate-stretch')
+          setTool('trim')
+        }}
+        onPrecisionCommand={runPrecisionCommand}
         onAction={runToolbarAction}
         onToggleSnapping={onToggleSnapping}
         onPlacementMode={onPlacementMode}
@@ -984,6 +1332,53 @@ export function Timeline({
         onResetVerticalZoom={() => changeVerticalZoom(DEFAULT_VERTICAL_ZOOM_BASIS_POINTS)}
       />
 
+      <div className="timeline-v1__precision-status" role="group" aria-label="Precision trim playback">
+        <button
+          type="button"
+          className="timeline-v1__precision-status-button"
+          aria-pressed={dynamicTrim.active}
+          disabled={!dynamicTrim.active && selectedEditPoints.length !== 1}
+          title={dynamicTrim.active ? 'Leave Dynamic Trim without changing the project.' : 'Select one Roll edit point, then enter Dynamic Trim.'}
+          onClick={toggleDynamicTrim}
+        >
+          Dynamic Trim
+        </button>
+        <button
+          type="button"
+          className="timeline-v1__precision-status-button"
+          aria-pressed={audioScrubbingEnabled}
+          onClick={() => onAudioScrubbingChange(!audioScrubbingEnabled)}
+        >
+          Audio Scrubbing
+        </button>
+        <TimelinePrecisionPopover
+          item={selectedItem}
+          editPoint={selectedEditPoints.length === 1 ? selectedEditPoints[0] : null}
+          precisionTool={precisionTool}
+          timescale={model.timescale}
+          durationTicks={model.durationTicks}
+          frameRate={frameRate}
+          busy={busy}
+          onApply={applyNumericPrecision}
+        />
+        <output className="timeline-v1__precision-status-output" aria-live="polite">
+          {dynamicTrim.active
+            ? `Dynamic Trim ${dynamicTrim.state}${dynamicTrim.message ? ` — ${dynamicTrim.message}` : ''}. Enter commits; Escape cancels.`
+            : shuttleState.direction === 0
+              ? 'Shuttle stopped'
+              : `Shuttle ${shuttleState.direction < 0 ? 'backwards' : 'forwards'} ${shuttleState.rate}x`}
+        </output>
+      </div>
+
+      {precisionDraft?.ok ? (
+        <TimelineTrimView
+          frames={trimViewFrames}
+          timescale={model.timescale}
+          mode={precisionDraft.feedback.mode}
+          deltaTicks={precisionDraft.feedback.appliedDeltaTicks}
+        />
+      ) : null}
+
       <TimelineSpeedPanel
         open={speedPanelOpen}
         clipLabel={speedSubject?.clipLabel ?? null}
@@ -996,7 +1391,15 @@ export function Timeline({
         timescale={model.timescale}
         busy={busy}
         rateStretchActive={rateStretchActive}
-        onRateStretchActive={setRateStretchActive}
+        onRateStretchActive={(active) => {
+          setRateStretchActive(active)
+          if (active) {
+            setPrecisionTool('rate-stretch')
+            setTool('trim')
+          } else if (precisionTool === 'rate-stretch') {
+            setPrecisionTool('standard-trim')
+          }
+        }}
         previewFor={onSpeedPreview}
         onChoose={(rate, keepPitch, direction) => {
           onSpeedChoose(rate, keepPitch, direction)
@@ -1185,6 +1588,13 @@ export function Timeline({
                   overscanTicks={overscanTicks}
                   busy={busy}
                   rateStretchActive={rateStretchActive && soleSelectedId !== null && lane.kind === 'video'}
+                  frameTicks={frameTicks}
+                  precisionTool={precisionTool}
+                  selectedEditPoints={selectedEditPoints}
+                  onEditPointSelect={selectEditPoint}
+                  onPrecisionPreview={previewPrecisionRequest}
+                  onPrecisionDraft={setPrecisionDraft}
+                  onPrecisionCommit={onPrecisionCommit}
                   onRateStretchPreview={onRateStretchPreview}
                   onRateStretchCommit={onRateStretchCommit}
                   pointerTicks={pointerTicks}

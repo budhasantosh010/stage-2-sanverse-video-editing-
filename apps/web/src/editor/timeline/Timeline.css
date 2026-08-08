@@ -742,6 +742,98 @@
   pointer-events: none;
 }
 
+.timeline-v1__precision-handle {
+  position: absolute;
+  z-index: 10;
+  border: 1px solid var(--color-ink);
+  padding: 0;
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.timeline-v1__precision-handle--edge {
+  top: -2px;
+  bottom: -2px;
+  width: 10px;
+  cursor: ew-resize;
+}
+
+.timeline-v1__precision-handle--start { left: -5px; }
+.timeline-v1__precision-handle--end { right: -5px; }
+
+.timeline-v1__precision-handle--body {
+  z-index: 4;
+  inset: 6px 18px;
+  min-width: 28px;
+  border-style: dashed;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 44%);
+  cursor: ew-resize;
+}
+
+.timeline-v1__precision-handle--body > span {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.timeline-v1__precision-handle:focus-visible,
+.timeline-v1__edit-point:focus-visible,
+.timeline-v1__precision-status-button:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+.timeline-v1__precision-tooltip--refused,
+.timeline-v1__edit-point-feedback--refused {
+  background: #5a1511;
+  color: #fff;
+}
+
+.timeline-v1__edit-point {
+  position: absolute;
+  z-index: 11;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  margin-left: -6px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: col-resize;
+}
+
+.timeline-v1__edit-point > span {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 5px;
+  width: 2px;
+  background: var(--color-ink);
+}
+
+.timeline-v1__edit-point[aria-pressed='true'] > span {
+  width: 4px;
+  left: 4px;
+  box-shadow: 0 0 0 2px var(--color-surface);
+}
+
+.timeline-v1__edit-point-feedback {
+  position: absolute;
+  z-index: 12;
+  top: 2px;
+  margin-left: 8px;
+  border-radius: 4px;
+  padding: 3px 5px;
+  background: var(--color-ink);
+  color: var(--color-surface);
+  font-size: 0.55rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
 .timeline-v1__playhead {
   position: absolute;
   z-index: 7;
@@ -1080,9 +1172,15 @@
 
 /* The overflow menu. It is a menu, not a second toolbar: the words come back
    here, because there is room for them. */
-.timeline-v1__more {
+.timeline-v1__more,
+.timeline-v1__trim-tools {
   position: relative;
   display: inline-flex;
+}
+
+.timeline-v1__trim-menu {
+  right: auto;
+  left: 0;
 }
 
 .timeline-v1__more-menu {
@@ -1131,6 +1229,195 @@
   flex: 0 0 auto;
   opacity: 0.7;
   font-size: 0.85em;
+}
+
+.timeline-v1__precision-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.timeline-v1__precision-status-button {
+  min-height: 28px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  padding: 4px 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.timeline-v1__precision-status-button[aria-pressed='true'] {
+  background: var(--color-ink);
+  color: var(--color-surface);
+}
+
+.timeline-v1__precision-status-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.timeline-v1__precision-status-output {
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-v1__trim-view {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--color-surface);
+}
+
+.timeline-v1__trim-view-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  text-transform: capitalize;
+}
+
+.timeline-v1__trim-view-heading strong {
+  color: var(--color-text);
+}
+
+.timeline-v1__trim-view-frames {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
+}
+
+.timeline-v1__trim-view-frame {
+  min-width: 0;
+  margin: 0;
+}
+
+.timeline-v1__trim-view-picture {
+  position: relative;
+  display: grid;
+  min-height: 90px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: #000;
+  color: #fff;
+  font-size: 0.65rem;
+}
+
+.timeline-v1__trim-view-picture canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.timeline-v1__trim-view-picture > span {
+  position: absolute;
+  inset: auto 6px 6px;
+  text-align: center;
+  opacity: 0.85;
+}
+
+.timeline-v1__trim-view-frame figcaption {
+  display: grid;
+  gap: 1px;
+  padding-top: 4px;
+  color: var(--color-text-muted);
+  font-size: 0.64rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-v1__trim-view-frame figcaption strong {
+  color: var(--color-text);
+}
+
+.timeline-v1__precision-popover {
+  position: relative;
+}
+
+.timeline-v1__precision-popover-card {
+  position: absolute;
+  z-index: 40;
+  left: 0;
+  top: calc(100% + 5px);
+  width: min(330px, calc(100vw - 32px));
+  max-height: min(520px, 70vh);
+  overflow: auto;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--color-surface);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 24%);
+}
+
+.timeline-v1__precision-readout {
+  display: grid;
+  gap: 3px;
+  margin: 0 0 10px;
+  font-size: 0.68rem;
+}
+
+.timeline-v1__precision-readout > div {
+  display: grid;
+  grid-template-columns: minmax(105px, 1fr) auto;
+  gap: 8px;
+}
+
+.timeline-v1__precision-readout dt { color: var(--color-text-muted); }
+.timeline-v1__precision-readout dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+.timeline-v1__precision-popover-card label {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.timeline-v1__precision-popover-card input,
+.timeline-v1__precision-popover-card select {
+  min-height: 32px;
+  width: 100%;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 5px;
+  padding: 4px 7px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-v1__precision-hint,
+.timeline-v1__precision-error {
+  margin: 7px 0 0;
+  font-size: 0.65rem;
+}
+
+.timeline-v1__precision-error { color: #8f1d16; font-weight: 700; }
+
+.timeline-v1__precision-popover-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.timeline-v1__precision-popover-actions button {
+  min-height: 30px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 5px;
+  padding: 4px 9px;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 /* The box drawn round several things at once.

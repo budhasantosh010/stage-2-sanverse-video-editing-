@@ -1,9 +1,13 @@
 import {
   itemIntersectsVisibleRange,
+  type PrecisionTrimPlan,
+  type PrecisionTrimRequestV1,
+  type TimelineEditPointRefV1,
   type TimelineGesture,
   type TimelineItemAction,
   type TimelineItemView,
   type TimelineLaneView,
+  type TimelinePrecisionToolV1,
   type TimelineViewportState,
   type VisibleTickRange,
 } from '../../features/timeline'
@@ -22,6 +26,7 @@ import {
   type ClipDerivedMedia,
 } from '../../features/media-analysis'
 import { TimelineItem } from './TimelineItem'
+import { TimelineEditPointHandle } from './TimelineEditPointHandle'
 import { decorationHeightPx, laneDensity, laneHeightPx } from './timeline-lane-metrics'
 import type { TimelineSnapResult } from './timeline-snap'
 import type { RateStretchPreview } from './TimelineRateStretchHandle'
@@ -51,6 +56,14 @@ export type TimelineLaneProps = Readonly<{
   overscanTicks: number
   busy: boolean
   rateStretchActive: boolean
+  /** Exact project ticks in one frame at the Timeline's current frame clock. */
+  frameTicks: number
+  precisionTool: TimelinePrecisionToolV1
+  selectedEditPoints: readonly TimelineEditPointRefV1[]
+  onEditPointSelect(editPoint: TimelineEditPointRefV1, modifiers: Readonly<{ ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }>): void
+  onPrecisionPreview(request: PrecisionTrimRequestV1): PrecisionTrimPlan
+  onPrecisionDraft(plan: PrecisionTrimPlan | null): void
+  onPrecisionCommit(plan: Extract<PrecisionTrimPlan, { ok: true }>): void
   onRateStretchPreview(targetDurationTicks: number): RateStretchPreview
   onRateStretchCommit(targetDurationTicks: number): void
   pointerTicks(clientX: number): number
@@ -81,6 +94,13 @@ export function TimelineLane({
   overscanTicks,
   busy,
   rateStretchActive,
+  frameTicks,
+  precisionTool,
+  selectedEditPoints,
+  onEditPointSelect,
+  onPrecisionPreview,
+  onPrecisionDraft = () => undefined,
+  onPrecisionCommit,
   onRateStretchPreview,
   onRateStretchCommit,
   pointerTicks,
@@ -104,6 +124,27 @@ export function TimelineLane({
       visibleEndTicks: end,
     }),
   )
+  const rollEditPoints = lane.kind === 'video' && precisionTool === 'roll'
+    ? [...lane.items]
+        .filter((item) => item.kind === 'clip' && item.clipId !== null && item.state === 'committed')
+        .sort((a, b) => a.startTicks - b.startTicks || a.id.localeCompare(b.id))
+        .flatMap((left, index, running) => {
+          const right = running[index + 1]
+          if (!right || left.startTicks + left.durationTicks !== right.startTicks) return []
+          const compositionTicks = right.startTicks
+          if (compositionTicks < start || compositionTicks > end) return []
+          return [Object.freeze({
+            editPoint: Object.freeze({
+              trackId: lane.id,
+              leftItemId: left.id,
+              rightItemId: right.id,
+              compositionTicks,
+            }) satisfies TimelineEditPointRefV1,
+            leftClipId: left.clipId as string,
+            rightClipId: right.clipId as string,
+          })]
+        })
+    : []
 
   /**
    * Whether a drop here would be accepted, asked BEFORE the user lets go.
@@ -206,6 +247,11 @@ export function TimelineLane({
           pixelsPerSecond={viewport.pixelsPerSecond}
           busy={busy}
           rateStretchActive={rateStretchActive}
+          frameTicks={frameTicks}
+          precisionTool={precisionTool}
+          onPrecisionPreview={onPrecisionPreview}
+          onPrecisionDraft={onPrecisionDraft}
+          onPrecisionCommit={onPrecisionCommit}
           onRateStretchPreview={onRateStretchPreview}
           onRateStretchCommit={onRateStretchCommit}
           normalization={normalizationFor(item)}
@@ -218,6 +264,29 @@ export function TimelineLane({
           onItemAction={onItemAction}
           onOpenProposal={onOpenProposal}
           onContextMenu={onContextMenu}
+        />
+      ))}
+      {rollEditPoints.map(({ editPoint, leftClipId, rightClipId }) => (
+        <TimelineEditPointHandle
+          key={`${leftClipId}:${rightClipId}`}
+          editPoint={editPoint}
+          leftClipId={leftClipId}
+          rightClipId={rightClipId}
+          timescale={timescale}
+          pixelsPerSecond={viewport.pixelsPerSecond}
+          selected={selectedEditPoints.some((selected) =>
+            selected.trackId === editPoint.trackId
+            && selected.leftItemId === editPoint.leftItemId
+            && selected.rightItemId === editPoint.rightItemId
+            && selected.compositionTicks === editPoint.compositionTicks)}
+          disabled={busy}
+          frameTicks={frameTicks}
+          pointerTime={pointerTime}
+          previewFor={onPrecisionPreview}
+          onDraft={onPrecisionDraft}
+          onSelect={onEditPointSelect}
+          onSnapGuide={onSnapGuide}
+          onCommit={onPrecisionCommit}
         />
       ))}
       {lane.items.length === 0 ? (

@@ -163,6 +163,31 @@ export const filmstripFrameKey = (input: Readonly<{
     resolution: snapWidthPx(input.widthPx),
   })
 
+/**
+ * One exact source frame for precision trim feedback.
+ *
+ * Filmstrips deliberately snap time to a quarter-second grid so zooming and
+ * scrolling reuse bounded work. A trim viewer has the opposite requirement:
+ * it must show the exact source boundary the planner is proposing. It still
+ * reuses the same hardened frame endpoint, cache, controller and bounded
+ * concurrency; only the source tick is not coarsened.
+ */
+export const precisionFrameKey = (input: Readonly<{
+  assetId: string
+  assetVersion: string
+  sourceTicks: number
+  widthPx: number
+}>): MediaAnalysisKeyV1 =>
+  Object.freeze({
+    schemaVersion: MEDIA_ANALYSIS_SCHEMA_VERSION,
+    kind: 'filmstrip-frame' as const,
+    assetId: input.assetId,
+    assetVersion: input.assetVersion,
+    sourceTicks: Math.max(0, Math.round(input.sourceTicks)),
+    spanTicks: 0,
+    resolution: snapWidthPx(input.widthPx),
+  })
+
 export const waveformBlockKey = (input: Readonly<{
   assetId: string
   assetVersion: string

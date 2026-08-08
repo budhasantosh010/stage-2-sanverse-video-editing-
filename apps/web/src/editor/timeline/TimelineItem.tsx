@@ -2,10 +2,13 @@ import { useCallback, useRef, useState, type MouseEvent, type PointerEvent } fro
 
 import {
   ticksToPixels,
+  type PrecisionTrimPlan,
+  type PrecisionTrimRequestV1,
   type TimelineGesture,
   type TimelineItemAction,
   type TimelineItemView,
   type TimelineLaneKind,
+  type TimelinePrecisionToolV1,
 } from '../../features/timeline'
 import type { AudioNormalizationRequestV1, ClipDerivedMedia } from '../../features/media-analysis'
 import { formatTimelineTime } from './timeline-ruler-model'
@@ -14,6 +17,7 @@ import { TimelineTrimHandle } from './TimelineTrimHandle'
 import { TimelineFilmstrip } from './TimelineFilmstrip'
 import { TimelineWaveform } from './TimelineWaveform'
 import { TimelineRateStretchHandle, type RateStretchPreview } from './TimelineRateStretchHandle'
+import { TimelinePrecisionHandle } from './TimelinePrecisionHandle'
 import { TimelineAudioDirectControls, type TimelineAudioState } from './TimelineAudioDirectControls'
 
 export type TimelineItemProps = Readonly<{
@@ -29,6 +33,11 @@ export type TimelineItemProps = Readonly<{
   pixelsPerSecond: number
   busy: boolean
   rateStretchActive: boolean
+  frameTicks: number
+  precisionTool: TimelinePrecisionToolV1
+  onPrecisionPreview(request: PrecisionTrimRequestV1): PrecisionTrimPlan
+  onPrecisionDraft(plan: PrecisionTrimPlan | null): void
+  onPrecisionCommit(plan: Extract<PrecisionTrimPlan, { ok: true }>): void
   onRateStretchPreview(targetDurationTicks: number): RateStretchPreview
   onRateStretchCommit(targetDurationTicks: number): void
   normalization: Readonly<{ projectId: string; request: AudioNormalizationRequestV1 }> | null
@@ -120,6 +129,11 @@ export function TimelineItem({
   pixelsPerSecond,
   busy,
   rateStretchActive,
+  frameTicks,
+  precisionTool,
+  onPrecisionPreview,
+  onPrecisionDraft = () => undefined,
+  onPrecisionCommit,
   onRateStretchPreview,
   onRateStretchCommit,
   normalization,
@@ -134,6 +148,11 @@ export function TimelineItem({
   onContextMenu,
 }: TimelineItemProps) {
   const [trimPreview, setTrimPreview] = useState<Readonly<{ edge: 'start' | 'end'; deltaTicks: number }> | null>(null)
+  const [precisionDraft, setPrecisionDraft] = useState<PrecisionTrimPlan | null>(null)
+  const setPrecisionDraftPlan = (plan: PrecisionTrimPlan | null) => {
+    setPrecisionDraft(plan)
+    onPrecisionDraft(plan)
+  }
   const [rateStretchDraft, setRateStretchDraft] = useState<Readonly<{
     targetDurationTicks: number
     preview: RateStretchPreview
@@ -163,21 +182,31 @@ export function TimelineItem({
   const [dragOffsetTicks, setDragOffsetTicks] = useState<number | null>(null)
   const canonicalLeftPx = ticksToPixels(item.startTicks, timescale, pixelsPerSecond)
   const canonicalWidthPx = ticksToPixels(item.durationTicks, timescale, pixelsPerSecond)
-  const previewStartTicks = trimPreview?.edge === 'start'
-    ? item.startTicks + trimPreview.deltaTicks
-    : item.startTicks
+  const successfulPrecision = precisionDraft?.ok ? precisionDraft : null
+  const previewStartTicks = successfulPrecision
+    ? successfulPrecision.feedback.selectedStartTicks
+    : trimPreview?.edge === 'start'
+      ? item.startTicks + trimPreview.deltaTicks
+      : item.startTicks
   const previewDurationTicks = rateStretchDraft
     ? rateStretchDraft.targetDurationTicks
-    : trimPreview
-      ? item.durationTicks - trimPreview.deltaTicks
-      : item.durationTicks
-  const leftPx = trimPreview?.edge === 'start'
+    : successfulPrecision
+      ? successfulPrecision.feedback.selectedDurationTicks
+      : trimPreview
+        ? item.durationTicks - trimPreview.deltaTicks
+        : item.durationTicks
+  const leftPx = successfulPrecision || trimPreview?.edge === 'start'
     ? ticksToPixels(previewStartTicks, timescale, pixelsPerSecond)
     : canonicalLeftPx
   const widthPx = ticksToPixels(previewDurationTicks, timescale, pixelsPerSecond)
   const isOverlayFamily = DRAGGABLE_KINDS.includes(item.kind)
-  const canTrim = !rateStretchActive && item.state === 'committed' && item.selected
-    && ((item.kind === 'clip' && item.clipId !== null) || isOverlayFamily)
+  const isPrimaryPrecisionTarget = item.state === 'committed' && item.selected && laneKind === 'video'
+    && item.kind === 'clip' && item.clipId !== null
+  const canPrecisionEdge = isPrimaryPrecisionTarget
+    && (precisionTool === 'standard-trim' || precisionTool === 'ripple-trim')
+  const canPrecisionBody = isPrimaryPrecisionTarget
+    && (precisionTool === 'slip' || precisionTool === 'slide')
+  const canTrim = !rateStretchActive && item.state === 'committed' && item.selected && isOverlayFamily
   const canRateStretch = rateStretchActive
     && item.state === 'committed'
     && item.selected
@@ -398,6 +427,75 @@ export function TimelineItem({
         />
       ) : null}
 
+      {canPrecisionEdge ? (
+        <>
+          <TimelinePrecisionHandle
+            kind="edge"
+            edge="start"
+            label={`${precisionTool === 'ripple-trim' ? 'Ripple trim' : 'Trim'} start`}
+            disabled={busy}
+            itemStartTicks={item.startTicks}
+            itemDurationTicks={item.durationTicks}
+            frameTicks={frameTicks}
+            pointerTicks={pointerTicks}
+            pointerTime={pointerTime}
+            requestForDelta={(deltaTicks) => Object.freeze({
+              mode: precisionTool as 'standard-trim' | 'ripple-trim',
+              clipId: item.clipId as string,
+              edge: 'start' as const,
+              deltaTicks,
+            })}
+            previewFor={onPrecisionPreview}
+            onSnapGuide={onSnapGuide}
+            onDraft={setPrecisionDraftPlan}
+            onCommit={onPrecisionCommit}
+          />
+          <TimelinePrecisionHandle
+            kind="edge"
+            edge="end"
+            label={`${precisionTool === 'ripple-trim' ? 'Ripple trim' : 'Trim'} end`}
+            disabled={busy}
+            itemStartTicks={item.startTicks}
+            itemDurationTicks={item.durationTicks}
+            frameTicks={frameTicks}
+            pointerTicks={pointerTicks}
+            pointerTime={pointerTime}
+            requestForDelta={(deltaTicks) => Object.freeze({
+              mode: precisionTool as 'standard-trim' | 'ripple-trim',
+              clipId: item.clipId as string,
+              edge: 'end' as const,
+              deltaTicks,
+            })}
+            previewFor={onPrecisionPreview}
+            onSnapGuide={onSnapGuide}
+            onDraft={setPrecisionDraftPlan}
+            onCommit={onPrecisionCommit}
+          />
+        </>
+      ) : null}
+
+      {canPrecisionBody ? (
+        <TimelinePrecisionHandle
+          kind="body"
+          label={precisionTool === 'slip' ? 'Slip source' : 'Slide clip'}
+          disabled={busy}
+          itemStartTicks={item.startTicks}
+          itemDurationTicks={item.durationTicks}
+          frameTicks={frameTicks}
+          pointerTicks={pointerTicks}
+          pointerTime={pointerTime}
+          requestForDelta={(deltaTicks) => Object.freeze({
+            mode: precisionTool as 'slip' | 'slide',
+            clipId: item.clipId as string,
+            deltaTicks,
+          })}
+          previewFor={onPrecisionPreview}
+          onSnapGuide={onSnapGuide}
+          onDraft={setPrecisionDraftPlan}
+          onCommit={onPrecisionCommit}
+        />
+      ) : null}
+
       {canDirectAudio ? (
         <TimelineAudioDirectControls
           accepted={Object.freeze({
@@ -478,6 +576,17 @@ export function TimelineItem({
       {trimPreview ? (
         <output className="timeline-v1__trim-tooltip" aria-live="polite">
           Start {formatTimelineTime(previewStartTicks, timescale, true)} · Duration {formatTimelineTime(previewDurationTicks, timescale, true)}
+        </output>
+      ) : null}
+      {precisionDraft ? (
+        <output
+          className={`timeline-v1__trim-tooltip timeline-v1__precision-tooltip${precisionDraft.ok ? '' : ' timeline-v1__precision-tooltip--refused'}`}
+          aria-live="polite"
+          data-precision-trim-state={precisionDraft.ok ? 'valid' : 'refused'}
+        >
+          {precisionDraft.ok
+            ? `${precisionDraft.description} · Δ ${formatTimelineTime(Math.abs(precisionDraft.feedback.appliedDeltaTicks), timescale, true)}${precisionDraft.feedback.appliedDeltaTicks < 0 ? ' earlier/shorter' : ' later/longer'}`
+            : precisionDraft.refusal.message}
         </output>
       ) : null}
       {rateStretchDraft ? (

@@ -183,6 +183,16 @@ describe('T1.14 keyboard shortcuts', () => {
     }
   })
 
+  it('makes every shortcut printed in the T3 Trim flyout executable and clash-free', () => {
+    expect(commandForKey(DEFAULT_KEYMAP, 'T')).toBe('tool-standard-trim')
+    expect(commandForKey(DEFAULT_KEYMAP, 'Shift+T')).toBe('tool-ripple-trim')
+    expect(commandForKey(DEFAULT_KEYMAP, 'R')).toBe('tool-roll')
+    expect(commandForKey(DEFAULT_KEYMAP, 'Y')).toBe('tool-slip')
+    expect(commandForKey(DEFAULT_KEYMAP, 'U')).toBe('tool-slide')
+    expect(commandForKey(DEFAULT_KEYMAP, 'Shift+R')).toBe('tool-rate-stretch')
+    expect(keymapConflicts(DEFAULT_KEYMAP)).toEqual([])
+  })
+
   it('becomes "My own" the moment a key is changed', () => {
     /*
      * Otherwise the screen would still say "Close to Premiere Pro" while no

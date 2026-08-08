@@ -12,6 +12,7 @@ import {
   horizontalZoomLevelIndex,
   PLACEMENT_MODES,
   type PlacementMode,
+  type TimelinePrecisionToolV1,
   type TimelineVerticalZoomV1,
   type TimelineViewportState,
 } from '../../features/timeline'
@@ -63,8 +64,14 @@ export type TimelineToolbarAction =
   | 'freeze'
   | 'speed'
 
-/** The tool the pointer is currently holding. Only Select is a real mode today. */
+/** The tool the pointer is currently holding. */
 export type TimelineTool = 'select' | 'razor' | 'trim'
+export type TimelinePrecisionCommand =
+  | 'trim-start-playhead'
+  | 'trim-end-playhead'
+  | 'ripple-trim-start-playhead'
+  | 'ripple-trim-end-playhead'
+  | 'extend-edit'
 
 export type TimelineToolbarProps = Readonly<{
   durationTicks: number
@@ -78,10 +85,13 @@ export type TimelineToolbarProps = Readonly<{
   /** The key each action currently answers to, already written for this machine. */
   shortcuts: Readonly<Partial<Record<TimelineToolbarAction, string>>>
   tool: TimelineTool
+  precisionTool?: TimelinePrecisionToolV1
   snappingEnabled: boolean
   placementMode: PlacementMode
   busy: boolean
   onTool(tool: TimelineTool): void
+  onPrecisionTool?(tool: TimelinePrecisionToolV1): void
+  onPrecisionCommand?(command: TimelinePrecisionCommand): void
   onAction(action: TimelineToolbarAction): void
   onToggleSnapping(): void
   onPlacementMode(mode: PlacementMode): void
@@ -205,8 +215,34 @@ const TOOL_SPECS: readonly Readonly<{ tool: TimelineTool; label: string; hint: s
   Object.freeze([
     { tool: 'select', label: 'Select', hint: 'Click things to pick them. Drag empty space to draw a box round several.', icon: ICONS.select, key: 'V' },
     { tool: 'razor', label: 'Razor', hint: 'Click a clip to cut it where you click.', icon: ICONS.razor, key: 'C' },
-    { tool: 'trim', label: 'Trim', hint: 'Drag the edge of a clip to make it shorter or longer.', icon: ICONS.trim, key: 'T' },
+    { tool: 'trim', label: 'Trim', hint: 'Choose Standard, Ripple, Roll, Slip, Slide, or the existing Rate Stretch tool.', icon: ICONS.trim, key: 'T' },
   ])
+
+const PRECISION_TOOL_SPECS: readonly Readonly<{
+  tool: TimelinePrecisionToolV1
+  label: string
+  shortcut: string
+  hint: string
+}>[] = Object.freeze([
+  { tool: 'standard-trim', label: 'Standard Trim', shortcut: 'T', hint: 'Change one source edge without moving unrelated clips.' },
+  { tool: 'ripple-trim', label: 'Ripple Trim', shortcut: 'Shift+T', hint: 'Change one source edge and shift the downstream primary sequence by the exact duration change.' },
+  { tool: 'roll', label: 'Roll', shortcut: 'R', hint: 'Move a cut between adjacent clips without changing the sequence length.' },
+  { tool: 'slip', label: 'Slip', shortcut: 'Y', hint: 'Change which source frames are shown without moving the clip on the Timeline.' },
+  { tool: 'slide', label: 'Slide', shortcut: 'U', hint: 'Move a clip while its two neighbors compensate, keeping the sequence length fixed.' },
+  { tool: 'rate-stretch', label: 'Rate Stretch', shortcut: 'Shift+R', hint: 'Use the existing T2 Rate Stretch system to change duration by changing speed.' },
+])
+
+const PRECISION_COMMAND_SPECS: readonly Readonly<{
+  command: TimelinePrecisionCommand
+  label: string
+  shortcut: string
+}>[] = Object.freeze([
+  { command: 'trim-start-playhead', label: 'Trim Start to Playhead', shortcut: 'Q' },
+  { command: 'trim-end-playhead', label: 'Trim End to Playhead', shortcut: 'W' },
+  { command: 'ripple-trim-start-playhead', label: 'Ripple Trim Start to Playhead', shortcut: 'Shift+Q' },
+  { command: 'ripple-trim-end-playhead', label: 'Ripple Trim End to Playhead', shortcut: 'Shift+W' },
+  { command: 'extend-edit', label: 'Extend Nearest Edit to Playhead', shortcut: 'E' },
+])
 
 export function TimelineToolbar({
   durationTicks,
@@ -218,10 +254,13 @@ export function TimelineToolbar({
   disabledReasons,
   shortcuts,
   tool,
+  precisionTool = 'standard-trim',
   snappingEnabled,
   placementMode,
   busy,
   onTool,
+  onPrecisionTool = () => undefined,
+  onPrecisionCommand = () => undefined,
   onAction,
   onToggleSnapping,
   onPlacementMode,
@@ -236,9 +275,11 @@ export function TimelineToolbar({
   onResetVerticalZoom,
 }: TimelineToolbarProps) {
   const [moreOpen, setMoreOpen] = useState(false)
+  const [trimOpen, setTrimOpen] = useState(false)
   const [zoomOpen, setZoomOpen] = useState(false)
   const [compactZoom, setCompactZoom] = useState(() => typeof window !== 'undefined' && window.innerWidth < 600)
   const moreRef = useRef<HTMLDivElement>(null)
+  const trimRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -271,6 +312,24 @@ export function TimelineToolbar({
       document.removeEventListener('keydown', onKeyDown)
     }
   }, [moreOpen])
+
+  useEffect(() => {
+    if (!trimOpen) return
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!trimRef.current?.contains(event.target as Node)) setTrimOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setTrimOpen(false)
+      trimRef.current?.querySelector<HTMLButtonElement>('[data-timeline-tool="trim"]')?.focus()
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointer)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [trimOpen])
 
   const reasonFor = (action: TimelineToolbarAction): string | null =>
     busy ? 'Project edits are paused right now.' : disabledReasons[action]
@@ -386,7 +445,7 @@ export function TimelineToolbar({
   return (
     <div className="timeline-v1__toolbar" aria-label="Timeline controls">
       <div className="timeline-v1__toolbar-group" role="radiogroup" aria-label="Tool">
-        {TOOL_SPECS.map((spec) => (
+        {TOOL_SPECS.map((spec) => spec.tool !== 'trim' ? (
           <button
             key={spec.tool}
             type="button"
@@ -400,6 +459,69 @@ export function TimelineToolbar({
           >
             <Icon path={spec.icon} />
           </button>
+        ) : (
+          <div key="trim" className="timeline-v1__trim-tools" ref={trimRef}>
+            <button
+              type="button"
+              role="radio"
+              className="timeline-v1__icon-button"
+              aria-checked={tool === 'trim'}
+              aria-expanded={trimOpen}
+              aria-haspopup="menu"
+              data-timeline-tool="trim"
+              title={`Trim (${spec.key}) — ${PRECISION_TOOL_SPECS.find((candidate) => candidate.tool === precisionTool)?.label ?? 'Standard Trim'}`}
+              aria-label={`Trim tool. Active: ${PRECISION_TOOL_SPECS.find((candidate) => candidate.tool === precisionTool)?.label ?? 'Standard Trim'}. Choose a precision trim mode.`}
+              onClick={() => {
+                onTool('trim')
+                setTrimOpen((open) => !open)
+              }}
+            >
+              <Icon path={spec.icon} />
+            </button>
+            {trimOpen ? (
+              <div className="timeline-v1__more-menu timeline-v1__trim-menu" role="menu" aria-label="Trim tool">
+                {PRECISION_TOOL_SPECS.map((candidate) => (
+                  <button
+                    key={candidate.tool}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={precisionTool === candidate.tool}
+                    className="timeline-v1__more-item"
+                    data-precision-tool={candidate.tool}
+                    title={`${candidate.label} (${candidate.shortcut}) — ${candidate.hint}`}
+                    aria-label={`${candidate.label}. ${candidate.hint}. Shortcut ${candidate.shortcut}.`}
+                    onClick={() => {
+                      onPrecisionTool(candidate.tool)
+                      onTool('trim')
+                      setTrimOpen(false)
+                    }}
+                  >
+                    <span className="timeline-v1__more-label">{candidate.label}</span>
+                    <kbd className="timeline-v1__more-key">{candidate.shortcut}</kbd>
+                  </button>
+                ))}
+                <hr aria-hidden="true" />
+                {PRECISION_COMMAND_SPECS.map((candidate) => (
+                  <button
+                    key={candidate.command}
+                    type="button"
+                    role="menuitem"
+                    className="timeline-v1__more-item"
+                    data-precision-command={candidate.command}
+                    aria-label={`${candidate.label}. Shortcut ${candidate.shortcut}.`}
+                    title={`${candidate.label} (${candidate.shortcut})`}
+                    onClick={() => {
+                      onPrecisionCommand(candidate.command)
+                      setTrimOpen(false)
+                    }}
+                  >
+                    <span className="timeline-v1__more-label">{candidate.label}</span>
+                    <kbd className="timeline-v1__more-key">{candidate.shortcut}</kbd>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         ))}
       </div>
 

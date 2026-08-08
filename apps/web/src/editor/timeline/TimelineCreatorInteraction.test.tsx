@@ -100,7 +100,7 @@ describe('T1.1 the icon toolbar', () => {
      * sees. A symbol with no name is a guessing game.
      */
     renderTimeline()
-    for (const name of [/^Select\./, /^Razor\./, /^Trim\./]) {
+    for (const name of [/^Select\./, /^Razor\./, /^Trim tool\./]) {
       const button = screen.getByRole('radio', { name })
       expect(button).toBeInTheDocument()
       expect(button).toHaveAttribute('title')
