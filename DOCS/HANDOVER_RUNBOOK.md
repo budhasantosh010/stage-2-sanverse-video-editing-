@@ -29,8 +29,7 @@ Two closure bugs are already fixed and must not regress: Hold Frame must route t
 its panel when enabled; Rate Stretch must preserve the clip's current Reverse /
 Forward direction.
 
-**Do not start T3 without explicit owner authorization.** Do not integrate or
-modify the separately owned Motion Graphics Library workstream from this branch.
+**Do not start T4 without explicit owner authorization.** Do not integrate or modify the separately owned Motion Graphics Library or Plan-B workstreams from this branch.
 
 ### Previous handoff
 ## Fast resume

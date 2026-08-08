@@ -139,7 +139,7 @@ for an identical file.
 | Ripple / roll / slip / slide | **absent** | none | no | no | n/a | no | none | T3 |
 | Trim to playhead | **absent** | reuses trim | yes | yes | yes | no | none | T3 |
 | Dynamic trim (J/K/L) | **absent** | none | no | no | n/a | no | none | T3 |
-| Numeric trim entry | **partial** — advanced panel | reuses trim | yes | yes | yes | partial | none | T3 |
+| Numeric precision trim | **yes** — compact Timeline popover | reuses precision planners; integer ticks canonical | yes | yes | yes | yes | none | done |
 | Keyframes on properties | **partial** | `set-visual-properties` | yes | yes | yes | **no lane** | none | T4 |
 | Keyframe lanes on timeline | **absent** | existing | n/a | n/a | n/a | no | none | T4 |
 | Graph (curve) editor | **absent** | existing curves | n/a | n/a | n/a | no | none | T4 |

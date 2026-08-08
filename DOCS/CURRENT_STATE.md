@@ -9,26 +9,14 @@ gate table, per-gate checklist and invariants are in
 `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md` — **read that
 file first in any new session.**
 
-**Gates T0, T1 and T2 are DONE. T3 through T7 are NOT STARTED.** Final T2 gate:
-**2,292/2,292 tests**, all-workspace production build exit 0, real Edge workflow
-34→44 with zero browser/HTTP errors, and a real revision-44 1920×1080 H.264/AAC
-export whose renderer SHA matches the MP4 on disk. T2 closure evidence is
-`DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md`.
+**Gates T0, T1, T2 and T3 are DONE. T4 through T7 are NOT STARTED.** Final T3 gate: **2,345/2,345 tests**, all-workspace production build PASS, real Microsoft Edge precision workflow on owner media, exact-frame Trim View, one-video continuity, responsive proof, and a real 1920×1080 H.264/AAC export. T3 evidence is under `DOCS/evidence/2026-08-04-timeline-completion/T3_*.md`.
 
 T2's final verification found and fixed two real defects before closure: Hold
 Frame was enabled but not routed to its panel, and Rate Stretch silently removed
 Reverse because the Studio adapter hard-coded `forward`. Both are now held by
 regression/browser evidence.
 
-**The owner authorized Gate T3 on 2026-08-08.** T3 runs only in the dedicated
-editor worktree/branch `timeline-t3-precision-trim`, based exactly on
-`5a50e4bf84b928ac686bb903d1425b21c64ae890`. T3-PRE0 is complete before feature
-code: `DOCS/PROGRAM_OWNERSHIP.md` makes Editor/Motion/AI ownership durable, and
-`tools/program-ownership/check-editor-boundary.mjs` plus 9 synthetic tests enforce
-protected `apps/motion-lab/**`, `packages/motion-*/**`, `motion/**`,
-`DOCS/motion/**` and forbid production `apps/web` imports from unfinished Motion
-packages. The live boundary check passes. T3 precision-feature implementation is
-next; T4 remains not started.
+**Gate T3 Precision Trimming is complete in the dedicated editor branch `timeline-t3-precision-trim`, based exactly on verified T2 SHA `5a50e4bf84b928ac686bb903d1425b21c64ae890`.** T3-PRE0 ownership enforcement remains permanent: `DOCS/PROGRAM_OWNERSHIP.md` and `tools/program-ownership/check-editor-boundary.mjs` protect Motion/Plan-B boundaries. T3 adds atomic Ripple/Roll/Slip/Slide planners, explicit Trim tools, playhead commands, J/K/L shuttle, Dynamic Trim, Audio Scrubbing, edit-point selection, multi-edit-point atomicity, numeric precision and exact-frame Trim View. T4 remains not started.
 
 ### Gate T0, thing one: the preview stopped lying
 

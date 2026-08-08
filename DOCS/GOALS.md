@@ -113,3 +113,4 @@ Never publish one invented percentage-complete number. A box closes only when it
       Gate T1. An export is identified by what it will produce, not by how many
       times the project was touched.
 - [x] Speed, reverse and freeze frame — Gate T2, complete 2026-08-08
+- [x] Precision trimming — Ripple/Roll/Slip/Slide, playhead commands, J/K/L, Dynamic Trim, Audio Scrubbing, multi-edit-point, numeric precision and exact-frame Trim View — Gate T3, complete 2026-08-08

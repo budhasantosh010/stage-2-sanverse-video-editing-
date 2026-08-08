@@ -730,3 +730,15 @@ pass. The live checker passes from the T2 base with no Motion path changes and n
 forbidden imports. No root dependency or workspace file changed.
 
 Precision feature code starts only after this guardrail. T4 remains not started.
+
+## 2026-08-08 — Gate T3 Precision Trimming complete
+
+Gate T3 closed on the dedicated Editor branch `timeline-t3-precision-trim` without crossing Motion or Plan-B ownership. The accepted-edit path now has one atomic `set-primary-clip-timings` primitive feeding closed Standard/Ripple/Roll/Slip/Slide planners; no temporary invalid composition is accepted and one completed compound trim is one Undo.
+
+The Timeline exposes explicit Trim modes, focusable Roll edit points, Q/W and Ripple-to-playhead commands, deterministic Extend, J/K/L shuttle, detached Dynamic Trim, bounded Audio Scrubbing, Ctrl/Cmd multi-edit-point selection, exact numeric time/frame input and an exact-frame Trim View. Trim View reuses Gate-D's existing derived-media endpoint/controller and is capped at four active frame requests; it adds no second video, clock or media-analysis authority.
+
+Final automated gate: **2,345/2,345** — API 403, Web 1,297, edit-domain 500, intent-domain 27, render-contract 118. All-workspace production build passed. A schema-valid 60-minute / 250-primary-clip fixture proved Ripple work is bounded by affected downstream clips while Roll/Slip/Slide/Multi-Roll remain proportional to their affected items and Trim View remains capped at four exact source frames.
+
+Real Edge owner-media evidence proved Standard, Ripple, Roll, Slip, Slide, J/K/L, Dynamic Trim cancel/commit, Audio Scrubbing, numeric refusal/acceptance, additive edit-point selection/all-or-nothing refusal, active Trim View cancellation, one-video continuity, reload, and no horizontal overflow at 1440×900, 1280×800, 1024×768 and 390×844. The final product export is 23.900 s, 1920×1080 H.264 High at 30 fps with AAC-LC stereo/48 kHz, 10,899,271 bytes, SHA-256 `79FDA906C32B6454ED83B6A8FF1F513C906B7770690A82086E49F9F695E08F38`; sampled frames decoded cleanly.
+
+T4 was not started. Motion and Plan-B files were not changed.

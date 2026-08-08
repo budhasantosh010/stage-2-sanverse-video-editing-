@@ -85,6 +85,17 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 - **Resolution:** Primary video selection renders only `PrimaryFootageCanvasControls`; the generic overlay layer remains authoritative for overlay selections.
 - **Evidence:** Studio regression assertion and final Edge screenshots contain the real footage controls without the false message.
 
+## Gate T3 validation-found issue details
+
+### FAIL-055 — precision timing ceiling lost its track-bound constant
+
+- **What failed:** the in-progress T3 branch defined `MAX_PRECISION_TIMING_CHANGES = MAX_CLIPS_PER_TRACK`, but an earlier partial edit had removed the single `MAX_CLIPS_PER_TRACK` declaration (and one repair attempt briefly duplicated it). The web/domain typecheck therefore could not compile the precision operation ceiling.
+- **Why it mattered:** a 60-minute primary sequence must remain bounded by the same 512-piece track ceiling; replacing the missing symbol with an unrelated magic number would have created two limits that could drift.
+- **Resolution:** restore one exported `MAX_CLIPS_PER_TRACK = 512` authority and derive `MAX_PRECISION_TIMING_CHANGES` from it. Keep the 60-minute/250-clip stress test as evidence that precision planning remains within the current track bound.
+- **Evidence:** edit-domain/web builds pass, focused T3 long-form suite passes, final repository gate is 2,345/2,345, and all-workspace production build passes.
+
+No unresolved T3 P0/P1 blocker remains. Browser automation limitations encountered during evidence collection (controlled-input driving, temporary Edge extension tabs, and private API hot reload resetting the disposable evidence project) were verification-harness issues, not accepted-project defects; they are recorded in T3 browser evidence rather than misclassified as product failures.
+
 ## Legacy risk and failure summary
 
 | ID | Date | Area | Failure or risk | Status | Next evidence |

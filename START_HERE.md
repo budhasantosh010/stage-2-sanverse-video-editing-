@@ -16,7 +16,7 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 - Final real Edge workflow ran revision `34 → 44`: transition, reverse preparation, direct audio, normalization, Rate Stretch still `Backwards`, J-cut, Freeze, Undo, Redo and reopen; one video element; zero browser errors; zero failed HTTP responses; no horizontal overflow at 1440×900, 1024×768 or 390×844.
 - Final revision-44 export succeeded in one attempt: 24.841 s, 1920×1080 H.264 High at 30 fps with AAC-LC stereo/48 kHz, 12,548,402 bytes. Renderer SHA and file SHA match exactly.
 - Two late T2 defects are fixed and registered: Hold Frame command routing (FAIL-053) and Rate Stretch preserving Reverse (FAIL-054).
-- **Do not start T3 unless the owner explicitly authorizes it.** A separate agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from the Timeline program.
+- **Do not start T4 unless the owner explicitly authorizes it.** A separate agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from the Timeline program.
 - Open human evidence remains human-only: repeated owner workflows, representative non-editor workflows, and agreed performance budgets.
 - Real-provider connection still requires the owner's data-leaving-machine decision and keys. Accounts and SaaS operations remain conditional.
 

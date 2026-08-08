@@ -37,9 +37,7 @@ but omitted from the panel-opening dispatcher; Rate Stretch hard-coded `forward`
 and stripped Reverse. The final real browser run proves the stretched clip stays
 `1.63x Backwards` and Freeze survives Undo→Redo→reopen.
 
-**Do not start T3 without explicit owner instruction.** A separate coding agent
-owns the Motion Graphics Library workstream; do not integrate or modify its
-protected paths from this timeline program.
+**Do not start T4 without explicit owner instruction.** A separate coding agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from this timeline program. Resume T3 only for evidence archaeology, not feature implementation.
 
 ## Completed: P1-F.1A
 

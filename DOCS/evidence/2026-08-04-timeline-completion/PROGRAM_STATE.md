@@ -214,13 +214,24 @@ drift.
 - Reverse preparation is proved by the exact network request emitted by the running app plus the returned bounded MP4; headless H.264 `currentSrc` timing is too flaky to use as the primary assertion.
 - The pitch-preservation filters are covered by implementation/tests; the final closure did not add an external 440 Hz tone measurement.
 
-### T3 — PRECISION TRIM
+### T3 — PRECISION TRIM — **DONE**
 
-Commit: `[verified] feat(timeline): add precision trim slip slide roll and rate stretch`
+Final commit: `[verified] feat(timeline): complete precision trimming`
 
-- [ ] T3.1 context trim cursor - [ ] T3.2 ripple - [ ] T3.3 roll - [ ] T3.4 slip
-- [ ] T3.5 slide - [ ] T3.6 trim to playhead - [ ] T3.7 dynamic trim J/K/L
-- [ ] T3.8 multi-edit-point trim - [ ] T3.9 numeric precision
+- [x] T3.1 explicit Trim flyout and context-sensitive precision handles
+- [x] T3.2 atomic Ripple Trim planner
+- [x] T3.3 atomic Roll planner + transition/J-L/source-handle validation
+- [x] T3.4 Slip with exact source mapping and Trim View feedback
+- [x] T3.5 Slide with compensated neighbours and sequence-duration invariant
+- [x] T3.6 Trim-to-playhead / Ripple-to-playhead / deterministic Extend commands
+- [x] T3.7 J/K/L shuttle + detached Dynamic Trim
+- [x] T3.8 edit-point selection + all-or-nothing multi-edit-point Roll
+- [x] T3.9 exact numeric precision using integer ticks and rational project FPS
+- [x] T3.10 bounded Audio Scrubbing through the existing T2 audio authority
+- [x] T3.11 exact-frame Trim View through the existing Gate-D derived-media authority
+- [x] T3.12 60-minute bounds proof, real Edge workflow, responsive proof and real MP4 export
+
+Final automated gate: **2,345 / 2,345**. Production build PASS. Evidence begins at `T3_PRECISION_TRIM_CATCHUP.md` and closes in the T3 evidence files beside it. T4 was not started.
 
 ### T4 — KEYFRAME LANES AND GRAPH EDITING
 
