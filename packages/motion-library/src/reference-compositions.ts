@@ -1,0 +1,2 @@
+import type { MotionAspectRatio, MotionCompositionV1 } from '@sanverse/motion-contract'
+export const MOTION_REFERENCE_COMPOSITIONS:Readonly<Record<MotionAspectRatio,MotionCompositionV1>>=Object.freeze({'16:9':Object.freeze({width:1920,height:1080,fpsNumerator:30,fpsDenominator:1}),'9:16':Object.freeze({width:1080,height:1920,fpsNumerator:30,fpsDenominator:1}),'1:1':Object.freeze({width:1080,height:1080,fpsNumerator:30,fpsDenominator:1}),'4:5':Object.freeze({width:1080,height:1350,fpsNumerator:30,fpsDenominator:1})})

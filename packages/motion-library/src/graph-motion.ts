@@ -1,0 +1,20 @@
+import type { Animatable, MotionEasingIdV1, MotionScalarExpressionV1 } from '@sanverse/motion-graph'
+import { motionNumber } from '@sanverse/motion-graph'
+
+export const mConst = (value: number): MotionScalarExpressionV1 => ({ kind: 'constant', value })
+export const mProgress = (): MotionScalarExpressionV1 => ({ kind: 'progress' })
+export const mSequence = (start: number, end: number, input: MotionScalarExpressionV1 = mProgress()): MotionScalarExpressionV1 => ({ kind: 'sequence', input, start, end })
+export const mEase = (easing: MotionEasingIdV1, input: MotionScalarExpressionV1): MotionScalarExpressionV1 => ({ kind: 'ease', easing, input })
+export const mSpring = (input: MotionScalarExpressionV1, damping: number, frequency: number): MotionScalarExpressionV1 => ({ kind: 'spring', input, damping, frequency })
+export const mStagger = (input: MotionScalarExpressionV1, index: number, count: number, overlap: number): MotionScalarExpressionV1 => ({ kind: 'stagger', input, index, count, overlap })
+export const mSin = (input: MotionScalarExpressionV1, cycles: number): MotionScalarExpressionV1 => ({ kind: 'sin', input, cycles })
+export const mClamp01 = (input: MotionScalarExpressionV1): MotionScalarExpressionV1 => ({ kind: 'clamp01', input })
+export const mMax = (a: MotionScalarExpressionV1, b: MotionScalarExpressionV1): MotionScalarExpressionV1 => ({ kind: 'max', a, b })
+export const mMin = (a: MotionScalarExpressionV1, b: MotionScalarExpressionV1): MotionScalarExpressionV1 => ({ kind: 'min', a, b })
+export const mAdd = (...values: readonly MotionScalarExpressionV1[]): MotionScalarExpressionV1 => ({ kind: 'add', values })
+export const mMultiply = (...values: readonly MotionScalarExpressionV1[]): MotionScalarExpressionV1 => ({ kind: 'multiply', values })
+export const mSubtract = (a: MotionScalarExpressionV1, b: MotionScalarExpressionV1): MotionScalarExpressionV1 => ({ kind: 'subtract', a, b })
+export const mLerp = (from: MotionScalarExpressionV1, to: MotionScalarExpressionV1, progress: MotionScalarExpressionV1): MotionScalarExpressionV1 => ({ kind: 'lerp', from, to, progress })
+export const mReduced = (reduced: MotionScalarExpressionV1, normal: MotionScalarExpressionV1): MotionScalarExpressionV1 => ({ kind: 'if-reduced-motion', reduced, normal })
+export const mNumber = (expression: MotionScalarExpressionV1): Animatable<number> => motionNumber({ kind: 'formula', expression })
+export const mOneMinus = (value: MotionScalarExpressionV1): MotionScalarExpressionV1 => mSubtract(mConst(1), value)

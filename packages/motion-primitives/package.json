@@ -1,0 +1,21 @@
+{
+  "name": "@sanverse/motion-primitives",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./math": "./src/math.ts",
+    "./easing": "./src/easing.ts",
+    "./phases": "./src/phases.ts",
+    "./transforms": "./src/transforms.ts",
+    "./reveals": "./src/reveals.ts",
+    "./text": "./src/text.ts",
+    "./text-fit": "./src/text-fit.ts",
+    "./numbers": "./src/numbers.ts",
+    "./frame": "./src/frame.ts"
+  },
+  "scripts": { "test": "vitest run", "build": "tsc -p tsconfig.json" },
+  "dependencies": { "@sanverse/edit-domain": "0.0.0", "@sanverse/motion-contract": "0.0.0" },
+  "devDependencies": { "typescript": "~5.8.3", "vitest": "^3.2.4" }
+}

@@ -1,0 +1,35 @@
+import type { MotionStylePackV1 } from '@sanverse/motion-contract'
+
+const SYSTEM_SANS='Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+const SYSTEM_SERIF='Georgia, "Times New Roman", serif'
+const SYSTEM_MONO='"SFMono-Regular", Consolas, "Liberation Mono", monospace'
+const HAND_SANS='"Trebuchet MS", "Segoe Print", ui-sans-serif, system-ui, sans-serif'
+
+export const SANVERSE_CLEAN_STYLE:MotionStylePackV1=Object.freeze({id:'sanverse.style.clean',name:'Sanverse Clean',description:'Professional, quiet and precise for long-form explanatory video.',tokens:Object.freeze({typography:Object.freeze({displayFont:SYSTEM_SANS,bodyFont:SYSTEM_SANS,numericFont:SYSTEM_MONO,headingWeight:760,bodyWeight:520}),colors:Object.freeze({background:'#0a0a0a',surface:'rgba(18,18,18,.90)',text:'#ffffff',textSecondary:'#b7b7b7',accent:'#5fff52',success:'#5fff52',warning:'#ffd166',danger:'#ff5d6c'}),shape:Object.freeze({radiusSmall:14,radiusMedium:24,radiusLarge:38,borderWidth:2}),depth:Object.freeze({shadowStrength:.24,glowStrength:.08}),motion:Object.freeze({intensity:.48,distanceScale:.82,springiness:.38,staggerScale:.82})})})
+
+export const CREATOR_ENERGETIC_STYLE:MotionStylePackV1=Object.freeze({id:'sanverse.style.creator-energetic',name:'Creator Energetic',description:'Punchier hierarchy, faster stagger and stronger emphasis for energetic creator video.',tokens:Object.freeze({typography:Object.freeze({displayFont:SYSTEM_SANS,bodyFont:SYSTEM_SANS,numericFont:SYSTEM_MONO,headingWeight:860,bodyWeight:600}),colors:Object.freeze({background:'#070707',surface:'rgba(10,10,10,.92)',text:'#ffffff',textSecondary:'#d2d2d2',accent:'#ff4fa3',success:'#6dff74',warning:'#ffe15a',danger:'#ff4a4a'}),shape:Object.freeze({radiusSmall:16,radiusMedium:28,radiusLarge:44,borderWidth:3}),depth:Object.freeze({shadowStrength:.4,glowStrength:.24}),motion:Object.freeze({intensity:.78,distanceScale:1.18,springiness:.72,staggerScale:1.12})})})
+
+export const DARK_MINIMAL_STYLE:MotionStylePackV1=Object.freeze({id:'sanverse.style.dark-minimal',name:'Dark Minimal',description:'Low-noise near-black surfaces with restrained cool accents.',tokens:Object.freeze({typography:Object.freeze({displayFont:SYSTEM_SANS,bodyFont:SYSTEM_SANS,numericFont:SYSTEM_MONO,headingWeight:700,bodyWeight:480}),colors:Object.freeze({background:'#050607',surface:'rgba(12,14,16,.92)',text:'#f4f6f8',textSecondary:'#8f98a3',accent:'#8ba4ff',success:'#74d99f',warning:'#d8b86a',danger:'#df7483'}),shape:Object.freeze({radiusSmall:10,radiusMedium:18,radiusLarge:28,borderWidth:1}),depth:Object.freeze({shadowStrength:.16,glowStrength:.03}),motion:Object.freeze({intensity:.32,distanceScale:.58,springiness:.22,staggerScale:.64})})})
+
+export const EDITORIAL_STYLE:MotionStylePackV1=Object.freeze({id:'sanverse.style.editorial',name:'Editorial',description:'Serif-led explanatory graphics inspired by magazine hierarchy and quiet evidence.',tokens:Object.freeze({typography:Object.freeze({displayFont:SYSTEM_SERIF,bodyFont:SYSTEM_SANS,numericFont:SYSTEM_MONO,headingWeight:700,bodyWeight:500}),colors:Object.freeze({background:'#f1ede4',surface:'rgba(249,246,239,.96)',text:'#171716',textSecondary:'#69645c',accent:'#c7432e',success:'#477a57',warning:'#b27c2d',danger:'#b73f49'}),shape:Object.freeze({radiusSmall:6,radiusMedium:12,radiusLarge:18,borderWidth:1}),depth:Object.freeze({shadowStrength:.12,glowStrength:0}),motion:Object.freeze({intensity:.38,distanceScale:.68,springiness:.20,staggerScale:.72})})})
+
+export const TECH_UI_STYLE:MotionStylePackV1=Object.freeze({id:'sanverse.style.tech-ui',name:'Tech UI',description:'Dense system-interface hierarchy with cyan signal accents and crisp geometry.',tokens:Object.freeze({typography:Object.freeze({displayFont:SYSTEM_SANS,bodyFont:SYSTEM_SANS,numericFont:SYSTEM_MONO,headingWeight:740,bodyWeight:540}),colors:Object.freeze({background:'#061015',surface:'rgba(7,25,33,.94)',text:'#e9fbff',textSecondary:'#8ab3be',accent:'#36d8ff',success:'#4cffac',warning:'#ffd15c',danger:'#ff667c'}),shape:Object.freeze({radiusSmall:8,radiusMedium:14,radiusLarge:22,borderWidth:1.5}),depth:Object.freeze({shadowStrength:.28,glowStrength:.22}),motion:Object.freeze({intensity:.62,distanceScale:.92,springiness:.45,staggerScale:.92})})})
+
+export const SKETCH_STYLE:MotionStylePackV1=Object.freeze({id:'sanverse.style.sketch',name:'Sketch',description:'Loose workshop-board character using warm paper contrast and hand-note typography cues.',tokens:Object.freeze({typography:Object.freeze({displayFont:HAND_SANS,bodyFont:HAND_SANS,numericFont:SYSTEM_MONO,headingWeight:760,bodyWeight:560}),colors:Object.freeze({background:'#ece6d7',surface:'rgba(255,251,239,.94)',text:'#282621',textSecondary:'#6d675b',accent:'#2676d8',success:'#3d8b55',warning:'#c58b28',danger:'#c64d4d'}),shape:Object.freeze({radiusSmall:5,radiusMedium:9,radiusLarge:15,borderWidth:2}),depth:Object.freeze({shadowStrength:.10,glowStrength:0}),motion:Object.freeze({intensity:.58,distanceScale:.86,springiness:.58,staggerScale:1.02})})})
+
+export const GLASS_STYLE:MotionStylePackV1=Object.freeze({id:'sanverse.style.glass',name:'Glass',description:'Translucent soft-depth surfaces for modern overlays and ambient UI graphics.',tokens:Object.freeze({typography:Object.freeze({displayFont:SYSTEM_SANS,bodyFont:SYSTEM_SANS,numericFont:SYSTEM_MONO,headingWeight:760,bodyWeight:520}),colors:Object.freeze({background:'#0a1020',surface:'rgba(34,46,72,.66)',text:'#ffffff',textSecondary:'#bcc9df',accent:'#8bf0ff',success:'#83f2b1',warning:'#ffe17a',danger:'#ff7c98'}),shape:Object.freeze({radiusSmall:18,radiusMedium:30,radiusLarge:48,borderWidth:1}),depth:Object.freeze({shadowStrength:.34,glowStrength:.18}),motion:Object.freeze({intensity:.52,distanceScale:.82,springiness:.46,staggerScale:.84})})})
+
+export const RETRO_NEON_STYLE:MotionStylePackV1=Object.freeze({id:'sanverse.style.retro-neon',name:'Retro / Neon',description:'High-contrast synth-era palette with neon magenta/cyan accents and stronger motion.',tokens:Object.freeze({typography:Object.freeze({displayFont:SYSTEM_SANS,bodyFont:SYSTEM_SANS,numericFont:SYSTEM_MONO,headingWeight:900,bodyWeight:620}),colors:Object.freeze({background:'#10051a',surface:'rgba(28,7,40,.93)',text:'#fff5ff',textSecondary:'#d2b9de',accent:'#00f5ff',success:'#6dff8c',warning:'#ffe45b',danger:'#ff3f9b'}),shape:Object.freeze({radiusSmall:12,radiusMedium:22,radiusLarge:36,borderWidth:2.5}),depth:Object.freeze({shadowStrength:.46,glowStrength:.48}),motion:Object.freeze({intensity:.86,distanceScale:1.24,springiness:.80,staggerScale:1.18})})})
+
+export const INITIAL_MOTION_STYLE_PACKS=Object.freeze([
+  SANVERSE_CLEAN_STYLE,
+  CREATOR_ENERGETIC_STYLE,
+  DARK_MINIMAL_STYLE,
+  EDITORIAL_STYLE,
+  TECH_UI_STYLE,
+  SKETCH_STYLE,
+  GLASS_STYLE,
+  RETRO_NEON_STYLE,
+] as const)
+
+export const motionStylePackById=(id:string):MotionStylePackV1=>{ const style=INITIAL_MOTION_STYLE_PACKS.find(candidate=>candidate.id===id); if(!style) throw new RangeError(`Unknown motion style pack: ${id}`); return style }

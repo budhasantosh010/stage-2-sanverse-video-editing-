@@ -1,0 +1,10 @@
+{
+  "name": "@sanverse/motion-native-runtime",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": { ".": "./src/index.tsx" },
+  "scripts": { "test": "vitest run", "build": "tsc -p tsconfig.json" },
+  "dependencies": { "@sanverse/motion-contract": "0.0.0", "@sanverse/motion-graph": "0.0.0", "react": "^19.1.1" },
+  "devDependencies": { "@types/react": "^19.1.10", "@types/react-dom": "^19.1.7", "react-dom": "^19.1.1", "typescript": "~5.8.3", "vitest": "^3.2.4" }
+}

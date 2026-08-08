@@ -1,0 +1,14 @@
+{
+  "name": "@sanverse/motion-contract",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "vitest run", "build": "tsc -p tsconfig.json" },
+  "dependencies": { "react": "^19.1.1" },
+  "devDependencies": {
+    "@types/react": "^19.1.10",
+    "typescript": "~5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

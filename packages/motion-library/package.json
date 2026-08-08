@@ -1,0 +1,14 @@
+{
+  "name": "@sanverse/motion-library",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./style-packs": "./src/style-packs.ts",
+    "./kinetic-headline": "./src/components/kinetic-headline.tsx"
+  },
+  "scripts": { "test": "vitest run", "build": "tsc -p tsconfig.json" },
+  "dependencies": { "@sanverse/motion-contract": "0.0.0", "@sanverse/motion-graph": "0.0.0", "@sanverse/motion-native-runtime": "0.0.0", "@sanverse/motion-primitives": "0.0.0", "react": "^19.1.1" },
+  "devDependencies": { "@sanverse/motion-testing": "0.0.0", "@types/react": "^19.1.10", "@types/react-dom": "^19.1.7", "react-dom": "^19.1.1", "typescript": "~5.8.3", "vitest": "^3.2.4" }
+}

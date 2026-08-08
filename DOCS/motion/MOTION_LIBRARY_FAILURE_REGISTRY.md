@@ -1,0 +1,50 @@
+# Motion Library Failure Registry
+
+Record real Plan A failures with what, where, when, reproduction, root cause, impact, attempts, status and one-line solution. Passing tests do not erase visual or browser failures.
+
+## MOTION-FAIL-001 — Missing Lab tick query became exact tick zero
+
+- Status: FIXED
+- Severity: medium
+- Milestone: MOTION-A2
+- Date: 2026-08-07
+
+WHAT: Opening a Motion Lab fixture URL without a `tick` parameter showed the component at tick 0 instead of its configured settled preview point.
+
+WHERE: `apps/motion-lab/src/MotionLabApp.tsx` initial URL preset parsing.
+
+WHEN/HOW: Found in the first real Edge screenshot of Checklist Card V1. The screenshot was blank although Checklist tests and state logic were green.
+
+WHY: `Number(initialSearch.get('tick'))` converts JavaScript `null` to numeric `0`. Missing and explicit-zero queries were therefore indistinguishable.
+
+IMPACT: Development visual inspection could misleadingly look like a component rendering failure. Exact user-entered tick 0 itself was always valid.
+
+ROOT CAUSE: Missing-query parsing, not component animation or layout.
+
+ATTEMPTS: Reproduced in real Edge, inspected exact tick behavior, isolated the parser conversion.
+
+ONE-LINE SOLUTION: `resolveInitialTick(rawValue, durationTicks, defaultProgress)` handles `null` before numeric conversion and has a regression test proving missing query ≠ explicit `0`.
+
+## MOTION-FAIL-002 — Advanced inspector stretched the Lab beyond the viewport
+
+- Status: FIXED
+- Severity: medium
+- Milestone: MOTION-A4.5
+- Date: 2026-08-08
+
+WHAT: Switching Motion Lab from Creator to Advanced made the preview appear blank and pushed the event strip and transport below the visible browser viewport.
+
+WHERE: `apps/motion-lab/src/styles.css` outer `.motion-lab` grid height authority.
+
+WHEN/HOW: Found in the first real Edge screenshot after the schema-driven Advanced inspector was wired. DOM inspection proved the graph-backed Headline was still rendered correctly; it had simply been centered far below the visible viewport.
+
+WHY: `.motion-lab` had only `min-height: 100vh`. The much taller Advanced inspector was allowed to grow the outer grid row instead of scrolling inside its own pane.
+
+IMPACT: Advanced graph editing looked like it had broken rendering even though the component and graph were healthy, and transport controls became unreachable without page scrolling.
+
+ROOT CAUSE: Missing fixed viewport-height authority in the internal workshop shell, not Motion Graph evaluation.
+
+ATTEMPTS: Verified the rendered component existed with `data-motion-graph-backed="true"`, inspected the calculated preview size in Edge DOM, then constrained the outer grid.
+
+ONE-LINE SOLUTION: `.motion-lab` now owns `height: 100vh`, `grid-template-rows: auto minmax(0, 1fr)` and `overflow: hidden`, so Browser/Inspector scroll internally while Stage and transport remain visible.
+
