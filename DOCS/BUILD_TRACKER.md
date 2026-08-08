@@ -146,4 +146,13 @@ Last updated: 2026-08-08
 - [x] Real Edge revision 34→44 workflow, one video, zero browser errors, zero failed HTTP responses, responsive 1440/1024/390
 - [x] Real revision-44 export: 1920×1080 H.264 High 30fps + AAC-LC stereo 48kHz, 24.841s, renderer/file SHA match
 - [x] Final evidence: `DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md`
-- [ ] Gate T3 — not started
+
+## P1-F.1E Gate T3 PRE0 — 2026-08-08
+
+- [x] Dedicated editor branch/worktree `timeline-t3-precision-trim` created from exact T2 SHA `5a50e4bf84b928ac686bb903d1425b21c64ae890`
+- [x] Permanent ownership contract: `DOCS/PROGRAM_OWNERSHIP.md`
+- [x] Editor boundary checker: `tools/program-ownership/check-editor-boundary.mjs`
+- [x] Synthetic boundary tests: 9/9 passing, including `packages/motion-*` wildcard and forbidden `apps/web` Motion imports
+- [x] Live boundary check PASS; Motion files changed NONE; no root dependency/workspace change
+- [ ] Gate T3 precision-feature implementation — authorized, not yet complete
+- [ ] Gate T4 — not started

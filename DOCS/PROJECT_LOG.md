@@ -706,3 +706,27 @@ all-workspace production build exit 0.
 Evidence: `DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md`.
 Gate T3 was not started, and the separately owned Motion Graphics Library
 workstream was not integrated or modified.
+
+## 2026-08-08 — Gate T3 PRE0: ownership is now enforceable, not just remembered
+
+The owner authorized Precision Trimming and required permanent multi-agent
+ownership before any feature code. T3 therefore moved to a fresh editor-only
+worktree/branch, `timeline-t3-precision-trim`, based exactly on the verified T2
+SHA `5a50e4bf84b928ac686bb903d1425b21c64ae890`.
+
+`DOCS/PROGRAM_OWNERSHIP.md` now defines the durable read-other/write-own rule for
+Editor, Motion Plan A+C and AI Plan B. The Editor's protected Motion boundary is
+`apps/motion-lab/**`, every `packages/motion-*/**`, `motion/**` and
+`DOCS/motion/**`; production `apps/web` may not import unfinished
+`@sanverse/motion-*` packages or Motion Lab until an explicit integration
+milestone.
+
+A zero-dependency Node checker at
+`tools/program-ownership/check-editor-boundary.mjs` inspects committed changes
+since the editor milestone base, staged changes, unstaged tracked changes and
+untracked files. It also scans production `apps/web` imports. Synthetic tests
+cover allowed editor changes and every requested protected/forbidden case: 9/9
+pass. The live checker passes from the T2 base with no Motion path changes and no
+forbidden imports. No root dependency or workspace file changed.
+
+Precision feature code starts only after this guardrail. T4 remains not started.

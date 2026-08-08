@@ -32,9 +32,10 @@ api 403 · web 1,248. `npm run build` exit 0.
   T7     Transcript + AI-ready contracts              NOT STARTED  —
 ```
 
-**Next action when a session starts:** T3 is the first unfinished gate, but do
-not start it until the owner explicitly authorizes T3. Until then, preserve the
-closed T2 state and its evidence.
+**Next action when a session starts:** T3 is authorized. Verify the editor-only
+worktree and run `node tools/program-ownership/check-editor-boundary.mjs --base
+5a50e4bf84b928ac686bb903d1425b21c64ae890` before editing. Continue only the
+first unfinished T3 item. T4 remains out of scope.
 
 ---
 

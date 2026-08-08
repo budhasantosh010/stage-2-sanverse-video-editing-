@@ -18,7 +18,17 @@ export whose renderer SHA matches the MP4 on disk. T2 closure evidence is
 T2's final verification found and fixed two real defects before closure: Hold
 Frame was enabled but not routed to its panel, and Rate Stretch silently removed
 Reverse because the Studio adapter hard-coded `forward`. Both are now held by
-regression/browser evidence. **Do not start T3 unless explicitly authorized.**
+regression/browser evidence.
+
+**The owner authorized Gate T3 on 2026-08-08.** T3 runs only in the dedicated
+editor worktree/branch `timeline-t3-precision-trim`, based exactly on
+`5a50e4bf84b928ac686bb903d1425b21c64ae890`. T3-PRE0 is complete before feature
+code: `DOCS/PROGRAM_OWNERSHIP.md` makes Editor/Motion/AI ownership durable, and
+`tools/program-ownership/check-editor-boundary.mjs` plus 9 synthetic tests enforce
+protected `apps/motion-lab/**`, `packages/motion-*/**`, `motion/**`,
+`DOCS/motion/**` and forbid production `apps/web` imports from unfinished Motion
+packages. The live boundary check passes. T3 precision-feature implementation is
+next; T4 remains not started.
 
 ### Gate T0, thing one: the preview stopped lying
 
