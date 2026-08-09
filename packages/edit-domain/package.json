@@ -28,7 +28,8 @@
     "./migrations/upgrade-project": "./src/migrations/upgrade-project.ts",
     "./annotations": "./src/annotations.ts",
     "./overlay-operations": "./src/overlay-operations.ts",
-    "./component-recipes": "./src/component-recipes.ts"
+    "./component-recipes": "./src/component-recipes.ts",
+    "./editor-animation": "./src/editor-animation.ts"
   },
   "scripts": {
     "test": "vitest run",
