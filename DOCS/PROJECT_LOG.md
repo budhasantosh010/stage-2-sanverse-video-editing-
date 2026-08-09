@@ -1,5 +1,18 @@
 # Project Log
 
+## 2026-08-10 — Sanverse Creative Engine Plan B0 Creative Direction Foundation complete
+
+- Created the unified Creative Engine program document: Plan A = Creative Capability, Plan B = Creative Intelligence, Plan C = Creative Control. Normal future cycles explicitly combine an A milestone, B milestone, C milestone and cross-plan proof unless a stabilization reason is recorded.
+- Added one `@sanverse/creative-direction` package rather than fragmenting Plan B. It reuses the canonical `PROJECT_TIMESCALE = 1,440,000` ticks/second and represents every Creative Direction region with exact `startTicks`/`endTicks`.
+- Added STYLE, GRAPHICS, MOTION, FOOTAGE, TRANSITION, EMPHASIS, NOTES and CONSTRAINTS tracks plus typed directive source/priority/status, semantic style/graphic/motion/footage/transition/emphasis/constraint vocabularies, comments and creative-plan versions with compare/restore lineage.
+- Added `sanverse.creative-edit-proposal/v1`: typed component placements, style assignments, motion assignments, footage treatments, constraints and explicit unresolved directives. Resolved component/style references fail closed against a supplied Plan-A catalog.
+- Added vendor-neutral `CreativePlanningModelV1` and a deterministic offline `FixtureCreativePlanner`. B0 has no provider SDK, API key, internet requirement, CSS/DOM generation or direct Motion Graph mutation.
+- Added an original 95-second product-launch textual reference fixture with notification hook, semantic headline, presenter/lower-third, prompt, product workflow, agent progress, scoped comparison, callback and generic Sanverse lockup. No source commercial media, logos, screenshots or extracted frames were committed.
+- Added immutable exact-tick Creative Direction operations for add/remove/move/resize/duplicate/type-change/property replacement. Validation rejects fractional/negative/reversed/out-of-range regions, duplicate IDs, unknown types/tracks, broken references, version cycles and detectable overlapping required conflicts.
+- Added development-only `?mode=creative-direction` inside Motion Lab. Real Edge on strict port 2010 shows all eight tracks, selected semantic region, exact ticks, typed inspector and 9-placement fixture proposal. Five UI tests exercise real region add/move/resize/duplicate/type/delete flows.
+- B0 release-candidate matrix: **346/346 combined Creative + Motion tests**, **8/8 workspace builds**. Existing C2/C3/A19 suites remain green. Evidence: `DOCS/creative-engine/evidence/CREATIVE-B0.md`; failures: `DOCS/creative-engine/FAILURE_REGISTRY.md`.
+- No `apps/web` or production editor source was changed. The lane is preserved by the dedicated `creative-direction-b0` checkpoint; C4 begins from that boundary.
+
 ## 2026-08-10 — Parallel Motion Program MOTION-A19 hierarchy-heavy explainer pack complete
 
 - Re-read the 69-component coverage matrix before implementation. Rejected Org / Hierarchy Map, Feedback Loop and Roadmap Milestones as overlaps with existing Hierarchy Diagram, Flywheel Diagram and milestone/sequence/step patterns.

@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build"
   },
   "dependencies": {
+    "@sanverse/creative-direction": "0.0.0",
     "@sanverse/motion-contract": "0.0.0",
     "@sanverse/motion-graph": "0.0.0",
     "@sanverse/motion-library": "0.0.0",
