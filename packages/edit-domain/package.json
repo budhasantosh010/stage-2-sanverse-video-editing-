@@ -29,7 +29,8 @@
     "./annotations": "./src/annotations.ts",
     "./overlay-operations": "./src/overlay-operations.ts",
     "./component-recipes": "./src/component-recipes.ts",
-    "./editor-animation": "./src/editor-animation.ts"
+    "./editor-animation": "./src/editor-animation.ts",
+    "./timeline-tracks": "./src/timeline-tracks.ts"
   },
   "scripts": {
     "test": "vitest run",

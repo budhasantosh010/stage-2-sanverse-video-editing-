@@ -44,10 +44,11 @@ const accept = (
 }
 
 describe('P1-F.1A C1.7 track output', () => {
-  it('names exactly five tracks and refuses any other', () => {
+  it('keeps exactly five legacy aliases while accepting stable T5 track ids', () => {
     expect(TIMELINE_TRACK_IDS).toEqual(['V2', 'V1', 'C1', 'A1', 'A2'])
     for (const trackId of TIMELINE_TRACK_IDS) expect(isTimelineTrackId(trackId)).toBe(true)
-    for (const invalid of ['V3', 'A3', 'v1', '', 'track_aaaaaaaa', null, 7]) {
+    expect(isTimelineTrackId('track_aaaaaaaa')).toBe(true)
+    for (const invalid of ['V3', 'A3', 'v1', '', 'track_short', null, 7]) {
       expect(isTimelineTrackId(invalid)).toBe(false)
     }
   })

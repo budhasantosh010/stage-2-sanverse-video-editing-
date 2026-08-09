@@ -20,6 +20,7 @@ import {
   isTimelineGroupsOperation,
   isTimelineMarkersOperation,
   isTimelineOperation,
+  isTimelineTrackOperation,
   isTrackOutputOperation,
   isVisualPropertiesOperation,
   validateOperationAgainstComposition,
@@ -31,10 +32,15 @@ import {
   type OverlayOperation,
   type ResolvedOverlayOperation,
 } from './overlay-operations.ts'
+import { type TrackOutputState } from './track-output.ts'
 import {
-  foldTrackOutputOperations,
-  type TrackOutputState,
-} from './track-output.ts'
+  applyTimelineTrackOperation,
+  createLegacyTimelineTrackState,
+  legacyDisplayTrackId,
+  setTimelineTrackOutput,
+  TIMELINE_TRACK_MODEL_SCHEMA_VERSION,
+  type TimelineTrackStateV2,
+} from './timeline-tracks.ts'
 import {
   foldTimelineMarkerOperations,
   type TimelineMarkerV1,
@@ -337,6 +343,8 @@ export type ProjectEvaluation = Readonly<{
   records: readonly ChangeSetRecord[]
   /** Latest active, valid full-state primary-footage motion per stable motion identity. */
   footageMotions: readonly SetFootageMotionOperation[]
+  /** Stable Editor Track Model V2 projected from the legacy defaults plus accepted T5 operations. */
+  trackState: TimelineTrackStateV2
   /** Keyed by position in `project.changeSets`. Empty when everything still fits. */
   failures: ReadonlyMap<number, ChangeSetFailure>
 }>
@@ -381,6 +389,50 @@ const evaluateRound = (
       return
     }
     composition = trial
+  })
+
+  // Pass 1.5 — which stable Editor tracks exist, how they are ordered, and
+  // which ones reach Preview/export. The seed is the deterministic projection
+  // of the pre-T5 five-row editor. T5 operations are replayed transactionally
+  // per change set so a compound add-track + assignment/output edit is either
+  // wholly accepted or contributes nothing.
+  const seed = createLegacyTimelineTrackState(project.composition)
+  let trackState: TimelineTrackStateV2 = seed.ok
+    ? seed.value
+    : Object.freeze({
+        schemaVersion: TIMELINE_TRACK_MODEL_SCHEMA_VERSION,
+        tracks: Object.freeze([]),
+        assignments: Object.freeze([]),
+      })
+  project.changeSets.forEach((record, index) => {
+    if (!contributes(index)) return
+    let trial = trackState
+    let failure: ChangeSetFailure | null = null
+    record.changeSet.operations.forEach((operation, position) => {
+      if (failure !== null) return
+      if (isTimelineTrackOperation(operation)) {
+        const applied = applyTimelineTrackOperation(trial, operation)
+        if (!applied.ok) {
+          failure = Object.freeze({ reason: applied.error.code, operationIndex: position })
+          return
+        }
+        trial = applied.value
+        return
+      }
+      if (isTrackOutputOperation(operation)) {
+        const applied = setTimelineTrackOutput(trial, operation.trackId, operation.outputEnabled)
+        if (!applied.ok) {
+          failure = Object.freeze({ reason: applied.error.code, operationIndex: position })
+          return
+        }
+        trial = applied.value
+      }
+    })
+    if (failure !== null) {
+      failures.set(index, failure)
+      return
+    }
+    trackState = trial
   })
 
   // Pass two — what is DRAWN on it.
@@ -470,6 +522,7 @@ const evaluateRound = (
     composition,
     records: Object.freeze(records),
     footageMotions,
+    trackState,
     failures: failures as ReadonlyMap<number, ChangeSetFailure>,
   })
 }
@@ -809,14 +862,30 @@ export const activeOverlayOperations = (project: EditProject): readonly Resolved
 export const activeVisualProperties = (project: EditProject): readonly SetVisualPropertiesOperation[] =>
   foldVisualPropertiesOperations(activeOperations(project).filter(isVisualPropertiesOperation))
 
+/** Stable Track Model V2 after deterministic legacy projection + accepted T5 edits. */
+export const activeTimelineTrackState = (project: EditProject): TimelineTrackStateV2 =>
+  evaluateProject(project).trackState
+
 /**
- * Which of the five tracks reach the finished video right now.
- *
- * Every track is on until an accepted operation says otherwise, so a project
- * that has never been touched here behaves exactly as it always did.
+ * Compatibility output view for the existing T0-T4 compiler/Preview. Dynamic
+ * T5 callers read `activeTimelineTrackState`; these legacy aliases resolve by
+ * role identity, never by current V/A/C display numbering.
  */
-export const activeTrackOutputs = (project: EditProject): TrackOutputState =>
-  foldTrackOutputOperations(activeOperations(project).filter(isTrackOutputOperation))
+export const activeTrackOutputs = (project: EditProject): TrackOutputState => {
+  const state = activeTimelineTrackState(project)
+  const output: Record<string, boolean> & Record<'V2' | 'V1' | 'C1' | 'A1' | 'A2', boolean> = {
+    V2: true,
+    V1: true,
+    C1: true,
+    A1: true,
+    A2: true,
+  }
+  for (const alias of ['V2', 'V1', 'C1', 'A1', 'A2'] as const) {
+    const trackId = legacyDisplayTrackId(state, alias)
+    if (trackId !== null) output[alias] = state.tracks.find((track) => track.trackId === trackId)?.outputEnabled ?? true
+  }
+  return Object.freeze(output)
+}
 
 /**
  * The user's markers right now. Empty for every project that has never had one,

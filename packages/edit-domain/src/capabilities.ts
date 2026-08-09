@@ -51,6 +51,8 @@ export const MUSIC_PRIMITIVE_ID = 'sanverse.music.primitive/v1'
 export const OVERLAY_REMOVE_PRIMITIVE_ID = 'sanverse.overlay.remove.primitive/v1'
 /** Which lanes are heard and seen in the finished video. */
 export const TRACK_OUTPUT_PRIMITIVE_ID = 'sanverse.timeline.track-output.primitive/v1'
+/** Stable dynamic Timeline tracks, metadata, Sync Lock, mix state and item assignment. */
+export const TIMELINE_TRACKS_PRIMITIVE_ID = 'sanverse.timeline.tracks.primitive/v2'
 /**
  * The user's own notes pinned to moments, and "treat these as one thing".
  *
@@ -274,8 +276,24 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     capabilityId: TRACK_OUTPUT_PRIMITIVE_ID,
     version: 1,
     level: 'primitive' as const,
-    accepts: 'One of the five tracks, and whether it reaches the finished video.',
+    accepts: 'One Timeline track, addressed by a legacy alias or stable track id, and whether it reaches the finished video.',
     produces: Object.freeze(['set-track-output']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: TIMELINE_TRACKS_PRIMITIVE_ID,
+    version: 2,
+    level: 'primitive' as const,
+    accepts: 'One stable Timeline track operation: create, remove, rename, reorder, Sync Lock, audio mix, or item assignment.',
+    produces: Object.freeze([
+      'add-timeline-track',
+      'remove-timeline-track',
+      'rename-timeline-track',
+      'reorder-timeline-track',
+      'set-track-sync-lock',
+      'set-track-audio-state',
+      'assign-timeline-item-track',
+    ]),
     requires: Object.freeze([]),
   }),
   Object.freeze({

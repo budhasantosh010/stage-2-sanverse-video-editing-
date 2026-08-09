@@ -42,6 +42,12 @@ import {
   type SetTrackOutputOperation,
 } from './track-output.ts'
 import {
+  TIMELINE_TRACK_OPERATION_KINDS,
+  isTimelineTrackOperationKind,
+  validateTimelineTrackOperation,
+  type TimelineTrackOperation,
+} from './timeline-tracks.ts'
+import {
   MARKERS_OPERATION_KIND,
   validateSetTimelineMarkersOperation,
   type SetTimelineMarkersOperation,
@@ -116,6 +122,7 @@ export type EditOperation =
   | SetVisualPropertiesOperation
   | SetFootageMotionOperation
   | SetTrackOutputOperation
+  | TimelineTrackOperation
   | SetTimelineMarkersOperation
   | SetTimelineGroupsOperation
 
@@ -128,6 +135,7 @@ export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze([
   VISUAL_PROPERTIES_OPERATION_KIND,
   FOOTAGE_MOTION_OPERATION_KIND,
   TRACK_OUTPUT_OPERATION_KIND,
+  ...TIMELINE_TRACK_OPERATION_KINDS,
   MARKERS_OPERATION_KIND,
   GROUPS_OPERATION_KIND,
 ])
@@ -135,6 +143,10 @@ export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze([
 export const isTrackOutputOperation = (
   operation: EditOperation,
 ): operation is SetTrackOutputOperation => operation.kind === TRACK_OUTPUT_OPERATION_KIND
+
+export const isTimelineTrackOperation = (
+  operation: EditOperation,
+): operation is TimelineTrackOperation => isTimelineTrackOperationKind(operation.kind)
 
 /**
  * The two operations that record what the user thinks, not what the video shows.
@@ -161,7 +173,12 @@ export const isTimelineGroupsOperation = (
  * wrong one.
  */
 export const isNonRenderOperation = (operation: EditOperation): boolean =>
-  isTimelineMarkersOperation(operation) || isTimelineGroupsOperation(operation)
+  isTimelineMarkersOperation(operation) ||
+  isTimelineGroupsOperation(operation) ||
+  (isTimelineTrackOperation(operation) && (
+    operation.kind === 'rename-timeline-track' ||
+    operation.kind === 'set-track-sync-lock'
+  ))
 
 /** True for the operations that change which footage the finished video is made of. */
 export const isTimelineOperation = (operation: EditOperation): operation is TimelineOperation =>
@@ -411,6 +428,20 @@ export const validateOperation = (input: unknown, path = '$'): Result<EditOperat
     return ok(groups.value)
   }
 
+  if (isTimelineTrackOperationKind(input.kind)) {
+    const tracks = validateTimelineTrackOperation(input, path)
+    if (!tracks.ok) {
+      return err({
+        code: 'OPERATION_INVALID',
+        issues: tracks.error.issues.map((issue) => ({
+          path: issue.path,
+          code: issue.code as OperationIssueCode,
+        })),
+      })
+    }
+    return ok(tracks.value)
+  }
+
   if (input.kind === TRACK_OUTPUT_OPERATION_KIND) {
     const output = validateTrackOutputOperation(input, path)
     if (!output.ok) {
@@ -484,6 +515,10 @@ export const validateOperationAgainstComposition = (
   // whole. No amount of cutting can invalidate it, so there is nothing here to
   // check against the footage.
   if (isTrackOutputOperation(operation)) return ok(operation)
+
+  // Track Model V2 operations are validated against the accepted track-state
+  // projection during project replay. They do not name a footage moment.
+  if (isTimelineTrackOperation(operation)) return ok(operation)
 
   /*
    * Markers and groups are checked against NOTHING here, on purpose.

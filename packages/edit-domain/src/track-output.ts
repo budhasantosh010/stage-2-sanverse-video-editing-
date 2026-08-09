@@ -2,6 +2,7 @@ import { err, isRecord, ok, type Result } from './result.ts'
 import { capabilityProduces } from './capabilities.ts'
 import { emptyExtensions, validateExtensions, type Extensions } from './json.ts'
 import { OPERATION_SCHEMA_VERSION } from './timeline-operations.ts'
+import { TRACK_ID_PATTERN } from './composition.ts'
 
 /**
  * Which of the five tracks reach the finished video.
@@ -40,10 +41,12 @@ export const TRACK_OUTPUT_OPERATION_KIND = 'set-track-output'
  */
 export const TIMELINE_TRACK_IDS = Object.freeze(['V2', 'V1', 'C1', 'A1', 'A2'] as const)
 
-export type TimelineTrackId = (typeof TIMELINE_TRACK_IDS)[number]
+export type LegacyTimelineTrackId = (typeof TIMELINE_TRACK_IDS)[number]
+export type StableTimelineTrackId = `track_${string}`
+export type TimelineTrackId = LegacyTimelineTrackId | StableTimelineTrackId
 
 export const isTimelineTrackId = (value: unknown): value is TimelineTrackId =>
-  typeof value === 'string' && (TIMELINE_TRACK_IDS as readonly string[]).includes(value)
+  typeof value === 'string' && ((TIMELINE_TRACK_IDS as readonly string[]).includes(value) || TRACK_ID_PATTERN.test(value))
 
 export type SetTrackOutputOperation = Readonly<{
   schemaVersion: typeof OPERATION_SCHEMA_VERSION
@@ -64,7 +67,7 @@ export type SetTrackOutputOperation = Readonly<{
  * is exactly how it already behaved. No migration is needed and no saved file
  * is rewritten.
  */
-export const DEFAULT_TRACK_OUTPUTS: Readonly<Record<TimelineTrackId, boolean>> = Object.freeze({
+export const DEFAULT_TRACK_OUTPUTS: Readonly<Record<LegacyTimelineTrackId, boolean>> = Object.freeze({
   V2: true,
   V1: true,
   C1: true,
@@ -72,7 +75,7 @@ export const DEFAULT_TRACK_OUTPUTS: Readonly<Record<TimelineTrackId, boolean>> =
   A2: true,
 })
 
-export type TrackOutputState = Readonly<Record<TimelineTrackId, boolean>>
+export type TrackOutputState = Readonly<Record<string, boolean> & Record<LegacyTimelineTrackId, boolean>>
 
 const KEYS = Object.freeze([
   'schemaVersion',
@@ -161,7 +164,7 @@ export const validateTrackOutputOperation = (
 export const foldTrackOutputOperations = (
   operations: readonly SetTrackOutputOperation[],
 ): TrackOutputState => {
-  const state: Record<TimelineTrackId, boolean> = { ...DEFAULT_TRACK_OUTPUTS }
+  const state: Record<string, boolean> & Record<LegacyTimelineTrackId, boolean> = { ...DEFAULT_TRACK_OUTPUTS }
   for (const operation of operations) state[operation.trackId] = operation.outputEnabled
   return Object.freeze(state)
 }
