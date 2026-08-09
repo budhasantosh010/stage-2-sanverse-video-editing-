@@ -1,6 +1,16 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type WheelEvent } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type WheelEvent } from 'react'
 
-import type { TimelineGroupV1, TimelineMarkerV1, TimelineTrackId, TrackOutputState, MarkerColor } from '@sanverse/edit-domain'
+import {
+  EMPTY_EDITOR_KEYFRAME_SELECTION,
+  type EditorAnimationTrackStateV1,
+  type EditorKeyframeClipboardV1,
+  type EditorKeyframeSelectionV1,
+  type TimelineGroupV1,
+  type TimelineMarkerV1,
+  type TimelineTrackId,
+  type TrackOutputState,
+  type MarkerColor,
+} from '@sanverse/edit-domain'
 import {
   EMPTY_SELECTION,
   EMPTY_DYNAMIC_TRIM,
@@ -55,6 +65,14 @@ import {
   type TimelineViewportState,
   type TimelineVerticalZoomV1,
   type TrackPresentationV1,
+  DEFAULT_TIMELINE_ANIMATION_PRESENTATION,
+  animationPresentationForTarget,
+  animationTargetExpanded,
+  readTimelineAnimationPresentation,
+  reconcileEditorKeyframeSelection,
+  writeTimelineAnimationPresentation,
+  type TimelineAnimationPresentationV1,
+  type TimelineAnimationSubjectV1,
 } from '../../features/timeline'
 import {
   canonicalKeyBinding,
@@ -90,6 +108,8 @@ import { TimelineLinkedAudioPanel, type TimelineLinkedAudioSubject } from './Tim
 import { TimelineFreezePanel } from './TimelineFreezePanel'
 import { TimelinePrecisionPopover, type NumericPrecisionIntentV1 } from './TimelinePrecisionPopover'
 import { TimelineTrimView } from './TimelineTrimView'
+import { TimelineAnimationLanes } from './TimelineAnimationLanes'
+import { TimelinePropertyGraphView } from './TimelinePropertyGraphView'
 import { planTimelineTrimViewFrames } from './timeline-trim-view-plan'
 import type { TimelineTransitionSubject, TransitionAudioV1, TransitionStyleV1 } from '../../features/timeline/timeline-transition-plan'
 import type { RateStretchPreview } from './TimelineRateStretchHandle'
@@ -103,6 +123,17 @@ export type TimelineProps = Readonly<{
   viewport: TimelineViewportState
   /** Everything picked, and where a Shift range measures from. */
   selection: TimelineSelectionV2
+  /** The one currently editable animation target. Presentation only until a planner commits. */
+  animationSubject?: TimelineAnimationSubjectV1 | null
+  /** Timeline items that contain accepted editor-owned animation, for compact badges. */
+  animatedItemIds?: readonly string[]
+  /** One keyframe selection authority shared by Timeline, Graph and Inspector adapters. */
+  keyframeSelection?: EditorKeyframeSelectionV1
+  onKeyframeSelectionChange?(selection: EditorKeyframeSelectionV1): void
+  /** Detached animation state used by Preview during pointer movement. */
+  onAnimationDraft?(state: EditorAnimationTrackStateV1 | null): void
+  /** One complete planner result; the Studio adapter converts this to the existing accepted operation. */
+  onAnimationCommit?(state: EditorAnimationTrackStateV1): void
   /** Which things the user said move together. Part of the project; no render effect. */
   groups: readonly TimelineGroupV1[]
   /** The user's own notes. Part of the project; no render effect. */
@@ -213,6 +244,9 @@ const NO_PRECISION_PREVIEW = (_request: PrecisionTrimRequestV1): PrecisionTrimPl
   }),
 })
 const IGNORE_PRECISION_COMMIT = (_plan: Extract<PrecisionTrimPlan, { ok: true }>): void => undefined
+const IGNORE_KEYFRAME_SELECTION = (_selection: EditorKeyframeSelectionV1): void => undefined
+const IGNORE_ANIMATION_DRAFT = (_state: EditorAnimationTrackStateV1 | null): void => undefined
+const IGNORE_ANIMATION_COMMIT = (_state: EditorAnimationTrackStateV1): void => undefined
 
 /** A stable empty object, so a project without files does not remount every lane. */
 const EMPTY_ASSET_FACTS: Readonly<Record<string, AssetFacts>> = Object.freeze({})
@@ -226,6 +260,12 @@ export function Timeline({
   frameRate = Object.freeze({ numerator: 30, denominator: 1 }),
   viewport,
   selection,
+  animationSubject = null,
+  animatedItemIds = Object.freeze([]),
+  keyframeSelection = EMPTY_EDITOR_KEYFRAME_SELECTION,
+  onKeyframeSelectionChange = IGNORE_KEYFRAME_SELECTION,
+  onAnimationDraft = IGNORE_ANIMATION_DRAFT,
+  onAnimationCommit = IGNORE_ANIMATION_COMMIT,
   groups,
   markers,
   selectedMarkerId,
@@ -296,6 +336,12 @@ export function Timeline({
   const [contextMenu, setContextMenu] = useState<Readonly<{ itemId: string; x: number; y: number }> | null>(null)
   const [tool, setTool] = useState<TimelineTool>('select')
   const [marquee, setMarquee] = useState<MarqueeSession | null>(null)
+  const [animationPresentation, setAnimationPresentation] = useState<TimelineAnimationPresentationV1>(() =>
+    readTimelineAnimationPresentation(model.projectId),
+  )
+  const [animationClipboard, setAnimationClipboard] = useState<EditorKeyframeClipboardV1 | null>(null)
+  const [animationNotice, setAnimationNotice] = useState<string | null>(null)
+  const [pendingAnimationExpandItemId, setPendingAnimationExpandItemId] = useState<string | null>(null)
   /**
    * Whether the Speed panel is showing. Kept here, next to the button that
    * opens it, because it is a view state and nothing else: no operation, no
@@ -318,6 +364,33 @@ export function Timeline({
     if (verticalZoomFrameRef.current !== null) cancelAnimationFrame(verticalZoomFrameRef.current)
     if (verticalAnchorFrameRef.current !== null) cancelAnimationFrame(verticalAnchorFrameRef.current)
   }, [])
+
+  useEffect(() => {
+    setAnimationPresentation(readTimelineAnimationPresentation(model.projectId))
+    setAnimationClipboard(null)
+    setAnimationNotice(null)
+  }, [model.projectId])
+
+  useEffect(() => {
+    if (!pendingAnimationExpandItemId || animationSubject?.itemId !== pendingAnimationExpandItemId) return
+    const next = animationPresentationForTarget(animationPresentation, animationSubject.target, true)
+    setAnimationPresentation(next)
+    writeTimelineAnimationPresentation(model.projectId, next)
+    setPendingAnimationExpandItemId(null)
+  }, [animationPresentation, animationSubject, model.projectId, pendingAnimationExpandItemId])
+
+  useEffect(() => {
+    const reconciled = reconcileEditorKeyframeSelection(keyframeSelection, animationSubject)
+    if (reconciled.addresses.length !== keyframeSelection.addresses.length ||
+        reconciled.addresses.some((address, index) => address.canonicalAtTicks !== keyframeSelection.addresses[index]?.canonicalAtTicks || address.property !== keyframeSelection.addresses[index]?.property)) {
+      onKeyframeSelectionChange(reconciled)
+    }
+  }, [animationSubject, keyframeSelection, onKeyframeSelectionChange])
+
+  const changeAnimationPresentation = (next: TimelineAnimationPresentationV1) => {
+    setAnimationPresentation(next)
+    writeTimelineAnimationPresentation(model.projectId, next)
+  }
 
   const allItems = useMemo(() => model.lanes.flatMap((lane) => lane.items), [model])
   const soleSelectedId = primarySelectedItemId(selection)
@@ -1442,6 +1515,36 @@ export function Timeline({
         onClose={() => setFreezePanelOpen(false)}
       />
 
+      {animationSubject ? (
+        <div className="timeline-animation__target-bar" role="group" aria-label="Selected item animation">
+          <button
+            type="button"
+            aria-pressed={animationTargetExpanded(animationPresentation, animationSubject.target)}
+            aria-label={animationTargetExpanded(animationPresentation, animationSubject.target) ? 'Collapse Animation' : 'Expand Animation'}
+            title={animationSubject.sourceAnchored ? 'Source animation — follows this footage wherever this source range is used.' : 'Show editor animation for this item.'}
+            onClick={() => changeAnimationPresentation(animationPresentationForTarget(
+              animationPresentation,
+              animationSubject.target,
+              !animationTargetExpanded(animationPresentation, animationSubject.target),
+            ))}
+          >
+            <span aria-hidden="true">◇</span>
+            {animationTargetExpanded(animationPresentation, animationSubject.target) ? 'Collapse Animation' : 'Expand Animation'}
+          </button>
+          <span>{animationSubject.label}</span>
+          {animationSubject.state.tracks.length > 0 ? <span>{animationSubject.state.tracks.length} animated propert{animationSubject.state.tracks.length === 1 ? 'y' : 'ies'}</span> : <span>No animation yet</span>}
+          <button
+            type="button"
+            aria-pressed={animationPresentation.graphOpen}
+            disabled={animationSubject.state.tracks.length === 0}
+            onClick={() => changeAnimationPresentation(Object.freeze({ ...animationPresentation, graphOpen: !animationPresentation.graphOpen }))}
+          >
+            {animationPresentation.graphOpen ? 'Close Graph' : 'Open Graph'}
+          </button>
+        </div>
+      ) : null}
+      {animationNotice ? <p className="timeline-animation__notice" role="status">{animationNotice}</p> : null}
+
       <div ref={viewportGridRef} className="timeline-v1__viewport-grid">
         {/*
           The track headers are real controls, so this column can no longer be
@@ -1601,6 +1704,11 @@ export function Timeline({
                   pointerTime={pointerTime}
                   onSnapGuide={setSnapGuideTicks}
                   onSelect={selectItem}
+                  animatedItemIds={animatedItemIds}
+                  onAnimationBadgeClick={(itemId) => {
+                    setPendingAnimationExpandItemId(itemId)
+                    selectItem(itemId)
+                  }}
                   onClearSelection={() => onSelectionChange(EMPTY_SELECTION)}
                   onSeek={onSeek}
                   onGesture={onGesture}
@@ -1609,6 +1717,33 @@ export function Timeline({
                   onContextMenu={openContextMenu}
                 />
               ))}
+              {animationSubject && animationTargetExpanded(animationPresentation, animationSubject.target) ? (
+                <TimelineAnimationLanes
+                  subject={animationSubject}
+                  presentation={animationPresentation}
+                  selection={keyframeSelection}
+                  clipboard={animationClipboard}
+                  visibleRange={visibleRange}
+                  overscanTicks={overscanTicks}
+                  pixelsPerSecond={viewport.pixelsPerSecond}
+                  timescale={model.timescale}
+                  playheadTicks={playheadTicks}
+                  frameTicks={frameTicks}
+                  frameRate={frameRate}
+                  compositionDurationTicks={model.durationTicks}
+                  busy={busy}
+                  onPresentationChange={changeAnimationPresentation}
+                  onSelectionChange={onKeyframeSelectionChange}
+                  onClipboardChange={setAnimationClipboard}
+                  onDraft={onAnimationDraft}
+                  onCommit={onAnimationCommit}
+                  onSeek={onSeek}
+                  onNotice={(message) => {
+                    setAnimationNotice(message)
+                    if (message) setContextMenu(null)
+                  }}
+                />
+              ) : null}
               {marqueeRect ? (
                 <div
                   className="timeline-v1__marquee"
@@ -1644,6 +1779,20 @@ export function Timeline({
           </div>
         </div>
       </div>
+
+      {animationSubject && animationPresentation.graphOpen ? (
+        <TimelinePropertyGraphView
+          subject={animationSubject}
+          presentation={animationPresentation}
+          selection={keyframeSelection}
+          busy={busy}
+          onPresentationChange={changeAnimationPresentation}
+          onSelectionChange={onKeyframeSelectionChange}
+          onDraft={onAnimationDraft}
+          onCommit={onAnimationCommit}
+          onNotice={setAnimationNotice}
+        />
+      ) : null}
 
       {/*
         What a box is about to take, said in words as well as drawn, because a

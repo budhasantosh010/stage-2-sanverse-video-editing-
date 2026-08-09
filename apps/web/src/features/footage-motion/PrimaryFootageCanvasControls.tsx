@@ -18,11 +18,14 @@ type ActiveGesture = Readonly<{
   initial: FootageMotionDraft
   latest: FootageMotionDraft
   sourceTime: MediaTime
+  keyframeEditProperties: readonly SupportedFootageMotionProperty[] | undefined
 }>
 
 export type PrimaryFootageCanvasControlsProps = Readonly<{
   draft: FootageMotionDraft
   sourceTime: MediaTime
+  /** Undefined preserves the pre-T4 behavior. When supplied, only explicitly selected properties edit keyframes; the rest remain static. */
+  keyframeEditProperties?: readonly SupportedFootageMotionProperty[]
   setDraft: Dispatch<SetStateAction<FootageMotionDraft | null>>
   busy: boolean
   narrow: boolean
@@ -50,7 +53,14 @@ const updateFromPointer = (
     source: FootageMotionDraft,
     property: SupportedFootageMotionProperty,
     value: number,
-  ) => updateFootageMotionValueAtSourceTime(source, property, value, gesture.sourceTime)
+  ) => updateFootageMotionValueAtSourceTime(
+    source,
+    property,
+    value,
+    gesture.keyframeEditProperties === undefined || gesture.keyframeEditProperties.includes(property)
+      ? gesture.sourceTime
+      : null,
+  )
   switch (gesture.kind) {
     case 'move': {
       if (shiftKey) {
@@ -100,6 +110,7 @@ const updateFromPointer = (
 export function PrimaryFootageCanvasControls({
   draft,
   sourceTime,
+  keyframeEditProperties,
   setDraft,
   busy,
   narrow,
@@ -184,8 +195,12 @@ export function PrimaryFootageCanvasControls({
       initial: draft,
       latest: draft,
       sourceTime,
+      keyframeEditProperties,
     })
   }
+
+  const keyframeSourceFor = (property: SupportedFootageMotionProperty): MediaTime | null =>
+    keyframeEditProperties === undefined || keyframeEditProperties.includes(property) ? sourceTime : null
 
   const nudge = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (busy || narrow || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return
@@ -195,13 +210,13 @@ export function PrimaryFootageCanvasControls({
       draft,
       'translate-x',
       clamp(draft.transform.translateX + (event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0), -2, 2),
-      sourceTime,
+      keyframeSourceFor('translate-x'),
     )
     const next = updateFootageMotionValueAtSourceTime(
       movedX,
       'translate-y',
       clamp(draft.transform.translateY + (event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0), -2, 2),
-      sourceTime,
+      keyframeSourceFor('translate-y'),
     )
     setDraft(next)
     onCommit(next)

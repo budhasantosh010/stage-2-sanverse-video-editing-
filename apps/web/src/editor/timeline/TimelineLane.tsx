@@ -70,6 +70,8 @@ export type TimelineLaneProps = Readonly<{
   pointerTime(clientX: number, excludedTicks?: readonly number[], bypassSnapping?: boolean): TimelineSnapResult
   onSnapGuide(ticks: number | null): void
   onSelect(itemId: string, modifiers?: Readonly<{ ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }>): void
+  animatedItemIds?: readonly string[]
+  onAnimationBadgeClick?(itemId: string): void
   onClearSelection(): void
   onSeek(ticks: number): void
   onGesture(gesture: TimelineGesture): void
@@ -107,6 +109,8 @@ export function TimelineLane({
   pointerTime,
   onSnapGuide,
   onSelect,
+  animatedItemIds = Object.freeze([]),
+  onAnimationBadgeClick = () => undefined,
   onClearSelection,
   onSeek,
   onGesture,
@@ -259,6 +263,8 @@ export function TimelineLane({
           pointerTime={pointerTime}
           onSnapGuide={onSnapGuide}
           onSelect={onSelect}
+          animated={animatedItemIds.includes(item.id)}
+          onAnimationBadgeClick={() => onAnimationBadgeClick(item.id)}
           onSeek={onSeek}
           onGesture={onGesture}
           onItemAction={onItemAction}

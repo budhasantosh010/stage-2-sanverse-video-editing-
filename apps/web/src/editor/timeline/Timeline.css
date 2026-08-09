@@ -1950,3 +1950,406 @@
   cursor: pointer;
   font-size: 12px;
 }
+
+/* ── T4 editor-owned keyframe lanes ─────────────────────────────────────── */
+.timeline-v1__animation-badge {
+  position: absolute;
+  z-index: 9;
+  top: 3px;
+  right: 3px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.timeline-v1__animation-badge:focus-visible {
+  outline: 2px solid var(--color-accent, #4f8cff);
+  outline-offset: 2px;
+}
+
+.timeline-animation__target-bar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-block: 1px solid var(--color-border-soft);
+  background: var(--color-surface-raised);
+  font-size: 0.72rem;
+}
+
+.timeline-animation__target-bar button,
+.timeline-animation__toolbar button,
+.timeline-animation__toolbar select,
+.timeline-animation__row-label button {
+  min-height: 28px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: inherit;
+}
+
+.timeline-animation__target-bar button,
+.timeline-animation__toolbar button,
+.timeline-animation__row-label button {
+  cursor: pointer;
+}
+
+.timeline-animation__target-bar button:focus-visible,
+.timeline-animation__toolbar button:focus-visible,
+.timeline-animation__toolbar select:focus-visible,
+.timeline-animation__diamond-hit:focus-visible,
+.timeline-animation__row-label button:focus-visible {
+  outline: 2px solid var(--color-accent, #4f8cff);
+  outline-offset: 2px;
+}
+
+.timeline-animation {
+  position: relative;
+  min-width: 100%;
+  border-block: 1px solid var(--color-border-strong);
+  background: var(--color-surface-sunken, rgb(127 127 127 / 5%));
+}
+
+.timeline-animation__toolbar {
+  position: sticky;
+  left: 0;
+  z-index: 8;
+  display: flex;
+  width: max-content;
+  max-width: min(100%, 980px);
+  min-height: 36px;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--color-border-soft);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  font-size: 0.68rem;
+}
+
+.timeline-animation__toolbar strong {
+  white-space: nowrap;
+}
+
+.timeline-animation__toolbar span {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.timeline-animation__toolbar button,
+.timeline-animation__toolbar select {
+  min-height: 26px;
+  padding: 2px 6px;
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+
+.timeline-animation__toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.timeline-animation__rows {
+  position: relative;
+  min-width: 100%;
+}
+
+.timeline-animation__row {
+  position: relative;
+  min-width: 100%;
+  border-bottom: 1px solid var(--color-border-soft);
+  background: var(--color-track);
+}
+
+.timeline-animation__row--active {
+  background: color-mix(in srgb, var(--color-accent, #4f8cff) 6%, var(--color-track));
+}
+
+.timeline-animation__row-label {
+  position: sticky;
+  left: 0;
+  z-index: 7;
+  display: flex;
+  width: 126px;
+  height: 100%;
+  align-items: center;
+  gap: 4px;
+  padding-inline: 5px;
+  border-right: 1px solid var(--color-border-soft);
+  background: color-mix(in srgb, var(--color-surface) 96%, transparent);
+}
+
+.timeline-animation__row-label button {
+  min-width: 0;
+  max-width: 86px;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-animation__row-label span {
+  color: var(--color-text-muted);
+  font-size: 0.55rem;
+  white-space: nowrap;
+}
+
+.timeline-animation__row-time {
+  position: absolute;
+  inset: 0;
+  min-width: 100%;
+}
+
+.timeline-animation__marquee {
+  position: absolute;
+  z-index: 5;
+  top: 2px;
+  bottom: 2px;
+  border: 1px dashed var(--color-accent, #4f8cff);
+  background: color-mix(in srgb, var(--color-accent, #4f8cff) 14%, transparent);
+  pointer-events: none;
+}
+
+.timeline-animation__segment-line {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--color-accent, #4f8cff) 40%, transparent);
+  pointer-events: none;
+}
+
+.timeline-animation__diamond-hit {
+  position: absolute;
+  z-index: 6;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.timeline-animation__diamond {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--color-text-muted);
+  background: var(--color-surface);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.timeline-animation__diamond-hit:hover .timeline-animation__diamond,
+.timeline-animation__diamond-hit[data-keyframe-selected='yes'] .timeline-animation__diamond {
+  border-color: var(--color-accent, #4f8cff);
+  background: var(--color-accent, #4f8cff);
+}
+
+.timeline-animation__diamond-hit[data-keyframe-playhead='yes'] .timeline-animation__diamond {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent, #4f8cff) 24%, transparent);
+}
+
+.timeline-animation__notice {
+  margin: 0;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--color-border-soft);
+  color: var(--color-text-muted);
+  background: var(--color-surface-sunken, rgb(127 127 127 / 5%));
+  font-size: 0.68rem;
+}
+
+.timeline-animation__empty,
+.timeline-animation__drag-status {
+  position: sticky;
+  left: 8px;
+  width: max-content;
+  margin: 0;
+  padding: 6px 8px;
+  color: var(--color-text-muted);
+  font-size: 0.66rem;
+}
+
+/* The graph is a drawer INSIDE Timeline. It never becomes a Studio panel. */
+.timeline-graph {
+  min-width: 0;
+  border-top: 1px solid var(--color-border-strong);
+  background: var(--color-surface-sunken, #101318);
+  overflow: hidden;
+  resize: vertical;
+}
+
+.timeline-graph__toolbar,
+.timeline-graph__interpolation {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--color-border-soft);
+  overflow-x: auto;
+  font-size: 0.68rem;
+}
+
+.timeline-graph__toolbar strong,
+.timeline-graph__toolbar label,
+.timeline-graph__interpolation label,
+.timeline-graph__interpolation span {
+  white-space: nowrap;
+}
+
+.timeline-graph__toolbar button,
+.timeline-graph__toolbar select,
+.timeline-graph__toolbar input,
+.timeline-graph__interpolation button,
+.timeline-graph__interpolation input {
+  min-height: 26px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: inherit;
+  font-size: 0.66rem;
+}
+
+.timeline-graph__toolbar button,
+.timeline-graph__interpolation button {
+  cursor: pointer;
+}
+
+.timeline-graph__toolbar button:focus-visible,
+.timeline-graph__toolbar select:focus-visible,
+.timeline-graph__toolbar input:focus-visible,
+.timeline-graph__interpolation button:focus-visible,
+.timeline-graph__interpolation input:focus-visible,
+.timeline-graph__point:focus-visible,
+.timeline-graph__bezier-handle:focus-visible {
+  outline: 2px solid var(--color-accent, #4f8cff);
+  outline-offset: 2px;
+}
+
+.timeline-graph__parameters {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 2px 5px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 6px;
+}
+
+.timeline-graph__parameters legend {
+  padding-inline: 3px;
+}
+
+.timeline-graph__parameters input {
+  width: 62px;
+}
+
+.timeline-graph__svg {
+  display: block;
+  width: 100%;
+  min-height: 96px;
+  background:
+    linear-gradient(to right, color-mix(in srgb, var(--color-border-soft) 40%, transparent) 1px, transparent 1px) 0 0 / 40px 100%,
+    linear-gradient(to bottom, color-mix(in srgb, var(--color-border-soft) 28%, transparent) 1px, transparent 1px) 0 0 / 100% 32px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.timeline-graph__svg:active {
+  cursor: grabbing;
+}
+
+.timeline-graph__marquee {
+  fill: color-mix(in srgb, var(--color-accent, #4f8cff) 14%, transparent);
+  stroke: var(--color-accent, #4f8cff);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+
+.timeline-graph__curve {
+  stroke: var(--color-accent, #4f8cff);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.timeline-graph__point {
+  fill: var(--color-surface);
+  stroke: var(--color-text-muted);
+  stroke-width: 1.5;
+  cursor: move;
+  touch-action: none;
+}
+
+.timeline-graph__point[data-selected='yes'] {
+  fill: var(--color-accent, #4f8cff);
+  stroke: white;
+}
+
+.timeline-graph__tangent {
+  stroke: color-mix(in srgb, var(--color-accent, #4f8cff) 56%, white);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+  pointer-events: none;
+}
+
+.timeline-graph__bezier-handle {
+  fill: var(--color-surface);
+  stroke: var(--color-accent, #4f8cff);
+  stroke-width: 2;
+  cursor: move;
+  touch-action: none;
+}
+
+.timeline-graph__hint,
+.timeline-graph__empty {
+  fill: var(--color-text-muted);
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+}
+
+.timeline-graph__empty {
+  margin: 8px;
+}
+
+@media (max-width: 1024px) {
+  .timeline-animation__toolbar {
+    max-width: 760px;
+    overflow-x: auto;
+  }
+
+  .timeline-animation__row-label {
+    width: 104px;
+  }
+}
+
+@media (max-width: 600px) {
+  .timeline-animation__target-bar {
+    overflow-x: auto;
+  }
+
+  .timeline-animation__toolbar {
+    max-width: calc(100vw - 72px);
+  }
+
+  .timeline-animation__diamond-hit {
+    width: 32px;
+    height: 32px;
+    margin: -16px 0 0 -16px;
+  }
+}

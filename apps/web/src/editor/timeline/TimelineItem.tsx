@@ -52,6 +52,8 @@ export type TimelineItemProps = Readonly<{
    * Reading it later would sometimes answer about a different key press.
    */
   onSelect(itemId: string, modifiers?: Readonly<{ ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }>): void
+  animated?: boolean
+  onAnimationBadgeClick?(): void
   onSeek(ticks: number): void
   onGesture(gesture: TimelineGesture): void
   /** One whole gesture on something laid on top of the footage. */
@@ -141,6 +143,8 @@ export function TimelineItem({
   pointerTime,
   onSnapGuide,
   onSelect,
+  animated = false,
+  onAnimationBadgeClick = () => undefined,
   onSeek,
   onGesture,
   onItemAction,
@@ -409,6 +413,22 @@ export function TimelineItem({
           </span>
         ) : null}
       </button>
+
+      {animated ? (
+        <button
+          type="button"
+          className="timeline-v1__animation-badge"
+          aria-label={`Show animation for ${item.label}`}
+          title="Show animation"
+          onClick={(event) => {
+            event.stopPropagation()
+            onSelect(item.id)
+            onAnimationBadgeClick()
+          }}
+        >
+          <span aria-hidden="true">◇</span>
+        </button>
+      ) : null}
 
       {canRateStretch ? (
         <TimelineRateStretchHandle

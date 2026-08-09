@@ -1,3 +1,25 @@
+.inspector__field {
+  display: grid;
+  gap: 5px;
+  margin-block: 8px;
+  font-size: 0.75rem;
+}
+
+.inspector__field input,
+.inspector__field select {
+  min-height: 32px;
+  padding-inline: 8px;
+  border: 1px solid var(--line, #d9d9d9);
+  border-radius: 6px;
+  background: var(--surface, #fff);
+  color: inherit;
+}
+
+.inspector__hint {
+  color: var(--muted-ink, #666);
+  font-size: 0.72rem;
+}
+
 .inspector {
   display: flex;
   min-height: 0;

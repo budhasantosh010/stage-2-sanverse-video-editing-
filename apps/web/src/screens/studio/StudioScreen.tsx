@@ -4,6 +4,11 @@ import {
   DEFAULT_CAPTION_STYLE_ID,
   DEFAULT_TITLE_STYLE_ID,
   activeOverlayOperations,
+  activeVisualProperties,
+  EMPTY_EDITOR_KEYFRAME_SELECTION,
+  editorAnimationStateFromVisualValue,
+  type EditorAnimationTrackStateV1,
+  type EditorKeyframeSelectionV1,
   type EditOperation,
   type MediaAsset,
   PROJECT_TIMESCALE,
@@ -85,6 +90,7 @@ import {
   type TimelineGesture,
   type TimelineItemAction,
   type TimelineSelectionV2,
+  type TimelineAnimationSubjectV1,
   type TimelineTrackId,
   type TimelineViewportState,
   type TimelineVerticalZoomV1,
@@ -203,9 +209,11 @@ import {
 } from '../../editor/assist'
 import {
   Inspector,
+  InspectorSelectedKeyframe,
   requestInspectorSelectionChange,
   resolveInspectorSelection,
 } from '../../editor/inspector'
+import { buildVisualPropertiesOperation } from '../../editor/inspector/inspector-operations'
 import {
   CanvasInteractionLayer,
   resolveCanvasSelection,
@@ -636,6 +644,7 @@ export function StudioScreen({
    * is worse than showing nothing at all.
    */
   const [timelineSelection, setTimelineSelection] = useState<TimelineSelectionV2>(EMPTY_SELECTION)
+  const [keyframeSelection, setKeyframeSelection] = useState<EditorKeyframeSelectionV1>(EMPTY_EDITOR_KEYFRAME_SELECTION)
   const selectedTimelineItemId = primarySelectedItemId(timelineSelection)
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null)
   /*
@@ -665,6 +674,8 @@ export function StudioScreen({
   const [inspectorSectionDirty, setInspectorSectionDirty] = useState(false)
   const [footageMotionDraft, setFootageMotionDraft] = useState<FootageMotionDraft | null>(null)
   const [footageMotionBaseline, setFootageMotionBaseline] = useState<string | null>(null)
+  const [footageKeyframePreviewState, setFootageKeyframePreviewState] = useState<EditorAnimationTrackStateV1 | null>(null)
+  const [visualKeyframePreviewState, setVisualKeyframePreviewState] = useState<EditorAnimationTrackStateV1 | null>(null)
   const [pendingTimelineSelection, setPendingTimelineSelection] = useState<Readonly<{ itemId: string | null }> | null>(null)
   const [canvasCropMode, setCanvasCropMode] = useState(false)
   const [proposalCanvasPoint, setProposalCanvasPoint] = useState<NormalizedPoint | null>(null)
@@ -1619,6 +1630,31 @@ export function StudioScreen({
   )
   const selectedVideoSelection = inspectorSelection.kind === 'video' ? inspectorSelection : null
   const acceptedFootageMotions = useMemo(() => effectiveFootageMotions(editProject), [editProject])
+  const acceptedVisualPropertyOperations = useMemo(() => activeVisualProperties(editProject), [editProject])
+  const animatedTimelineItemIds = useMemo(() => {
+    const animatedVisualIds = new Set(
+      acceptedVisualPropertyOperations.filter((operation) => operation.tracks.length > 0).map((operation) => operation.visualId),
+    )
+    const ids: string[] = []
+    for (const lane of timelineModel.lanes) {
+      for (const item of lane.items) {
+        if (item.visualId && animatedVisualIds.has(item.visualId)) {
+          ids.push(item.id)
+          continue
+        }
+        if (lane.kind !== 'video' || item.assetId === null || item.sourceStartTicks === null || item.sourceDurationTicks === null) continue
+        const sourceEnd = item.sourceStartTicks + item.sourceDurationTicks
+        const animated = acceptedFootageMotions.some((motion) =>
+          motion.assetId === item.assetId &&
+          motion.tracks.length > 0 &&
+          motion.sourceInterval.start.ticks < sourceEnd &&
+          motion.sourceInterval.start.ticks + motion.sourceInterval.duration.ticks > item.sourceStartTicks!,
+        )
+        if (animated) ids.push(item.id)
+      }
+    }
+    return Object.freeze(ids)
+  }, [acceptedFootageMotions, acceptedVisualPropertyOperations, timelineModel])
   const selectedSourceTime = selectedVideoSelection &&
     playheadTicks >= selectedVideoSelection.clip.compositionStart.ticks &&
     playheadTicks < selectedVideoSelection.clip.compositionStart.ticks + selectedVideoSelection.clip.sourceRange.duration.ticks
@@ -1670,36 +1706,44 @@ export function StudioScreen({
 
   const footageDisplayPlan = useMemo(() => {
     if (!footagePlan || !footageMotionDraft || !selectedVideoSelection) return footagePlan
-    if (!acceptedFootageMotion && !footageMotionDirty) return footagePlan
+    if (!acceptedFootageMotion && !footageMotionDirty && !footageKeyframePreviewState) return footagePlan
+    const previewDraft = footageKeyframePreviewState
+      ? Object.freeze({
+          ...footageMotionDraft,
+          transform: footageKeyframePreviewState.transform,
+          crop: footageKeyframePreviewState.crop,
+          tracks: footageKeyframePreviewState.tracks,
+        })
+      : footageMotionDraft
     const draftNode = Object.freeze({
-      motionId: footageMotionDraft.motionId,
-      sourceInterval: footageMotionDraft.sourceInterval,
-      transform: footageMotionDraft.transform,
-      crop: footageMotionDraft.crop,
-      tracks: footageMotionDraft.tracks,
+      motionId: previewDraft.motionId,
+      sourceInterval: previewDraft.sourceInterval,
+      transform: previewDraft.transform,
+      crop: previewDraft.crop,
+      tracks: previewDraft.tracks,
     })
-    const draftStart = footageMotionDraft.sourceInterval.start.ticks
-    const draftEnd = draftStart + footageMotionDraft.sourceInterval.duration.ticks
+    const draftStart = previewDraft.sourceInterval.start.ticks
+    const draftEnd = draftStart + previewDraft.sourceInterval.duration.ticks
     return Object.freeze({
       ...footagePlan,
       segments: Object.freeze(footagePlan.segments.map((segment) => {
         const segmentSourceStart = segment.sourceStartTicks
         const segmentSourceEnd = segmentSourceStart + segment.interval.duration.ticks
         const intersects =
-          segment.assetId === footageMotionDraft.assetId &&
+          segment.assetId === previewDraft.assetId &&
           draftStart < segmentSourceEnd &&
           draftEnd > segmentSourceStart
         if (!intersects) return segment
         return Object.freeze({
           ...segment,
           footageMotions: Object.freeze([
-            ...segment.footageMotions.filter((motion) => motion.motionId !== footageMotionDraft.motionId),
+            ...segment.footageMotions.filter((motion) => motion.motionId !== previewDraft.motionId),
             draftNode,
           ]),
         })
       })),
     })
-  }, [acceptedFootageMotion, footageMotionDirty, footageMotionDraft, footagePlan, selectedVideoSelection])
+  }, [acceptedFootageMotion, footageKeyframePreviewState, footageMotionDirty, footageMotionDraft, footagePlan, selectedVideoSelection])
 
   const activeFootageMotion = footageDisplayPlan
     ? footageMotionAtCompositionTime(footageDisplayPlan, playheadPreviewTicks, reducedMotion)
@@ -1855,6 +1899,90 @@ export function StudioScreen({
   const visibleCanvasNodeIds = new Set(canvasVisibleNodes.map((node) => node.nodeId))
   const canvasSelectionResult = resolveCanvasSelection(inspectorSelection, visibleCanvasNodeIds)
   const visualDraftController = useSharedVisualDraft(canvasSelectionResult)
+  const selectedTimelineItem = selectedTimelineItemId
+    ? timelineModel.lanes.flatMap((lane) => lane.items).find((item) => item.id === selectedTimelineItemId) ?? null
+    : null
+  const animationSubject = useMemo<TimelineAnimationSubjectV1 | null>(() => {
+    if (!selectedTimelineItem) return null
+    const trackId = trackIdForLane(selectedTimelineItem.laneId)
+    const locked = lockedTrackIds.includes(trackId)
+    if (selectedVideoSelection && footageMotionDraft && !isFreezeClip(selectedVideoSelection.clip)) {
+      return Object.freeze({
+        itemId: selectedTimelineItem.id,
+        laneId: selectedTimelineItem.laneId,
+        label: selectedTimelineItem.label,
+        target: Object.freeze({
+          kind: 'primary-footage-motion' as const,
+          motionId: footageMotionDraft.motionId,
+          assetId: footageMotionDraft.assetId,
+          selectedPlacementClipId: selectedVideoSelection.clip.clipId,
+        }),
+        state: Object.freeze({
+          targetKind: 'primary-footage' as const,
+          durationTicks: footageMotionDraft.sourceInterval.duration.ticks,
+          transform: footageMotionDraft.transform,
+          crop: footageMotionDraft.crop,
+          tracks: footageMotionDraft.tracks,
+          locked,
+        }),
+        timeContext: Object.freeze({
+          kind: 'primary-footage-motion' as const,
+          clip: selectedVideoSelection.clip,
+          motionSourceInterval: footageMotionDraft.sourceInterval,
+        }),
+        sourceAnchored: true,
+      })
+    }
+    if (
+      inspectorSelection.kind === 'caption' ||
+      inspectorSelection.kind === 'nameplate' ||
+      inspectorSelection.kind === 'title' ||
+      inspectorSelection.kind === 'callout' ||
+      inspectorSelection.kind === 'media-overlay'
+    ) {
+      const properties = visualDraftController.draft?.value ?? inspectorSelection.visualProperties
+      return Object.freeze({
+        itemId: selectedTimelineItem.id,
+        laneId: selectedTimelineItem.laneId,
+        label: selectedTimelineItem.label,
+        target: Object.freeze({ kind: 'visual-properties' as const, visualId: inspectorSelection.visualId }),
+        state: editorAnimationStateFromVisualValue({
+          targetKind: inspectorSelection.kind,
+          properties,
+          durationTicks: inspectorSelection.durationTicks,
+          locked,
+        }),
+        timeContext: Object.freeze({
+          kind: 'visual-properties' as const,
+          compositionStartTicks: inspectorSelection.startTicks,
+          durationTicks: inspectorSelection.durationTicks,
+        }),
+        sourceAnchored: false,
+      })
+    }
+    return null
+  }, [
+    footageMotionDraft,
+    inspectorSelection,
+    lockedTrackIds,
+    selectedTimelineItem,
+    selectedVideoSelection,
+    visualDraftController.draft?.value,
+  ])
+  const selectedFootageKeyframeProperties = useMemo(() => {
+    if (!animationSubject || animationSubject.target.kind !== 'primary-footage-motion' || animationSubject.timeContext.kind !== 'primary-footage-motion' || !selectedSourceTime) return Object.freeze([])
+    const motionId = animationSubject.target.motionId
+    const canonicalAtTicks = selectedSourceTime.ticks - animationSubject.timeContext.motionSourceInterval.start.ticks
+    if (canonicalAtTicks < 0) return Object.freeze([])
+    return Object.freeze(keyframeSelection.addresses.flatMap((entry) =>
+      entry.target.kind === 'primary-footage-motion' &&
+      entry.target.motionId === motionId &&
+      entry.property !== 'opacity' &&
+      entry.canonicalAtTicks === canonicalAtTicks
+        ? [entry.property]
+        : [],
+    ))
+  }, [animationSubject, keyframeSelection, selectedSourceTime])
   const canvasTargets: readonly CanvasHitTarget[] = canvasVisibleNodes.flatMap((node) => {
     const item = timelineModel.lanes
       .flatMap((lane) => lane.items)
@@ -1886,11 +2014,19 @@ export function StudioScreen({
       canvasSelectionResult.selection.nodeId === node.nodeId &&
       visualDraftController.draft
     ) {
+      const draftValue = visualKeyframePreviewState
+        ? Object.freeze({
+            ...visualDraftController.draft.value,
+            transform: visualKeyframePreviewState.transform,
+            crop: visualKeyframePreviewState.crop,
+            tracks: visualKeyframePreviewState.tracks,
+          })
+        : visualDraftController.draft.value
       return visualCssStyleFromPropertiesAt(
         Object.freeze({
           visualId: canvasSelectionResult.selection.visualId,
           nodeIds: Object.freeze([node.nodeId]),
-          ...visualDraftController.draft.value,
+          ...draftValue,
         }),
         node,
         playheadPreviewTicks,
@@ -2147,6 +2283,65 @@ export function StudioScreen({
 
   function commitFootageMotionGesture(nextDraft: FootageMotionDraft) {
     void applyFootageMotion(buildFootageMotionOperation(nextDraft, createOperationId()))
+  }
+
+  function handleAnimationDraft(nextState: EditorAnimationTrackStateV1 | null) {
+    if (nextState === null || animationSubject === null) {
+      setFootageKeyframePreviewState(null)
+      setVisualKeyframePreviewState(null)
+      return
+    }
+    if (animationSubject.target.kind === 'primary-footage-motion') {
+      setFootageKeyframePreviewState(nextState)
+      setVisualKeyframePreviewState(null)
+      return
+    }
+    setVisualKeyframePreviewState(nextState)
+    setFootageKeyframePreviewState(null)
+  }
+
+  function handleAnimationCommit(nextState: EditorAnimationTrackStateV1) {
+    setFootageKeyframePreviewState(null)
+    setVisualKeyframePreviewState(null)
+    if (animationSubject?.target.kind === 'primary-footage-motion' && footageMotionDraft) {
+      const nextDraft = Object.freeze({
+        ...footageMotionDraft,
+        transform: nextState.transform,
+        crop: nextState.crop,
+        tracks: nextState.tracks,
+      })
+      setFootageMotionDraft(nextDraft)
+      void applyFootageMotion(buildFootageMotionOperation(nextDraft, createOperationId()))
+      return
+    }
+    if (
+      animationSubject?.target.kind === 'visual-properties' &&
+      (inspectorSelection.kind === 'caption' || inspectorSelection.kind === 'nameplate' ||
+       inspectorSelection.kind === 'title' || inspectorSelection.kind === 'callout' || inspectorSelection.kind === 'media-overlay')
+    ) {
+      const current = visualDraftController.draft?.value ?? inspectorSelection.visualProperties
+      const nextValue = Object.freeze({
+        ...current,
+        transform: nextState.transform,
+        crop: nextState.crop,
+        tracks: nextState.tracks,
+      })
+      const built = buildVisualPropertiesOperation(inspectorSelection, nextValue, createOperationId())
+      if (!built.ok) {
+        setTimelineNotice(built.message)
+        return
+      }
+      visualDraftController.update(nextValue)
+      void onCreateOverlay(built.operation).then((error) => {
+        if (error) {
+          visualDraftController.reportNotice(error)
+          setTimelineNotice(error)
+          return
+        }
+        visualDraftController.markApplied()
+        setTimelineNotice('Animation edit applied. Undo restores the previous keyframes.')
+      })
+    }
   }
 
   function seekSelectedSourceTime(sourceTime: ReturnType<typeof mediaTime>) {
@@ -3747,6 +3942,7 @@ export function StudioScreen({
                     <PrimaryFootageCanvasControls
                       draft={footageMotionDraft}
                       sourceTime={selectedSourceTime}
+                      keyframeEditProperties={selectedFootageKeyframeProperties}
                       setDraft={setFootageMotionDraft}
                       busy={canvasBusy || timelineBusy}
                       narrow={canvasNarrow}
@@ -3881,6 +4077,15 @@ export function StudioScreen({
               <h2>{studioWorkspace === 'edit' ? 'Inspector' : studioWorkspace === 'effects' ? 'Effect controls' : studioWorkspace === 'color' ? 'Color controls' : 'Audio controls'}</h2>
             </div>
             {toolSupported ? <>
+            {studioWorkspace !== 'color' && studioWorkspace !== 'audio' ? (
+              <InspectorSelectedKeyframe
+                subject={animationSubject}
+                selection={keyframeSelection}
+                busy={timelineBusy}
+                onCommit={handleAnimationCommit}
+                onNotice={(message) => setTimelineNotice(message)}
+              />
+            ) : null}
             {selectedVideoSelection && footageMotionDraft && studioWorkspace !== 'color' && studioWorkspace !== 'audio' ? (
               <FootageMotionInspector
                 draft={footageMotionDraft}
@@ -3962,6 +4167,12 @@ export function StudioScreen({
           frameRate={primaryVideoAsset?.frameRate ?? Object.freeze({ numerator: 30, denominator: 1 })}
           viewport={timelineViewport}
           selection={timelineSelection}
+          animationSubject={animationSubject}
+          animatedItemIds={animatedTimelineItemIds}
+          keyframeSelection={keyframeSelection}
+          onKeyframeSelectionChange={setKeyframeSelection}
+          onAnimationDraft={handleAnimationDraft}
+          onAnimationCommit={handleAnimationCommit}
           groups={timelineGroups}
           markers={timelineMarkers}
           selectedMarkerId={selectedMarkerId}
