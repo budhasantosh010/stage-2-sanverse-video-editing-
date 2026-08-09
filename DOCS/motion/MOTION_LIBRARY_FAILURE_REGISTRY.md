@@ -227,3 +227,58 @@ ATTEMPTS: Replaced timer polling with a `MutationObserver` that waits for the ac
 
 ONE-LINE SOLUTION: retained browser metric is mutation-to-DOM-commit based: 50 commits averaged 23.804 ms, p95 38.9 ms, worst 49.9 ms in the local headless Edge development environment.
 
+## MOTION-FAIL-012 — First A19 hierarchy renderer looked like a flat card grid
+
+- Status: FIXED
+- Severity: medium for visual/structural communication quality
+- Milestone: MOTION-A19
+- Date: 2026-08-09
+
+WHAT: the first real Edge Decision Tree and Journey Map review was mechanically valid but visually read as adjacent cards. The graph already contained nested relationships and connector paths, yet the renderer collapsed relationship evidence into a generic arrow footer.
+
+WHERE: `packages/motion-library/src/components/a19-hierarchy-explainers.tsx` initial A19 renderer.
+
+WHY: the first implementation proved graph structure before giving each variant its own relationship visualization.
+
+IMPACT: accepting it would have met schema tests while failing the actual A19 goal: hierarchy-heavy explainers that visually communicate their structure.
+
+ATTEMPTS: rejected the first screenshots, kept the graph/data contract, then redesigned the renderer by variant: parent-depth Decision levels, explicit Swimlane handoffs, numbered Journey flow, a real 2×2 Priority Matrix, staged Value Chain arrows, dependency-width Layer Stack, core→region Ecosystem structure and dependency levels. Visible cards were also mapped to their real Surface/Label/Detail graph nodes for C3 selection/effects.
+
+ONE-LINE SOLUTION: retain one nested Motion Graph, but render its relationships explicitly instead of treating hierarchy as a card collection.
+
+## MOTION-FAIL-013 — First A19 portrait scale was technically valid but underpowered
+
+- Status: FIXED
+- Severity: medium for visual quality
+- Milestone: MOTION-A19
+- Date: 2026-08-10
+
+WHAT: the first 9:16 A19 review had correct layouts with no clipping, but compact typography inherited card-scale sizes (34px title, ~20px node labels) and left the 1080×1920 compositions visually too small, especially Journey Map, Priority Matrix and Value Chain.
+
+WHERE: `packages/motion-library/src/components/a19-hierarchy-explainers.tsx` compact renderer dimensions.
+
+WHY: the initial compact values optimized for fitting dense hierarchy rather than real short-form composition readability.
+
+IMPACT: content remained correct but the portrait graphics did not use enough composition space to be useful on mobile video.
+
+ATTEMPTS: increased composition-space compact typography, node padding, matrix region height, connector labels, ecosystem labels/members and portrait surface height; widened the Decision root; reran A19 tests/build; recaptured all eight portrait cases across all eight style packs, including busy-background and reduced-motion cases.
+
+ONE-LINE SOLUTION: portrait now uses purpose-built compact composition sizing while 16:9 sizing remains unchanged.
+
+## MOTION-FAIL-014 — Headless Edge screenshot paths were initially parsed as multiple targets
+
+- Status: FIXED / evidence harness only
+- Severity: low for product, low for evidence quality
+- Milestone: MOTION-A19
+- Date: 2026-08-09
+
+WHAT: the first A19 headless Edge capture exited with code 13 and produced no PNG. Edge stderr reported `Multiple targets are not supported in headless mode.`
+
+WHERE: temporary PowerShell screenshot command, not product source.
+
+WHY: the worktree path contains spaces and the `--user-data-dir` / `--screenshot` arguments were not quoted as single arguments by `Start-Process`.
+
+IMPACT: no product/browser rendering failure occurred; the invalid capture was discarded.
+
+ONE-LINE SOLUTION: quote the profile and screenshot arguments explicitly; subsequent real Edge captures succeeded.
+

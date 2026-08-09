@@ -1,5 +1,17 @@
 # Project Log
 
+## 2026-08-10 — Parallel Motion Program MOTION-A19 hierarchy-heavy explainer pack complete
+
+- Re-read the 69-component coverage matrix before implementation. Rejected Org / Hierarchy Map, Feedback Loop and Roadmap Milestones as overlaps with existing Hierarchy Diagram, Flywheel Diagram and milestone/sequence/step patterns.
+- Added eight genuinely distinct hierarchy-heavy first-party scenarios: Decision Tree, Swimlane Process, Journey Map, Priority Matrix, Value Chain, Layer Stack Explainer, Ecosystem Regions Map and Dependency Map. Public catalog: **69 → 77 components**.
+- Reused the mature Family Creator/Designer/Advanced editing shell without reusing the flat graph structure. A19 switches at one common factory boundary into variant-specific nested Motion Graph scenes with stable data-derived IDs, semantic parts, real child Surface/Label/Detail nodes and relationship connector paths.
+- Added typed structured-data validation: stable IDs, duplicate detection, active-ID validation, bounded per-variant density, Swimlane step IDs, Priority quadrants, decision/dependency references and explicit cycle refusal. Scene duration is bounded to **1.5–12 seconds** and canonical Sanverse ticks remain mandatory.
+- Authored A19 entrances use C2 exact-tick keyframes for opacity, Y position, scale and connector trim/reveal. Direct/backward/random seek equality passes. Reduced motion swaps those entrance tracks for stable final constants while preserving semantic content.
+- C3 integration is real rather than cosmetic: all 77 public components project at all four ratios; A19 tests exercise rename/eye/group/lock through the C1/C3 operation boundary; dense Swimlane reaches **127 graph nodes**. Real Edge Compositor selects nested `a19.decision-tree.node:automate.surface` and the Preview outline lands on that exact child.
+- Browser review rejected two technically valid but visually weak passes before acceptance: the first renderer flattened relationships into cards (`MOTION-FAIL-012`), and the first portrait scale was too small (`MOTION-FAIL-013`). The accepted renderer has distinct relationship visuals and purpose-built 9:16 typography. All eight final 16:9 baselines and all eight final 9:16 baselines were manually inspected across all eight style packs; busy-background and reduced-motion cases are included.
+- Measured A19 separately: 256 module/style/ratio graph create+evaluate combinations averaged **1.506 ms**; SSR markup averaged **4.813 ms**. Dense 127-node Swimlane create+evaluate+C3 projection averaged **10.308 ms**. These are local engineering timings, not FPS claims.
+- Final A19 release-candidate gate: **315/315 Motion tests**, **7/7 Motion workspace builds**, clean `apps/web`, runtime-authority, prohibited-dependency, Plan-B and C4 scans. Evidence: `DOCS/motion/evidence/MOTION-A19.md`. The dedicated immutable release checkpoint is tagged `motion-library-v1.3`.
+
 ## 2026-08-09 — Parallel Motion Program MOTION-C3 Professional Layer Hierarchy complete
 
 - Added a backward-compatible constant node `enabled` render switch so Layer eye toggles no longer destroy animated `visible`/opacity/keyframe state. Resolved nodes publish local/effective enabled state and sibling stacking index; parent disable does not mutate child-local switches.

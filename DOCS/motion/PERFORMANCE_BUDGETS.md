@@ -134,3 +134,18 @@ The retained browser metric uses a `MutationObserver` on the actual selection ov
 This includes the full development Motion Lab React/Layer/overlay path. It is not paint time or Motion Graph evaluator cost.
 
 The first timer-based browser benchmark is discarded and recorded as `MOTION-FAIL-011` because background Edge throttled its `setTimeout(0)` waits.
+
+## MOTION-A19 hierarchy-heavy pack measured review — 2026-08-10
+
+A19 was measured separately from the C3 synthetic Layer stress because its goal is realistic nested explainer scenes rather than arbitrary row count. The local development sweep covered **8 A19 modules × 8 style packs × 4 ratios = 256 combinations** at a settled exact tick:
+
+- graph scene creation + exact-tick evaluation: **1.506 ms average**, **3.369 ms p95**, **33.072 ms worst local sample**;
+- server-side component markup: **4.813 ms average**, **7.683 ms p95**, **43.470 ms worst local sample**;
+- mean generated markup size: **7,892 bytes**.
+
+The bounded density stress uses `sanverse.swimlane-process` with **5 lanes × 5 steps = 127 graph nodes** in 9:16:
+
+- scene creation + exact-tick evaluation + C3 Layer projection, 50 runs: **10.308 ms average**, **15.160 ms p95**, **18.970 ms worst local sample**;
+- server-side markup, 20 runs: **12.167 ms average**, **15.299 ms p95**, **18.144 ms worst local sample**.
+
+These measurements include local runtime/JIT/GC noise and are not FPS, browser paint-time or universal production-memory guarantees. The dense 127-node case remains well below the synthetic C3 500/1000-row regime that would justify immediate Layer virtualization.

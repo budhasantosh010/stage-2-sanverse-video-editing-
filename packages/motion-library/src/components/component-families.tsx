@@ -8,6 +8,7 @@ import { FULL_NATIVE_GRAPH_CAPABILITIES, graphGroup, graphShape, graphText, resp
 import { mConst, mEase, mMultiply, mNumber, mOneMinus, mProgress, mReduced, mSequence, mStagger } from '../graph-motion.ts'
 import { SANVERSE_CLEAN_STYLE } from '../style-packs.ts'
 import { isRecord, unknownFieldIssues, validationFailure, validationSuccess, valueIssue } from '../validation.ts'
+import { A19_HIERARCHY_CONFIGS, a19HierarchyItemLimit, createA19HierarchyScene, isA19HierarchyConfig, renderA19HierarchyComponent, validateA19HierarchyProps } from './a19-hierarchy-explainers.tsx'
 
 export type FamilyKind = 'title' | 'value' | 'list' | 'status' | 'diagram' | 'quote' | 'cta'
 
@@ -375,22 +376,23 @@ const renderFamilyVisual = (config: FamilyVariantConfig, props: FamilyComponentP
 }
 
 const createFamilyComponent = (config: FamilyVariantConfig): MotionGraphBackedComponentModuleV1<FamilyComponentProps, FamilyComponentStyle> => {
+  const hierarchyHeavy = isA19HierarchyConfig(config)
   const defaultProps: FamilyComponentProps = Object.freeze({ eyebrow: config.eyebrow, title: config.title, subtitle: config.subtitle, value: config.value, items: Object.freeze([...config.items]) })
   const definition: MotionComponentDefinitionV1 = Object.freeze({
     id: config.id, version: 1, name: config.name, purpose: config.purpose, category: categoryForFamily(config.family), performanceClass: config.family === 'diagram' || config.family === 'list' ? 'medium' : 'light',
     supportedAspectRatios: Object.freeze(['16:9', '9:16', '1:1', '4:5'] as const),
     minDurationTicks: durationTicksForConfig(config, 'min'), defaultDurationTicks: durationTicksForConfig(config, 'default'), maxDurationTicks: durationTicksForConfig(config, 'max'),
     events: Object.freeze(config.events ?? [{ name: 'enter-start', normalizedTime: 0 }, { name: 'content-reveal', normalizedTime: 0.08 }, { name: 'settled', normalizedTime: 0.56 }, { name: 'exit-start', normalizedTime: 0.84 }]),
-    contentLimits: Object.freeze([{ field: 'title', description: 'Primary visible title.', minimum: 1, maximum: 96, unit: 'characters' as const }, { field: 'items', description: 'Optional supporting items.', minimum: 0, maximum: 6, unit: 'items' as const }]),
+    contentLimits: Object.freeze([{ field: 'title', description: 'Primary visible title.', minimum: 1, maximum: 96, unit: 'characters' as const }, { field: 'items', description: hierarchyHeavy ? 'Structured hierarchy rows.' : 'Optional supporting items.', minimum: hierarchyHeavy ? 2 : 0, maximum: a19HierarchyItemLimit(config), unit: 'items' as const }]),
     capabilities: FULL_NATIVE_GRAPH_CAPABILITIES,
   })
   const Component = ({ props, style, context }: MotionComponentRenderPropsV1<FamilyComponentProps, FamilyComponentStyle>) => {
-    const state = evaluateFamilyComponentState(props, context)
     const graph = useMotionGraphPresentation()
+    if (hierarchyHeavy) return renderA19HierarchyComponent(config, props, style, context, graph.scene)
+    const state = evaluateFamilyComponentState(props, context)
     const graphStyle = (id: string, base: CSSProperties): CSSProperties => mergeMotionGraphNodeStyle(base, graph.scene?.nodes[id] ?? null, graph.selectedNodeId === id)
     const prefix = nodePrefix(config)
     const short = Math.min(context.composition.width, context.composition.height)
-    const align = alignmentFor(config)
     const surface = graph.scene?.nodes[`${prefix}.surface`]
     const shape = surface?.type === 'shape' ? surface : null
     const graphBacked = Boolean(graph.scene)
@@ -403,7 +405,15 @@ const createFamilyComponent = (config: FamilyVariantConfig): MotionGraphBackedCo
       </section>
     </div>
   }
-  return Object.freeze({ definition, defaultProps, defaultStyle: DEFAULT_FAMILY_STYLE, validateProps: validateFamilyComponentProps, validateStyle: validateFamilyComponentStyle, Component, createScene: (props: FamilyComponentProps, style: FamilyComponentStyle, context: MotionRenderContextV1) => createFamilyScene(config, props, style, context) })
+  return Object.freeze({
+    definition,
+    defaultProps,
+    defaultStyle: DEFAULT_FAMILY_STYLE,
+    validateProps: (input: unknown) => hierarchyHeavy ? validateA19HierarchyProps(config, input) : validateFamilyComponentProps(input),
+    validateStyle: validateFamilyComponentStyle,
+    Component,
+    createScene: (props: FamilyComponentProps, style: FamilyComponentStyle, context: MotionRenderContextV1) => hierarchyHeavy ? createA19HierarchyScene(config, props, style, context) : createFamilyScene(config, props, style, context),
+  })
 }
 
 const configs = Object.freeze([
@@ -445,6 +455,8 @@ const configs = Object.freeze([
   { id:'sanverse.hierarchy-diagram', name:'Hierarchy Diagram', purpose:'Show a compact hierarchy of layers or responsibilities.', family:'diagram', variant:'hierarchy', eyebrow:'SYSTEM', title:'Knowledge hierarchy', subtitle:'', value:'', items:['Global knowledge','Platform playbook','Format rules','Final asset'] },
   { id:'sanverse.flywheel-diagram', name:'Flywheel Diagram', purpose:'Show a repeating compounding loop.', family:'diagram', variant:'flywheel', eyebrow:'FLYWHEEL', title:'Publish → learn → improve', subtitle:'Every cycle feeds the next.', value:'', items:['Research','Create','Publish','Measure','Iterate'] },
   { id:'sanverse.sequence-diagram', name:'Sequence Diagram', purpose:'Show a deterministic ordered handoff between actors.', family:'diagram', variant:'sequence', eyebrow:'HANDOFF', title:'Creator system sequence', subtitle:'', value:'', items:['Input','Research agent','Creation agent','Human review','Distribution'] },
+  // MOTION-A19 — hierarchy-heavy explainer pack. These use custom nested graph scenes behind the same Family editing shell.
+  ...A19_HIERARCHY_CONFIGS,
   // Quote / testimonial / proof — 4.
   { id:'sanverse.quote-card', name:'Quote Card', purpose:'Present one attributed quote with strong typography.', family:'quote', variant:'quote', eyebrow:'QUOTE', title:'The system should remove repeated work, not human judgment.', subtitle:'', value:'— Operating principle', items:[] },
   { id:'sanverse.testimonial-card', name:'Testimonial Card', purpose:'Present a customer testimonial with attribution.', family:'quote', variant:'testimonial', eyebrow:'CUSTOMER', title:'We finally know what to publish every week.', subtitle:'The process is clearer and the team moves faster.', value:'— Client feedback', items:[] },

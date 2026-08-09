@@ -1,9 +1,9 @@
 # Sanverse Motion Component Coverage Matrix
 
 Date: 2026-08-09
-Milestone: Plan A continuation through MOTION-A18
+Milestone: Plan A continuation through MOTION-A19
 Historical inventory baseline: 48 first-party components
-Current catalog after A17 + A18: **69 first-party components**
+Current catalog after A17 + A18 + A19: **77 first-party components**
 
 ## Visual-review score rubric
 
@@ -305,3 +305,38 @@ Mechanical tests cover 0.75, 1, 1.5, 2, 3 and 5 seconds. Durations below 0.75 se
 No outside commercial template, logo, proprietary asset, screenshot or animation runtime was used to construct the nine A18 designs. They are first-party Sanverse compositions built from the existing typography, shape, graph, style-pack and C2 keyframe primitives. Default client/product names are invented or Sanverse-local. The communication principles extracted are generic: sequential emphasis, ranked choice, podium ordering, focused feature explanation and keyboard-shortcut teaching.
 
 A18 browser evidence intentionally distributes the nine components across all eight style packs, all four reference ratios, hostile/busy backgrounds and reduced motion rather than taking 8 × 9 redundant screenshots.
+
+## MOTION-A19 inventory gate — hierarchy-heavy explainer pack
+
+The 69-component catalog was re-read before A19. This batch is intentionally about **structural explanation**, not another flat card family. Three candidates were explicitly rejected as aliases:
+
+- Org / Hierarchy Map — existing `Hierarchy Diagram` already covers generic hierarchy.
+- Feedback Loop — existing `Flywheel Diagram` already covers repeating feedback/compounding loops.
+- Roadmap Milestones — existing `Milestone Status`, `Step List` and `Sequence Diagram` already cover the basic job.
+
+A19 instead adds eight scenarios whose communication value depends on materially nested relationships and therefore exercises C3 hierarchy more deeply.
+
+| Component ID | Display name | Distinct structural scenario | Stable data IDs | Nested C3 hierarchy | C2 authored keyframes | Ratios | Styles | Visual |
+|---|---|---|---|---|---|---|---|---|
+| `sanverse.decision-tree` | Decision Tree | Branching question/decision/result logic with labeled edges | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.swimlane-process` | Swimlane Process | Ownership lanes containing independently addressable process steps and handoffs | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.journey-map` | Journey Map | Ordered experience stages with stage-specific moments/metrics | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.priority-matrix` | Priority Matrix | Impact × effort quadrants with addressable items | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.value-chain` | Value Chain | Sequential stages that transform one kind of value into the next | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.layer-stack-explainer` | Layer Stack Explainer | Dependency stack from experience down to infrastructure | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.ecosystem-regions-map` | Ecosystem Regions Map | Core plus relationship regions and nested members | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.dependency-map` | Dependency Map | Acyclic dependency levels with explicit prerequisites | ✓ | ✓ | ✓ | 4 | 8 | A |
+
+### A19 authoring/data contract
+
+A19 keeps the existing Family Creator/Designer/Advanced editing shell for title, structured rows, active item and shared style tokens, but replaces the old flat family graph with variant-specific nested scenes. Structured rows carry stable IDs such as `research`, `publish` and `lane-3-step-5`; Layer identity does not depend on array position or display text. Invalid IDs, duplicate IDs, missing references, decision/dependency cycles, invalid active IDs and excessive row density fail closed.
+
+Every A19 component declares a **1.5–12 second** authoring window and uses the canonical Sanverse tick authority. Normal authored entrances are C2 exact-tick opacity/position/scale tracks; connector paths use exact-tick trim/reveal tracks. Reduced motion replaces those entrance tracks with final constants while preserving semantic text and hierarchy.
+
+The bounded dense proof is a 5-lane × 5-step Swimlane: **127 graph nodes** with stable nested step IDs. It remains a single Motion Graph and projects through C3 without a second hierarchy store.
+
+### A19 provenance / originality
+
+All eight A19 designs are first-party Sanverse compositions. No commercial template, proprietary screenshot, logo asset or external animation runtime was copied or imported. The generic communication ideas—branching decisions, swimlanes, journey stages, matrices, value chains, stacks, ecosystems and dependencies—are expressed using the existing Sanverse Motion Graph, shared style tokens, C2 keyframes and C3 Layers architecture.
+
+A19 browser evidence includes manually inspected 16:9 baselines for all eight plus 9:16 captures distributed across all eight style packs. The portrait set includes a busy-background Creator Energetic Ecosystem and a reduced-motion Dependency Map. The first flat relationship renderer and the first undersized portrait scale were rejected and corrected before acceptance.
