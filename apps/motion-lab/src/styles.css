@@ -72,6 +72,41 @@ button { cursor: pointer; }
 .motion-lab__component-category { color: #5fff52; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
 .motion-lab__catalog-note { margin-top: 14px; color: #67676d; font-size: 10px; line-height: 1.5; }
 
+.motion-lab__body--compositor { grid-template-columns: 330px minmax(520px, 1fr) 320px; }
+.motion-lab__layers { min-height: 0; overflow: auto; padding: 12px 10px 18px; border-right: 1px solid #242428; background: #111214; }
+.motion-lab__panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.motion-lab__panel-title-row small { display: block; margin-top: 2px; color: #66666e; font-size: 9px; }
+.motion-lab__panel-title-row > button,
+.motion-lab__layer-toolbar button { padding: 5px 7px; border: 1px solid #333338; border-radius: 6px; color: #bdbdc4; background: #19191c; font-size: 9px; }
+.motion-lab__layer-search { width: 100%; margin: 10px 0 7px; padding: 8px 9px; border: 1px solid #2d2d32; border-radius: 7px; outline: 0; background: #0d0e10; font-size: 11px; }
+.motion-lab__layer-toolbar { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 5px; margin-bottom: 8px; }
+.motion-lab__layer-toolbar button:disabled { opacity: .3; cursor: default; }
+.motion-lab__layer-tree { display: grid; gap: 2px; min-height: 90px; }
+.motion-lab__layer-row-wrap { min-width: 0; }
+.motion-lab__layer-row { min-width: 0; height: 30px; display: grid; grid-template-columns: 18px 22px 22px 18px minmax(0,1fr) auto; align-items: center; gap: 2px; padding-right: 5px; border: 1px solid transparent; border-radius: 5px; color: #b4b4bb; user-select: none; }
+.motion-lab__layer-row:hover { background: #191a1d; }
+.motion-lab__layer-row--selected { background: #18212a; border-color: #294058; }
+.motion-lab__layer-row--primary { box-shadow: inset 2px 0 0 #62baff; }
+.motion-lab__layer-row button { padding: 0; border: 0; color: inherit; background: transparent; font-size: 10px; }
+.motion-lab__layer-disclosure:disabled { opacity: .25; }
+.motion-lab__layer-eye { color: #c9c9cf !important; }
+.motion-lab__layer-eye--muted { color: #53535a !important; }
+.motion-lab__layer-lock { color: #5e5e65 !important; }
+.motion-lab__layer-lock--active { color: #ffcb62 !important; }
+.motion-lab__layer-type { display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid #35353b; border-radius: 4px; color: #787881; font: 700 8px/1 Consolas, monospace; }
+.motion-lab__layer-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.motion-lab__layer-rename { min-width: 0; width: 100%; padding: 3px 5px; border: 1px solid #5a7c9f; border-radius: 4px; background: #111820; font-size: 10px; }
+.motion-lab__layer-badges { display: inline-flex; align-items: center; gap: 3px; color: #67c1ff; font-size: 8px; }
+.motion-lab__layer-badges button { color: #67c1ff; font-size: 8px; }
+.motion-lab__layer-drop-zones { display: grid; grid-template-columns: repeat(3,1fr); gap: 3px; margin-top: 2px; margin-bottom: 3px; }
+.motion-lab__layer-drop-zones button { padding: 3px; border: 1px dashed #3e586f; border-radius: 4px; color: #7faed3; background: #121a21; font-size: 7px; }
+.motion-lab__layer-drop-zones button:disabled { opacity: .2; }
+.motion-lab__layer-menu { position: relative; z-index: 5; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 3px; padding: 5px; border: 1px solid #3b3b42; border-radius: 7px; background: #17171b; box-shadow: 0 10px 30px rgba(0,0,0,.38); }
+.motion-lab__layer-menu button { padding: 5px; border: 1px solid #2f2f35; border-radius: 4px; color: #b9b9c0; background: #1d1d21; font-size: 8px; }
+.motion-lab__layer-menu button:disabled { opacity: .3; }
+.motion-lab__layer-selection-summary { margin-top: 8px; padding: 7px; border-top: 1px solid #25252a; color: #66666e; font: 8px/1.4 Consolas, monospace; overflow-wrap: anywhere; }
+.motion-lab__layer-empty { color: #75757d; font-size: 10px; }
+
 .motion-lab__stage-column { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto 1fr 28px auto 28px; background: #0d0d0f; }
 .motion-lab__stage-toolbar { min-height: 48px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #232327; background: #121214; }
 .motion-lab__segmented { display: inline-flex; overflow: hidden; border: 1px solid #303036; border-radius: 8px; }

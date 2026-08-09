@@ -189,3 +189,41 @@ ATTEMPTS: Increased the actual composition-space compact line sizes, reran all 1
 
 ONE-LINE SOLUTION: Stacked Hook portrait now uses materially larger compact typography while preserving three-line hierarchy and no clipping; the weak first screenshot is not retained as evidence.
 
+## MOTION-FAIL-010 — First C3 hierarchy stress fixture was malformed
+
+- Status: FIXED
+- Severity: low for product, medium for verification quality
+- Milestone: MOTION-C3
+- Date: 2026-08-09
+
+WHAT: the first depth/width stress test generated invalid synthetic Text nodes and invalid parent links, so all ten new hierarchy-stress cases failed scene validation before Layer projection could be measured.
+
+WHERE: `packages/motion-graph/src/layers.test.ts` synthetic test helpers only.
+
+WHY: the existing local `text(id, name, parentId, value)` helper was called with arguments in the wrong positions while creating synthetic depth/sibling scenes.
+
+IMPACT: the failed run did not say anything about Layer projection scalability; accepting it as a product failure would have been false.
+
+ATTEMPTS: Kept validation strict, corrected only the synthetic fixture constructor calls, then reran the same unchanged depth `1/3/5/10/20` and sibling `10/50/100/500/1000` matrix. All 17 Layer tests passed at that point; the final Layer suite later reached 18/18 after native-node-family coverage was added.
+
+ONE-LINE SOLUTION: fix the test data rather than weakening validation; the identical hierarchy stress matrix now passes.
+
+## MOTION-FAIL-011 — Timer-based C3 selection benchmark timed out in headless Edge
+
+- Status: FIXED / invalid measurement discarded
+- Severity: low for product, medium for evidence quality
+- Milestone: MOTION-C3
+- Date: 2026-08-09
+
+WHAT: the first real-browser Layer→Preview selection benchmark performed 100 iterations and awaited `setTimeout(0)` after each click. In headless/background Edge those timers were throttled enough to exceed the command timeout.
+
+WHERE: temporary C3 browser measurement harness, not product source.
+
+WHY: background browser timer scheduling is not a reliable proxy for React/DOM selection commit time.
+
+IMPACT: the timed-out run produced no valid selection-latency number and is not used as performance evidence.
+
+ATTEMPTS: Replaced timer polling with a `MutationObserver` that waits for the actual `data-motion-selection-node-id` overlay mutation, then ran 50 alternating real Layer selections successfully.
+
+ONE-LINE SOLUTION: retained browser metric is mutation-to-DOM-commit based: 50 commits averaged 23.804 ms, p95 38.9 ms, worst 49.9 ms in the local headless Edge development environment.
+

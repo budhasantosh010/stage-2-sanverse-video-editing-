@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, PropsWithChildren, ReactNode } from 'react'
 import type { MotionComponentModuleV1, MotionCompositionV1, MotionRenderContextV1 } from '@sanverse/motion-contract'
 import type { MotionGraphBackedComponentModuleV1, MotionGraphOperationV1, MotionGraphPatchV1, ResolvedMotionNodeV1, ResolvedMotionSceneV1 } from '@sanverse/motion-graph'
@@ -22,6 +22,7 @@ export function MotionCompositionFrame({ composition, displayScale = 1, backgrou
 interface MotionResolvedSceneContextValue {
   readonly scene: ResolvedMotionSceneV1
   readonly selectedNodeId: string | null
+  readonly selectedNodeIds: readonly string[]
 }
 const MotionResolvedSceneContext = createContext<MotionResolvedSceneContextValue | null>(null)
 
@@ -36,9 +37,10 @@ export interface MotionComponentHostProps<Props, Style> {
   readonly graphPatches?: readonly MotionGraphPatchV1[]
   readonly graphOperations?: readonly MotionGraphOperationV1[]
   readonly selectedGraphNodeId?: string | null
+  readonly selectedGraphNodeIds?: readonly string[]
 }
 
-export function MotionComponentHost<Props, Style>({ module, props, style, context, graphPatches = [], graphOperations = [], selectedGraphNodeId = null }: MotionComponentHostProps<Props, Style>) {
+export function MotionComponentHost<Props, Style>({ module, props, style, context, graphPatches = [], graphOperations = [], selectedGraphNodeId = null, selectedGraphNodeIds = selectedGraphNodeId ? [selectedGraphNodeId] : [] }: MotionComponentHostProps<Props, Style>) {
   const Component = module.Component
   const resolvedScene = isGraphBackedModule(module)
     ? (() => {
@@ -52,15 +54,15 @@ export function MotionComponentHost<Props, Style>({ module, props, style, contex
   return (
     <div data-motion-component-id={module.definition.id} data-motion-component-version={module.definition.version} data-motion-graph-backed={resolvedScene ? 'true' : 'false'} style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
       {resolvedScene
-        ? <MotionResolvedSceneContext.Provider value={{ scene: resolvedScene, selectedNodeId: selectedGraphNodeId }}>{component}</MotionResolvedSceneContext.Provider>
+        ? <MotionResolvedSceneContext.Provider value={{ scene: resolvedScene, selectedNodeId: selectedGraphNodeId, selectedNodeIds: Object.freeze([...selectedGraphNodeIds]) }}>{component}</MotionResolvedSceneContext.Provider>
         : component}
     </div>
   )
 }
 
-export const useMotionGraphPresentation = (): Readonly<{ scene: ResolvedMotionSceneV1 | null; selectedNodeId: string | null }> => {
+export const useMotionGraphPresentation = (): Readonly<{ scene: ResolvedMotionSceneV1 | null; selectedNodeId: string | null; selectedNodeIds: readonly string[] }> => {
   const value = useContext(MotionResolvedSceneContext)
-  return value ? { scene: value.scene, selectedNodeId: value.selectedNodeId } : { scene: null, selectedNodeId: null }
+  return value ? { scene: value.scene, selectedNodeId: value.selectedNodeId, selectedNodeIds: value.selectedNodeIds } : { scene: null, selectedNodeId: null, selectedNodeIds: Object.freeze([]) }
 }
 export const useResolvedMotionScene = (): ResolvedMotionSceneV1 | null => useMotionGraphPresentation().scene
 export const useResolvedMotionNode = (nodeId: string): ResolvedMotionNodeV1 | null => useResolvedMotionScene()?.nodes[nodeId] ?? null
@@ -113,12 +115,12 @@ const maskImageFor = (node: ResolvedMotionNodeV1): string | null => {
   return `url("data:image/svg+xml,${encodeURIComponent(escapeSvg(svg))}")`
 }
 
-export const mergeMotionGraphNodeStyle = (base: CSSProperties, node: ResolvedMotionNodeV1 | null, selected = false): CSSProperties => {
+export const mergeMotionGraphNodeStyle = (base: CSSProperties, node: ResolvedMotionNodeV1 | null, _selected = false): CSSProperties => {
   if (!node) return base
   const hasGraphTransform = node.transform.positionX !== 0 || node.transform.positionY !== 0 || node.transform.rotationDeg !== 0 || node.transform.scaleX !== 1 || node.transform.scaleY !== 1
   const hasEnabledEffects = node.effects.some((effect) => effect.enabled)
   const hasEnabledMasks = node.masks.some((mask) => mask.enabled)
-  const hasGraphPresentation = !node.visible || node.opacity !== 1 || hasGraphTransform || node.blendMode !== 'normal' || hasEnabledEffects || hasEnabledMasks || selected
+  const hasGraphPresentation = !node.effectiveEnabled || !node.visible || node.opacity !== 1 || hasGraphTransform || node.blendMode !== 'normal' || hasEnabledEffects || hasEnabledMasks || (base.position !== undefined && node.stackingIndex !== 0)
   if (!hasGraphPresentation) return base
   const baseOpacity = typeof base.opacity === 'number' ? base.opacity : 1
   const transformParts: string[] = []
@@ -133,8 +135,9 @@ export const mergeMotionGraphNodeStyle = (base: CSSProperties, node: ResolvedMot
   const maskImage = maskImageFor(node)
   return {
     ...base,
-    visibility: node.visible ? base.visibility : 'hidden',
+    visibility: node.effectiveEnabled && node.visible ? base.visibility : 'hidden',
     opacity: baseOpacity * node.opacity,
+    zIndex: base.zIndex ?? (base.position !== undefined ? node.stackingIndex : undefined),
     transform: graphTransform ? `${baseTransform}${baseTransform ? ' ' : ''}${graphTransform}` : base.transform,
     transformOrigin: hasGraphAnchor ? `${node.transform.anchorX * 100}% ${node.transform.anchorY * 100}%` : base.transformOrigin,
     filter: `${baseFilter}${baseFilter && graphFilter ? ' ' : ''}${graphFilter}` || undefined,
@@ -143,36 +146,87 @@ export const mergeMotionGraphNodeStyle = (base: CSSProperties, node: ResolvedMot
     maskImage: maskImage ?? undefined,
     WebkitMaskSize: maskImage ? '100% 100%' : undefined,
     maskSize: maskImage ? '100% 100%' : undefined,
-    outline: selected ? '3px solid rgba(84,180,255,.92)' : base.outline,
-    outlineOffset: selected ? 3 : base.outlineOffset,
   }
 }
 
-export const mergeMotionGraphNodeDecorationStyle = (base: CSSProperties, node: ResolvedMotionNodeV1 | null, selected = false): CSSProperties => {
+export const mergeMotionGraphNodeDecorationStyle = (base: CSSProperties, node: ResolvedMotionNodeV1 | null, _selected = false): CSSProperties => {
   if (!node) return base
   const graphFilter = motionGraphEffectFilter(node)
   const baseFilter = typeof base.filter === 'string' ? base.filter : ''
   const maskImage = maskImageFor(node)
-  const hasPresentation = !node.visible || graphFilter || node.blendMode !== 'normal' || maskImage || selected
+  const hasPresentation = !node.effectiveEnabled || !node.visible || graphFilter || node.blendMode !== 'normal' || maskImage
   if (!hasPresentation) return base
   return {
     ...base,
-    visibility: node.visible ? base.visibility : 'hidden',
+    visibility: node.effectiveEnabled && node.visible ? base.visibility : 'hidden',
     filter: `${baseFilter}${baseFilter && graphFilter ? ' ' : ''}${graphFilter}` || undefined,
     mixBlendMode: node.blendMode === 'normal' ? base.mixBlendMode : node.blendMode,
     WebkitMaskImage: maskImage ?? undefined,
     maskImage: maskImage ?? undefined,
     WebkitMaskSize: maskImage ? '100% 100%' : undefined,
     maskSize: maskImage ? '100% 100%' : undefined,
-    outline: selected ? '3px solid rgba(84,180,255,.92)' : base.outline,
-    outlineOffset: selected ? 3 : base.outlineOffset,
   }
 }
 
 export const useMotionGraphNodeStyle = (nodeId: string, base: CSSProperties): CSSProperties => {
   const context = useContext(MotionResolvedSceneContext)
   const node = context?.scene.nodes[nodeId] ?? null
-  return mergeMotionGraphNodeStyle(base, node, context?.selectedNodeId === nodeId)
+  return mergeMotionGraphNodeStyle(base, node, context?.selectedNodeIds.includes(nodeId) === true)
+}
+
+export interface MotionSelectionOverlayProps {
+  readonly composition: MotionCompositionV1
+  readonly selectedNodeIds: readonly string[]
+  readonly labels?: Readonly<Record<string, string>>
+  readonly descendantNodeIdsByNodeId?: Readonly<Record<string, readonly string[]>>
+  readonly measurementKey?: string | number
+}
+
+interface SelectionBoundsV1 { readonly nodeId: string; readonly left: number; readonly top: number; readonly width: number; readonly height: number; readonly label: string }
+
+export function MotionSelectionOverlay({ composition, selectedNodeIds, labels = {}, descendantNodeIdsByNodeId = {}, measurementKey = 0 }: MotionSelectionOverlayProps) {
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const [bounds, setBounds] = useState<readonly SelectionBoundsV1[]>(Object.freeze([]))
+  useLayoutEffect(() => {
+    const sentinel = sentinelRef.current
+    const root = sentinel?.parentElement
+    if (!root || selectedNodeIds.length === 0) { setBounds(Object.freeze([])); return }
+    const measure = () => {
+      const rootRect = root.getBoundingClientRect()
+      const scaleX = rootRect.width / composition.width
+      const scaleY = rootRect.height / composition.height
+      if (!(scaleX > 0) || !(scaleY > 0)) return
+      const candidates = Array.from(root.querySelectorAll<HTMLElement>('[data-motion-node-id]'))
+      const byNodeId = new Map<string, HTMLElement[]>()
+      for (const element of candidates) {
+        const nodeId = element.dataset.motionNodeId
+        if (!nodeId) continue
+        byNodeId.set(nodeId, [...(byNodeId.get(nodeId) ?? []), element])
+      }
+      const next: SelectionBoundsV1[] = []
+      for (const nodeId of selectedNodeIds) {
+        const direct = byNodeId.get(nodeId) ?? []
+        const fallbackIds = descendantNodeIdsByNodeId[nodeId] ?? []
+        const elements = direct.length > 0 ? direct : fallbackIds.flatMap((id) => byNodeId.get(id) ?? [])
+        if (elements.length === 0) continue
+        const rects = elements.map((element) => element.getBoundingClientRect()).filter((rect) => rect.width > 0 || rect.height > 0)
+        if (rects.length === 0) continue
+        const left = Math.min(...rects.map((rect) => rect.left))
+        const top = Math.min(...rects.map((rect) => rect.top))
+        const right = Math.max(...rects.map((rect) => rect.right))
+        const bottom = Math.max(...rects.map((rect) => rect.bottom))
+        next.push(Object.freeze({ nodeId, left: (left - rootRect.left) / scaleX, top: (top - rootRect.top) / scaleY, width: (right - left) / scaleX, height: (bottom - top) / scaleY, label: labels[nodeId] ?? nodeId }))
+      }
+      setBounds(Object.freeze(next))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(root)
+    return () => observer.disconnect()
+  }, [composition.width, composition.height, descendantNodeIdsByNodeId, labels, measurementKey, selectedNodeIds])
+  return <div ref={sentinelRef} aria-hidden="true" data-motion-selection-overlay="true" style={{ position:'absolute', inset:0, pointerEvents:'none', zIndex:120 }}>
+    {bounds.map((box, index) => <div key={box.nodeId} data-motion-selection-node-id={box.nodeId} style={{ position:'absolute', left:box.left, top:box.top, width:box.width, height:box.height, border:index === bounds.length - 1 ? '3px solid rgba(84,180,255,.95)' : '2px solid rgba(84,180,255,.64)', boxSizing:'border-box' }}><span style={{ position:'absolute', left:0, top:-28, maxWidth:Math.max(120, box.width), overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', padding:'4px 7px', borderRadius:5, background:'rgba(14,18,24,.92)', color:'#a9d8ff', font:'700 15px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace' }}>{box.label}</span></div>)}
+  </div>
 }
 
 export function MotionSafeArea({ composition, insetRatio = 0.075, visible = true }: Readonly<{ composition: MotionCompositionV1; insetRatio?: number; visible?: boolean }>) {

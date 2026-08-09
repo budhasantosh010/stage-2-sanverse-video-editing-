@@ -89,9 +89,25 @@ export const evaluateScene = (sceneInput: MotionSceneV1, context: MotionRenderCo
     height: resolveNumber(mask.height, `${node.id}.mask.${mask.id}.height`),
     radius: resolveNumber(mask.radius, `${node.id}.mask.${mask.id}.radius`),
   })))
+  const effectiveEnabledCache = new Map<string, boolean>()
+  const effectiveEnabledFor = (nodeId: string): boolean => {
+    const cached = effectiveEnabledCache.get(nodeId)
+    if (cached !== undefined) return cached
+    const node = scene.nodes[nodeId]
+    if (!node) return false
+    const own = node.enabled !== false
+    const result = own && (node.parentId === null || effectiveEnabledFor(node.parentId))
+    effectiveEnabledCache.set(nodeId, result)
+    return result
+  }
+  const stackingIndexFor = (node: MotionNodeV1): number => {
+    if (!node.parentId) return 0
+    const parent = scene.nodes[node.parentId]
+    return parent?.type === 'group' ? Math.max(0, parent.childIds.indexOf(node.id)) : 0
+  }
   const nodes: Record<string, ResolvedMotionNodeV1> = {}
   for (const node of Object.values(scene.nodes)) {
-    const base = { id: node.id, name: node.name, parentId: node.parentId, visible: resolveBoolean(node.visible, `${node.id}.visible`), opacity: resolveNumber(node.opacity, `${node.id}.opacity`), transform: resolveTransform(node), blendMode: node.blendMode, effects: resolveEffects(node), masks: resolveMasks(node) }
+    const base = { id: node.id, name: node.name, parentId: node.parentId, enabled: node.enabled !== false, effectiveEnabled: effectiveEnabledFor(node.id), stackingIndex: stackingIndexFor(node), visible: resolveBoolean(node.visible, `${node.id}.visible`), opacity: resolveNumber(node.opacity, `${node.id}.opacity`), transform: resolveTransform(node), blendMode: node.blendMode, effects: resolveEffects(node), masks: resolveMasks(node) }
     if (node.type === 'group') nodes[node.id] = Object.freeze({ ...base, type: 'group', childIds: node.childIds })
     else if (node.type === 'text') nodes[node.id] = Object.freeze({ ...base, type: 'text', text: resolveString(node.text, `${node.id}.text`), fillColor: resolveString(node.fillColor, `${node.id}.fillColor`), fontFamily: node.fontFamily, fontSize: resolveNumber(node.fontSize, `${node.id}.fontSize`), fontWeight: resolveNumber(node.fontWeight, `${node.id}.fontWeight`), textAlign: node.textAlign })
     else if (node.type === 'shape') nodes[node.id] = Object.freeze({ ...base, type: 'shape', shape: node.shape, width: resolveNumber(node.width, `${node.id}.width`), height: resolveNumber(node.height, `${node.id}.height`), fillColor: resolveString(node.fillColor, `${node.id}.fillColor`), strokeColor: resolveString(node.strokeColor, `${node.id}.strokeColor`), strokeWidth: resolveNumber(node.strokeWidth, `${node.id}.strokeWidth`), radius: resolveNumber(node.radius, `${node.id}.radius`) })

@@ -18,6 +18,8 @@ export interface MotionNodeBaseV1 {
   readonly id: MotionNodeId
   readonly name: string
   readonly parentId: MotionNodeId | null
+  /** Constant authoring/render switch. Missing means enabled for backwards compatibility. */
+  readonly enabled?: boolean
   readonly visible: Animatable<boolean>
   readonly opacity: Animatable<number>
   readonly transform: MotionTransformV1
@@ -33,7 +35,7 @@ export interface MotionImageNodeV1 extends MotionNodeBaseV1 { readonly type: 'im
 export type MotionNodeV1 = MotionGroupNodeV1 | MotionTextNodeV1 | MotionShapeNodeV1 | MotionPathNodeV1 | MotionImageNodeV1
 
 export interface ResolvedMotionTransformV1 { readonly positionX: number; readonly positionY: number; readonly scaleX: number; readonly scaleY: number; readonly rotationDeg: number; readonly anchorX: number; readonly anchorY: number }
-export interface ResolvedMotionNodeBaseV1 { readonly id: MotionNodeId; readonly name: string; readonly parentId: MotionNodeId | null; readonly visible: boolean; readonly opacity: number; readonly transform: ResolvedMotionTransformV1; readonly blendMode: MotionBlendModeV1; readonly effects: readonly ResolvedMotionEffectV1[]; readonly masks: readonly ResolvedMotionMaskV1[] }
+export interface ResolvedMotionNodeBaseV1 { readonly id: MotionNodeId; readonly name: string; readonly parentId: MotionNodeId | null; readonly enabled: boolean; readonly effectiveEnabled: boolean; readonly stackingIndex: number; readonly visible: boolean; readonly opacity: number; readonly transform: ResolvedMotionTransformV1; readonly blendMode: MotionBlendModeV1; readonly effects: readonly ResolvedMotionEffectV1[]; readonly masks: readonly ResolvedMotionMaskV1[] }
 export interface ResolvedMotionGroupNodeV1 extends ResolvedMotionNodeBaseV1 { readonly type: 'group'; readonly childIds: readonly MotionNodeId[] }
 export interface ResolvedMotionTextNodeV1 extends ResolvedMotionNodeBaseV1 { readonly type: 'text'; readonly text: string; readonly fillColor: string; readonly fontFamily: string; readonly fontSize: number; readonly fontWeight: number; readonly textAlign: 'left' | 'center' | 'right' }
 export interface ResolvedMotionShapeNodeV1 extends ResolvedMotionNodeBaseV1 { readonly type: 'shape'; readonly shape: MotionShapeNodeV1['shape']; readonly width: number; readonly height: number; readonly fillColor: string; readonly strokeColor: string; readonly strokeWidth: number; readonly radius: number }
@@ -41,4 +43,4 @@ export interface ResolvedMotionPathNodeV1 extends ResolvedMotionNodeBaseV1 { rea
 export interface ResolvedMotionImageNodeV1 extends ResolvedMotionNodeBaseV1 { readonly type: 'image'; readonly source: string; readonly width: number; readonly height: number; readonly fit: MotionImageNodeV1['fit']; readonly imageOpacity: number }
 export type ResolvedMotionNodeV1 = ResolvedMotionGroupNodeV1 | ResolvedMotionTextNodeV1 | ResolvedMotionShapeNodeV1 | ResolvedMotionPathNodeV1 | ResolvedMotionImageNodeV1
 
-export const nodeBase = (id: string, name: string, parentId: string | null): Pick<MotionNodeBaseV1, 'id' | 'name' | 'parentId' | 'visible' | 'opacity' | 'transform' | 'blendMode' | 'effects' | 'masks'> => ({ id, name, parentId, visible: constant(true), opacity: constant(1), transform: identityTransform(), blendMode: 'normal', effects: Object.freeze([]), masks: Object.freeze([]) })
+export const nodeBase = (id: string, name: string, parentId: string | null): Pick<MotionNodeBaseV1, 'id' | 'name' | 'parentId' | 'enabled' | 'visible' | 'opacity' | 'transform' | 'blendMode' | 'effects' | 'masks'> => ({ id, name, parentId, enabled: true, visible: constant(true), opacity: constant(1), transform: identityTransform(), blendMode: 'normal', effects: Object.freeze([]), masks: Object.freeze([]) })

@@ -126,7 +126,7 @@ export function KeyframeTimeline({ scene, selectedNodeId, localTicks, durationTi
   const keyframes = selectedTarget?.animatable.kind === 'keyframes' ? selectedTarget.animatable.keyframes : Object.freeze([])
 
   return (
-    <section className="motion-lab__inspector-section motion-lab__keyframe-timeline" data-motion-keyframe-timeline="true">
+    <section className="motion-lab__inspector-section motion-lab__keyframe-timeline" data-motion-keyframe-timeline="true" data-inspector-section="animation">
       <h2>Animation · C2 keyframes</h2>
       <small>Developer proof only. One property owns one Animatable authority; manual keyframes use exact Sanverse ticks.</small>
       {selectedNodeId && numericTargets.length > 0 ? (

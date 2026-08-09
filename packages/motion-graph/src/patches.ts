@@ -8,6 +8,7 @@ import { assertValidMotionScene } from './validation.ts'
 
 export type MotionGraphPatchV1 =
   | Readonly<{ op: 'set-property'; target: MotionNodePropertyPathV1; value: Animatable<MotionPropertyPrimitiveV1> }>
+  | Readonly<{ op: 'set-node-enabled'; nodeId: string; enabled: boolean }>
   | Readonly<{ op: 'add-node'; node: MotionNodeV1; parentId: string; index?: number }>
   | Readonly<{ op: 'remove-node'; nodeId: string }>
   | Readonly<{ op: 'rename-node'; nodeId: string; name: string }>
@@ -112,6 +113,7 @@ export const applyMotionGraphPatch = (scene: MotionSceneV1, patch: MotionGraphPa
   let layout = scene.layout
   const requireNode = (id: string): MotionNodeV1 => { const node = nodes[id]; if (!node) throw new RangeError(`Unknown node: ${id}`); return node }
   if (patch.op === 'set-property') nodes[patch.target.nodeId] = setProperty(requireNode(patch.target.nodeId), patch.target.property, patch.value)
+  else if (patch.op === 'set-node-enabled') { const node = requireNode(patch.nodeId); nodes[patch.nodeId] = Object.freeze({ ...node, enabled: patch.enabled }) }
   else if (patch.op === 'set-blend-mode') nodes[patch.nodeId] = Object.freeze({ ...requireNode(patch.nodeId), blendMode: patch.blendMode })
   else if (patch.op === 'add-effect') { const node = requireNode(patch.nodeId); nodes[patch.nodeId] = Object.freeze({ ...node, effects: insertAt(node.effects, patch.effect, patch.index) }) }
   else if (patch.op === 'remove-effect') { const node = requireNode(patch.nodeId); nodes[patch.nodeId] = Object.freeze({ ...node, effects: Object.freeze(node.effects.filter((effect) => effect.id !== patch.effectId)) }) }

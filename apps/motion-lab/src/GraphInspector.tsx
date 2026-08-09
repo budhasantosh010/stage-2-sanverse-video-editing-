@@ -29,6 +29,8 @@ export interface SchemaPropertyBindingValue {
 interface GraphInspectorProps {
   readonly level: MotionExposureLevel
   readonly onLevelChange: (level: MotionExposureLevel) => void
+  readonly compositorMode?: boolean
+  readonly onCompositorModeChange?: (active: boolean) => void
   readonly exposures: readonly MotionExposureV1[]
   readonly scene: MotionSceneV1 | null
   readonly resolvedScene: ResolvedMotionSceneV1 | null
@@ -87,7 +89,7 @@ function LayerTree({ node, selectedNodeId, onSelectNode }: Readonly<{ node: Moti
   )
 }
 
-export function GraphInspector({ level, onLevelChange, exposures, scene, resolvedScene, readExposure, writeExposure, selectedNodeId, onSelectNode, onOperation }: GraphInspectorProps) {
+export function GraphInspector({ level, onLevelChange, compositorMode = false, onCompositorModeChange, exposures, scene, resolvedScene, readExposure, writeExposure, selectedNodeId, onSelectNode, onOperation }: GraphInspectorProps) {
   const [effectType, setEffectType] = useState<MotionEffectTypeV1>('glow')
   const effectCounter = useRef(1)
   const maskCounter = useRef(1)
@@ -118,7 +120,8 @@ export function GraphInspector({ level, onLevelChange, exposures, scene, resolve
       <section className="motion-lab__inspector-section">
         <h2>Editing level</h2>
         <div className="motion-lab__segmented motion-lab__level-switcher" aria-label="Exposure level">
-          {(['creator', 'designer', 'advanced'] as const).map((candidate) => <button key={candidate} type="button" aria-pressed={level === candidate} onClick={() => onLevelChange(candidate)}>{candidate[0]!.toUpperCase() + candidate.slice(1)}</button>)}
+          {(['creator', 'designer', 'advanced'] as const).map((candidate) => <button key={candidate} type="button" aria-pressed={!compositorMode && level === candidate} onClick={() => { onCompositorModeChange?.(false); onLevelChange(candidate) }}>{candidate[0]!.toUpperCase() + candidate.slice(1)}</button>)}
+          {onCompositorModeChange ? <button type="button" aria-pressed={compositorMode} onClick={() => { onLevelChange('advanced'); onCompositorModeChange(true) }}>Compositor</button> : null}
         </div>
         <small>One Motion Graph. Each level reveals more of the same underlying composition.</small>
       </section>
@@ -171,7 +174,7 @@ export function GraphInspector({ level, onLevelChange, exposures, scene, resolve
             ) : <small>Select a semantic part or layer.</small>}
           </section>
 
-          <section className="motion-lab__inspector-section">
+          <section className="motion-lab__inspector-section" data-inspector-section="effects">
             <h2>Effects</h2>
             {selectedNode ? (
               <>
@@ -207,7 +210,7 @@ export function GraphInspector({ level, onLevelChange, exposures, scene, resolve
             ) : <small>Select a node to add effects.</small>}
           </section>
 
-          <section className="motion-lab__inspector-section">
+          <section className="motion-lab__inspector-section" data-inspector-section="masks">
             <h2>Masks</h2>
             {selectedNode ? (
               <>

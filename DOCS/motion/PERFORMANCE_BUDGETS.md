@@ -77,3 +77,60 @@ The nine A18 keyframe-native modules were also measured separately across all ei
 These are local engineering measurements from the current development machine and include runtime/JIT/GC noise. They are not universal browser-frame, FPS or production-memory guarantees.
 
 The first standalone A18 benchmark attempt produced no usable measurements because its temporary `tsx` runner did not provide the classic JSX `React` global expected by an existing component module. That invalid attempt is recorded in the Motion failure registry; only the corrected rerun above is retained as evidence.
+
+## MOTION-C3 Layer hierarchy measured review — 2026-08-09
+
+C3 measurements are separated by subsystem. They are local development-machine engineering evidence, not renderer FPS or universal production budgets.
+
+### Pure Layer projection
+
+Synthetic sibling scenes were already validated and resolved before projection timing:
+
+| Graph nodes | Average projection | p95 | Worst local sample |
+|---:|---:|---:|---:|
+| 10 | 0.1733 ms | 0.5635 ms | 0.9688 ms |
+| 50 | 0.5669 ms | 0.9839 ms | 1.2966 ms |
+| 100 | 0.7407 ms | 1.0200 ms | 1.5645 ms |
+| 500 | 7.9139 ms | 8.5520 ms | 8.8628 ms |
+| 1000 | 11.1493 ms | 13.5930 ms | 15.3678 ms |
+
+Depth stress at 1, 3, 5, 10 and 20 nested groups also passes mechanically.
+
+### React Layer tree construction proxy
+
+Server-side `renderToStaticMarkup(<LayerPanel ...>)` was used only as a React tree-construction proxy; it is **not** browser paint/FPS:
+
+| Rows | Average | Worst local sample |
+|---:|---:|---:|
+| 10 | 5.3417 ms | 13.9316 ms |
+| 50 | 27.6991 ms | 38.0894 ms |
+| 100 | 11.2896 ms | 47.8597 ms |
+| 500 | 116.2011 ms | 200.5468 ms |
+| 1000 | 176.4393 ms | 523.6778 ms |
+
+The non-monotonic 50/100 averages are development-process/JIT noise. The useful conclusion is qualitative: hundreds to one thousand simultaneously rendered rows become materially more expensive, while current real components are far smaller (Cost Card 18 nodes; Team Network 32 nodes). C3 therefore **does not add premature virtualization**. Virtualization becomes justified only if realistic future A19+ components/workflows approach the synthetic hundreds-row regime and browser interaction actually degrades.
+
+### Universal operation timing on a synthetic 1000-node scene
+
+These include immutable graph update plus full validation:
+
+- 20 selection toggles: **0.0384 ms average** per 20-toggle sequence, p95 0.0683 ms.
+- rename: **6.5419 ms average**, p95 8.3243 ms.
+- sibling reorder: **6.6997 ms average**, p95 8.3011 ms.
+- reparent: **6.3341 ms average**, p95 7.7487 ms.
+- duplicate subtree (single synthetic leaf in the 1000-node scene): **11.4988 ms average**, p95 18.2352 ms.
+- group five siblings: **23.8023 ms average**, p95 30.9247 ms.
+- recording 50 bounded Motion Lab history entries: **0.0451 ms average**, p95 0.0716 ms.
+
+### Real headless Edge selection commit
+
+The retained browser metric uses a `MutationObserver` on the actual selection overlay rather than background timers or `requestAnimationFrame`:
+
+- 50 alternating Cost/Value number Layer selections;
+- **23.804 ms average** click→selection-overlay DOM commit;
+- **38.9 ms p95**;
+- **49.9 ms worst local sample**.
+
+This includes the full development Motion Lab React/Layer/overlay path. It is not paint time or Motion Graph evaluator cost.
+
+The first timer-based browser benchmark is discarded and recorded as `MOTION-FAIL-011` because background Edge throttled its `setTimeout(0)` waits.

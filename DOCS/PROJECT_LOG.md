@@ -1,5 +1,17 @@
 # Project Log
 
+## 2026-08-09 — Parallel Motion Program MOTION-C3 Professional Layer Hierarchy complete
+
+- Added a backward-compatible constant node `enabled` render switch so Layer eye toggles no longer destroy animated `visible`/opacity/keyframe state. Resolved nodes publish local/effective enabled state and sibling stacking index; parent disable does not mutate child-local switches.
+- Added serializable `MotionAuthoringMetadataV1` for locks only. Effective ancestor lock is enforced at the C1 operation boundary; locked descendants cannot be deleted indirectly through an unlocked parent. Locking remains pixel-neutral, while the visibility eye stays independently usable.
+- Added pure `projectMotionLayers(...)` and one canonical selection state. Layers derive stable IDs, human display labels, parent/child order, semantic membership, enable/lock state, C2 keyframe/authored-motion indicators and effect/mask counts from the same Motion Graph. Group/Text/Shape/Path/Image are covered; all **69 components × 4 ratios** project successfully.
+- Added Motion Lab `Compositor` mode with search/expand Layers, single/Ctrl/Shift selection, Layer↔Preview selection synchronization, composition-space bounds overlays, conservative node Inspector, `◆/~ / fx / M` indicators, context actions, explicit Before/Inside/After drag intent and high-value shortcuts. No production Studio integration was added.
+- All mutations continue through C1 operations: enable, rename, reorder, local-transform reparent, duplicate, atomic delete, group/ungroup, effects and masks. Reparent deliberately does not fake animated world-transform preservation or rewrite component-authored layout templates; the exact C3 boundary is documented in `DOCS/motion/LAYER_ARCHITECTURE.md`.
+- Added a bounded 50-transaction **Motion Lab-only** snapshot journal to prove one user action = one Undo/Redo transaction without importing production Studio history. Real Edge proved Group → Undo → Redo.
+- Real Edge also proved Layer→Preview and Preview→Layer selection, selection survival through seek/ratio/style changes, multi-selection, ancestor lock, hidden-parent/child-local-state behavior, stable-ID rename, explicit DROP INSIDE reparent and live effect/mask/keyframe badges. Cost Card composition-region PNG bytes are exactly identical before/after grouping with selection overlays cleared.
+- Measured C3 hierarchy separately: pure projection averaged 0.1733/0.5669/0.7407/7.9139/11.1493 ms at 10/50/100/500/1000 nodes; real headless Edge Layer→Preview DOM selection commit averaged **23.804 ms**, p95 38.9 ms. Synthetic 1000-row React construction is slower, but current real trees are tens of nodes, so C3 intentionally avoids premature virtualization.
+- Final C3 release-candidate gate: **304/304 Motion tests**, **7/7 Motion builds**, clean runtime/dependency/production/Plan-B/C4 scans. Evidence: `DOCS/motion/evidence/MOTION-C3.md`. C3 must be checkpointed/tagged separately before A19 begins.
+
 ## 2026-08-09 — Parallel Motion Program MOTION-A18 keyframe-native creator pack complete
 
 - Re-read the full 60-component coverage matrix before implementation and rejected candidate ideas already solved by Question Title, Before / After, Myth vs Fact, Chapter Title, Single Metric, Comment Highlight, Cursor Callout, Milestone Status, Step List / Progress Status or existing comparison modules.

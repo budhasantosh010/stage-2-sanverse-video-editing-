@@ -187,6 +187,7 @@ export const validateMotionScene = (input: unknown): MotionValidationResultV1<Mo
     if (structuralIds.has(node.id)) issues.push(issue(`$.nodes.${key}.id`, 'Duplicate node id.')); else structuralIds.add(node.id)
     if (node.parentId !== null && !scene.nodes[node.parentId]) issues.push(issue(`$.nodes.${key}.parentId`, 'Parent node does not exist.'))
     if (parentCycle(scene, node.id)) issues.push(issue(`$.nodes.${key}.parentId`, 'Parent hierarchy contains a cycle.'))
+    if (node.enabled !== undefined && typeof node.enabled !== 'boolean') issues.push(issue(`$.nodes.${key}.enabled`, 'Node enabled switch must be boolean when present.'))
     if (!MOTION_BLEND_MODES.includes(node.blendMode)) issues.push(issue(`$.nodes.${key}.blendMode`, 'Unsupported blend mode.'))
     nodeAnimatables(node).forEach(([property, value]) => validateAnimatable(value, `$.nodes.${key}.${property}`, issues, nodeAnimatableConstraint(property)))
     if (node.type === 'group') {

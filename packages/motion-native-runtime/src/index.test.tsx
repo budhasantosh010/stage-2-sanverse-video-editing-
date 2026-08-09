@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { MotionGraphBackedComponentModuleV1, MotionShapeNodeV1 } from '@sanverse/motion-graph'
-import { constant, createMotionScene, nodeBase } from '@sanverse/motion-graph'
-import { MotionComponentHost, MotionCompositionFrame, MotionSafeArea, useResolvedMotionNode } from './index.tsx'
+import { applyMotionOperation, constant, createMotionScene, evaluateScene, nodeBase } from '@sanverse/motion-graph'
+import { mergeMotionGraphNodeStyle, MotionComponentHost, MotionCompositionFrame, MotionSafeArea, useResolvedMotionNode } from './index.tsx'
 
 const composition = { width: 1920, height: 1080, fpsNumerator: 30, fpsDenominator: 1 } as const
 const context = { localTicks: 720_000, durationTicks: 2_880_000, ticksPerSecond: 1_440_000, composition, reducedMotion: false } as const
@@ -84,5 +84,21 @@ describe('native runtime', () => {
     )
     expect(markup).toContain('data-motion-graph-backed="true"')
     expect(markup).toContain('data-probe-opacity="0.25"')
+  })
+
+  it('maps graph sibling order to rendered stacking for positioned visual nodes', () => {
+    const first = { ...nodeBase('first', 'Red', 'root'), type: 'shape' as const, shape: 'rectangle' as const, width: constant(200), height: constant(200), fillColor: constant('#ff0000'), strokeColor: constant('transparent'), strokeWidth: constant(0), radius: constant(0) }
+    const second = { ...nodeBase('second', 'Blue', 'root'), type: 'shape' as const, shape: 'rectangle' as const, width: constant(200), height: constant(200), fillColor: constant('#0000ff'), strokeColor: constant('transparent'), strokeWidth: constant(0), radius: constant(0) }
+    const root = { ...nodeBase('root', 'Root', null), type: 'group' as const, childIds: ['first', 'second'] as const }
+    const scene = createMotionScene({ componentId:'sanverse.z-order-proof', componentVersion:1, rootNodeId:'root', nodes:{root,first,second}, semanticParts:[{id:'shapes',label:'Shapes',role:'content-group',nodeIds:['first','second']}], exposures:[], layout:{mode:'responsive',ownership:[],formatOverrides:[]}, supportedAspectRatios:['16:9'] })
+    const before = evaluateScene(scene, context)
+    expect(mergeMotionGraphNodeStyle({ position:'absolute' }, before.nodes.first!).zIndex).toBeUndefined()
+    expect(mergeMotionGraphNodeStyle({ position:'absolute' }, before.nodes.second!).zIndex).toBe(1)
+    const reordered = applyMotionOperation(scene, { operationId:'reorder-blue', type:'reorder-node', nodeId:'second', index:0 })
+    expect(reordered.ok).toBe(true)
+    if (!reordered.ok) return
+    const after = evaluateScene(reordered.scene, context)
+    expect(mergeMotionGraphNodeStyle({ position:'absolute' }, after.nodes.second!).zIndex).toBeUndefined()
+    expect(mergeMotionGraphNodeStyle({ position:'absolute' }, after.nodes.first!).zIndex).toBe(1)
   })
 })

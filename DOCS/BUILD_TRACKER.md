@@ -57,6 +57,7 @@ Last updated: 2026-08-09
 
 | MOTION-C2 | Parallel Motion Program | Deterministic first-class keyframes, universal keyframe operations, timeline projection and Advanced Motion Lab authoring proof | Complete | 253/253 Motion tests; 7/7 Motion builds; real Edge exact/backward/random direct-seek equality; `DOCS/motion/evidence/MOTION-C2.md`; pushed commit/tag `735bc9730233c00b6f23cdbe42b50f3eb8f91d5a` / `motion-compositor-c2` |
 | MOTION-A18 | Parallel Motion Program | Nine genuinely missing keyframe-native creator/software communication scenarios after re-auditing the 60-component coverage matrix | Complete | Public catalog 60→69; 271/271 Motion tests; 7/7 Motion builds; 0.75–8s bounded durations; 4 ratios × 8 styles mechanically covered; nine retained real-Edge baselines manually inspected; `DOCS/motion/evidence/MOTION-A18.md` |
+| MOTION-C3 | Parallel Motion Program | Professional graph-derived Layer hierarchy with enabled-vs-animated visibility, authoring locks, canonical selection, C1 hierarchy operations and development Compositor UI | Complete | 304/304 Motion tests; 7/7 Motion builds; all 69 components × 4 ratios project; real Edge Layer↔Preview/multi/lock/eye/group/reparent/effect-mask-keyframe proof; byte-identical group pixels; measured 10→1000-node projection; `DOCS/motion/evidence/MOTION-C3.md` |
 
 ## Status rules
 

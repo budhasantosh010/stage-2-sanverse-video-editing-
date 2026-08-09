@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ChangeEvent, ReactNode } from 'react'
 import type { MotionAspectRatio, MotionExposureLevel, MotionStylePackV1 } from '@sanverse/motion-contract'
-import { applyMotionOperations, constant, evaluateScene } from '@sanverse/motion-graph'
-import type { MotionExposureV1, MotionGraphOperationV1, MotionNodePropertyNameV1, MotionPropertyPrimitiveV1, MotionSceneV1, ResolvedMotionNodeV1 } from '@sanverse/motion-graph'
+import { applyMotionOperations, constant, createDefaultEffect, createDefaultMask, createMotionAuthoringMetadata, createMotionSelectionState, evaluateScene, projectMotionLayers, selectMotionNode, selectMotionNodeRange, selectionFallbackAfterDelete, setMotionNodeLocked, toggleMotionNodeSelection } from '@sanverse/motion-graph'
+import type { MotionAuthoringMetadataV1, MotionExposureV1, MotionGraphOperationV1, MotionNodePropertyNameV1, MotionPropertyPrimitiveV1, MotionSceneV1, MotionSelectionStateV1, ResolvedMotionNodeV1 } from '@sanverse/motion-graph'
 import {
   CHECKLIST_CARD_DEFINITION,
   ChecklistCardModule,
@@ -63,6 +63,7 @@ import {
   MotionDebugBounds,
   MotionGridOverlay,
   MotionSafeArea,
+  MotionSelectionOverlay,
 } from '@sanverse/motion-native-runtime'
 import { SANVERSE_TICKS_PER_SECOND, frameForTicks } from '@sanverse/motion-primitives'
 import { PLAYBACK_SPEEDS, advancePlaybackTicks, clampExactTick, resolveInitialTick, stepFrame } from './transport.ts'
@@ -70,6 +71,11 @@ import type { PlaybackSpeed } from './transport.ts'
 import { GraphInspector, previewOperatedScene } from './GraphInspector.tsx'
 import { KeyframeTimeline } from './KeyframeTimeline.tsx'
 import { OperationPlayground } from './OperationPlayground.tsx'
+import { LayerPanel } from './LayerPanel.tsx'
+import type { LayerDropIntent } from './LayerPanel.tsx'
+import { CompositorInspector } from './CompositorInspector.tsx'
+import { createCompositorHistory, pushCompositorHistory, redoCompositorHistory, undoCompositorHistory } from './compositor-history.ts'
+import type { MotionLabCompositorSnapshotV1 } from './compositor-history.ts'
 
 const ratioOrder: readonly MotionAspectRatio[] = ['16:9', '9:16', '1:1', '4:5']
 const backgroundOptions = ['black', 'white', 'neutral', 'busy'] as const
@@ -240,6 +246,7 @@ const resolvedNodeProperty = (node: ResolvedMotionNodeV1, property: MotionNodePr
 
 const operationIdentity = (operation: MotionGraphOperationV1): string | null => {
   if (operation.type === 'set-property' || operation.type === 'reset-property') return `property:${operation.target.nodeId}:${operation.target.property}`
+  if (operation.type === 'set-node-enabled') return `node-enabled:${operation.nodeId}`
   if (operation.type === 'set-effect-property') return `effect-property:${operation.nodeId}:${operation.effectId}:${operation.parameter}`
   if (operation.type === 'set-effect-enabled') return `effect-enabled:${operation.nodeId}:${operation.effectId}`
   if (operation.type === 'set-mask-property') return `mask-property:${operation.nodeId}:${operation.maskId}:${operation.property}`
@@ -276,12 +283,18 @@ export function MotionLabApp() {
   const [speed, setSpeed] = useState<PlaybackSpeed>(1)
   const [reducedMotion, setReducedMotion] = useState(initialReducedMotion)
   const [background, setBackground] = useState<PreviewBackground>(initialBackground)
-  const [exposureLevel, setExposureLevel] = useState<MotionExposureLevel>(initialSearch.get('level') === 'advanced' ? 'advanced' : initialSearch.get('level') === 'designer' ? 'designer' : 'creator')
+  const [exposureLevel, setExposureLevel] = useState<MotionExposureLevel>(initialSearch.get('level') === 'advanced' || initialSearch.get('level') === 'compositor' ? 'advanced' : initialSearch.get('level') === 'designer' ? 'designer' : 'creator')
+  const [compositorMode, setCompositorMode] = useState(initialSearch.get('level') === 'compositor')
   const [graphOperations, setGraphOperations] = useState<readonly MotionGraphOperationV1[]>(initialGraphOperations)
   const [graphOperationError, setGraphOperationError] = useState<string | null>(null)
   const graphOperationCounterRef = useRef(1)
   const nextGraphOperationId = (kind: string): string => `lab:${kind}:${graphOperationCounterRef.current++}`
-  const [selectedGraphNodeId, setSelectedGraphNodeId] = useState<string | null>(initialSelectedGraphNodeId)
+  const [authoringMetadata, setAuthoringMetadata] = useState<MotionAuthoringMetadataV1>(() => createMotionAuthoringMetadata())
+  const [selection, setSelection] = useState<MotionSelectionStateV1>(() => selectMotionNode(initialSelectedGraphNodeId))
+  const selectedGraphNodeId = selection.primaryNodeId
+  const setSelectedGraphNodeId = (nodeId: string | null) => setSelection(selectMotionNode(nodeId))
+  const [compositorHistory, setCompositorHistory] = useState(() => createCompositorHistory(50))
+  const [inspectorFocus, setInspectorFocus] = useState<'effects' | 'masks' | 'animation' | null>(null)
 
   const [text, setText] = useState(initialText)
   const [emphasisText, setEmphasisText] = useState(initialEmphasisText)
@@ -634,6 +647,16 @@ export function MotionLabApp() {
   const currentGraphScene = operatedGraphPreview?.scene ?? null
   const applicableGraphOperations = operatedGraphPreview?.operations ?? []
   const resolvedGraphScene = currentGraphScene ? evaluateScene(currentGraphScene, context) : null
+  const layerProjection = currentGraphScene ? projectMotionLayers({ scene: currentGraphScene, resolvedScene: resolvedGraphScene, authoringMetadata }) : null
+  const selectionOverlayLabels = layerProjection ? Object.freeze(Object.fromEntries(layerProjection.preorderNodeIds.map((nodeId) => [nodeId, layerProjection.layersById[nodeId]!.displayName]))) : Object.freeze({})
+  const selectionOverlayDescendants = layerProjection ? Object.freeze(Object.fromEntries(layerProjection.preorderNodeIds.map((nodeId) => {
+    const collect = (id: string): string[] => {
+      const layer = layerProjection.layersById[id]
+      if (!layer) return []
+      return layer.childNodeIds.length === 0 ? [id] : layer.childNodeIds.flatMap(collect)
+    }
+    return [nodeId, Object.freeze(collect(nodeId))]
+  }))) : Object.freeze({})
   const graphExposures: readonly MotionExposureV1[] = currentGraphScene
     ? Object.freeze([
         ...COMMON_LAB_EXPOSURES.map((exposure) => exposure.id === 'common.duration' ? Object.freeze({ ...exposure, constraints: { minimum: minimumDurationSeconds, maximum: maximumDurationSeconds, step: 1 } }) : exposure),
@@ -713,27 +736,211 @@ export function MotionLabApp() {
     setLocalTicks(Math.round(nextDurationSeconds * SANVERSE_TICKS_PER_SECOND * nextProgress))
     setGraphOperations([])
     setGraphOperationError(null)
-    setSelectedGraphNodeId(null)
+    setAuthoringMetadata(createMotionAuthoringMetadata())
+    setSelection(createMotionSelectionState())
+    setCompositorHistory(createCompositorHistory(50))
+    setInspectorFocus(null)
   }
 
-  const appendGraphOperations = (operations: readonly MotionGraphOperationV1[]) => {
-    if (operations.length === 0 || !currentGraphScene) return
-    const preview = applyMotionOperations(currentGraphScene, operations, { durationTicks })
+  const compositorSnapshot = (): MotionLabCompositorSnapshotV1 => Object.freeze({ graphOperations, authoringMetadata, selection })
+  const restoreCompositorSnapshot = (snapshot: MotionLabCompositorSnapshotV1) => {
+    setGraphOperations(snapshot.graphOperations)
+    setAuthoringMetadata(snapshot.authoringMetadata)
+    setSelection(snapshot.selection)
+    setGraphOperationError(null)
+  }
+  const recordCompositorHistory = () => setCompositorHistory((history) => pushCompositorHistory(history, compositorSnapshot()))
+
+  const appendGraphOperations = (operations: readonly MotionGraphOperationV1[], recordHistory = true): boolean => {
+    if (operations.length === 0 || !currentGraphScene) return false
+    const preview = applyMotionOperations(currentGraphScene, operations, { durationTicks, authoringMetadata })
     if (!preview.ok) {
       setGraphOperationError(`${preview.error.code}: ${preview.error.message}`)
+      return false
+    }
+    let next = [...graphOperations]
+    for (const operation of operations) {
+      const identity = operationIdentity(operation)
+      if (identity) next = next.filter((candidate) => operationIdentity(candidate) !== identity)
+      next.push(operation)
+    }
+    if (recordHistory) recordCompositorHistory()
+    setGraphOperationError(null)
+    setGraphOperations(Object.freeze(next))
+    return true
+  }
+
+  const undoCompositor = () => {
+    const result = undoCompositorHistory(compositorHistory, compositorSnapshot())
+    if (!result.snapshot) return
+    setCompositorHistory(result.history)
+    restoreCompositorSnapshot(result.snapshot)
+  }
+  const redoCompositor = () => {
+    const result = redoCompositorHistory(compositorHistory, compositorSnapshot())
+    if (!result.snapshot) return
+    setCompositorHistory(result.history)
+    restoreCompositorSnapshot(result.snapshot)
+  }
+  const resetCompositor = () => {
+    if (graphOperations.length === 0 && authoringMetadata.lockedNodeIds.length === 0 && selection.selectedNodeIds.length === 0) return
+    recordCompositorHistory()
+    setGraphOperations(Object.freeze([]))
+    setAuthoringMetadata(createMotionAuthoringMetadata())
+    setSelection(createMotionSelectionState())
+    setGraphOperationError(null)
+  }
+
+  const selectLayerNode = (nodeId: string, modifiers: Readonly<{ toggle: boolean; range: boolean; visibleNodeIds: readonly string[] }>) => {
+    setSelection((current) => modifiers.range ? selectMotionNodeRange(current, nodeId, modifiers.visibleNodeIds) : modifiers.toggle ? toggleMotionNodeSelection(current, nodeId) : selectMotionNode(nodeId))
+  }
+  const toggleLayerLock = (nodeId: string) => {
+    if (!currentGraphScene?.nodes[nodeId]) return
+    recordCompositorHistory()
+    const directlyLocked = authoringMetadata.lockedNodeIds.includes(nodeId)
+    setAuthoringMetadata(setMotionNodeLocked(authoringMetadata, currentGraphScene, nodeId, !directlyLocked))
+  }
+  const toggleLayerEnabled = (nodeId: string) => {
+    const layer = layerProjection?.layersById[nodeId]
+    if (!layer) return
+    appendGraphOperations([{ operationId: nextGraphOperationId('layer-enabled'), type: 'set-node-enabled', nodeId, enabled: !layer.enabled }])
+  }
+  const toggleSelectedLayersEnabled = (nodeIds: readonly string[]) => {
+    if (!layerProjection || nodeIds.length === 0) return
+    const nextEnabled = nodeIds.some((nodeId) => layerProjection.layersById[nodeId]?.enabled === false)
+    appendGraphOperations(nodeIds.map((nodeId): MotionGraphOperationV1 => ({ operationId: nextGraphOperationId('layer-enabled-bulk'), type: 'set-node-enabled', nodeId, enabled: nextEnabled })))
+  }
+  const toggleSelectedLayersLocked = (nodeIds: readonly string[]) => {
+    if (!currentGraphScene || nodeIds.length === 0) return
+    recordCompositorHistory()
+    const shouldLock = nodeIds.some((nodeId) => !authoringMetadata.lockedNodeIds.includes(nodeId))
+    let next = authoringMetadata
+    for (const nodeId of nodeIds) if (currentGraphScene.nodes[nodeId]) next = setMotionNodeLocked(next, currentGraphScene, nodeId, shouldLock)
+    setAuthoringMetadata(next)
+  }
+  const addLayerEffect = (nodeId: string) => appendGraphOperations([{ operationId: nextGraphOperationId('layer-add-effect'), type: 'add-effect', nodeId, effect: createDefaultEffect(`lab-layer-glow:${graphOperationCounterRef.current}`, 'glow') }])
+  const addLayerMask = (nodeId: string) => appendGraphOperations([{ operationId: nextGraphOperationId('layer-add-mask'), type: 'add-mask', nodeId, mask: createDefaultMask(`lab-layer-mask:${graphOperationCounterRef.current}`, 'rounded-rectangle') }])
+  const renameLayer = (nodeId: string, name: string) => appendGraphOperations([{ operationId: nextGraphOperationId('layer-rename'), type: 'rename-node', nodeId, name }])
+  const duplicateLayers = (nodeIds: readonly string[]) => {
+    if (!currentGraphScene || nodeIds.length === 0) return
+    const selected = new Set(nodeIds)
+    const topLevel = nodeIds.filter((nodeId) => {
+      let parent = currentGraphScene.nodes[nodeId]?.parentId ?? null
+      while (parent) { if (selected.has(parent)) return false; parent = currentGraphScene.nodes[parent]?.parentId ?? null }
+      return true
+    })
+    const nonce = graphOperationCounterRef.current
+    const duplicates = topLevel.map((nodeId, index) => `${nodeId}::copy:${nonce + index}`)
+    const operations = topLevel.map((nodeId, index): MotionGraphOperationV1 => ({ operationId: nextGraphOperationId('layer-duplicate'), type: 'duplicate-node', nodeId, duplicateId: duplicates[index]! }))
+    if (appendGraphOperations(operations)) setSelection(createMotionSelectionState(duplicates, duplicates.at(-1) ?? null, duplicates[0] ?? null))
+  }
+  const duplicateLayer = (nodeId: string) => duplicateLayers([nodeId])
+  const deleteLayers = (nodeIds: readonly string[]) => {
+    if (!currentGraphScene || nodeIds.length === 0) return
+    const selected = new Set(nodeIds)
+    const topLevel = nodeIds.filter((nodeId) => {
+      let parent = currentGraphScene.nodes[nodeId]?.parentId ?? null
+      while (parent) { if (selected.has(parent)) return false; parent = currentGraphScene.nodes[parent]?.parentId ?? null }
+      return true
+    })
+    const operations = topLevel.map((nodeId): MotionGraphOperationV1 => ({ operationId: nextGraphOperationId('layer-delete'), type: 'remove-node', nodeId, mode: 'subtree' }))
+    const preview = applyMotionOperations(currentGraphScene, operations, { durationTicks, authoringMetadata })
+    if (!preview.ok) { setGraphOperationError(`${preview.error.code}: ${preview.error.message}`); return }
+    const previousPrimary = selection.primaryNodeId
+    if (appendGraphOperations(operations)) setSelection(selectMotionNode(selectionFallbackAfterDelete(currentGraphScene, preview.scene, topLevel, previousPrimary)))
+  }
+  const groupLayers = (nodeIds: readonly string[]) => {
+    if (!currentGraphScene || nodeIds.length === 0) return
+    const groupId = `lab-group:${graphOperationCounterRef.current}`
+    if (appendGraphOperations([{ operationId: nextGraphOperationId('layer-group'), type: 'group-nodes', nodeIds, groupId, groupName: 'Group' }])) setSelection(selectMotionNode(groupId))
+  }
+  const ungroupLayer = (groupId: string) => {
+    const group = currentGraphScene?.nodes[groupId]
+    if (!group || group.type !== 'group') return
+    const childIds = [...group.childIds]
+    const parentId = group.parentId
+    if (appendGraphOperations([{ operationId: nextGraphOperationId('layer-ungroup'), type: 'ungroup-nodes', groupId }])) setSelection(createMotionSelectionState(childIds, childIds.at(-1) ?? parentId, childIds[0] ?? parentId))
+  }
+  const moveLayer = (nodeId: string, direction: -1 | 1) => {
+    if (!currentGraphScene) return
+    const node = currentGraphScene.nodes[nodeId]
+    const parent = node?.parentId ? currentGraphScene.nodes[node.parentId] : null
+    if (!node || !parent || parent.type !== 'group') return
+    const index = parent.childIds.indexOf(nodeId)
+    const nextIndex = Math.max(0, Math.min(parent.childIds.length - 1, index + direction))
+    if (nextIndex !== index) appendGraphOperations([{ operationId: nextGraphOperationId('layer-reorder'), type: 'reorder-node', nodeId, index: nextIndex }])
+  }
+  const dropLayer = (sourceNodeId: string, targetNodeId: string, intent: LayerDropIntent) => {
+    if (!currentGraphScene || sourceNodeId === targetNodeId) return
+    const source = currentGraphScene.nodes[sourceNodeId]
+    const target = currentGraphScene.nodes[targetNodeId]
+    if (!source || !target || sourceNodeId === currentGraphScene.rootNodeId) return
+    if (intent === 'inside') {
+      if (target.type !== 'group') return
+      appendGraphOperations([{ operationId: nextGraphOperationId('layer-reparent'), type: 'reparent-node', nodeId: sourceNodeId, parentId: targetNodeId, index: target.childIds.length }])
       return
     }
-    setGraphOperationError(null)
-    setGraphOperations((current) => {
-      let next = [...current]
-      for (const operation of operations) {
-        const identity = operationIdentity(operation)
-        if (identity) next = next.filter((candidate) => operationIdentity(candidate) !== identity)
-        next.push(operation)
-      }
-      return Object.freeze(next)
-    })
+    const parentId = target.parentId
+    const parent = parentId ? currentGraphScene.nodes[parentId] : null
+    if (!parentId || !parent || parent.type !== 'group') return
+    let targetIndex = parent.childIds.indexOf(targetNodeId) + (intent === 'after' ? 1 : 0)
+    if (source.parentId === parentId) {
+      const sourceIndex = parent.childIds.indexOf(sourceNodeId)
+      if (sourceIndex >= 0 && sourceIndex < targetIndex) targetIndex -= 1
+      targetIndex = Math.max(0, Math.min(parent.childIds.length - 1, targetIndex))
+      appendGraphOperations([{ operationId: nextGraphOperationId('layer-reorder'), type: 'reorder-node', nodeId: sourceNodeId, index: targetIndex }])
+    } else {
+      targetIndex = Math.max(0, Math.min(parent.childIds.length, targetIndex))
+      appendGraphOperations([{ operationId: nextGraphOperationId('layer-reparent'), type: 'reparent-node', nodeId: sourceNodeId, parentId, index: targetIndex }])
+    }
   }
+  const focusInspectorSection = (section: 'effects' | 'masks' | 'animation') => {
+    setExposureLevel('advanced')
+    setCompositorMode(true)
+    setInspectorFocus(section)
+  }
+
+  useEffect(() => {
+    if (!inspectorFocus) return
+    const frame = requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(`[data-inspector-section="${inspectorFocus}"]`)?.scrollIntoView({ block: 'nearest' })
+      setInspectorFocus(null)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [inspectorFocus])
+
+  useEffect(() => {
+    if (!compositorMode) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const editingText = target?.matches('input,textarea,select,[contenteditable="true"]') ?? false
+      if (event.key === 'Escape') {
+        if (editingText) return
+        event.preventDefault()
+        setSelection(createMotionSelectionState())
+        return
+      }
+      if (editingText) return
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (selection.selectedNodeIds.length) { event.preventDefault(); deleteLayers(selection.selectedNodeIds) }
+        return
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
+        if (selection.selectedNodeIds.length) { event.preventDefault(); duplicateLayers(selection.selectedNodeIds) }
+        return
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'g') {
+        if (selection.selectedNodeIds.length) { event.preventDefault(); groupLayers(selection.selectedNodeIds) }
+        return
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+        event.preventDefault()
+        if (event.shiftKey) redoCompositor(); else undoCompositor()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [compositorMode, selection, graphOperations, authoringMetadata, compositorHistory, currentGraphScene, layerProjection, durationTicks])
 
   const componentExposureValue = (propertyId: string): MotionPropertyPrimitiveV1 | null => {
     if (propertyId === 'stylePackId') return stylePackId
@@ -911,8 +1118,33 @@ export function MotionLabApp() {
         </div>
       </header>
 
-      <section className="motion-lab__body">
-        <aside className="motion-lab__browser" aria-label="Component browser">
+      <section className={`motion-lab__body${compositorMode ? ' motion-lab__body--compositor' : ''}`}>
+        {compositorMode ? <LayerPanel
+          projection={layerProjection}
+          selection={selection}
+          canUndo={compositorHistory.undo.length > 0}
+          canRedo={compositorHistory.redo.length > 0}
+          onSelectNode={selectLayerNode}
+          onClearSelection={() => setSelection(createMotionSelectionState())}
+          onToggleEnabled={toggleLayerEnabled}
+          onToggleLock={toggleLayerLock}
+          onRename={renameLayer}
+          onDuplicate={duplicateLayer}
+          onDuplicateSelection={duplicateLayers}
+          onDelete={deleteLayers}
+          onGroup={groupLayers}
+          onToggleSelectionEnabled={toggleSelectedLayersEnabled}
+          onToggleSelectionLock={toggleSelectedLayersLocked}
+          onUngroup={ungroupLayer}
+          onMove={moveLayer}
+          onDrop={dropLayer}
+          onAddEffect={addLayerEffect}
+          onAddMask={addLayerMask}
+          onFocusSection={focusInspectorSection}
+          onUndo={undoCompositor}
+          onRedo={redoCompositor}
+          onReset={resetCompositor}
+        /> : <aside className="motion-lab__browser" aria-label="Component browser">
           <div className="motion-lab__panel-title">Components · {MOTION_COMPONENT_CATALOG.length}</div>
           <input className="motion-lab__search" aria-label="Search motion components" value={componentSearch} onChange={(event) => setComponentSearch(event.target.value)} placeholder="Search library…" />
           <div className="motion-lab__catalog">
@@ -934,7 +1166,7 @@ export function MotionLabApp() {
             })}
           </div>
           <div className="motion-lab__catalog-note">Proof components are added one at a time only after their tests and visual gate exist.</div>
-        </aside>
+        </aside>}
 
         <section className="motion-lab__stage-column">
           <div className="motion-lab__stage-toolbar">
@@ -957,7 +1189,14 @@ export function MotionLabApp() {
             </div>
           </div>
 
-          <div className="motion-lab__preview-host" ref={previewHostRef}>
+          <div className="motion-lab__preview-host" ref={previewHostRef} onClickCapture={(event) => {
+            if (!compositorMode) return
+            const target = event.target as HTMLElement
+            const nodeElement = target.closest<HTMLElement>('[data-motion-node-id]')
+            const nodeId = nodeElement?.dataset.motionNodeId ?? null
+            if (!nodeId || !currentGraphScene?.nodes[nodeId]) { setSelection(createMotionSelectionState()); return }
+            setSelection((current) => event.shiftKey && layerProjection ? selectMotionNodeRange(current, nodeId, layerProjection.preorderNodeIds) : event.ctrlKey || event.metaKey ? toggleMotionNodeSelection(current, nodeId) : selectMotionNode(nodeId))
+          }}>
             <MotionCompositionFrame
               composition={composition}
               displayScale={displayScale}
@@ -969,22 +1208,23 @@ export function MotionLabApp() {
                   <MotionCenterGuides visible={centerGuides} />
                   <MotionSafeArea composition={composition} visible={safeArea} />
                   <MotionDebugBounds visible={bounds} label="composition" inset={4} />
+                  {compositorMode ? <MotionSelectionOverlay composition={composition} selectedNodeIds={selection.selectedNodeIds} labels={selectionOverlayLabels} descendantNodeIdsByNodeId={selectionOverlayDescendants} measurementKey={`${localTicks}:${ratio}:${stylePackId}:${applicableGraphOperations.length}`} /> : null}
                 </>
               )}
             >
               <div style={{ position: 'absolute', inset: 0, ...previewBackgroundStyle(background) }} />
               {isFamily && familyRenderable && familyModule && validatedFamilyProps && validatedFamilyStyle ? (
-                <MotionComponentHost module={familyModule} props={validatedFamilyProps} style={validatedFamilyStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} />
+                <MotionComponentHost module={familyModule} props={validatedFamilyProps} style={validatedFamilyStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} selectedGraphNodeIds={selection.selectedNodeIds} />
               ) : isHeadline && headlineRenderable && validatedHeadlineProps && validatedHeadlineStyle ? (
-                <MotionComponentHost module={KineticHeadlineModule} props={validatedHeadlineProps} style={validatedHeadlineStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} />
+                <MotionComponentHost module={KineticHeadlineModule} props={validatedHeadlineProps} style={validatedHeadlineStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} selectedGraphNodeIds={selection.selectedNodeIds} />
               ) : isChecklist && checklistRenderable && validatedChecklistProps && validatedChecklistStyle ? (
-                <MotionComponentHost module={ChecklistCardModule} props={validatedChecklistProps} style={validatedChecklistStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} />
+                <MotionComponentHost module={ChecklistCardModule} props={validatedChecklistProps} style={validatedChecklistStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} selectedGraphNodeIds={selection.selectedNodeIds} />
               ) : isCostValue && costValueRenderable && validatedCostValueProps && validatedCostValueStyle ? (
-                <MotionComponentHost module={CostValueCardModule} props={validatedCostValueProps} style={validatedCostValueStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} />
+                <MotionComponentHost module={CostValueCardModule} props={validatedCostValueProps} style={validatedCostValueStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} selectedGraphNodeIds={selection.selectedNodeIds} />
               ) : isTimer && timerRenderable && validatedTimerProps && validatedTimerStyle ? (
-                <MotionComponentHost module={TimerStatusPillModule} props={validatedTimerProps} style={validatedTimerStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} />
+                <MotionComponentHost module={TimerStatusPillModule} props={validatedTimerProps} style={validatedTimerStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} selectedGraphNodeIds={selection.selectedNodeIds} />
               ) : isTeamNetwork && teamNetworkRenderable && validatedTeamNetworkProps && validatedTeamNetworkStyle ? (
-                <MotionComponentHost module={TeamNetworkDiagramModule} props={validatedTeamNetworkProps} style={validatedTeamNetworkStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} />
+                <MotionComponentHost module={TeamNetworkDiagramModule} props={validatedTeamNetworkProps} style={validatedTeamNetworkStyle} context={context} graphOperations={applicableGraphOperations} selectedGraphNodeId={selectedGraphNodeId} selectedGraphNodeIds={selection.selectedNodeIds} />
               ) : (
                 <div className="motion-lab__refusal" style={{ position: 'absolute', inset: 0 }}>
                   <div>
@@ -1054,6 +1294,8 @@ export function MotionLabApp() {
           <GraphInspector
             level={exposureLevel}
             onLevelChange={setExposureLevel}
+            compositorMode={compositorMode}
+            onCompositorModeChange={setCompositorMode}
             exposures={graphExposures}
             scene={currentGraphScene}
             resolvedScene={resolvedGraphScene}
@@ -1063,6 +1305,7 @@ export function MotionLabApp() {
             onSelectNode={setSelectedGraphNodeId}
             onOperation={(operation) => appendGraphOperations([operation])}
           />
+          {compositorMode ? <CompositorInspector scene={currentGraphScene} resolvedScene={resolvedGraphScene} authoringMetadata={authoringMetadata} selection={selection} onOperation={(operation) => appendGraphOperations([operation])} nextOperationId={nextGraphOperationId} /> : null}
           {exposureLevel === 'advanced' ? (
             <>
               <KeyframeTimeline

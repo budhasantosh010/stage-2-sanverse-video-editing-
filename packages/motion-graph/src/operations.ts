@@ -11,6 +11,8 @@ import type { MotionGraphPatchV1 } from './patches.ts'
 import { constant, keyframed } from './properties.ts'
 import type { Animatable, MotionBezierHandlesV1, MotionKeyframeInterpolationV1, MotionKeyframeTargetV1, MotionNodePropertyNameV1, MotionNodePropertyPathV1, MotionPropertyPrimitiveV1 } from './properties.ts'
 import type { MotionSceneV1 } from './scene.ts'
+import type { MotionAuthoringMetadataV1 } from './authoring.ts'
+import { motionNodeLockState } from './authoring.ts'
 import { validateMotionScene } from './validation.ts'
 
 export type MotionMaskPropertyNameV1 = 'enabled' | 'invert' | 'opacity' | 'feather' | 'expansion' | 'x' | 'y' | 'width' | 'height' | 'radius'
@@ -22,6 +24,7 @@ interface MotionOperationBaseV1 {
 export type MotionGraphOperationV1 =
   | (MotionOperationBaseV1 & Readonly<{ type: 'set-property'; target: MotionNodePropertyPathV1; value: Animatable<MotionPropertyPrimitiveV1> }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'reset-property'; target: MotionNodePropertyPathV1; value: Animatable<MotionPropertyPrimitiveV1> }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'set-node-enabled'; nodeId: string; enabled: boolean }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'add-keyframe'; target: MotionKeyframeTargetV1; keyframeId: string; tick: number; value?: MotionPropertyPrimitiveV1; interpolation: MotionKeyframeInterpolationV1; bezier?: MotionBezierHandlesV1 }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'remove-keyframe'; target: MotionKeyframeTargetV1; keyframeId: string }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'move-keyframe'; target: MotionKeyframeTargetV1; keyframeId: string; tick: number }>)
@@ -50,7 +53,7 @@ export type MotionGraphOperationV1 =
   | (MotionOperationBaseV1 & Readonly<{ type: 'set-blend-mode'; nodeId: string; blendMode: MotionBlendModeV1 }>)
 
 export const MOTION_GRAPH_OPERATION_TYPES = Object.freeze([
-  'set-property', 'reset-property',
+  'set-property', 'reset-property', 'set-node-enabled',
   'add-keyframe', 'remove-keyframe', 'move-keyframe', 'set-keyframe-value', 'set-keyframe-interpolation', 'set-keyframe-bezier', 'clear-keyframes',
   'add-node', 'remove-node', 'duplicate-node', 'rename-node', 'reparent-node', 'reorder-node', 'group-nodes', 'ungroup-nodes',
   'add-effect', 'remove-effect', 'duplicate-effect', 'reorder-effect', 'set-effect-property', 'set-effect-enabled',
@@ -72,6 +75,7 @@ export type MotionOperationErrorCodeV1 =
   | 'CYCLE_DETECTED'
   | 'INDEX_INVALID'
   | 'ROOT_PROTECTED'
+  | 'LOCKED'
   | 'GROUP_INVALID'
   | 'EFFECT_INVALID'
   | 'EFFECT_PARAMETER_INVALID'
@@ -114,6 +118,8 @@ export interface MotionOperationApplyOptionsV1 {
   readonly idFactory?: (request: MotionOperationIdRequestV1) => string
   /** Optional owning composition duration. When supplied, keyframe mutations refuse ticks beyond it. */
   readonly durationTicks?: number
+  /** Persistent authoring-only metadata. Locks gate mutations but never alter rendered pixels. */
+  readonly authoringMetadata?: MotionAuthoringMetadataV1
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -166,8 +172,9 @@ export const validateMotionGraphOperation = (input: unknown): MotionOperationErr
     if (input.type === 'set-keyframe-bezier' && input.bezier !== null && !validBezierSyntax(input.bezier)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.bezier', message: 'Keyframe Bezier handles are invalid.' })
     if (input.type === 'clear-keyframes' && !primitive(input.fallbackValue)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.fallbackValue', message: 'clear-keyframes requires an explicit finite fallbackValue.' })
   }
-  const needsNodeId = ['remove-node', 'duplicate-node', 'rename-node', 'reparent-node', 'reorder-node', 'add-effect', 'remove-effect', 'duplicate-effect', 'reorder-effect', 'set-effect-property', 'set-effect-enabled', 'add-mask', 'remove-mask', 'reorder-mask', 'set-mask-property', 'set-blend-mode']
+  const needsNodeId = ['set-node-enabled', 'remove-node', 'duplicate-node', 'rename-node', 'reparent-node', 'reorder-node', 'add-effect', 'remove-effect', 'duplicate-effect', 'reorder-effect', 'set-effect-property', 'set-effect-enabled', 'add-mask', 'remove-mask', 'reorder-mask', 'set-mask-property', 'set-blend-mode']
   if (needsNodeId.includes(input.type) && !boundedId(input.nodeId)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.nodeId', message: 'nodeId must be a bounded non-empty string.' })
+  if (input.type === 'set-node-enabled' && typeof input.enabled !== 'boolean') return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.enabled', message: 'Node enabled state must be boolean.' })
   if ((input.type === 'set-property' || input.type === 'reset-property') && (!isRecord(input.target) || !boundedId(input.target.nodeId) || typeof input.target.property !== 'string' || !isRecord(input.value))) return Object.freeze({ code: 'OPERATION_INVALID', operationId, message: 'Property operation needs a typed target and animatable value.' })
   if (input.type === 'add-node' && (!isRecord(input.node) || !boundedId(input.node.id) || !boundedId(input.parentId))) return Object.freeze({ code: 'OPERATION_INVALID', operationId, message: 'add-node needs a node and parentId.' })
   if (input.type === 'remove-node' && input.mode !== 'subtree') return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.mode', message: 'remove-node V1 supports explicit subtree removal only.' })
@@ -346,6 +353,42 @@ const mapThrownError = (operationId: string, error: unknown): MotionOperationFai
 
 const operationInverseId = (operationId: string, suffix = 'inverse'): string => `${operationId}:${suffix}`
 
+const operationLockTargets = (scene: MotionSceneV1, operation: MotionGraphOperationV1): readonly string[] => {
+  if (operation.type === 'set-node-enabled') return Object.freeze([])
+  if (operation.type === 'add-keyframe' || operation.type === 'remove-keyframe' || operation.type === 'move-keyframe' || operation.type === 'set-keyframe-value' || operation.type === 'set-keyframe-interpolation' || operation.type === 'set-keyframe-bezier' || operation.type === 'clear-keyframes') return Object.freeze([operation.target.nodeId])
+  if (operation.type === 'set-property' || operation.type === 'reset-property') return Object.freeze([operation.target.nodeId])
+  if (operation.type === 'remove-node') return Object.freeze(subtreeNodeIds(scene, operation.nodeId))
+  if (operation.type === 'add-node') return Object.freeze([operation.parentId])
+  if (operation.type === 'reparent-node') return Object.freeze([operation.nodeId, operation.parentId])
+  if (operation.type === 'group-nodes') {
+    const parentId = scene.nodes[operation.nodeIds[0] ?? '']?.parentId
+    return Object.freeze([...operation.nodeIds, ...(parentId ? [parentId] : [])])
+  }
+  if (operation.type === 'ungroup-nodes') {
+    const group = scene.nodes[operation.groupId]
+    const parentId = group?.parentId
+    const descendants = group?.type === 'group' ? group.childIds.flatMap((childId) => subtreeNodeIds(scene, childId)) : []
+    return Object.freeze([operation.groupId, ...descendants, ...(parentId ? [parentId] : [])])
+  }
+  if ('nodeId' in operation && typeof operation.nodeId === 'string') {
+    const targets = [operation.nodeId]
+    if (operation.type === 'duplicate-node' && operation.parentId) targets.push(operation.parentId)
+    return Object.freeze(targets)
+  }
+  return Object.freeze([])
+}
+
+const lockedOperationFailure = (scene: MotionSceneV1, operation: MotionGraphOperationV1, metadata: MotionAuthoringMetadataV1 | undefined): MotionOperationFailureV1 | null => {
+  if (!metadata) return null
+  for (const nodeId of operationLockTargets(scene, operation)) {
+    const state = motionNodeLockState(scene, metadata, nodeId)
+    if (!state.effectiveLocked) continue
+    const owner = state.directlyLocked ? nodeId : state.lockedByAncestorNodeId
+    return fail(operation.operationId, 'LOCKED', `Node ${nodeId} is locked${owner && owner !== nodeId ? ` by ancestor ${owner}` : ''}. Unlock it before editing.`, { path: '$.nodeId' })
+  }
+  return null
+}
+
 type MotionKeyframeOperationV1 = Extract<MotionGraphOperationV1, Readonly<{ type: 'add-keyframe' | 'remove-keyframe' | 'move-keyframe' | 'set-keyframe-value' | 'set-keyframe-interpolation' | 'set-keyframe-bezier' | 'clear-keyframes' }>>
 
 const keyframeTickFailure = (operationId: string, tick: number, options?: MotionOperationApplyOptionsV1): MotionOperationFailureV1 | null => {
@@ -474,9 +517,19 @@ export const applyMotionOperation = (
   const syntaxIssue = validateMotionGraphOperation(operation)
   if (syntaxIssue) return Object.freeze({ ok: false, error: syntaxIssue })
   const operationId = operation.operationId
+  const lockIssue = lockedOperationFailure(scene, operation, options?.authoringMetadata)
+  if (lockIssue) return lockIssue
 
   try {
     if (operation.type === 'add-keyframe' || operation.type === 'remove-keyframe' || operation.type === 'move-keyframe' || operation.type === 'set-keyframe-value' || operation.type === 'set-keyframe-interpolation' || operation.type === 'set-keyframe-bezier' || operation.type === 'clear-keyframes') return applyKeyframeOperation(scene, operation, options)
+
+    if (operation.type === 'set-node-enabled') {
+      const node = findNode(scene, operation.nodeId)
+      if (!node) return fail(operationId, 'TARGET_NOT_FOUND', `Unknown node: ${operation.nodeId}`)
+      const previous = node.enabled !== false
+      const candidate = applyMotionGraphPatch(scene, { op: 'set-node-enabled', nodeId: node.id, enabled: operation.enabled })
+      return success(candidate, [node.id], [Object.freeze({ operationId: operationInverseId(operationId), type: 'set-node-enabled', nodeId: node.id, enabled: previous })])
+    }
 
     if (operation.type === 'set-property' || operation.type === 'reset-property') {
       const node = findNode(scene, operation.target.nodeId)
@@ -776,6 +829,7 @@ export const applyMotionOperations = (
 
 export const motionOperationFromPatch = (operationId: string, patch: MotionGraphPatchV1): MotionGraphOperationV1 => {
   if (patch.op === 'set-property') return { operationId, type: 'set-property', target: patch.target, value: patch.value }
+  if (patch.op === 'set-node-enabled') return { operationId, type: 'set-node-enabled', nodeId: patch.nodeId, enabled: patch.enabled }
   if (patch.op === 'add-node') return { operationId, type: 'add-node', node: patch.node, parentId: patch.parentId, index: patch.index }
   if (patch.op === 'remove-node') return { operationId, type: 'remove-node', nodeId: patch.nodeId, mode: 'subtree' }
   if (patch.op === 'rename-node') return { operationId, type: 'rename-node', nodeId: patch.nodeId, name: patch.name }
