@@ -140,9 +140,9 @@ for an identical file.
 | Trim to playhead | **absent** | reuses trim | yes | yes | yes | no | none | T3 |
 | Dynamic trim (J/K/L) | **absent** | none | no | no | n/a | no | none | T3 |
 | Numeric precision trim | **yes** — compact Timeline popover | reuses precision planners; integer ticks canonical | yes | yes | yes | yes | none | done |
-| Keyframes on properties | **partial** | `set-visual-properties` | yes | yes | yes | **no lane** | none | T4 |
-| Keyframe lanes on timeline | **absent** | existing | n/a | n/a | n/a | no | none | T4 |
-| Graph (curve) editor | **absent** | existing curves | n/a | n/a | n/a | no | none | T4 |
+| Keyframes on properties | **yes** — closed Editor target/property capability matrix, full-state planners, source/visual time projection | existing `set-visual-properties` + `set-footage-motion` | yes | yes | yes | yes | none | done T4 |
+| Keyframe lanes on timeline | **yes** — expandable animated/all-property rows, shared selection, bounded visible diamonds, numeric/keyboard/marquee/clipboard editing | existing animation tracks | yes | yes | yes | yes | bounded to active target + visible range/overscan | done T4 |
+| Graph (curve) editor | **yes** — Timeline-local single-property Graph, pan/zoom/Fit, point/marquee/Bezier/Spring/Bounce editing | shared `evaluateVisualProperties` | yes | yes | yes | yes | max 640 graph samples; one active target/property | done T4 |
 | Add / delete / rename tracks | **absent** — five fixed | none | no | no | n/a | no | **large** | T5 |
 | Sync lock, targeting | **absent** | none | n/a | n/a | n/a | no | none | T5 |
 | Audio channel display | **absent** | none | no | no | n/a | no | none | T5 |

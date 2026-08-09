@@ -1,0 +1,106 @@
+{
+  "browser": "Edg/151.0.4129.72",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36 Edg/151.0.0.0",
+  "projectId": "project_c4785438d46d9ad15b75f080166dd679",
+  "home": {
+    "title": "Sanverse Stage 2",
+    "recent": true,
+    "open": true
+  },
+  "studio": {
+    "videoCount": 1,
+    "workspace": "Edit",
+    "projectRevision": 7,
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "innerHeight": 900,
+    "hasExportButton": true
+  },
+  "errors": {
+    "exceptions": [],
+    "consoleErrors": [],
+    "loadingFailed": [
+      {
+        "requestId": "14484.880",
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "requestId": "14484.884",
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "requestId": "14484.886",
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      },
+      {
+        "requestId": "14484.887",
+        "errorText": "net::ERR_ABORTED",
+        "canceled": true
+      }
+    ],
+    "httpErrors": []
+  },
+  "recordedT4Workflow": {
+    "startingRevision": 0,
+    "firstTrackRevision": 1,
+    "midpointRevision": 2,
+    "graphPoint": {
+      "duringRevision": 2,
+      "afterRevision": 3,
+      "value": 0.7887323943661971
+    },
+    "customBezierRevision": 4,
+    "bezierHandle": {
+      "duringRevision": 4,
+      "afterRevision": 5,
+      "x1": 0.3237491564638966,
+      "y1": -0.6244897959183688
+    },
+    "graphZoom": {
+      "from": 1,
+      "to": 2.5,
+      "revisionStayed": 5
+    },
+    "workspaceRoundTrip": {
+      "path": [
+        "Edit",
+        "Effects",
+        "Edit"
+      ],
+      "revisionStayed": 5,
+      "videoCount": 1,
+      "selectionValue": 0.7887323943661971,
+      "graphOpen": true,
+      "zoom": 2.5
+    },
+    "undo": {
+      "revision": 6
+    },
+    "redo": {
+      "revision": 7
+    },
+    "responsive": [
+      {
+        "width": 1440,
+        "height": 900,
+        "scrollWidth": 1440,
+        "videoCount": 1
+      },
+      {
+        "width": 1024,
+        "height": 768,
+        "scrollWidth": 1024,
+        "videoCount": 1
+      },
+      {
+        "width": 390,
+        "height": 844,
+        "scrollWidth": 375,
+        "videoCount": 1
+      }
+    ]
+  }
+}

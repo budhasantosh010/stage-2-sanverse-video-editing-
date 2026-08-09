@@ -1,6 +1,6 @@
 # Build Tracker
 
-Last updated: 2026-08-08
+Last updated: 2026-08-10
 
 | ID | Goal | Deliverable | Status | Evidence |
 |---|---|---|---|---|
@@ -156,4 +156,17 @@ Last updated: 2026-08-08
 - [x] Live boundary check PASS; Motion files changed NONE; no root dependency/workspace change
 - [x] Gate T3 precision-feature implementation — COMPLETE: atomic Ripple/Roll/Slip/Slide, Trim commands, J/K/L + Dynamic Trim, Audio Scrubbing, multi-edit-point, numeric precision and exact-frame Trim View
 - [x] Gate T3 final verification — 2,345/2,345 tests, all-workspace build PASS, real Edge + responsive + real MP4 export, boundary PASS
-- [ ] Gate T4 — not started
+
+## P1-F.1E Gate T4 — 2026-08-10
+
+- [x] Dedicated editor branch/worktree `timeline-t4-keyframe-graph` from exact verified T3 SHA `aed76ac0232e8a920812b800d234a96e32de7396`
+- [x] Animation-authority audit before feature UI; no project/render schema bump required
+- [x] Closed target/property capability resolver, source/visual time projection and full-state keyframe planners
+- [x] Expandable property lanes, one shared keyframe selection, numeric/keyboard/marquee/clipboard editing and badges
+- [x] Linear/Ease/Custom Bezier/Spring/Bounce interpolation; Hold truthfully withheld because unsupported end-to-end
+- [x] Timeline-local Property Graph with bounded 640-sample ceiling, pan/zoom/Fit, point drag, marquee and Bezier handles
+- [x] Inspector and primary Canvas explicit-keyframe synchronization; no implicit Auto-Key
+- [x] T2/T3 interaction matrix + export identity + evaluator overshoot safety + 60-minute/250-placement/50-target bounds
+- [x] Final verification — **2,419/2,419**, all-workspace build PASS, real Edge 151 Graph/Bezier/Undo/Redo/reopen + responsive evidence, real revision-7 MP4 export
+- [x] Ownership checker PASS against exact T3 base; protected Motion/Plan-B changes NONE
+- [ ] Gate T5 — not started; requires explicit owner authorization

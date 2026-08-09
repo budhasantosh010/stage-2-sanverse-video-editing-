@@ -8,7 +8,8 @@ Status: **Proposed for owner approval**
 - [x] Gate T1 creator interaction
 - [x] Gate T2 speed, audio, transitions and creator time tools
 - [x] Gate T3 precision trimming — Ripple/Roll/Slip/Slide, playhead commands, J/K/L, Dynamic Trim, Audio Scrubbing, multi-edit-point, numeric precision and exact-frame Trim View; final gate 2,345/2,345 + real Edge/export evidence
-- [ ] Gate T4 keyframe lanes / graph editor — not started; requires explicit owner authorization
+- [x] Gate T4 keyframe lanes / graph editor — closed capabilities/time projection, full-state planners, shared selection/clipboard, expandable lanes, truthful interpolation, Timeline-local Property Graph, Inspector/Canvas sync; final gate 2,419/2,419 + real Edge/export evidence
+- [ ] Gate T5 advanced track controls — not started; requires explicit owner authorization
 
 
 This is the compact ticking surface. Do not put implementation explanations

@@ -8,15 +8,15 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 ## Current gate
 
-- **P1-F.1E Complete Timeline Experience is complete through Gate T2.** T0, T1 and T2 are DONE; T3 through T7 are NOT STARTED.
+- **P1-F.1E Complete Timeline Experience is complete through Gate T4.** T0 through T4 are DONE; T5 through T7 are NOT STARTED.
 - The authoritative gate table and invariants live in `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md`.
-- Final T2 evidence is `DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md` plus `t2-master-browser-report.json`, `t2-master-screenshots/`, and `t2-export-metadata.json` in the same folder.
-- T2 now carries constant rational speed, Rate Stretch, Reverse, Freeze Frame, direct gain/fades/pan, real loudness normalization, linked J/L audio windows, truthful transition controls and bounded advanced-placement planners through one accepted project/time authority.
-- Final suites: API 403/403, Web 1,248/1,248, edit-domain 496/496, intent-domain 27/27, render-contract 118/118 — **2,292/2,292 total** — plus an all-workspace production build with exit 0.
-- Final real Edge workflow ran revision `34 → 44`: transition, reverse preparation, direct audio, normalization, Rate Stretch still `Backwards`, J-cut, Freeze, Undo, Redo and reopen; one video element; zero browser errors; zero failed HTTP responses; no horizontal overflow at 1440×900, 1024×768 or 390×844.
-- Final revision-44 export succeeded in one attempt: 24.841 s, 1920×1080 H.264 High at 30 fps with AAC-LC stereo/48 kHz, 12,548,402 bytes. Renderer SHA and file SHA match exactly.
-- Two late T2 defects are fixed and registered: Hold Frame command routing (FAIL-053) and Rate Stretch preserving Reverse (FAIL-054).
-- **Do not start T4 unless the owner explicitly authorizes it.** A separate agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from the Timeline program.
+- Final T4 evidence is `DOCS/evidence/2026-08-04-timeline-completion/T4_FINAL_CLOSURE.md`, with `T4_BROWSER_WORKFLOW.md`, `T4_TEST_RESULTS.md`, `T4_EXPORT_EVIDENCE.md`, `t4-browser-report.json`, screenshots, ffprobe output and decoded export frames beside it.
+- T4 adds Editor-owned keyframe lanes, shared keyframe selection/clipboard, truthful interpolation, an Editor-local Property Graph, Inspector/Canvas synchronization, source-vs-visual time projection, and bounded long-form behavior without adding a second project, video, playhead or animation authority.
+- Final suites: API 404/404, Web 1,334/1,334, edit-domain 536/536, intent-domain 27/27, render-contract 118/118 — **2,419/2,419 total** — plus an all-workspace production build PASS.
+- Final real Edge 151 workflow proved detached Graph point and Bezier-handle movement, exactly one accepted revision on release, zero-revision Graph zoom/workspace changes, Undo/Redo/reopen continuity, one video element and no HTTP 4xx/5xx responses.
+- Final revision-7 export succeeded in one attempt: 30.033333 s, 1920×1080 H.264 High at 30 fps with AAC-LC stereo/48 kHz, 10,977,559 bytes, SHA-256 `6d4c704fad146f312c63b047a7b53f53f14207ecf7aece7662bfa430123b9f7d`.
+- Hold interpolation remains deliberately unavailable because the current Editor contract cannot represent it truthfully end-to-end; T4 does not fake Auto-Key or Hold.
+- **Do not start T5 without explicit owner authorization.** A separate agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from the Timeline program.
 - Open human evidence remains human-only: repeated owner workflows, representative non-editor workflows, and agreed performance budgets.
 - Real-provider connection still requires the owner's data-leaving-machine decision and keys. Accounts and SaaS operations remain conditional.
 

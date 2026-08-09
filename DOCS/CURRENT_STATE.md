@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-08-08
+Last updated: 2026-08-10
 
 ## Active goal
 
@@ -9,14 +9,14 @@ gate table, per-gate checklist and invariants are in
 `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md` — **read that
 file first in any new session.**
 
-**Gates T0, T1, T2 and T3 are DONE. T4 through T7 are NOT STARTED.** Final T3 gate: **2,345/2,345 tests**, all-workspace production build PASS, real Microsoft Edge precision workflow on owner media, exact-frame Trim View, one-video continuity, responsive proof, and a real 1920×1080 H.264/AAC export. T3 evidence is under `DOCS/evidence/2026-08-04-timeline-completion/T3_*.md`.
+**Gates T0 through T4 are DONE. T5 through T7 are NOT STARTED.** Final T4 gate: **2,419/2,419 tests**, all-workspace production build PASS, real Microsoft Edge 151 keyframe/Graph workflow on owner media, detached Graph/Bezier drag proof, one-video continuity, responsive proof, Undo/Redo/reopen, and a real revision-7 1920×1080 H.264/AAC export. T4 evidence is under `DOCS/evidence/2026-08-04-timeline-completion/T4_*.md` plus the adjacent `t4-*` machine-readable/screenshots/frame artifacts.
 
 T2's final verification found and fixed two real defects before closure: Hold
 Frame was enabled but not routed to its panel, and Rate Stretch silently removed
 Reverse because the Studio adapter hard-coded `forward`. Both are now held by
 regression/browser evidence.
 
-**Gate T3 Precision Trimming is complete in the dedicated editor branch `timeline-t3-precision-trim`, based exactly on verified T2 SHA `5a50e4bf84b928ac686bb903d1425b21c64ae890`.** T3-PRE0 ownership enforcement remains permanent: `DOCS/PROGRAM_OWNERSHIP.md` and `tools/program-ownership/check-editor-boundary.mjs` protect Motion/Plan-B boundaries. T3 adds atomic Ripple/Roll/Slip/Slide planners, explicit Trim tools, playhead commands, J/K/L shuttle, Dynamic Trim, Audio Scrubbing, edit-point selection, multi-edit-point atomicity, numeric precision and exact-frame Trim View. T4 remains not started.
+**Gate T4 Keyframe Lanes and Graph Editing is complete in the dedicated editor branch `timeline-t4-keyframe-graph`, based exactly on verified T3 SHA `aed76ac0232e8a920812b800d234a96e32de7396`.** Permanent ownership enforcement remains active through `DOCS/PROGRAM_OWNERSHIP.md` and `tools/program-ownership/check-editor-boundary.mjs`. T4 adds closed Editor animation capabilities/time projection, full-state keyframe planners, expandable property lanes, shared selection/clipboard, truthful interpolation, a bounded Timeline-local Property Graph, Inspector/Canvas synchronization, T2/T3 timing interaction coverage and real Preview/export proof. T5 remains not started.
 
 ### Gate T0, thing one: the preview stopped lying
 

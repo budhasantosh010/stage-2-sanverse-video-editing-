@@ -4,14 +4,14 @@
 new session. It is updated at the end of every working block, not only at the end
 of a gate.**
 
-Last updated: 2026-08-08
-Branch: `timeline-t2-completion`
+Last updated: 2026-08-10
+Branch: `timeline-t4-keyframe-graph`
 Program start commit: `45c0c981fb869afd236f10cbea829b1859d5beb6`
 Latest pushed commit: see `git rev-parse HEAD` — this file is committed WITH the
 work it describes, so HEAD is always the commit that made these numbers true.
 Test baseline at program start: **1,723**
-Tests now: **2,292** — edit-domain 496 · render-contract 118 · intent-domain 27 ·
-api 403 · web 1,248. `npm run build` exit 0.
+Tests now: **2,419** — edit-domain 536 · render-contract 118 · intent-domain 27 ·
+api 404 · web 1,334. All-workspace production build PASS.
 
 ---
 
@@ -23,19 +23,22 @@ api 403 · web 1,248. `npm run build` exit 0.
   P0     Verify + capability inventory                DONE         ad11b07..
   T0     Correctness: preview truth, mixed export     DONE         ad11b07
   T1     Creator interaction: selection/clipboard     DONE         ef9332c
-  T2     Speed, audio, transitions                    DONE         (this commit)
+  T2     Speed, audio, transitions                    DONE         5a50e4b..
          └─ final closure: 2,292 tests + real Edge + real revision-44 export
-  T3     Precision trim: ripple/roll/slip/slide       NOT STARTED  —
-  T4     Keyframe lanes + graph editor                NOT STARTED  —
+  T3     Precision trim: ripple/roll/slip/slide       DONE         aed76ac..
+         └─ final closure: 2,345 tests + real Edge + real precision export
+  T4     Keyframe lanes + graph editor                DONE         (this commit)
+         └─ final closure: 2,419 tests + real Edge Graph/Bezier + revision-7 export
   T5     Advanced tracks, expandable tracks           NOT STARTED  —
   T6     Sequences + source-editing workflows         NOT STARTED  —
   T7     Transcript + AI-ready contracts              NOT STARTED  —
 ```
 
-**Next action when a session starts:** T3 is authorized. Verify the editor-only
-worktree and run `node tools/program-ownership/check-editor-boundary.mjs --base
-5a50e4bf84b928ac686bb903d1425b21c64ae890` before editing. Continue only the
-first unfinished T3 item. T4 remains out of scope.
+**Next action when a session starts:** T4 is closed. Read `T4_FINAL_CLOSURE.md`
+and the adjacent T4 evidence, verify the branch/working tree, and do not start
+T5 without explicit owner authorization. If T5 is later authorized, create its
+own Editor worktree from the verified T4 tip and run the permanent ownership
+checker before editing. Motion and Plan-B protected paths remain out of scope.
 
 ---
 
@@ -233,13 +236,19 @@ Final commit: `[verified] feat(timeline): complete precision trimming`
 
 Final automated gate: **2,345 / 2,345**. Production build PASS. Evidence begins at `T3_PRECISION_TRIM_CATCHUP.md` and closes in the T3 evidence files beside it. T4 was not started.
 
-### T4 — KEYFRAME LANES AND GRAPH EDITING
+### T4 — KEYFRAME LANES AND GRAPH EDITING — **DONE**
 
-Commit: `[verified] feat(timeline): add keyframe lanes and graph editing`
+Final commit: `[verified] feat(timeline): add keyframe lanes and graph editing`
 
-- [ ] T4.1 closed property ids - [ ] T4.2 expandable lanes - [ ] T4.3 interactions
-- [ ] T4.4 interpolation - [ ] T4.5 graph editor - [ ] T4.6 keyframe clipboard
-- [ ] T4.7 badges
+- [x] T4.1 closed property ids and target capability matrix
+- [x] T4.2 expandable animated/all-property lanes with bounded visible diamonds
+- [x] T4.3 shared selection, pointer/keyboard/numeric/marquee interactions with detached drafts
+- [x] T4.4 Linear/Ease/Custom Bezier/Spring/Bounce interpolation; Hold truthfully withheld
+- [x] T4.5 Timeline-local Property Graph with bounded sampling, pan/zoom/Fit, point/Bezier editing
+- [x] T4.6 keyframe Copy/Cut/Paste-at-playhead/Duplicate with collision-safe all-or-nothing planners
+- [x] T4.7 animation badges plus Inspector/Canvas explicit-keyframe synchronization
+
+Final automated gate: **2,419 / 2,419**. All-workspace production build PASS. Real Edge 151 proved detached Graph point and Bezier-handle drag with exactly one revision on release, zero-revision Graph zoom/workspace continuity, Undo/Redo/reopen, one-video continuity and responsive 1440/1024/390 behavior. Real revision-7 export: 1920×1080 H.264 High 30 fps + AAC-LC stereo 48 kHz, 30.033333 s, 10,977,559 bytes, SHA-256 `6d4c704fad146f312c63b047a7b53f53f14207ecf7aece7662bfa430123b9f7d`. T5 was not started.
 
 ### T5 — ADVANCED TRACK CONTROLS
 

@@ -96,6 +96,17 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 
 No unresolved T3 P0/P1 blocker remains. Browser automation limitations encountered during evidence collection (controlled-input driving, temporary Edge extension tabs, and private API hot reload resetting the disposable evidence project) were verification-harness issues, not accepted-project defects; they are recorded in T3 browser evidence rather than misclassified as product failures.
 
+## Gate T4 validation-found issue details
+
+### FAIL-056 — easing overshoot could leave the valid visual render domain between valid keyframes
+
+- **What failed:** the shared Editor evaluator correctly bounded authored endpoint values but Spring/Custom-Bezier interpolation could mathematically overshoot between them, allowing evaluated opacity, scale or opposing crop values to leave the same numeric domain the operation validator requires.
+- **Why it mattered:** T4 makes extreme easing directly editable in the Graph. Valid canonical keyframes must never produce invalid intermediate Preview/export state, and Preview and FFmpeg must not invent separate clamps.
+- **Resolution:** keep canonical authored keyframes unchanged, but clamp only the shared evaluated render state to the existing visual-property limits; normalize opposing crop edges below a combined width/height of 1. Both Preview and export already consume this evaluator.
+- **Evidence:** focused evaluator tests prove raw easing can overshoot while evaluated opacity/scale/crop remain safe; final repository gate is 2,419/2,419; real revision-7 Graph/Bezier export succeeds and decoded frames are valid.
+
+No unresolved T4 P0/P1 blocker remains. The first broad regression sweep also found two mistakes in the newly written T4 long-form test harness (an off-window diamond query and a jsdom-only missing `URL.createObjectURL` spy target); both were corrected without production changes. Four `ERR_ABORTED` requests in final browser reporting were canceled by the deliberate forced reload and had no HTTP error response.
+
 ## Legacy risk and failure summary
 
 | ID | Date | Area | Failure or risk | Status | Next evidence |

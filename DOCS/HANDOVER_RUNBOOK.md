@@ -4,7 +4,7 @@ Use this runbook when a new session, agent, or context window resumes the projec
 
 ## Current handoff
 
-**P1-F.1E Gate T2 is complete. T3 through T7 have not started.**
+**P1-F.1E is complete through Gate T4. T5 through T7 have not started.**
 
 Read in this order when resuming:
 
@@ -12,24 +12,23 @@ Read in this order when resuming:
 2. `DOCS/HANDOFF.md`
 3. `DOCS/CURRENT_STATE.md`
 4. `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md`
-5. `DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md`
+5. `DOCS/evidence/2026-08-04-timeline-completion/T4_FINAL_CLOSURE.md`
 
-Final T2 verification: **2,292/2,292 tests**, all-workspace production build
-exit 0, real Microsoft Edge workflow revision 34→44 with zero browser errors and
-zero failed HTTP responses, and a real revision-44 1920×1080 H.264/AAC export
-whose renderer SHA matches the MP4 on disk.
+Final T4 verification: **2,419/2,419 tests**, all-workspace production build
+PASS, real Microsoft Edge 151 Graph/keyframe workflow with zero runtime/console
+errors and zero HTTP 4xx/5xx responses on the final reopen, and a real revision-7
+1920×1080 H.264/AAC export whose renderer SHA matches the MP4 on disk.
 
-T2 owns constant rational speed, Rate Stretch, Reverse, Freeze Frame, direct
-gain/fades/pan, real loudness normalization, linked J/L audio windows, truthful
-transition controls and bounded advanced-placement planners. Preserve the core
-rules: one gesture = one change set = one Undo, integer ticks only, and Preview /
-export share one accepted project authority.
+T4 owns Editor keyframe presentation/editing only. Preserve the core rules: one
+gesture = one change set = one Undo, integer ticks only, primary motion keyframes
+follow source time, visual keyframes follow visual-relative time, graph/layout
+changes create zero revisions, and Preview/export share the existing animation
+evaluator and accepted project authority.
 
-Two closure bugs are already fixed and must not regress: Hold Frame must route to
-its panel when enabled; Rate Stretch must preserve the clip's current Reverse /
-Forward direction.
+Hold remains unavailable rather than faked, and primary Canvas does not imply
+Auto-Key.
 
-**Do not start T4 without explicit owner authorization.** Do not integrate or modify the separately owned Motion Graphics Library or Plan-B workstreams from this branch.
+**Do not start T5 without explicit owner authorization.** Do not integrate or modify the separately owned Motion Graphics Library or Plan-B workstreams from this branch.
 
 ### Previous handoff
 ## Fast resume

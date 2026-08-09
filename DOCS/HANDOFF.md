@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-**P1-F.1E — Complete Timeline Experience is complete through Gate T2.**
+**P1-F.1E — Complete Timeline Experience is complete through Gate T4.**
 
 The live gate table, per-gate checklist, program rules and traps are in:
 
@@ -12,32 +12,35 @@ DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md
 
 **Read that file before anything else.** Do not reconstruct state from chat.
 
-**Gates T0, T1 and T2 are DONE. T3 through T7 are NOT STARTED.** Final T2 gate:
-**2,292/2,292 tests**, all-workspace production build exit 0, a clean real Edge
-workflow from revision 34→44, and a real revision-44 MP4 whose renderer SHA
-matches the file on disk.
+**Gates T0 through T4 are DONE. T5 through T7 are NOT STARTED.** Final T4 gate:
+**2,419/2,419 tests**, all-workspace production build PASS, a real Edge 151
+keyframe/Graph workflow with one-video continuity, and a real revision-7 MP4
+whose renderer SHA matches the file on disk.
 
-Final T2 closure evidence:
+Final T4 closure evidence:
 
 ```
-DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md
-DOCS/evidence/2026-08-04-timeline-completion/t2-master-browser-report.json
-DOCS/evidence/2026-08-04-timeline-completion/t2-master-screenshots/
-DOCS/evidence/2026-08-04-timeline-completion/t2-export-metadata.json
+DOCS/evidence/2026-08-04-timeline-completion/T4_FINAL_CLOSURE.md
+DOCS/evidence/2026-08-04-timeline-completion/T4_BROWSER_WORKFLOW.md
+DOCS/evidence/2026-08-04-timeline-completion/T4_TEST_RESULTS.md
+DOCS/evidence/2026-08-04-timeline-completion/T4_EXPORT_EVIDENCE.md
+DOCS/evidence/2026-08-04-timeline-completion/t4-browser-report.json
+DOCS/evidence/2026-08-04-timeline-completion/t4-browser-screenshots/
+DOCS/evidence/2026-08-04-timeline-completion/t4-export-frames/
 ```
 
-T2 now includes constant rational speed, Rate Stretch, Reverse, Freeze Frame,
-direct gain/fades/pan, real loudness normalization, linked J/L audio windows,
-truthful transition controls and the advanced placement planners. Preview,
-accepted history, Undo/Redo, reopen and FFmpeg export share the same project/time
-authority.
+T4 now includes source-vs-visual animation time projection, closed full-state
+keyframe planners, expandable Timeline property lanes, shared keyframe
+selection/clipboard, truthful interpolation, a Timeline-local Property Graph,
+and Inspector/Canvas synchronization. Pointer movement remains detached; real
+Edge point and Bezier-handle drags produced exactly one accepted revision on
+release. Graph zoom and Studio workspace changes produced zero revisions.
 
-Two late browser-found defects were fixed before closure: Hold Frame was enabled
-but omitted from the panel-opening dispatcher; Rate Stretch hard-coded `forward`
-and stripped Reverse. The final real browser run proves the stretched clip stays
-`1.63x Backwards` and Freeze survives Undo→Redo→reopen.
+The final revision-7 export is 30.033333 s, 1920×1080 H.264 High at 30 fps with
+AAC-LC stereo/48 kHz, 10,977,559 bytes, SHA-256
+`6d4c704fad146f312c63b047a7b53f53f14207ecf7aece7662bfa430123b9f7d`.
 
-**Do not start T4 without explicit owner instruction.** A separate coding agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from this timeline program. Resume T3 only for evidence archaeology, not feature implementation.
+**Do not start T5 without explicit owner instruction.** A separate coding agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from this timeline program. Resume T4 only for evidence archaeology or a specifically authorized repair.
 
 ## Completed: P1-F.1A
 

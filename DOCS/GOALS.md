@@ -114,3 +114,4 @@ Never publish one invented percentage-complete number. A box closes only when it
       times the project was touched.
 - [x] Speed, reverse and freeze frame — Gate T2, complete 2026-08-08
 - [x] Precision trimming — Ripple/Roll/Slip/Slide, playhead commands, J/K/L, Dynamic Trim, Audio Scrubbing, multi-edit-point, numeric precision and exact-frame Trim View — Gate T3, complete 2026-08-08
+- [x] Keyframe lanes and graph editing — closed property/time authority, expandable property lanes, shared keyframe selection/clipboard, truthful interpolation, bounded Property Graph, Inspector/Canvas synchronization and real Preview/export parity — Gate T4, complete 2026-08-10

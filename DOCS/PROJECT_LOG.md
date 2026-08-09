@@ -742,3 +742,17 @@ Final automated gate: **2,345/2,345** — API 403, Web 1,297, edit-domain 500, i
 Real Edge owner-media evidence proved Standard, Ripple, Roll, Slip, Slide, J/K/L, Dynamic Trim cancel/commit, Audio Scrubbing, numeric refusal/acceptance, additive edit-point selection/all-or-nothing refusal, active Trim View cancellation, one-video continuity, reload, and no horizontal overflow at 1440×900, 1280×800, 1024×768 and 390×844. The final product export is 23.900 s, 1920×1080 H.264 High at 30 fps with AAC-LC stereo/48 kHz, 10,899,271 bytes, SHA-256 `79FDA906C32B6454ED83B6A8FF1F513C906B7770690A82086E49F9F695E08F38`; sampled frames decoded cleanly.
 
 T4 was not started. Motion and Plan-B files were not changed.
+
+## 2026-08-10 — Gate T4 Keyframe Lanes and Graph Editing complete
+
+Gate T4 closed on dedicated Editor branch `timeline-t4-keyframe-graph`, based exactly on verified T3 SHA `aed76ac0232e8a920812b800d234a96e32de7396`. The required authority audit was written before UI work. T4 reused existing `set-footage-motion` / `set-visual-properties` and the shared animation evaluator rather than adding a second project/render schema or Motion dependency.
+
+The Editor now has closed property capability/time projection, full-state keyframe planners, expandable animated/all-property lanes, one shared keyframe selection, pointer/keyboard/numeric/marquee editing, Copy/Cut/Paste/Duplicate, truthful Linear/Ease/Custom Bezier/Spring/Bounce controls, a bounded Timeline-local Property Graph, and Inspector/primary-Canvas explicit-keyframe synchronization. Primary-footage animation follows source time; visual overlays follow visual-relative time. Hold remains unavailable rather than faked, and no implicit Auto-Key was introduced.
+
+Final automated gate: **2,419/2,419** — API 404, Web 1,334, edit-domain 536, intent-domain 27, render-contract 118. All-workspace production build passed. The 60-minute stress fixture covers 250 placements / 50 animated targets; Timeline diamond projection is visible-range bounded and Graph sampling is capped at 640.
+
+Real Edge 151 on owner media proved first-track creation, midpoint creation, a Graph point drag whose movement stayed at revision 2 and committed once to revision 3, Custom Bezier creation, a Bezier-handle drag whose movement stayed at revision 4 and committed once to revision 5, zero-revision Graph zoom and `Edit→Effects→Edit`, Undo→revision 6, Redo→revision 7, reopen continuity, one video and no HTTP 4xx/5xx responses. Responsive 1440×900, 1024×768 and 390×844 checks had no horizontal page overflow.
+
+The real revision-7 export succeeded in one attempt: 30.033333 s, 1920×1080 H.264 High at 30 fps with AAC-LC stereo/48 kHz, 10,977,559 bytes, SHA-256 `6d4c704fad146f312c63b047a7b53f53f14207ecf7aece7662bfa430123b9f7d`; decoded 5s/15s/25s frames visibly show the authored horizontal animation moving out and returning.
+
+Motion and Plan-B protected files were not changed. T5 was not started.

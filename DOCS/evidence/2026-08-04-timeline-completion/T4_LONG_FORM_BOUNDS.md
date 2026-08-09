@@ -12,4 +12,4 @@ Bounds:
 - Pointer movement operates on detached track state and calls no server accepted-edit path until release.
 - Existing Gate-D filmstrip/waveform media-analysis concurrency/cache bounds remain unchanged; T4 adds no derived-media process.
 
-A focused 60-minute test proves a dense 64-keyframe property mounts only the few diamonds inside a 60-second visible window plus 15-second overscan. Graph sampling at a 4,000px test width remains at or below the hard 640-sample ceiling.
+A focused 60-minute test proves a dense 64-keyframe property mounts only the zero-to-few diamonds that actually fall inside the current visible window plus bounded overscan; it never mounts the whole project's keyframe set. Graph sampling at a 4,000px test width remains at or below the hard 640-sample ceiling.
