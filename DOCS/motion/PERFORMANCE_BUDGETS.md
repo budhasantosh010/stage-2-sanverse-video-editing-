@@ -149,3 +149,26 @@ The bounded density stress uses `sanverse.swimlane-process` with **5 lanes × 5 
 - server-side markup, 20 runs: **12.167 ms average**, **15.299 ms p95**, **18.144 ms worst local sample**.
 
 These measurements include local runtime/JIT/GC noise and are not FPS, browser paint-time or universal production-memory guarantees. The dense 127-node case remains well below the synthetic C3 500/1000-row regime that would justify immediate Layer virtualization.
+
+## MOTION-C4 dope-sheet stress review — 2026-08-10
+
+C4 was measured with synthetic keyframed Shape-node scenes at the required track/key counts. Projection is `projectMotionDopeSheet(scene)`. Render is `renderToStaticMarkup(<AnimationDopeSheet ...>)` and therefore a React tree-construction proxy, **not** browser paint/FPS. Selection toggles up to 100 projected keyframe IDs. Atomic drag builds and applies up to 50 typed `move-keyframe` operations through full immutable validation. Seek evaluates the whole Motion Scene at five exact ticks.
+
+| Tracks | Keys | Projection avg / p95 / worst | SSR avg / p95 / worst | Select≤100 avg / p95 / worst | Atomic drag≤50 avg / p95 / worst | Five seeks avg / p95 / worst |
+|---:|---:|---|---|---|---|---|
+| 10 | 50 | 0.325 / 0.584 / 0.584 ms | 13.921 / 26.710 / 26.710 ms | 0.218 / 0.398 / 0.398 ms | 3.978 / 6.597 / 6.597 ms | 0.827 / 1.828 / 1.828 ms |
+| 50 | 500 | 0.871 / 1.296 / 1.296 ms | 60.735 / 77.847 / 77.847 ms | 0.773 / 2.582 / 2.582 ms | 62.018 / 72.246 / 72.246 ms | 2.584 / 4.319 / 4.319 ms |
+| 100 | 1,000 | 1.555 / 2.576 / 2.576 ms | 119.307 / 143.978 / 143.978 ms | 0.713 / 1.511 / 1.511 ms | 136.735 / 216.965 / 216.965 ms | 5.632 / 13.466 / 13.466 ms |
+| 500 | 5,000 | 9.840 / 13.858 / 13.858 ms | 284.846 / 298.371 / 298.371 ms | 0.774 / 0.934 / 0.934 ms | 792.568 / 943.991 / 943.991 ms | 35.084 / 39.734 / 39.734 ms |
+| 500 | 10,000 | 15.214 / 18.757 / 18.757 ms | 353.590 / 385.433 / 385.433 ms | 0.615 / 0.867 / 0.867 ms | 1,170.088 / 1,197.704 / 1,197.704 ms | 47.269 / 58.665 / 58.665 ms |
+
+Interpretation:
+
+- pure C4 projection remains comparatively small even at 10,000 synthetic keys;
+- synthetic hundreds-track React construction becomes materially heavier;
+- C4 selection state itself remains cheap;
+- the dominant huge-scene multi-drag cost is full immutable graph-operation validation, not the C4 projection;
+- current public component track counts are far below these 500-track cases, so C4 does **not** add premature virtualization or weaken validation;
+- if realistic future components/workflows approach hundreds of simultaneous tracks, add rendering-only virtualization over the same projection and separately profile graph validation.
+
+The first standalone C4 benchmark produced no valid measurements because its temporary `tsx` runner required the classic JSX `React` global for an existing Lab component. The benchmark harness supplied the global and reran the same matrix; only the corrected measurements above are retained.

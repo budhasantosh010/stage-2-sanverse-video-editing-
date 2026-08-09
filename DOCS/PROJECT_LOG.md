@@ -1,5 +1,17 @@
 # Project Log
 
+## 2026-08-10 — Sanverse Creative Engine MOTION-C4 Professional Animation Timeline complete
+
+- Added `projectMotionDopeSheet(...)` as a pure derived control projection over existing C2 `deriveTimelineTrackGroups(...)`. C4 stores no second keyframes, Layers or animation clock; stable track/key selection IDs point back to the real typed C2 targets/keyframe IDs.
+- Added C4 keyframe UI selection helpers plus bounded frame/start/end/key/event snapping and collision-safe atomic multi-key move/delete operation builders. Positive same-track multi-moves apply later→earlier and negative moves earlier→later to avoid transient key collisions while preserving IDs/spacing.
+- Added the development `AnimationDopeSheet` inside existing Compositor mode. It shares the Motion Lab playhead and C3 node selection and provides seconds/frames/ticks ruler, keyframe/driver distinction, single/Ctrl/Shift selection, pointer multi-drag, add/delete, ±1/±10-frame nudge, 1–16× zoom, horizontal pan/fit, vertical track navigation, UI-only collapse, event markers and numeric keyframe/Bezier Inspector.
+- All C4 edits route through existing C2 `MotionGraphOperationV1` and `applyMotionOperations(...)`. The entire selected operation array enters `appendGraphOperations(...)` once, so a five-key drag is one bounded Compositor history transaction/Undo rather than five.
+- Added a full 77-component × 4-ratio C4 projection gate. Every projected track references its real scene node; driver/binding tracks never fabricate keyframes; all keyframes remain inside owning duration.
+- Real Edge on strict Motion Lab port 2010 proved two selected Cost/Value scale keys, actual pointer multi-drag, C3 Layer sync, event markers and zoom. The first browser drag exposed lower-frame-only snap logic; the fix compares both neighboring frame boundaries. Corrected result moved `3,024,000 / 4,320,000` → exact snapped `3,600,000 / 4,896,000` while preserving `1,296,000` ticks spacing.
+- Required stress matrix measured 10 tracks/50 keys, 50/500, 100/1000, 500/5000 and 500/10000. At 10k keys projection averaged 15.214 ms while SSR construction averaged 353.590 ms; 50-key immutable drag on the synthetic 500-track scene averaged 1,170.088 ms. Current real components are far smaller, so C4 does not add premature virtualization or weaken validation.
+- Fresh C4 release candidate: **361/361 combined Creative + Motion tests**, **8/8 builds**. Evidence: `DOCS/motion/evidence/MOTION-C4.md`; architecture: `DOCS/motion/DOPE_SHEET_ARCHITECTURE.md`; failures: `MOTION-FAIL-015/016`.
+- No `apps/web` or production video-timeline source was changed. The lane is preserved by the dedicated `motion-compositor-c4` checkpoint; A20 begins from that boundary.
+
 ## 2026-08-10 — Sanverse Creative Engine Plan B0 Creative Direction Foundation complete
 
 - Created the unified Creative Engine program document: Plan A = Creative Capability, Plan B = Creative Intelligence, Plan C = Creative Control. Normal future cycles explicitly combine an A milestone, B milestone, C milestone and cross-plan proof unless a stabilization reason is recorded.

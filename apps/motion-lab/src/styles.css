@@ -108,6 +108,7 @@ button { cursor: pointer; }
 .motion-lab__layer-empty { color: #75757d; font-size: 10px; }
 
 .motion-lab__stage-column { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto 1fr 28px auto 28px; background: #0d0d0f; }
+.motion-lab__stage-column--c4 { grid-template-rows: auto minmax(220px, 1fr) 330px auto 28px; }
 .motion-lab__stage-toolbar { min-height: 48px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #232327; background: #121214; }
 .motion-lab__segmented { display: inline-flex; overflow: hidden; border: 1px solid #303036; border-radius: 8px; }
 .motion-lab__segmented button { min-width: 50px; padding: 6px 8px; border: 0; border-right: 1px solid #303036; color: #9a9aa1; background: #151518; font-size: 11px; }

@@ -4,6 +4,7 @@ import { CreativeDirectionLab } from './CreativeDirectionLab.tsx'
 import { MotionLabApp } from './MotionLabApp.tsx'
 import './styles.css'
 import './creative-direction.css'
+import './dope-sheet.css'
 
 const rootElement = document.getElementById('root')
 if (!rootElement) throw new Error('Motion Lab root element not found.')

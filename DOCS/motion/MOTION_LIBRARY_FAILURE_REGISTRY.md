@@ -282,3 +282,43 @@ IMPACT: no product/browser rendering failure occurred; the invalid capture was d
 
 ONE-LINE SOLUTION: quote the profile and screenshot arguments explicitly; subsequent real Edge captures succeeded.
 
+## MOTION-FAIL-015 — First C4 standalone performance harness lacked the classic JSX React global
+
+- Status: FIXED / evidence harness only
+- Severity: low for product, medium for performance-evidence quality
+- Milestone: MOTION-C4
+- Date: 2026-08-10
+
+WHAT: the first C4 10→10,000-key performance run failed before measurements with `ReferenceError: React is not defined` while server-rendering the existing `AnimationDopeSheet.tsx` from a temporary `tsx` script.
+
+WHERE: `tmp/c4-performance-review.ts`, not production or Motion Lab runtime source.
+
+WHY: the standalone `tsx` invocation compiled the imported existing TSX using the classic JSX runtime, while the normal Vite/TypeScript app build supplies its configured JSX runtime.
+
+IMPACT: the failed run yielded no performance numbers and is not retained as evidence.
+
+ATTEMPTS: supplied `globalThis.React` only inside the temporary benchmark harness, then reran the identical 10/50, 50/500, 100/1000, 500/5000 and 500/10000 matrix successfully.
+
+ONE-LINE SOLUTION: fix the measurement harness runtime rather than changing C4 product code; only the corrected stress results are documented.
+
+## MOTION-FAIL-016 — Real Edge exposed lower-frame-only C4 snapping
+
+- Status: FIXED
+- Severity: medium for animation-editing correctness
+- Milestone: MOTION-C4
+- Date: 2026-08-10
+
+WHAT: the first real Edge multi-key drag preserved relative spacing but landed the primary key at `3,586,963` ticks even though snapping was enabled and the closer 30fps frame boundary was `3,600,000`.
+
+WHERE: `packages/motion-graph/src/dope-sheet.ts`, initial frame snap candidate.
+
+WHY: `frameForTicks(raw)` floors to the previous frame. The first implementation tested only that lower frame boundary, so a raw tick in the second half of a frame could be farther from the lower boundary than the snap threshold while still being close to the next frame.
+
+IMPACT: frame snapping was directionally asymmetric and could fail during ordinary rightward drags.
+
+ATTEMPTS: retained the failed browser result as diagnostic evidence only, changed snapping to compare lower and upper frame ticks and choose the nearest, added an upper-half regression test, then repeated the same CDP multi-select/drag.
+
+VERIFIED FIX: the retained second browser proof moved the selected pair from `3,024,000 / 4,320,000` to exact snapped `3,600,000 / 4,896,000` while preserving the original `1,296,000`-tick spacing.
+
+ONE-LINE SOLUTION: nearest-frame snapping now chooses the closer lower/upper frame boundary before applying the existing threshold.
+

@@ -74,6 +74,7 @@ import { OperationPlayground } from './OperationPlayground.tsx'
 import { LayerPanel } from './LayerPanel.tsx'
 import type { LayerDropIntent } from './LayerPanel.tsx'
 import { CompositorInspector } from './CompositorInspector.tsx'
+import { AnimationDopeSheet } from './AnimationDopeSheet.tsx'
 import { createCompositorHistory, pushCompositorHistory, redoCompositorHistory, undoCompositorHistory } from './compositor-history.ts'
 import type { MotionLabCompositorSnapshotV1 } from './compositor-history.ts'
 
@@ -1168,7 +1169,7 @@ export function MotionLabApp() {
           <div className="motion-lab__catalog-note">Proof components are added one at a time only after their tests and visual gate exist.</div>
         </aside>}
 
-        <section className="motion-lab__stage-column">
+        <section className={`motion-lab__stage-column${compositorMode ? ' motion-lab__stage-column--c4' : ''}`}>
           <div className="motion-lab__stage-toolbar">
             <div className="motion-lab__segmented" aria-label="Composition ratio">
               {ratioOrder.map((candidate) => (
@@ -1236,14 +1237,35 @@ export function MotionLabApp() {
             </MotionCompositionFrame>
           </div>
 
-          <div className="motion-lab__event-strip">
-            {currentDefinition.events.map((event) => (
-              <div key={event.name} className="motion-lab__event" style={{ left: `${event.normalizedTime * 100}%` }} title={`${event.name} @ ${event.normalizedTime}`}>
-                <span />
-                <small>{event.name}</small>
-              </div>
-            ))}
-          </div>
+          {compositorMode ? (
+            <AnimationDopeSheet
+              scene={currentGraphScene}
+              selectedNodeId={selectedGraphNodeId}
+              localTicks={localTicks}
+              durationTicks={durationTicks}
+              composition={composition}
+              events={currentDefinition.events}
+              initialSelectedKeyframeId={initialSearch.get('c4key')}
+              errorMessage={graphOperationError}
+              canUndo={compositorHistory.undo.length > 0}
+              canRedo={compositorHistory.redo.length > 0}
+              onSeek={seek}
+              onSelectNode={(nodeId) => setSelectedGraphNodeId(nodeId)}
+              onOperations={(operations) => appendGraphOperations(operations)}
+              nextOperationId={nextGraphOperationId}
+              onUndo={undoCompositor}
+              onRedo={redoCompositor}
+            />
+          ) : (
+            <div className="motion-lab__event-strip">
+              {currentDefinition.events.map((event) => (
+                <div key={event.name} className="motion-lab__event" style={{ left: `${event.normalizedTime * 100}%` }} title={`${event.name} @ ${event.normalizedTime}`}>
+                  <span />
+                  <small>{event.name}</small>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="motion-lab__transport">
             <div className="motion-lab__transport-buttons">
