@@ -6,7 +6,13 @@ import {
   TIMELINE_MARKERS_PRIMITIVE_ID,
   TRACK_OUTPUT_PRIMITIVE_ID,
 } from '@sanverse/edit-domain/capabilities'
-import { acceptChangeSet, type EditProject } from '@sanverse/edit-domain'
+import {
+  DEFAULT_VISUAL_PROPERTIES,
+  FOOTAGE_MOTION_CAPABILITY_ID,
+  acceptChangeSet,
+  mediaTime,
+  type EditProject,
+} from '@sanverse/edit-domain'
 import { changeSetOf, testMultiAssetProject, testSplit } from '@sanverse/edit-domain/test-fixtures'
 
 import { exportIdempotencyKey } from './export-identity.ts'
@@ -206,6 +212,62 @@ describe('T1 — an export is identified by what it will produce', () => {
       extensions: {},
     }])
     expect(exportIdempotencyKey(after)).toBe(exportIdempotencyKey(before))
+  })
+
+  it('T4 changes export identity when a rendered keyframe value/time/easing changes', () => {
+    const before = testMultiAssetProject()
+    const clip = before.composition.tracks.flatMap((track) => track.clips).find((candidate) => candidate.segmentKind === 'video')!
+    const baseMotion = {
+      schemaVersion: 'sanverse.operation/v3',
+      operationId: 'operation_t4motionkey1',
+      kind: 'set-footage-motion',
+      capabilityId: FOOTAGE_MOTION_CAPABILITY_ID,
+      motionId: 'motion_t4export01',
+      assetId: clip.assetId,
+      sourceInterval: clip.sourceRange,
+      transform: DEFAULT_VISUAL_PROPERTIES.transform,
+      crop: DEFAULT_VISUAL_PROPERTIES.crop,
+      tracks: [{
+        property: 'scale',
+        keyframes: [
+          { at: mediaTime(0), value: 1, easing: { kind: 'linear' } },
+          { at: clip.sourceRange.duration, value: 1.2, easing: { kind: 'linear' } },
+        ],
+      }],
+      extensions: {},
+    }
+    const animated = accept(before, 'changeset_t4motionkey1', [baseMotion])
+    const changedValue = accept(animated, 'changeset_t4motionkey2', [{
+      ...baseMotion,
+      operationId: 'operation_t4motionkey2',
+      tracks: [{ ...baseMotion.tracks[0], keyframes: [baseMotion.tracks[0].keyframes[0], { ...baseMotion.tracks[0].keyframes[1], value: 1.4 }] }],
+    }])
+    const changedTime = accept(changedValue, 'changeset_t4motionkey3', [{
+      ...baseMotion,
+      operationId: 'operation_t4motionkey3',
+      tracks: [{
+        ...baseMotion.tracks[0],
+        keyframes: [
+          baseMotion.tracks[0].keyframes[0],
+          { at: mediaTime(Math.max(1, clip.sourceRange.duration.ticks - 1)), value: 1.4, easing: { kind: 'linear' } },
+        ],
+      }],
+    }])
+    const changedEasing = accept(changedTime, 'changeset_t4motionkey4', [{
+      ...baseMotion,
+      operationId: 'operation_t4motionkey4',
+      tracks: [{
+        ...baseMotion.tracks[0],
+        keyframes: [
+          { ...baseMotion.tracks[0].keyframes[0], easing: { kind: 'cubic-bezier', x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
+          { at: mediaTime(Math.max(1, clip.sourceRange.duration.ticks - 1)), value: 1.4, easing: { kind: 'linear' } },
+        ],
+      }],
+    }])
+    expect(exportIdempotencyKey(animated)).not.toBe(exportIdempotencyKey(before))
+    expect(exportIdempotencyKey(changedValue)).not.toBe(exportIdempotencyKey(animated))
+    expect(exportIdempotencyKey(changedTime)).not.toBe(exportIdempotencyKey(changedValue))
+    expect(exportIdempotencyKey(changedEasing)).not.toBe(exportIdempotencyKey(changedTime))
   })
 
   it('still answers for a project that cannot be compiled', () => {

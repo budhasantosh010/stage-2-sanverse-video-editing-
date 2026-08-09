@@ -724,6 +724,33 @@ export const evaluateVisualProperties = (
     if (track.property === 'crop-left') crop.left = value
   }
 
+  // Valid keyframe endpoints can still overshoot between endpoints when the
+  // existing cubic/spring easing permits it. Keep canonical keyframes intact,
+  // but clamp the one shared evaluated editor state so Preview and FFmpeg see
+  // the same render-safe values. This is intentionally editor-owned and does
+  // not change Motion Program easing semantics.
+  transform.translateX = Math.min(2, Math.max(-2, transform.translateX))
+  transform.translateY = Math.min(2, Math.max(-2, transform.translateY))
+  transform.scale = Math.min(20, Math.max(0.01, transform.scale))
+  transform.rotationDegrees = Math.min(3_600, Math.max(-3_600, transform.rotationDegrees))
+  transform.opacity = Math.min(1, Math.max(0, transform.opacity))
+  crop.top = Math.min(0.99, Math.max(0, crop.top))
+  crop.right = Math.min(0.99, Math.max(0, crop.right))
+  crop.bottom = Math.min(0.99, Math.max(0, crop.bottom))
+  crop.left = Math.min(0.99, Math.max(0, crop.left))
+  const verticalCrop = crop.top + crop.bottom
+  if (verticalCrop >= 1) {
+    const factor = 0.99 / verticalCrop
+    crop.top *= factor
+    crop.bottom *= factor
+  }
+  const horizontalCrop = crop.left + crop.right
+  if (horizontalCrop >= 1) {
+    const factor = 0.99 / horizontalCrop
+    crop.left *= factor
+    crop.right *= factor
+  }
+
   if (!reducedMotion) {
     const applyPhase = (phase: VisualTransitionPhase, progress: number, entering: boolean): void => {
       if (phase.kind === 'none') return

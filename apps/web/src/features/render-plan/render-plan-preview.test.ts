@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { RenderPlan, VisualPropertiesNode } from '@sanverse/render-contract'
+import { DEFAULT_VISUAL_PROPERTIES, evaluateVisualProperties, type VisualEasing } from '@sanverse/edit-domain'
 import { changeSetOf, testCallout, testProject, testTitle } from '@sanverse/edit-domain/test-fixtures'
 import {
   compilePreviewPlan,
@@ -132,6 +133,53 @@ describe('motion preview timing', () => {
     const style = visualCssStyleFromPropertiesAt(plan.visuals[0], node, 2.5 * S, 1280, 720, false)
     expect(style.transform).toContain('translate(64px, 0px)')
     expect(style.opacity).toBe(0.8)
+  })
+
+  it.each([
+    ['Linear', { kind: 'linear' } as VisualEasing],
+    ['Ease In', { kind: 'cubic-bezier', x1: 0.42, y1: 0, x2: 1, y2: 1 } as VisualEasing],
+    ['Ease Out', { kind: 'cubic-bezier', x1: 0, y1: 0, x2: 0.58, y2: 1 } as VisualEasing],
+    ['Ease In-Out', { kind: 'cubic-bezier', x1: 0.42, y1: 0, x2: 0.58, y2: 1 } as VisualEasing],
+    ['Custom Bezier', { kind: 'cubic-bezier', x1: 0.25, y1: 0.1, x2: 0.25, y2: 1 } as VisualEasing],
+    ['Spring', { kind: 'spring', mass: 1, stiffness: 170, damping: 26, velocity: 0 } as VisualEasing],
+    ['Bounce', { kind: 'bounce', intensity: 0.6 } as VisualEasing],
+  ])('keeps %s preview geometry on the shared evaluator for every exposed property', (_label, easing) => {
+    const duration = S
+    const base: VisualPropertiesNode = {
+      ...plan.visuals[0],
+      transform: DEFAULT_VISUAL_PROPERTIES.transform,
+      crop: DEFAULT_VISUAL_PROPERTIES.crop,
+      layer: 3,
+      mask: DEFAULT_VISUAL_PROPERTIES.mask,
+      transition: DEFAULT_VISUAL_PROPERTIES.transition,
+      effects: [],
+      tracks: [
+        { property: 'translate-x', keyframes: [{ at: at(0), value: 0, easing }, { at: at(1), value: 0.2, easing: { kind: 'linear' } }] },
+        { property: 'translate-y', keyframes: [{ at: at(0), value: 0, easing }, { at: at(1), value: -0.1, easing: { kind: 'linear' } }] },
+        { property: 'scale', keyframes: [{ at: at(0), value: 1, easing }, { at: at(1), value: 1.5, easing: { kind: 'linear' } }] },
+        { property: 'rotation', keyframes: [{ at: at(0), value: 0, easing }, { at: at(1), value: 45, easing: { kind: 'linear' } }] },
+        { property: 'opacity', keyframes: [{ at: at(0), value: 0.4, easing }, { at: at(1), value: 0.9, easing: { kind: 'linear' } }] },
+        { property: 'crop-top', keyframes: [{ at: at(0), value: 0, easing }, { at: at(1), value: 0.05, easing: { kind: 'linear' } }] },
+        { property: 'crop-right', keyframes: [{ at: at(0), value: 0, easing }, { at: at(1), value: 0.06, easing: { kind: 'linear' } }] },
+        { property: 'crop-bottom', keyframes: [{ at: at(0), value: 0, easing }, { at: at(1), value: 0.07, easing: { kind: 'linear' } }] },
+        { property: 'crop-left', keyframes: [{ at: at(0), value: 0, easing }, { at: at(1), value: 0.08, easing: { kind: 'linear' } }] },
+      ],
+    }
+    const localTicks = [-1, 0, S / 4, S / 2, 3 * S / 4, S, S + 1]
+    for (const local of localTicks) {
+      const evaluated = evaluateVisualProperties(base, local, duration)
+      const css = visualCssStyleFromPropertiesAt(base, { ...node, interval: { start: at(2), duration: at(1) } }, 2 * S + local, 1280, 720, false)
+      expect(css.transform).toBe(
+        `translate(${evaluated.transform.translateX * 1280}px, ${evaluated.transform.translateY * 720}px) ` +
+        `scale(${evaluated.transform.scale}) rotate(${evaluated.transform.rotationDegrees}deg)`,
+      )
+      expect(css.opacity).toBe(evaluated.transform.opacity)
+      const hasCrop = Object.values(evaluated.crop).some((value) => value > 0)
+      expect(css.clipPath).toBe(hasCrop
+        ? `inset(${evaluated.crop.top * 100}% ${evaluated.crop.right * 100}% ${evaluated.crop.bottom * 100}% ${evaluated.crop.left * 100}%)`
+        : undefined)
+      expect(css.zIndex).toBe(evaluated.layer)
+    }
   })
 
   it('projects the detached Canvas draft with the same exact visual contract as accepted preview', () => {

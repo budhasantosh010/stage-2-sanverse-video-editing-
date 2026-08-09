@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import { mediaTime } from './time'
 import {
   DEFAULT_VISUAL_PROPERTIES,
   evaluatePropertyTrack,
+  evaluateVisualProperties,
   validateVisualPropertiesOperation,
   type SetVisualPropertiesOperation,
 } from './visual-properties'
@@ -150,6 +152,59 @@ describe('property tracks, easing, and physical motion', () => {
     expect(spring).toBeLessThan(1.25)
     expect(bounce).toBeGreaterThan(-0.2)
     expect(bounce).toBeLessThanOrEqual(0)
+  })
+
+  it('clamps easing overshoot only at the shared evaluated render state', () => {
+    const opacityTrack = {
+      property: 'opacity' as const,
+      keyframes: [
+        { at: mediaTime(0), value: 0.9, easing: { kind: 'cubic-bezier' as const, x1: 0.2, y1: 2, x2: 0.8, y2: 2 } },
+        { at: mediaTime(1_440_000), value: 1, easing: { kind: 'linear' as const } },
+      ],
+    }
+    const scaleTrack = {
+      property: 'scale' as const,
+      keyframes: [
+        { at: mediaTime(0), value: 19, easing: { kind: 'cubic-bezier' as const, x1: 0.2, y1: 2, x2: 0.8, y2: 2 } },
+        { at: mediaTime(1_440_000), value: 20, easing: { kind: 'linear' as const } },
+      ],
+    }
+    expect(evaluatePropertyTrack(opacityTrack, 720_000)).toBeGreaterThan(1)
+    expect(evaluatePropertyTrack(scaleTrack, 720_000)).toBeGreaterThan(20)
+
+    const evaluated = evaluateVisualProperties({
+      ...DEFAULT_VISUAL_PROPERTIES,
+      tracks: [opacityTrack, scaleTrack],
+    }, 720_000, 1_440_000)
+    expect(evaluated.transform.opacity).toBe(1)
+    expect(evaluated.transform.scale).toBe(20)
+  })
+
+  it('keeps animated crop render-safe even when easing overshoots valid endpoints', () => {
+    const evaluated = evaluateVisualProperties({
+      ...DEFAULT_VISUAL_PROPERTIES,
+      tracks: [
+        {
+          property: 'crop-left',
+          keyframes: [
+            { at: mediaTime(0), value: 0.45, easing: { kind: 'cubic-bezier', x1: 0.2, y1: 2, x2: 0.8, y2: 2 } },
+            { at: mediaTime(1_440_000), value: 0.49, easing: { kind: 'linear' } },
+          ],
+        },
+        {
+          property: 'crop-right',
+          keyframes: [
+            { at: mediaTime(0), value: 0.45, easing: { kind: 'cubic-bezier', x1: 0.2, y1: 2, x2: 0.8, y2: 2 } },
+            { at: mediaTime(1_440_000), value: 0.49, easing: { kind: 'linear' } },
+          ],
+        },
+      ],
+    }, 720_000, 1_440_000)
+    expect(evaluated.crop.left).toBeGreaterThanOrEqual(0)
+    expect(evaluated.crop.right).toBeGreaterThanOrEqual(0)
+    expect(evaluated.crop.left).toBeLessThanOrEqual(0.99)
+    expect(evaluated.crop.right).toBeLessThanOrEqual(0.99)
+    expect(evaluated.crop.left + evaluated.crop.right).toBeLessThan(1)
   })
 
   it('refuses unordered or duplicate keyframe times', () => {
