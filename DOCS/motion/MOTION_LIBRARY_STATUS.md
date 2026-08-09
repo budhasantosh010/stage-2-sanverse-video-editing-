@@ -1,6 +1,6 @@
 # Motion Library Status
 
-Last updated: 2026-08-08
+Last updated: 2026-08-09
 
 ## Repository / worktree location
 
@@ -52,8 +52,10 @@ Implementation and verification are complete.
 - MOTION-A17 — **complete**. Twelve genuinely missing social-proof, editorial, explainer and software-demo scenarios were added graph-native, taking the public catalog from 48 to **60 components**. Every new component passes four-ratio and eight-style automated coverage and has a retained manually inspected browser baseline. Evidence: `DOCS/motion/evidence/MOTION-A17.md`.
 - First Plan-A + Plan-C continuation cycle — **complete** at **207/207 Motion tests** and **7/7 Motion workspace builds**. Remote branch/tag verification closed that cycle before C2 began.
 - MOTION-C2 — **implementation + verification complete**. Deterministic keyframes are now a first-class `Animatable` authority with stable IDs, Hold/Linear/Bezier interpolation, typed node/effect/mask targets, seven universal keyframe operations, atomic batches/inverses, serialization, useful timeline-track projection and a development keyframe timeline in Advanced Motion Lab. The Cost / Value Card proof is graph-operation-only and real Edge direct/backward/random exact-seek behavior is verified. Evidence: `DOCS/motion/evidence/MOTION-C2.md`.
-- C2 release-candidate gate — **253/253 Motion tests** and **7/7 Motion workspace builds** passed. Existing 60 component implementations remain unchanged; representative visual regression is clean at the composition level. Git preservation/tagging closes C2 before A18 begins.
-- MOTION-A18 — **next active milestone after the C2 Git checkpoint**. It must inspect the 60-component coverage matrix first and add only 8–10 genuinely missing keyframe-ready creator scenarios.
-- MOTION-C3 — **not started**. Professional Layer Hierarchy remains outside this cycle until C2 + A18 are both closed and reported.
+- C2 release gate — **complete and preserved**. **253/253 Motion tests** and **7/7 Motion workspace builds** passed; commit `735bc9730233c00b6f23cdbe42b50f3eb8f91d5a` is pushed and the pushed annotated rollback tag `motion-compositor-c2` dereferences to the same commit.
+- MOTION-A18 — **complete for implementation, mechanical verification, inspected browser evidence and measured performance**. The 60-component coverage matrix was re-read before selection. Nine genuinely missing keyframe-native creator scenarios were added, taking the public catalog to **69 components**. Evidence: `DOCS/motion/evidence/MOTION-A18.md`.
+- A18 release gate — **271/271 Motion tests** and **7/7 Motion workspace builds** passed. The nine A18 modules pass the 0.75/1/1.5/2/3/5-second duration matrix, all four ratios, all eight style packs, reduced motion, exact-seek determinism, text stress/refusal coverage and compositor readiness. All nine retained real-Edge baselines were manually inspected; one undersized Stacked Hook portrait pass was corrected and recaptured before acceptance.
+- Current public Motion state — **69 complete first-party components**, **8 shared style packs**, **4 required ratios**, C2 keyframes available as a first-class graph authority, and no production Studio integration in this cycle.
+- MOTION-C3 — **not started**. Professional Layer Hierarchy remains outside this completed cycle.
 
 Production `apps/web` remains untouched by this Motion cycle. No Plan-B AI decision logic has been added.

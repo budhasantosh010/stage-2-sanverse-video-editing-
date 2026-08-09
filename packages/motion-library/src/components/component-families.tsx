@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import type { MotionComponentDefinitionV1, MotionComponentRenderPropsV1, MotionRenderContextV1, MotionStylePackV1, MotionValidationResultV1 } from '@sanverse/motion-contract'
 import type { MotionExposureV1, MotionGraphBackedComponentModuleV1, MotionSceneV1 } from '@sanverse/motion-graph'
-import { constant, createMotionScene } from '@sanverse/motion-graph'
+import { constant, createMotionScene, keyframed } from '@sanverse/motion-graph'
 import { SANVERSE_TICKS_PER_SECOND, easeInCubic, easeOutCubic, normalizedProgress, sequenceProgress, staggerProgress } from '@sanverse/motion-primitives'
 import { mergeMotionGraphNodeStyle, useMotionGraphPresentation } from '@sanverse/motion-native-runtime'
 import { FULL_NATIVE_GRAPH_CAPABILITIES, graphGroup, graphShape, graphText, responsiveGraphLayout } from '../graph-common.ts'
@@ -44,6 +44,10 @@ export interface FamilyVariantConfig {
   readonly subtitle: string
   readonly value: string
   readonly items: readonly string[]
+  readonly minDurationSeconds?: number
+  readonly defaultDurationSeconds?: number
+  readonly maxDurationSeconds?: number
+  readonly events?: readonly Readonly<{ name: string; normalizedTime: number }>[]
 }
 
 export interface FamilyComponentState {
@@ -116,8 +120,53 @@ export const evaluateFamilyComponentState = (props: FamilyComponentProps, contex
 
 const nodePrefix = (config: FamilyVariantConfig) => `family.${config.id.replace(/^sanverse\./u, '')}`
 
+export const A18_KEYFRAME_CREATOR_COMPONENT_IDS = Object.freeze([
+  'sanverse.keyword-slam',
+  'sanverse.three-beat-headline',
+  'sanverse.stacked-hook',
+  'sanverse.sentence-deconstruction',
+  'sanverse.punch-word-reveal',
+  'sanverse.poll-vote-result',
+  'sanverse.ranking-podium',
+  'sanverse.app-feature-spotlight',
+  'sanverse.keyboard-shortcut-callout',
+] as const)
+const A18_KEYFRAME_CREATOR_IDS = new Set<string>(A18_KEYFRAME_CREATOR_COMPONENT_IDS)
+const isA18KeyframeCreator = (config: FamilyVariantConfig): boolean => A18_KEYFRAME_CREATOR_IDS.has(config.id)
+const durationTicksForConfig = (config: FamilyVariantConfig, field: 'min' | 'default' | 'max'): number => {
+  const seconds = field === 'min' ? (config.minDurationSeconds ?? 1) : field === 'default' ? (config.defaultDurationSeconds ?? 4) : (config.maxDurationSeconds ?? 16)
+  return Math.round(SANVERSE_TICKS_PER_SECOND * seconds)
+}
+const tickAt = (context: MotionRenderContextV1, progress: number): number => Math.round(context.durationTicks * progress)
+const revealTrack = (id: string, context: MotionRenderContextV1, start: number, peak = Math.min(start + 0.18, 0.78)) => context.reducedMotion
+  ? constant(1)
+  : keyframed([
+      { id: `${id}:hidden`, tick: tickAt(context, 0), value: 0, interpolation: 'hold' as const },
+      { id: `${id}:enter`, tick: tickAt(context, start), value: 0, interpolation: 'bezier' as const, bezier: { inX: 0.7, inY: 1, outX: 0.2, outY: 0.82 } },
+      { id: `${id}:shown`, tick: tickAt(context, peak), value: 1, interpolation: 'linear' as const },
+      { id: `${id}:exit`, tick: tickAt(context, 0.92), value: 1, interpolation: 'linear' as const },
+      { id: `${id}:gone`, tick: tickAt(context, 1), value: 0, interpolation: 'linear' as const },
+    ])
+const translateYTrack = (id: string, context: MotionRenderContextV1, start: number, amount: number) => context.reducedMotion
+  ? constant(0)
+  : keyframed([
+      { id: `${id}:offset`, tick: tickAt(context, 0), value: amount, interpolation: 'hold' as const },
+      { id: `${id}:enter`, tick: tickAt(context, start), value: amount, interpolation: 'bezier' as const, bezier: { inX: 0.72, inY: 1, outX: 0.2, outY: 0.84 } },
+      { id: `${id}:settled`, tick: tickAt(context, Math.min(start + 0.20, 0.78)), value: 0, interpolation: 'linear' as const },
+    ])
+const scaleTrack = (id: string, context: MotionRenderContextV1, start: number, from = 0.78, overshoot = 1.08) => context.reducedMotion
+  ? constant(1)
+  : keyframed([
+      { id: `${id}:small`, tick: tickAt(context, 0), value: from, interpolation: 'hold' as const },
+      { id: `${id}:enter`, tick: tickAt(context, start), value: from, interpolation: 'bezier' as const, bezier: { inX: 0.7, inY: 1, outX: 0.18, outY: 0.9 } },
+      { id: `${id}:overshoot`, tick: tickAt(context, Math.min(start + 0.14, 0.74)), value: overshoot, interpolation: 'bezier' as const, bezier: { inX: 0.78, inY: 1.12, outX: 0.3, outY: 1.08 } },
+      { id: `${id}:settled`, tick: tickAt(context, Math.min(start + 0.24, 0.82)), value: 1, interpolation: 'linear' as const },
+    ])
+
 export const createFamilyScene = (config: FamilyVariantConfig, props: FamilyComponentProps, style: FamilyComponentStyle, context: MotionRenderContextV1): MotionSceneV1 => {
   validateContext(context)
+  const a18Keyframed = isA18KeyframeCreator(config)
+  if (a18Keyframed && (context.durationTicks < durationTicksForConfig(config, 'min') || context.durationTicks > durationTicksForConfig(config, 'max'))) throw new RangeError(`${config.id} duration is outside its supported keyframe-authoring window.`)
   const prefix = nodePrefix(config)
   const rootId = `${prefix}.root`
   const surfaceId = `${prefix}.surface`
@@ -131,19 +180,29 @@ export const createFamilyScene = (config: FamilyVariantConfig, props: FamilyComp
   const itemIds = props.items.map((_, index) => `${prefix}.item:${index + 1}`)
   const root = graphGroup(rootId, config.name, null, [surfaceId, accentId, contentId])
   const short = Math.min(context.composition.width, context.composition.height)
-  const surface = graphShape({ id: surfaceId, name: 'Surface', parentId: rootId, width: Math.round(context.composition.width * 0.76), height: Math.round(context.composition.height * 0.56), fillColor: style.surfaceColor, strokeColor: `${style.accentColor}28`, strokeWidth: 2, radius: style.radius })
-  const accent = graphShape({ id: accentId, name: 'Accent', parentId: rootId, width: Math.round(short * 0.16), height: Math.max(6, Math.round(short * 0.012)), fillColor: style.accentColor, strokeColor: 'transparent', strokeWidth: 0, radius: 999 })
+  const surfaceBase = graphShape({ id: surfaceId, name: 'Surface', parentId: rootId, width: Math.round(context.composition.width * 0.76), height: Math.round(context.composition.height * 0.56), fillColor: style.surfaceColor, strokeColor: `${style.accentColor}28`, strokeWidth: 2, radius: style.radius })
+  const surface = a18Keyframed ? Object.freeze({ ...surfaceBase, opacity: revealTrack(`${prefix}:surface`, context, 0.02, 0.14) }) : surfaceBase
+  const accentBase = graphShape({ id: accentId, name: 'Accent', parentId: rootId, width: Math.round(short * 0.16), height: Math.max(6, Math.round(short * 0.012)), fillColor: style.accentColor, strokeColor: 'transparent', strokeWidth: 0, radius: 999 })
+  const accent = a18Keyframed ? Object.freeze({ ...accentBase, opacity: revealTrack(`${prefix}:accent`, context, 0.10, 0.24), transform: Object.freeze({ ...accentBase.transform, scaleX: scaleTrack(`${prefix}:accent-scale`, context, 0.10, 0.35, 1), scaleY: constant(1) }) }) : accentBase
   const contentBase = graphGroup(contentId, 'Content', rootId, [eyebrowId, titleId, subtitleId, valueId, itemsId])
   const reveal = mReduced(mConst(1), mEase('ease-out-cubic', mSequence(0.02, 0.30, mProgress())))
   const remain = mOneMinus(mEase('ease-in-cubic', mSequence(0.84, 1, mProgress())))
-  const content = Object.freeze({ ...contentBase, opacity: mNumber(mMultiply(reveal, remain)), transform: Object.freeze({ ...contentBase.transform, positionY: mNumber(mReduced(mConst(0), mMultiply(mConst(26 * style.motionIntensity), mOneMinus(reveal)))) }) })
-  const eyebrow = Object.freeze({ ...graphText({ id: eyebrowId, name: 'Eyebrow', parentId: contentId, text: props.eyebrow, color: style.accentColor, fontFamily: style.fontFamily, fontSize: Math.round(short * 0.025), fontWeight: 800 }), visible: constant(Boolean(props.eyebrow.trim())) })
-  const title = graphText({ id: titleId, name: 'Title', parentId: contentId, text: props.title, color: style.textColor, fontFamily: style.fontFamily, fontSize: Math.round(short * 0.064), fontWeight: style.titleWeight })
-  const subtitle = Object.freeze({ ...graphText({ id: subtitleId, name: 'Subtitle', parentId: contentId, text: props.subtitle, color: style.mutedColor, fontFamily: style.fontFamily, fontSize: Math.round(short * 0.027), fontWeight: style.bodyWeight }), visible: constant(Boolean(props.subtitle.trim())) })
-  const value = Object.freeze({ ...graphText({ id: valueId, name: 'Value', parentId: contentId, text: props.value, color: style.accentColor, fontFamily: style.fontFamily, fontSize: Math.round(short * 0.085), fontWeight: style.titleWeight }), visible: constant(Boolean(props.value.trim())) })
+  const content = a18Keyframed ? contentBase : Object.freeze({ ...contentBase, opacity: mNumber(mMultiply(reveal, remain)), transform: Object.freeze({ ...contentBase.transform, positionY: mNumber(mReduced(mConst(0), mMultiply(mConst(26 * style.motionIntensity), mOneMinus(reveal)))) }) })
+  const eyebrowBase = graphText({ id: eyebrowId, name: 'Eyebrow', parentId: contentId, text: props.eyebrow, color: style.accentColor, fontFamily: style.fontFamily, fontSize: Math.round(short * 0.025), fontWeight: 800 })
+  const eyebrow = Object.freeze({ ...eyebrowBase, visible: constant(Boolean(props.eyebrow.trim())), ...(a18Keyframed ? { opacity: revealTrack(`${prefix}:eyebrow`, context, 0.04, 0.16), transform: Object.freeze({ ...eyebrowBase.transform, positionY: translateYTrack(`${prefix}:eyebrow-y`, context, 0.04, 18 * style.motionIntensity) }) } : {}) })
+  const titleBase = graphText({ id: titleId, name: 'Title', parentId: contentId, text: props.title, color: style.textColor, fontFamily: style.fontFamily, fontSize: Math.round(short * 0.064), fontWeight: style.titleWeight })
+  const title = a18Keyframed ? Object.freeze({ ...titleBase, opacity: revealTrack(`${prefix}:title`, context, 0.10, 0.28), transform: Object.freeze({ ...titleBase.transform, positionY: translateYTrack(`${prefix}:title-y`, context, 0.10, 34 * style.motionIntensity), scaleX: scaleTrack(`${prefix}:title-sx`, context, 0.10, 0.92, 1.04), scaleY: scaleTrack(`${prefix}:title-sy`, context, 0.10, 0.92, 1.04) }) }) : titleBase
+  const subtitleBase = graphText({ id: subtitleId, name: 'Subtitle', parentId: contentId, text: props.subtitle, color: style.mutedColor, fontFamily: style.fontFamily, fontSize: Math.round(short * 0.027), fontWeight: style.bodyWeight })
+  const subtitle = Object.freeze({ ...subtitleBase, visible: constant(Boolean(props.subtitle.trim())), ...(a18Keyframed ? { opacity: revealTrack(`${prefix}:subtitle`, context, 0.22, 0.40), transform: Object.freeze({ ...subtitleBase.transform, positionY: translateYTrack(`${prefix}:subtitle-y`, context, 0.22, 22 * style.motionIntensity) }) } : {}) })
+  const valueBase = graphText({ id: valueId, name: 'Value', parentId: contentId, text: props.value, color: style.accentColor, fontFamily: style.fontFamily, fontSize: Math.round(short * 0.085), fontWeight: style.titleWeight })
+  const value = Object.freeze({ ...valueBase, visible: constant(Boolean(props.value.trim())), ...(a18Keyframed ? { opacity: revealTrack(`${prefix}:value`, context, 0.28, 0.46), transform: Object.freeze({ ...valueBase.transform, positionY: translateYTrack(`${prefix}:value-y`, context, 0.28, 26 * style.motionIntensity), scaleX: scaleTrack(`${prefix}:value-sx`, context, 0.28, 0.72, 1.10), scaleY: scaleTrack(`${prefix}:value-sy`, context, 0.28, 0.72, 1.10) }) } : {}) })
   const items = graphGroup(itemsId, 'Items', contentId, itemIds)
   const itemNodes = Object.fromEntries(props.items.map((item, index) => {
     const base = graphText({ id: itemIds[index]!, name: `Item ${index + 1}`, parentId: itemsId, text: item, color: style.textColor, fontFamily: style.fontFamily, fontSize: Math.round(short * 0.027), fontWeight: style.bodyWeight })
+    if (a18Keyframed) {
+      const start = Math.min(0.18 + index * 0.11, 0.58)
+      return [base.id, Object.freeze({ ...base, opacity: revealTrack(`${prefix}:item:${index + 1}`, context, start, Math.min(start + 0.16, 0.78)), transform: Object.freeze({ ...base.transform, positionY: translateYTrack(`${prefix}:item:${index + 1}:y`, context, start, 30 * style.motionIntensity), scaleX: scaleTrack(`${prefix}:item:${index + 1}:sx`, context, start, 0.88, 1.03), scaleY: scaleTrack(`${prefix}:item:${index + 1}:sy`, context, start, 0.88, 1.03) }) })]
+    }
     const itemReveal = mReduced(mConst(1), mEase('ease-out-cubic', mStagger(mSequence(0.12, 0.54, mProgress()), index, Math.max(1, props.items.length), 0.55)))
     return [base.id, Object.freeze({ ...base, opacity: mNumber(mMultiply(itemReveal, remain)) })]
   }))
@@ -190,6 +249,22 @@ const renderFamilyVisual = (config: FamilyVariantConfig, props: FamilyComponentP
   const item = (text: string, index: number, extra: CSSProperties = {}) => <div key={`${text}:${index}`} data-motion-node-id={`${prefix}.item:${index + 1}`} style={graphStyle(`${prefix}.item:${index + 1}`, { color: style.textColor, fontSize: state.layout === 'wide' ? 26 : 22, lineHeight: 1.22, fontWeight: style.bodyWeight, ...extra })}>{text}</div>
 
   if (config.family === 'title') {
+    if (config.variant === 'keyword-slam') {
+      return <div style={{ display: 'grid', gap: 14, textAlign: 'center', justifyItems: 'center' }}>{eyebrow}<div style={{ maxWidth: '92%' }}>{title}</div><div data-motion-node-id={`${prefix}.value`} style={graphStyle(`${prefix}.value`, { color: style.accentColor, fontSize: state.layout === 'wide' ? 132 : 86, lineHeight: .88, fontWeight: 950, letterSpacing: '-.07em', textTransform: 'uppercase', overflowWrap: 'anywhere' })}>{props.value}</div>{subtitle}<div data-motion-node-id={`${prefix}.accent`} style={graphStyle(`${prefix}.accent`, { width: state.layout === 'wide' ? 190 : 120, height: 8, borderRadius: 999, background: style.accentColor })} /></div>
+    }
+    if (config.variant === 'three-beat') {
+      return <div style={{ display: 'grid', gap: 14, textAlign: 'center' }}>{eyebrow}{title}<div style={{ color: style.mutedColor, fontSize: state.layout === 'wide' ? 24 : 20 }}>{props.subtitle}</div><div style={{ display: 'grid', gridTemplateColumns: state.layout === 'wide' ? 'repeat(3, minmax(0,1fr))' : '1fr', gap: 12 }}>{props.items.slice(0, 3).map((entry, index) => item(entry, index, { padding: state.layout === 'wide' ? '22px 18px' : '15px 16px', borderRadius: style.radius, border: `1px solid ${style.accentColor}${index === 1 ? '88' : '35'}`, background: index === 1 ? `${style.accentColor}16` : `${style.textColor}08`, fontSize: state.layout === 'wide' ? 34 : 27, fontWeight: 850, textAlign: 'center' }))}</div>{value}</div>
+    }
+    if (config.variant === 'stacked-hook') {
+      const lines = [props.title, props.subtitle, props.value].filter(Boolean)
+      return <div style={{ display: 'grid', gap: 10, textAlign: 'left' }}>{eyebrow}{lines.map((line, index) => <div key={`${line}:${index}`} data-motion-node-id={index === 0 ? `${prefix}.title` : index === 1 ? `${prefix}.subtitle` : `${prefix}.value`} style={graphStyle(index === 0 ? `${prefix}.title` : index === 1 ? `${prefix}.subtitle` : `${prefix}.value`, { padding: '12px 16px', borderLeft: `6px solid ${index === 1 ? style.accentColor : `${style.textColor}33`}`, background: index === 1 ? `${style.accentColor}10` : `${style.textColor}06`, color: index === 1 ? style.accentColor : style.textColor, fontSize: state.layout === 'wide' ? 58 - index * 5 : 64 - index * 7, fontWeight: index === 1 ? 900 : style.titleWeight, lineHeight: 1.02, overflowWrap: 'anywhere' })}>{line}</div>)}</div>
+    }
+    if (config.variant === 'sentence-deconstruction') {
+      return <div style={{ display: 'grid', gap: 18, textAlign: 'center' }}>{eyebrow}{title}<div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>{props.items.map((entry, index) => item(entry, index, { padding: '11px 15px', borderRadius: 999, background: index % 2 === 0 ? `${style.accentColor}14` : `${style.textColor}0a`, border: `1px solid ${index % 2 === 0 ? style.accentColor : style.textColor}35`, color: index % 2 === 0 ? style.accentColor : style.textColor, fontWeight: 800 }))}</div>{subtitle}<div data-motion-node-id={`${prefix}.accent`} style={graphStyle(`${prefix}.accent`, { width: 9, height: 9, borderRadius: '50%', background: style.accentColor })} /></div>
+    }
+    if (config.variant === 'punch-word') {
+      return <div style={{ display: 'grid', gap: 14, textAlign: 'center', justifyItems: 'center' }}>{eyebrow}{title}<div data-motion-node-id={`${prefix}.value`} style={graphStyle(`${prefix}.value`, { padding: state.layout === 'wide' ? '18px 30px' : '14px 22px', borderRadius: style.radius, background: style.accentColor, color: '#080808', fontSize: state.layout === 'wide' ? 86 : 62, lineHeight: .9, fontWeight: 950, letterSpacing: '-.06em', textTransform: 'uppercase', overflowWrap: 'anywhere' })}>{props.value}</div>{subtitle}</div>
+    }
     const isSplit = config.variant === 'split'
     const isQuestion = config.variant === 'question'
     const isLower = config.variant === 'lower-third'
@@ -197,6 +272,9 @@ const renderFamilyVisual = (config: FamilyVariantConfig, props: FamilyComponentP
   }
   if (config.family === 'value') {
     const compare = config.variant === 'before-after'
+    if (config.variant === 'poll-result') {
+      return <div style={{ display: 'grid', gap: 16, textAlign: 'left' }}>{eyebrow}{title}{subtitle}<div style={{ display: 'grid', gap: 10 }}>{props.items.slice(0, 4).map((entry, index) => { const parts = entry.split('·'); const label = parts[0]?.trim() ?? entry; const percent = parts[1]?.trim() ?? ''; const numeric = Number.parseFloat(percent); const width = Number.isFinite(numeric) ? `${Math.max(0, Math.min(100, numeric))}%` : `${Math.max(24, 92 - index * 18)}%`; return <div key={`${entry}:${index}`} data-motion-node-id={`${prefix}.item:${index + 1}`} style={graphStyle(`${prefix}.item:${index + 1}`, { display: 'grid', gap: 6, padding: '10px 12px', borderRadius: style.radius * .7, border: `1px solid ${style.textColor}1d`, background: `${style.textColor}06` })}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: style.textColor, fontSize: state.layout === 'wide' ? 23 : 20, fontWeight: 750 }}><span>{label}</span><strong style={{ color: index === 0 ? style.accentColor : style.mutedColor }}>{percent}</strong></div><div style={{ height: 8, borderRadius: 999, overflow: 'hidden', background: `${style.textColor}12` }}><div style={{ width, height: '100%', borderRadius: 999, background: index === 0 ? style.accentColor : `${style.textColor}55` }} /></div></div> })}</div>{value}</div>
+    }
     if (config.variant === 'myth-fact' || config.variant === 'problem-solution') {
       const left = props.items[0] ?? 'Problem'
       const right = props.items[1] ?? props.value
@@ -219,6 +297,14 @@ const renderFamilyVisual = (config: FamilyVariantConfig, props: FamilyComponentP
     if (config.variant === 'search') {
       return <div style={{ display: 'grid', gap: 14, textAlign: 'left' }}>{eyebrow}<div data-motion-node-id={`${prefix}.accent`} style={graphStyle(`${prefix}.accent`, { padding: '13px 16px', borderRadius: 999, border: `1px solid ${style.textColor}24`, background: `${style.textColor}08`, color: style.textColor, fontSize: state.layout === 'wide' ? 28 : 23, fontWeight: 650 })}>⌕&nbsp;&nbsp;{props.title}</div><div style={{ color: style.mutedColor, fontSize: 18 }}>{props.subtitle}</div><div style={{ display: 'grid', gap: 8 }}>{props.items.map((entry, index) => item(`${index + 1}. ${entry}`, index, { padding: '11px 0', borderBottom: `1px solid ${style.textColor}12` }))}</div></div>
     }
+    if (config.variant === 'ranking-podium') {
+      const ranked = props.items.slice(0, 3)
+      const order = ranked.length === 3 ? [ranked[1]!, ranked[0]!, ranked[2]!] : ranked
+      return <div style={{ display: 'grid', gap: 16, textAlign: 'center' }}>{eyebrow}{title}{subtitle}<div style={{ display: 'grid', gridTemplateColumns: state.layout === 'wide' ? `repeat(${Math.max(1, order.length)}, minmax(0,1fr))` : '1fr', gap: 10, alignItems: 'end' }}>{order.map((entry, visualIndex) => { const originalIndex = ranked.indexOf(entry); const place = originalIndex + 1; const height = state.layout === 'wide' ? 100 + (4 - place) * 34 : 'auto'; return <div key={entry} data-motion-node-id={`${prefix}.item:${originalIndex + 1}`} style={graphStyle(`${prefix}.item:${originalIndex + 1}`, { minHeight: height, display: 'grid', alignContent: 'center', gap: 6, padding: '16px 14px', borderRadius: `${style.radius}px ${style.radius}px 8px 8px`, background: place === 1 ? `${style.accentColor}1e` : `${style.textColor}09`, border: `1px solid ${place === 1 ? style.accentColor : style.textColor}36`, color: style.textColor })}><strong style={{ color: place === 1 ? style.accentColor : style.mutedColor, fontSize: 26 }}>#{place}</strong><span style={{ fontSize: state.layout === 'wide' ? 24 : 21, fontWeight: 800 }}>{entry.replace(/^#\d+\s*/u, '')}</span></div> })}</div>{value}</div>
+    }
+    if (config.variant === 'app-feature') {
+      return <div style={{ display: 'grid', gap: 16, textAlign: 'left' }}><div data-motion-node-id={`${prefix}.accent`} style={graphStyle(`${prefix}.accent`, { width: 54, height: 54, display: 'grid', placeItems: 'center', borderRadius: 14, background: `${style.accentColor}18`, border: `1px solid ${style.accentColor}55`, color: style.accentColor, fontSize: 26, fontWeight: 900 })}>✦</div>{eyebrow}{title}{subtitle}<div style={{ display: 'grid', gridTemplateColumns: state.layout === 'wide' ? `repeat(${Math.max(1, props.items.length)}, minmax(0,1fr))` : '1fr', gap: 10 }}>{props.items.map((entry, index) => item(entry, index, { padding: '13px 15px', borderRadius: style.radius * .7, background: `${style.textColor}07`, border: `1px solid ${style.accentColor}28` }))}</div>{value}</div>
+    }
     return <div style={{ display: 'grid', gap: 18, textAlign: alignmentFor(config) }}>{eyebrow}{title}{subtitle}{tags ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>{props.items.map((entry, index) => item(entry, index, { padding: '10px 16px', border: `1px solid ${style.accentColor}55`, borderRadius: 999, background: `${style.accentColor}0c` }))}</div> : two ? <div style={{ display: 'grid', gridTemplateColumns: state.layout === 'wide' ? '1fr 1fr' : '1fr', gap: 14 }}>{props.items.map((entry, index) => item(entry, index, { padding: 16, borderRadius: style.radius * .7, border: `1px solid ${index % 2 === 0 ? style.successColor : style.dangerColor}44` }))}</div> : <div style={{ display: 'grid', gap: 10 }}>{props.items.map((entry, index) => item(`${config.variant === 'numbered' || config.variant === 'steps' ? `${index + 1}. ` : '• '}${entry}`, index, { padding: '8px 0' }))}</div>}</div>
   }
   if (config.family === 'status') {
@@ -229,6 +315,9 @@ const renderFamilyVisual = (config: FamilyVariantConfig, props: FamilyComponentP
     }
     if (config.variant === 'cursor') {
       return <div style={{ display: 'grid', gap: 16, textAlign: 'center', justifyItems: 'center' }}>{eyebrow}<div data-motion-node-id={`${prefix}.accent`} style={graphStyle(`${prefix}.accent`, { color: style.accentColor, fontSize: state.layout === 'wide' ? 68 : 54, lineHeight: .9, filter: `drop-shadow(0 8px 18px ${style.accentColor}55)` })}>↖</div><div style={{ padding: '16px 20px', borderRadius: style.radius, border: `2px solid ${style.accentColor}66`, background: `${style.accentColor}0b` }}>{title}</div>{value}{subtitle}{props.items.map((entry, index) => item(entry, index, { color: style.mutedColor }))}</div>
+    }
+    if (config.variant === 'keyboard-shortcut') {
+      return <div style={{ display: 'grid', gap: 16, textAlign: 'center', justifyItems: 'center' }}>{eyebrow}{title}<div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'center' }}>{props.items.slice(0, 4).map((entry, index) => item(entry, index, { minWidth: state.layout === 'wide' ? 74 : 62, padding: '14px 16px', borderRadius: 12, border: `1px solid ${style.textColor}38`, borderBottomWidth: 5, background: `${style.textColor}0c`, fontFamily: 'Consolas, monospace', fontSize: state.layout === 'wide' ? 31 : 25, fontWeight: 900, textAlign: 'center' }))}</div><div data-motion-node-id={`${prefix}.value`} style={graphStyle(`${prefix}.value`, { color: style.accentColor, fontSize: state.layout === 'wide' ? 30 : 24, fontWeight: 900, letterSpacing: '.06em' })}>{props.value}</div>{subtitle}</div>
     }
     return <div style={{ display: 'grid', gap: 18, textAlign: alignmentFor(config) }}>{eyebrow}<div style={{ display: 'flex', alignItems: 'center', gap: 14, justifyContent: alignmentFor(config) === 'left' ? 'flex-start' : 'center' }}><span style={{ width: 14, height: 14, borderRadius: '50%', background: urgent ? style.dangerColor : style.accentColor, boxShadow: `0 0 24px ${urgent ? style.dangerColor : style.accentColor}88` }} />{title}</div>{value}{subtitle}{progress ? <div style={{ height: 14, borderRadius: 999, background: `${style.textColor}14`, overflow: 'hidden' }}><div style={{ width: props.value || '68%', height: '100%', background: style.accentColor }} /></div> : null}</div>
   }
@@ -290,8 +379,8 @@ const createFamilyComponent = (config: FamilyVariantConfig): MotionGraphBackedCo
   const definition: MotionComponentDefinitionV1 = Object.freeze({
     id: config.id, version: 1, name: config.name, purpose: config.purpose, category: categoryForFamily(config.family), performanceClass: config.family === 'diagram' || config.family === 'list' ? 'medium' : 'light',
     supportedAspectRatios: Object.freeze(['16:9', '9:16', '1:1', '4:5'] as const),
-    minDurationTicks: SANVERSE_TICKS_PER_SECOND, defaultDurationTicks: SANVERSE_TICKS_PER_SECOND * 4, maxDurationTicks: SANVERSE_TICKS_PER_SECOND * 16,
-    events: Object.freeze([{ name: 'enter-start', normalizedTime: 0 }, { name: 'content-reveal', normalizedTime: 0.08 }, { name: 'settled', normalizedTime: 0.56 }, { name: 'exit-start', normalizedTime: 0.84 }]),
+    minDurationTicks: durationTicksForConfig(config, 'min'), defaultDurationTicks: durationTicksForConfig(config, 'default'), maxDurationTicks: durationTicksForConfig(config, 'max'),
+    events: Object.freeze(config.events ?? [{ name: 'enter-start', normalizedTime: 0 }, { name: 'content-reveal', normalizedTime: 0.08 }, { name: 'settled', normalizedTime: 0.56 }, { name: 'exit-start', normalizedTime: 0.84 }]),
     contentLimits: Object.freeze([{ field: 'title', description: 'Primary visible title.', minimum: 1, maximum: 96, unit: 'characters' as const }, { field: 'items', description: 'Optional supporting items.', minimum: 0, maximum: 6, unit: 'items' as const }]),
     capabilities: FULL_NATIVE_GRAPH_CAPABILITIES,
   })
@@ -381,6 +470,16 @@ const configs = Object.freeze([
   { id:'sanverse.search-results', name:'Search Results', purpose:'Show a query with a concise ranked set of software or web search results.', family:'list', variant:'search', eyebrow:'SEARCH', title:'AI workflow automation', subtitle:'3 relevant results', value:'', items:['Best AI workflow tools for creator teams','How creators automate research without losing judgment','Case study · 4× weekly output'] },
   { id:'sanverse.upload-status', name:'Upload Status', purpose:'Show file upload progress with filename, transfer state and supporting detail.', family:'status', variant:'upload', eyebrow:'UPLOAD', title:'Episode 12.mp4', subtitle:'Uploading master file · 1.8 GB of 2.5 GB', value:'72%', items:['Encoding starts automatically after upload'] },
   { id:'sanverse.cursor-callout', name:'Cursor Callout', purpose:'Point to one software UI target with a labeled cursor-style emphasis.', family:'status', variant:'cursor', eyebrow:'CLICK HERE', title:'Choose the winning format', subtitle:'This row drove the highest retention in the current batch.', value:'OUTLIER 8.9', items:['Highest 30-second retention'] },
+  // MOTION-A18 — keyframe-native short-form creator pack. Existing 60 components stay on their established motion paths.
+  { id:'sanverse.keyword-slam', name:'Keyword Slam', purpose:'Isolate one decisive keyword as the temporal payoff to a short setup line.', family:'title', variant:'keyword-slam', eyebrow:'THE LEVER', title:'The format lives or dies on', subtitle:'One word carries the promise.', value:'RETENTION', items:[], minDurationSeconds:.75, defaultDurationSeconds:2, maxDurationSeconds:8, events:[{name:'setup',normalizedTime:.10},{name:'keyword-slam',normalizedTime:.28},{name:'settled',normalizedTime:.56},{name:'exit-start',normalizedTime:.92}] },
+  { id:'sanverse.three-beat-headline', name:'Three-Beat Headline', purpose:'Deliver a hook as three explicit sequential beats with a final payoff.', family:'title', variant:'three-beat', eyebrow:'3-BEAT HOOK', title:'Three beats. One promise.', subtitle:'Each beat advances the viewer instead of repeating the same headline.', value:'THEN PROVE IT', items:['STOP THE SCROLL','OPEN A LOOP','PAY IT OFF'], minDurationSeconds:.75, defaultDurationSeconds:2, maxDurationSeconds:8, events:[{name:'beat-1',normalizedTime:.18},{name:'beat-2',normalizedTime:.29},{name:'beat-3',normalizedTime:.40},{name:'settled',normalizedTime:.62},{name:'exit-start',normalizedTime:.92}] },
+  { id:'sanverse.stacked-hook', name:'Stacked Hook', purpose:'Build a short-form hook from three stacked escalating lines rather than one flat headline.', family:'title', variant:'stacked-hook', eyebrow:'STACKED HOOK', title:'You do not need more content.', subtitle:'You need a format people finish.', value:'Then repeat the winner.', items:[], minDurationSeconds:.75, defaultDurationSeconds:2, maxDurationSeconds:8, events:[{name:'line-1',normalizedTime:.10},{name:'line-2',normalizedTime:.22},{name:'line-3',normalizedTime:.34},{name:'settled',normalizedTime:.58},{name:'exit-start',normalizedTime:.92}] },
+  { id:'sanverse.sentence-deconstruction', name:'Sentence Deconstruction', purpose:'Break one claim into semantic fragments so an explainer can inspect the sentence piece by piece.', family:'title', variant:'sentence-deconstruction', eyebrow:'BREAK IT DOWN', title:'Consistency is a system problem', subtitle:'The fragments reveal what the sentence actually claims.', value:'', items:['CONSISTENCY','IS A','SYSTEM','PROBLEM'], minDurationSeconds:.75, defaultDurationSeconds:2.4, maxDurationSeconds:8, events:[{name:'claim',normalizedTime:.10},{name:'fragment-1',normalizedTime:.18},{name:'fragment-2',normalizedTime:.29},{name:'fragment-3',normalizedTime:.40},{name:'settled',normalizedTime:.64},{name:'exit-start',normalizedTime:.92}] },
+  { id:'sanverse.punch-word-reveal', name:'Punch Word Reveal', purpose:'Reveal one punch word as a separate full-strength beat after a readable setup sentence.', family:'title', variant:'punch-word', eyebrow:'PUNCH WORD', title:'The part everyone skips is', subtitle:'That is where the decision happens.', value:'PACKAGING', items:[], minDurationSeconds:.75, defaultDurationSeconds:1.8, maxDurationSeconds:8, events:[{name:'setup',normalizedTime:.10},{name:'punch-word',normalizedTime:.28},{name:'settled',normalizedTime:.55},{name:'exit-start',normalizedTime:.92}] },
+  { id:'sanverse.poll-vote-result', name:'Poll / Vote Result', purpose:'Show a question with ranked vote percentages and a visually dominant winning option.', family:'value', variant:'poll-result', eyebrow:'POLL RESULT', title:'Which hook would you click?', subtitle:'Audience vote · 1,284 responses', value:'WINNER · OPTION A', items:['A · 62%','B · 24%','C · 14%'], minDurationSeconds:.75, defaultDurationSeconds:2.2, maxDurationSeconds:8, events:[{name:'question',normalizedTime:.08},{name:'option-1',normalizedTime:.18},{name:'option-2',normalizedTime:.29},{name:'option-3',normalizedTime:.40},{name:'winner',normalizedTime:.52},{name:'exit-start',normalizedTime:.92}] },
+  { id:'sanverse.ranking-podium', name:'Ranking Podium', purpose:'Show a top-three result with explicit first/second/third hierarchy rather than a generic ordered list.', family:'list', variant:'ranking-podium', eyebrow:'TOP 3', title:'What moved retention most', subtitle:'Ranked from the current batch.', value:'WINNER · HOOK', items:['#1 Hook','#2 Title','#3 Thumbnail'], minDurationSeconds:.75, defaultDurationSeconds:2.2, maxDurationSeconds:8, events:[{name:'rank-3',normalizedTime:.18},{name:'rank-2',normalizedTime:.29},{name:'rank-1',normalizedTime:.40},{name:'winner',normalizedTime:.52},{name:'exit-start',normalizedTime:.92}] },
+  { id:'sanverse.app-feature-spotlight', name:'App Feature Spotlight', purpose:'Focus attention on one software capability with supporting product details, distinct from a whole browser demo.', family:'list', variant:'app-feature', eyebrow:'FEATURE SPOTLIGHT', title:'Outlier Topic Radar', subtitle:'One focused feature, not the whole dashboard.', value:'LIVE SIGNALS', items:['Cross-channel outliers','Saved evidence','Reusable topic score'], minDurationSeconds:.75, defaultDurationSeconds:2.4, maxDurationSeconds:8, events:[{name:'feature-icon',normalizedTime:.08},{name:'feature-name',normalizedTime:.18},{name:'detail-1',normalizedTime:.29},{name:'detail-2',normalizedTime:.40},{name:'settled',normalizedTime:.62},{name:'exit-start',normalizedTime:.92}] },
+  { id:'sanverse.keyboard-shortcut-callout', name:'Keyboard Shortcut Callout', purpose:'Teach one software keyboard shortcut with explicit keycaps and action label.', family:'status', variant:'keyboard-shortcut', eyebrow:'SHORTCUT', title:'Open Command Search', subtitle:'Keep the tutorial moving without a full browser recreation.', value:'SEARCH COMMANDS', items:['CTRL','K'], minDurationSeconds:.75, defaultDurationSeconds:1.8, maxDurationSeconds:8, events:[{name:'action',normalizedTime:.10},{name:'key-1',normalizedTime:.22},{name:'key-2',normalizedTime:.33},{name:'settled',normalizedTime:.55},{name:'exit-start',normalizedTime:.92}] },
 ] satisfies readonly FamilyVariantConfig[])
 
 export const FAMILY_VARIANT_CONFIGS = configs

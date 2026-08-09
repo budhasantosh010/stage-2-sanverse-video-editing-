@@ -63,3 +63,17 @@ End-of-benchmark process observation: RSS 166,100,992 bytes, heap used 38,786,32
 Real headless Edge, full Advanced Motion Lab C2 Cost Card proof, 100 exact-tick input changes: 75.771 ms average dispatch→next-macrotask DOM commit, p95 125.6 ms, worst 143.1 ms. This is a development-workshop React/DOM metric, not paint time, renderer FPS or pure Motion Graph cost.
 
 Two invalid benchmark attempts are retained in the failure registry: `MOTION-FAIL-006` (mixed oversized benchmark timed out) and `MOTION-FAIL-007` (`requestAnimationFrame` was throttled in headless/background Edge). No numbers from those failed runs are treated as evidence.
+
+## MOTION-A18 measured review — 69-component catalog — 2026-08-09
+
+After the nine keyframe-native A18 creator scenarios, a fresh local warm development-process sweep covered all **69 public modules** across all four reference ratios:
+
+- Motion Graph scene creation + exact-tick evaluation: 1,380 operations in 559.804 ms; **0.4057 ms average**, **1.2879 ms p95**, **14.646 ms worst local sample**.
+- Server-side markup generation: 552 operations in 863.193 ms; **1.5638 ms average**, **2.9823 ms p95**, **21.0042 ms worst local sample**.
+- Mean generated markup size: **2,181 bytes**.
+
+The nine A18 keyframe-native modules were also measured separately across all eight style packs and all four ratios (288 graph create+evaluate operations): **94.486 ms total**, **0.3281 ms average**, **0.6476 ms p95**, **1.1173 ms worst local sample**.
+
+These are local engineering measurements from the current development machine and include runtime/JIT/GC noise. They are not universal browser-frame, FPS or production-memory guarantees.
+
+The first standalone A18 benchmark attempt produced no usable measurements because its temporary `tsx` runner did not provide the classic JSX `React` global expected by an existing component module. That invalid attempt is recorded in the Motion failure registry; only the corrected rerun above is retained as evidence.

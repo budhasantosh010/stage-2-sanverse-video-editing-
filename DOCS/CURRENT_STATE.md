@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-08-05
+Last updated: 2026-08-09
 
 ## Active goal
 
@@ -13,9 +13,11 @@ file first in any new session.**
 
 **Gate T0 is DONE.** Gates T1 through T7 are NOT STARTED. Tests: **1,848**.
 
-### Parallel Motion Program checkpoint — MOTION-C2
+### Parallel Motion Program checkpoint — MOTION-C2 + MOTION-A18
 
-The separate Motion worktree has completed the implementation and release-candidate verification of **MOTION-C2 deterministic keyframes** without changing `apps/web` or the production editor goal above. C2 keeps one `Animatable` authority per graph property, adds stable-ID Hold/Linear/Bezier keyframe tracks, typed node/effect/mask keyframe operations, atomic transactions/inverse readiness, serialization, timeline-track projection, and a developer-only Advanced Motion Lab keyframe timeline. The Cost / Value Card proof is graph-operation-only; real Edge direct/backward/random exact-seek equality passed. Motion-only release-candidate suites are **253/253** with **7/7 Motion workspace builds**. Evidence: `DOCS/motion/evidence/MOTION-C2.md`. C3 is not started; A18 follows only after the separate C2 Git checkpoint.
+The separate Motion worktree has completed **MOTION-C2 deterministic keyframes** and the **MOTION-A18 keyframe-native creator pack** without changing `apps/web` or the production editor goal above. C2 keeps one `Animatable` authority per graph property, adds stable-ID Hold/Linear/Bezier keyframe tracks, typed node/effect/mask keyframe operations, atomic transactions/inverse readiness, serialization, timeline-track projection, and a developer-only Advanced Motion Lab keyframe timeline. C2 is preserved at pushed commit/tag `735bc9730233c00b6f23cdbe42b50f3eb8f91d5a` / `motion-compositor-c2`.
+
+A18 re-read the 60-component coverage matrix, rejected overlapping candidates, and added nine distinct creator/software communication scenarios whose default authored motion uses the C2 keyframe engine: Keyword Slam, Three-Beat Headline, Stacked Hook, Sentence Deconstruction, Punch Word Reveal, Poll / Vote Result, Ranking Podium, App Feature Spotlight and Keyboard Shortcut Callout. The public Motion catalog is now **69 components**. Final Motion-only suites are **271/271** with **7/7 Motion workspace builds**; all nine retained A18 Edge baselines were manually inspected. Evidence: `DOCS/motion/evidence/MOTION-C2.md` and `DOCS/motion/evidence/MOTION-A18.md`. **MOTION-C3 is not started.**
 
 ### Gate T0, thing one: the preview stopped lying
 

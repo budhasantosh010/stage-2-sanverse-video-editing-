@@ -1,5 +1,15 @@
 # Project Log
 
+## 2026-08-09 — Parallel Motion Program MOTION-A18 keyframe-native creator pack complete
+
+- Re-read the full 60-component coverage matrix before implementation and rejected candidate ideas already solved by Question Title, Before / After, Myth vs Fact, Chapter Title, Single Metric, Comment Highlight, Cursor Callout, Milestone Status, Step List / Progress Status or existing comparison modules.
+- Added nine genuinely distinct first-party scenarios: Keyword Slam, Three-Beat Headline, Stacked Hook, Sentence Deconstruction, Punch Word Reveal, Poll / Vote Result, Ranking Podium, App Feature Spotlight and Keyboard Shortcut Callout. Public catalog: **60 → 69 components**.
+- Reused the mature family content/style/exposure contract while giving all nine distinct visual branches and default authored motion driven by C2 exact-tick keyframe tracks. Existing 60 component implementations remain on their established authored-motion paths.
+- All nine are bounded to **0.75–8 seconds** with 1.8–2.4-second defaults; mechanical coverage explicitly includes 0.75/1/1.5/2/3/5-second durations, four reference ratios, eight shared styles, reduced motion, text stress/refusal, exact-seek determinism and Level-4 compositor readiness.
+- Real Edge retained and manually inspected one baseline for each new component while intentionally distributing the batch across all eight style packs, all four ratios, busy backgrounds and reduced motion. The first Stacked Hook 9:16 review exposed undersized portrait typography; it was increased, retested, recaptured and accepted before closeout (`MOTION-FAIL-009`).
+- Fresh local measured review: complete 69-component catalog graph create+evaluate averaged **0.4057 ms** and SSR markup **1.5638 ms**; the nine A18 modules across 8 styles × 4 ratios averaged **0.3281 ms** graph create+evaluate. Measurements are local engineering evidence, not frame-time guarantees. The first standalone benchmark runner failure was discarded and recorded as `MOTION-FAIL-008`.
+- Final A18 Motion gate: **271/271 tests**, **7/7 Motion workspace builds**, nine manually inspected browser baselines, no `apps/web` integration and no Plan-B AI decision logic. Evidence: `DOCS/motion/evidence/MOTION-A18.md`. **MOTION-C3 remains not started.**
+
 ## 2026-08-08 — Parallel Motion Program MOTION-C2 deterministic keyframes complete
 
 - Preserved the existing one-property/one-`Animatable` authority: constants may convert directly to keyframes; existing keyframe tracks remain editable; motion drivers and bindings refuse implicit replacement and require a later explicit bake/reset.

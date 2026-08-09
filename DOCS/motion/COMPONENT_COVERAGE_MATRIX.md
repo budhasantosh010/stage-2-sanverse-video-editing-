@@ -1,8 +1,9 @@
 # Sanverse Motion Component Coverage Matrix
 
-Date: 2026-08-08
-Milestone: Plan A continuation after MOTION-C1
-Baseline catalog: 48 first-party components
+Date: 2026-08-09
+Milestone: Plan A continuation through MOTION-A18
+Historical inventory baseline: 48 first-party components
+Current catalog after A17 + A18: **69 first-party components**
 
 ## Visual-review score rubric
 
@@ -198,9 +199,9 @@ Real high-value gap selected:
 
 Standalone arrow/circle/divider variants are not selected in this batch because they are lower-value than missing creator communication scenarios and risk becoming decorative near-duplicates.
 
-## Selected next batch — 12 genuinely missing scenarios
+## MOTION-A17 batch — 12 genuinely missing scenarios — COMPLETE
 
-The next batch is intentionally capped at 12 and prioritized by creator/social usefulness:
+This historical A17 batch was intentionally capped at 12 and prioritized by creator/social usefulness:
 
 1. `sanverse.comment-highlight` — social comment + handle + reaction proof
 2. `sanverse.client-proof-strip` — compact client/name proof strip using original text/monogram marks, not copied commercial logos
@@ -245,3 +246,62 @@ Every selected component must ship with:
 - focused automated tests,
 - one retained real-browser visual baseline per new component, with ratios/style packs intentionally varied across the batch,
 - provenance/originality notes with no copied commercial template, logo or proprietary asset.
+
+## A17 extension — 48 → 60 — COMPLETE
+
+The 12 A17 modules above are now implemented and retained in the public catalog. Each has L1/L2/L3 exposures, Level-4 graph readiness, four ratios, eight style packs, reduced-motion coverage and one manually inspected browser baseline. See `DOCS/motion/evidence/MOTION-A17.md`.
+
+## A18 inventory gate after C2
+
+C2 changed the selection logic for the next library batch: the library no longer needs another generic title/card variant merely to increase count. The useful test is whether a scenario creates a distinct **temporal communication structure** that benefits from explicit editable keyframes.
+
+The 60-component catalog was re-read before adding A18. The following candidates were explicitly **not** selected because existing components already solve the job adequately:
+
+- Question → Answer Reveal — overlaps Question Title plus ordinary content sequencing.
+- Before → After Statement — overlaps Before / After and Problem → Solution.
+- Counterpoint / Rebuttal — substantially overlaps Myth vs Fact.
+- Chapter Slam — overlaps Chapter Title, Section Title and Chapter Break.
+- Big Number Impact — overlaps Stat Title, Single Metric and Metric Delta.
+- Pinned Comment / Reaction Bubble — overlaps Comment Highlight and Chat Thread.
+- Screen Zoom Target — overlaps Cursor Callout / Browser Demo.
+- Timeline Milestone / Achievement Unlock / Milestone Counter — overlap Milestone Status and existing progress patterns for this batch.
+- Step Progress Navigator — overlaps Step List + Progress Status.
+- Versus Reveal — overlaps Split Title, Pros / Cons and existing comparison surfaces.
+
+## MOTION-A18 batch — 9 keyframe-native creator scenarios
+
+A18 adds nine distinct scenarios and intentionally keeps all pre-A18 component implementations on their existing authored-motion paths.
+
+| Component ID | Display name | Category | Distinct communication scenario | L1 | L2 | L3 | L4 | C2 keyframes by default | Ratios | Styles | Visual |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `sanverse.keyword-slam` | Keyword Slam | typography | Setup line resolves into one isolated decisive keyword | ✓ | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.three-beat-headline` | Three-Beat Headline | typography | Three explicit sequential hook beats plus payoff | ✓ | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.stacked-hook` | Stacked Hook | typography | Three escalating stacked lines, not one flat headline | ✓ | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.sentence-deconstruction` | Sentence Deconstruction | typography | Break one claim into semantic fragments for explanation | ✓ | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.punch-word-reveal` | Punch Word Reveal | typography | Readable setup followed by one separate full-strength punch word | ✓ | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.poll-vote-result` | Poll / Vote Result | comparison | Question + ranked vote bars + explicit winner | ✓ | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.ranking-podium` | Ranking Podium | card | Top-three result with podium hierarchy rather than a generic ordered list | ✓ | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.app-feature-spotlight` | App Feature Spotlight | card | One software capability with supporting feature details, not a whole dashboard | ✓ | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.keyboard-shortcut-callout` | Keyboard Shortcut Callout | ui | Explicit software keycaps + action teaching graphic | ✓ | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+
+### A18 temporal model
+
+All nine use exact-tick C2 keyframe tracks for their authored entrance/reveal hierarchy. Common keyed properties include opacity, Y position and scale. Item/beat timing is staggered by exact ticks derived from the owning component duration. Their normal graph therefore exercises the same keyframe evaluator and Timeline projection used by compositor overrides.
+
+Reduced motion does not freeze the beginning of the animation. For the nine A18 modules, authored motion tracks are replaced by stable final constants when `reducedMotion=true`, preserving all semantic text and useful layout.
+
+### A18 short-form duration contract
+
+All nine declare:
+
+- minimum: **0.75 s**;
+- default: approximately **1.8–2.4 s** depending on scenario;
+- maximum: **8 s**.
+
+Mechanical tests cover 0.75, 1, 1.5, 2, 3 and 5 seconds. Durations below 0.75 seconds and above 8 seconds fail closed during graph construction.
+
+### A18 provenance / originality
+
+No outside commercial template, logo, proprietary asset, screenshot or animation runtime was used to construct the nine A18 designs. They are first-party Sanverse compositions built from the existing typography, shape, graph, style-pack and C2 keyframe primitives. Default client/product names are invented or Sanverse-local. The communication principles extracted are generic: sequential emphasis, ranked choice, podium ordering, focused feature explanation and keyboard-shortcut teaching.
+
+A18 browser evidence intentionally distributes the nine components across all eight style packs, all four reference ratios, hostile/busy backgrounds and reduced motion rather than taking 8 × 9 redundant screenshots.

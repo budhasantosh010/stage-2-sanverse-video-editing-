@@ -1,6 +1,6 @@
 # Build Tracker
 
-Last updated: 2026-08-03
+Last updated: 2026-08-09
 
 | ID | Goal | Deliverable | Status | Evidence |
 |---|---|---|---|---|
@@ -55,7 +55,8 @@ Last updated: 2026-08-03
 | P1F02-01 | Nested Studio Layout Engine V2 | Exact-version nested panel adapter with typed migration, persistence, presets, responsive overlay, and one editor authority | Complete | 1,158/1,158; real edit/Undo/Redo/export; build passes; screenshot-compositor exception recorded |
 | P1F021-01 | Nested Layout Stabilization | One desktop height authority; full-height AI rail; protected Preview/Timeline; panel queries; laptop AI fallback; tablet/mobile drawers | Complete — owner visual approval open | Real browser: one video, preserved draft, 10 stable 1440×900 expand/collapse cycles, laptop overlay fallback, keyboard resize, 1440/1280/1238/1024/390 geometry, edit/Undo/Redo/export; 1,164/1,164; build passes |
 
-| MOTION-C2 | Parallel Motion Program | Deterministic first-class keyframes, universal keyframe operations, timeline projection and Advanced Motion Lab authoring proof | Complete | 253/253 Motion tests; 7/7 Motion builds; real Edge exact/backward/random direct-seek equality; `DOCS/motion/evidence/MOTION-C2.md`; preserved by `motion-compositor-c2` checkpoint |
+| MOTION-C2 | Parallel Motion Program | Deterministic first-class keyframes, universal keyframe operations, timeline projection and Advanced Motion Lab authoring proof | Complete | 253/253 Motion tests; 7/7 Motion builds; real Edge exact/backward/random direct-seek equality; `DOCS/motion/evidence/MOTION-C2.md`; pushed commit/tag `735bc9730233c00b6f23cdbe42b50f3eb8f91d5a` / `motion-compositor-c2` |
+| MOTION-A18 | Parallel Motion Program | Nine genuinely missing keyframe-native creator/software communication scenarios after re-auditing the 60-component coverage matrix | Complete | Public catalog 60→69; 271/271 Motion tests; 7/7 Motion builds; 0.75–8s bounded durations; 4 ratios × 8 styles mechanically covered; nine retained real-Edge baselines manually inspected; `DOCS/motion/evidence/MOTION-A18.md` |
 
 ## Status rules
 

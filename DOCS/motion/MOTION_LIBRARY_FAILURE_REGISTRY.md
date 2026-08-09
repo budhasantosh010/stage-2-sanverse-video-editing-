@@ -151,3 +151,41 @@ IMPACT: the run could not be used as a preview-frame-time or FPS measurement.
 
 ONE-LINE SOLUTION: the retained browser metric measures exact-tick input dispatch to the next macrotask/DOM commit and is labelled that way; no FPS or paint claim is inferred from it.
 
+## MOTION-FAIL-008 — First standalone A18 performance runner lacked the JSX React global
+
+- Status: FIXED / invalid measurement discarded
+- Severity: low for product, medium for evidence quality
+- Milestone: MOTION-A18
+- Date: 2026-08-09
+
+WHAT: the first standalone A18 performance script failed before producing usable numbers with `ReferenceError: React is not defined` while server-rendering an existing JSX component through `tsx`.
+
+WHERE: temporary `tmp/a18-performance-review.ts` measurement harness, not Motion product source.
+
+WHY: the temporary standalone runner did not provide the classic JSX `React` global expected by an existing component module. Normal Vitest/Vite/TypeScript workspace execution was already green.
+
+IMPACT: no performance number from that failed attempt could be accepted.
+
+ATTEMPTS: Kept the failed run as invalid evidence, fixed only the temporary benchmark harness by providing the required React global, then reran the same measurement successfully.
+
+ONE-LINE SOLUTION: standalone benchmark setup now matches the JSX runtime expectation; only the corrected 69-component/A18 measurements are retained.
+
+## MOTION-FAIL-009 — Stacked Hook portrait type was too small in first browser review
+
+- Status: FIXED
+- Severity: medium for visual quality
+- Milestone: MOTION-A18
+- Date: 2026-08-09
+
+WHAT: the first `sanverse.stacked-hook` 9:16 baseline rendered without clipping but the three hook lines were too small relative to the real 1080×1920 composition to meet the intended short-form emphasis hierarchy.
+
+WHERE: `packages/motion-library/src/components/component-families.tsx`, A18 `stacked-hook` visual branch.
+
+WHY: the initial compact-layout font sizes were inherited from card-like family proportions rather than being large enough for a full-screen portrait kinetic hook.
+
+IMPACT: the component was technically valid but visually underpowered; accepting it would have weakened the A18 quality gate.
+
+ATTEMPTS: Increased the actual composition-space compact line sizes, reran all 18 focused A18 tests plus the motion-library build, recaptured the 9:16 Dark Minimal baseline from a live HTTP-200 Motion Lab URL, and manually inspected it again.
+
+ONE-LINE SOLUTION: Stacked Hook portrait now uses materially larger compact typography while preserving three-line hierarchy and no clipping; the weak first screenshot is not retained as evidence.
+
