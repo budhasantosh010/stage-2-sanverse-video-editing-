@@ -8,14 +8,14 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 ## Current gate
 
-- **P1-F.1E Complete Timeline Experience is complete through Gate T2.** T0, T1 and T2 are DONE; T3 through T7 are NOT STARTED.
+- **P1-F.1E Complete Timeline Experience is complete through Gate T3.** T0, T1, T2 and T3 are DONE; T4 through T7 are NOT STARTED.
 - The authoritative gate table and invariants live in `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md`.
-- Final T2 evidence is `DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md` plus `t2-master-browser-report.json`, `t2-master-screenshots/`, and `t2-export-metadata.json` in the same folder.
-- T2 now carries constant rational speed, Rate Stretch, Reverse, Freeze Frame, direct gain/fades/pan, real loudness normalization, linked J/L audio windows, truthful transition controls and bounded advanced-placement planners through one accepted project/time authority.
-- Final suites: API 403/403, Web 1,248/1,248, edit-domain 496/496, intent-domain 27/27, render-contract 118/118 — **2,292/2,292 total** — plus an all-workspace production build with exit 0.
-- Final real Edge workflow ran revision `34 → 44`: transition, reverse preparation, direct audio, normalization, Rate Stretch still `Backwards`, J-cut, Freeze, Undo, Redo and reopen; one video element; zero browser errors; zero failed HTTP responses; no horizontal overflow at 1440×900, 1024×768 or 390×844.
-- Final revision-44 export succeeded in one attempt: 24.841 s, 1920×1080 H.264 High at 30 fps with AAC-LC stereo/48 kHz, 12,548,402 bytes. Renderer SHA and file SHA match exactly.
-- Two late T2 defects are fixed and registered: Hold Frame command routing (FAIL-053) and Rate Stretch preserving Reverse (FAIL-054).
+- Final T3 evidence is `DOCS/evidence/2026-08-04-timeline-completion/T3_FINAL_CLOSURE.md` plus the T3 browser screenshots, exact-frame Trim View evidence, long-form bounds evidence, and export frames in the same folder.
+- T3 adds explicit Standard/Ripple Trim, Roll, Slip, Slide, trim-to-playhead, deterministic Extend, J/K/L shuttle, detached Dynamic Trim, Audio Scrubbing, edit-point selection, all-or-nothing multi-edit-point trim, exact numeric precision, and bounded exact-frame Trim View on top of the existing T2 project/time authority.
+- Final suites: API 403/403, Web 1,297/1,297, edit-domain 500/500, intent-domain 27/27, render-contract 118/118 — **2,345/2,345 total** — plus an all-workspace production build PASS.
+- Final real Edge workflow on owner media proved Standard Trim, Ripple Trim, Roll, Slip, Slide, shuttle, Dynamic Trim cancel/commit, Audio Scrubbing, numeric precision, multi-edit-point refusal atomicity, Trim View, zoom persistence, reload and exactly one video, with responsive proof at 1440×900, 1280×800, 1024×768 and 390×844.
+- Final T3 export: 23.900000 s, 1920×1080 H.264 High at 30 fps, AAC-LC stereo/48 kHz, 717 video frames, 10,899,271 bytes, SHA-256 `79FDA906C32B6454ED83B6A8FF1F513C906B7770690A82086E49F9F695E08F38`; sampled frames decoded and were visually inspected.
+- The two late T2 defects remain regression-protected: Hold Frame command routing (FAIL-053) and Rate Stretch preserving Reverse (FAIL-054).
 - **Do not start T4 unless the owner explicitly authorizes it.** A separate agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from the Timeline program.
 - Open human evidence remains human-only: repeated owner workflows, representative non-editor workflows, and agreed performance budgets.
 - Real-provider connection still requires the owner's data-leaving-machine decision and keys. Accounts and SaaS operations remain conditional.

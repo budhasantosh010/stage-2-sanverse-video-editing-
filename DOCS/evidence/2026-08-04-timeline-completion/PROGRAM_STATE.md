@@ -4,14 +4,14 @@
 new session. It is updated at the end of every working block, not only at the end
 of a gate.**
 
-Last updated: 2026-08-08
-Branch: `timeline-t2-completion`
+Last updated: 2026-08-09
+Branch: `timeline-t3-precision-trim`
 Program start commit: `45c0c981fb869afd236f10cbea829b1859d5beb6`
 Latest pushed commit: see `git rev-parse HEAD` — this file is committed WITH the
 work it describes, so HEAD is always the commit that made these numbers true.
 Test baseline at program start: **1,723**
-Tests now: **2,292** — edit-domain 496 · render-contract 118 · intent-domain 27 ·
-api 403 · web 1,248. `npm run build` exit 0.
+Tests now: **2,345** — edit-domain 500 · render-contract 118 · intent-domain 27 ·
+api 403 · web 1,297. All-workspace production build PASS.
 
 ---
 
@@ -23,19 +23,19 @@ api 403 · web 1,248. `npm run build` exit 0.
   P0     Verify + capability inventory                DONE         ad11b07..
   T0     Correctness: preview truth, mixed export     DONE         ad11b07
   T1     Creator interaction: selection/clipboard     DONE         ef9332c
-  T2     Speed, audio, transitions                    DONE         (this commit)
+  T2     Speed, audio, transitions                    DONE         5a50e4b
          └─ final closure: 2,292 tests + real Edge + real revision-44 export
-  T3     Precision trim: ripple/roll/slip/slide       NOT STARTED  —
+  T3     Precision trim: ripple/roll/slip/slide       DONE         aed76ac
+         └─ final closure: 2,345 tests + real Edge + real MP4 export
   T4     Keyframe lanes + graph editor                NOT STARTED  —
   T5     Advanced tracks, expandable tracks           NOT STARTED  —
   T6     Sequences + source-editing workflows         NOT STARTED  —
   T7     Transcript + AI-ready contracts              NOT STARTED  —
 ```
 
-**Next action when a session starts:** T3 is authorized. Verify the editor-only
-worktree and run `node tools/program-ownership/check-editor-boundary.mjs --base
-5a50e4bf84b928ac686bb903d1425b21c64ae890` before editing. Continue only the
-first unfinished T3 item. T4 remains out of scope.
+**Next action when a session starts:** T3 is complete. Do not begin T4 until the
+owner explicitly authorizes it. Preserve the Editor/Motion/AI ownership boundary
+and run the editor boundary checker before any future Editor commit.
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-**P1-F.1E — Complete Timeline Experience is complete through Gate T2.**
+**P1-F.1E — Complete Timeline Experience is complete through Gate T3.**
 
 The live gate table, per-gate checklist, program rules and traps are in:
 
@@ -12,32 +12,34 @@ DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md
 
 **Read that file before anything else.** Do not reconstruct state from chat.
 
-**Gates T0, T1 and T2 are DONE. T3 through T7 are NOT STARTED.** Final T2 gate:
-**2,292/2,292 tests**, all-workspace production build exit 0, a clean real Edge
-workflow from revision 34→44, and a real revision-44 MP4 whose renderer SHA
-matches the file on disk.
+**Gates T0, T1, T2 and T3 are DONE. T4 through T7 are NOT STARTED.** Final T3 gate:
+**2,345/2,345 tests**, all-workspace production build PASS, a real Microsoft Edge
+precision-edit workflow on owner media, one-video continuity, responsive proof,
+and a real 1920×1080 H.264/AAC MP4 whose sampled frames were inspected.
 
-Final T2 closure evidence:
+Final T3 closure evidence:
 
 ```
-DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md
-DOCS/evidence/2026-08-04-timeline-completion/t2-master-browser-report.json
-DOCS/evidence/2026-08-04-timeline-completion/t2-master-screenshots/
-DOCS/evidence/2026-08-04-timeline-completion/t2-export-metadata.json
+DOCS/evidence/2026-08-04-timeline-completion/T3_FINAL_CLOSURE.md
+DOCS/evidence/2026-08-04-timeline-completion/T3_BROWSER_WORKFLOW.md
+DOCS/evidence/2026-08-04-timeline-completion/T3_PREVIEW_EXPORT_PARITY.md
+DOCS/evidence/2026-08-04-timeline-completion/T3_LONG_FORM_BOUNDS.md
+DOCS/evidence/2026-08-04-timeline-completion/t3-browser-screenshots/
+DOCS/evidence/2026-08-04-timeline-completion/t3-export-frames/
 ```
 
-T2 now includes constant rational speed, Rate Stretch, Reverse, Freeze Frame,
-direct gain/fades/pan, real loudness normalization, linked J/L audio windows,
-truthful transition controls and the advanced placement planners. Preview,
-accepted history, Undo/Redo, reopen and FFmpeg export share the same project/time
-authority.
+T3 now includes explicit Standard/Ripple Trim, Roll, Slip, Slide, trim-to-playhead,
+deterministic Extend, J/K/L shuttle, detached Dynamic Trim, Audio Scrubbing,
+edit-point selection, all-or-nothing multi-edit-point trimming, exact numeric
+precision and bounded exact-frame Trim View. It preserves the T2 speed, Reverse,
+Freeze, J/L, transition, group, marker, zoom, Preview/export and one-video
+authorities.
 
-Two late browser-found defects were fixed before closure: Hold Frame was enabled
-but omitted from the panel-opening dispatcher; Rate Stretch hard-coded `forward`
-and stripped Reverse. The final real browser run proves the stretched clip stays
-`1.63x Backwards` and Freeze survives Undo→Redo→reopen.
+The final real export is 23.900000 seconds, H.264 High 1920×1080 at 30 fps with
+AAC-LC stereo/48 kHz, 717 video frames and SHA-256
+`79FDA906C32B6454ED83B6A8FF1F513C906B7770690A82086E49F9F695E08F38`.
 
-**Do not start T4 without explicit owner instruction.** A separate coding agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from this timeline program. Resume T3 only for evidence archaeology, not feature implementation.
+**Do not start T4 without explicit owner instruction.** A separate coding agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from this timeline program. T3 is complete; reopen it only for a proven T3 blocker or evidence correction.
 
 ## Completed: P1-F.1A
 

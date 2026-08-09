@@ -4,7 +4,7 @@ Use this runbook when a new session, agent, or context window resumes the projec
 
 ## Current handoff
 
-**P1-F.1E Gate T2 is complete. T3 through T7 have not started.**
+**P1-F.1E Gate T3 is complete. T4 through T7 have not started.**
 
 Read in this order when resuming:
 
@@ -12,22 +12,23 @@ Read in this order when resuming:
 2. `DOCS/HANDOFF.md`
 3. `DOCS/CURRENT_STATE.md`
 4. `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md`
-5. `DOCS/evidence/2026-08-04-timeline-completion/T2_FINAL_CLOSURE.md`
+5. `DOCS/evidence/2026-08-04-timeline-completion/T3_FINAL_CLOSURE.md`
 
-Final T2 verification: **2,292/2,292 tests**, all-workspace production build
-exit 0, real Microsoft Edge workflow revision 34→44 with zero browser errors and
-zero failed HTTP responses, and a real revision-44 1920×1080 H.264/AAC export
-whose renderer SHA matches the MP4 on disk.
+Final T3 verification: **2,345/2,345 tests**, all-workspace production build
+PASS, real Microsoft Edge precision-edit workflow on owner media with one video,
+responsive proof at 1440×900 / 1280×800 / 1024×768 / 390×844, and a real
+23.900000-second 1920×1080 H.264 High/AAC-LC export with 717 video frames.
 
-T2 owns constant rational speed, Rate Stretch, Reverse, Freeze Frame, direct
-gain/fades/pan, real loudness normalization, linked J/L audio windows, truthful
-transition controls and bounded advanced-placement planners. Preserve the core
-rules: one gesture = one change set = one Undo, integer ticks only, and Preview /
-export share one accepted project authority.
+T3 owns the precision-editing layer: Standard/Ripple Trim, Roll, Slip, Slide,
+trim-to-playhead, deterministic Extend, J/K/L shuttle, detached Dynamic Trim,
+Audio Scrubbing, edit-point selection, all-or-nothing multi-edit-point trim,
+exact numeric precision and bounded exact-frame Trim View. Preserve the core
+rules: one gesture = one change set = one Undo, integer ticks only, planner/ghost
+equality, and Preview/export share one accepted project authority.
 
-Two closure bugs are already fixed and must not regress: Hold Frame must route to
-its panel when enabled; Rate Stretch must preserve the clip's current Reverse /
-Forward direction.
+T2 speed/Reverse/Freeze/J-L/transition behavior remains preserved, including the
+two closure regressions: Hold Frame must route to its panel when enabled and Rate
+Stretch must preserve the clip's current Reverse/Forward direction.
 
 **Do not start T4 without explicit owner authorization.** Do not integrate or modify the separately owned Motion Graphics Library or Plan-B workstreams from this branch.
 
