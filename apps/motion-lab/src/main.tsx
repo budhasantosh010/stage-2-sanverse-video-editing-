@@ -4,6 +4,7 @@ import { CreativeDirectionLab } from './CreativeDirectionLab.tsx'
 import { MotionLabApp } from './MotionLabApp.tsx'
 import './styles.css'
 import './creative-direction.css'
+import './source-understanding.css'
 import './dope-sheet.css'
 
 const rootElement = document.getElementById('root')

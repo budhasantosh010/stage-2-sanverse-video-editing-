@@ -21,6 +21,7 @@ import type {
   CreativeEditProposalV1,
 } from '@sanverse/creative-direction'
 import { creativePlacementMotionLabUrl } from './creative-engine-bridge.ts'
+import { SourceUnderstandingPanel } from './SourceUnderstandingPanel.tsx'
 
 const TICKS_PER_SECOND = 1_440_000
 const trackClass = (track: string) => `creative-direction__region creative-direction__region--${track.toLowerCase()}`
@@ -138,6 +139,7 @@ export function CreativeDirectionLab() {
 
       <section className="creative-direction__workspace">
         <section className="creative-direction__main">
+          <SourceUnderstandingPanel />
           <section className="creative-direction__preview" aria-label="Creative Direction preview">
             <div className="creative-direction__preview-frame">
               <div className="creative-direction__preview-eyebrow">SEMANTIC PREVIEW</div>

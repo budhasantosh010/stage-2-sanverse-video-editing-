@@ -77,6 +77,8 @@ export interface CreativeDirectiveBaseV1<Kind extends CreativeDirectiveKindV1, T
   readonly source: CreativeDirectiveSourceV1
   readonly priority: CreativeDirectivePriorityV1
   readonly status: CreativeDirectiveStatusV1
+  /** Stable B1 source-understanding observations that justify this directive. */
+  readonly sourceObservationIds?: readonly string[]
 }
 
 export interface CreativeStyleDirectiveV1 extends CreativeDirectiveBaseV1<'style', 'STYLE'> {
@@ -169,6 +171,7 @@ export interface CreativeDirectiveSeedV1 {
   readonly source?: CreativeDirectiveSourceV1
   readonly priority?: CreativeDirectivePriorityV1
   readonly status?: CreativeDirectiveStatusV1
+  readonly sourceObservationIds?: readonly string[]
 }
 
 const base = <Kind extends CreativeDirectiveKindV1>(kind: Kind, seed: CreativeDirectiveSeedV1) => Object.freeze({
@@ -180,6 +183,7 @@ const base = <Kind extends CreativeDirectiveKindV1>(kind: Kind, seed: CreativeDi
   source: seed.source ?? 'human',
   priority: seed.priority ?? 'preferred',
   status: seed.status ?? 'draft',
+  ...(seed.sourceObservationIds?.length ? { sourceObservationIds: Object.freeze([...seed.sourceObservationIds]) } : {}),
 })
 
 export const createCreativeDirective = (kind: CreativeDirectiveKindV1, seed: CreativeDirectiveSeedV1): CreativeDirectiveV1 => {
@@ -201,4 +205,5 @@ export const convertCreativeDirectiveKind = (directive: CreativeDirectiveV1, kin
   source: directive.source,
   priority: directive.priority,
   status: directive.status,
+  sourceObservationIds: directive.sourceObservationIds,
 })

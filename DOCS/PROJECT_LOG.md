@@ -1,5 +1,16 @@
 # Project Log
 
+## 2026-08-10 — Sanverse Creative Engine Plan B1 Video Understanding Foundation complete
+
+- Added one bounded `@sanverse/video-understanding` package using the existing Sanverse exact-tick authority. V1 source understanding includes source metadata, timed transcript/optional word timing, shots, overlapping visual regions, normalized spatial observations, semantic moments, generic observations, finite confidence and required provenance.
+- Added structured JSON and SRT/VTT transcript ingestion plus vendor-neutral shot/visual/spatial/semantic analyzer boundaries. The deterministic offline semantic analyzer conservatively recognizes explicit percentages, money, questions, comparisons, process/list language, CTA, security, feature and benefit language without any provider/API requirement.
+- Added fail-closed validation and JSON round-trip serialization. Shots may contain honest gaps but cannot overlap; normalized spatial rectangles must remain inside 0..1 source space; semantic transcript references and provenance must exist.
+- Added original 72-second product-launch and scalable synthetic fixtures. The development Creative Direction Lab now exposes SHOTS/VISUAL/TRANSCRIPT/SEMANTICS/SPATIAL source lanes and an observation inspector. Real Edge retains the loaded 68% statistic with transcript-rule provenance at `motion/visual-baselines/b1-source-understanding.png`.
+- Extended B0 directive/proposal contracts with optional `sourceObservationIds`; fixture compilation preserves them while Creative Direction remains independent of the B1 package. Cross-document existence remains an integration responsibility rather than creating a reverse dependency.
+- Measured 1/10/30/60-minute transcript fixtures separately for analysis/validation/serialization/timeline projection and Source Understanding React construction; results are recorded without inventing a product SLA in `DOCS/creative-engine/evidence/B1.md`.
+- B1 implementation found and fixed a `%` regex boundary bug and a typed normalized-bounds validation issue; the first too-early browser screenshot was rejected and recaptured after the async fixture loaded.
+- Fresh B1 release candidate: **401/401 Creative + Motion + B1 tests**, **9/9 builds**. `apps/web`, production editor, B2/B3/C6/A22 and external model/runtime dependencies remain untouched.
+
 ## 2026-08-10 — Sanverse Creative Engine ABC-1 integrated workflow complete
 
 - Added a development-only proposal→Motion bridge in Motion Lab; the `@sanverse/creative-direction` package remains independent of Motion internals. Resolved B0 proposal rows now expose `Preview in Motion Lab ↗` and carry their actual semantic text/items/placement into the chosen Plan-A component.

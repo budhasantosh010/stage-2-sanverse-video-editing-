@@ -61,3 +61,23 @@
 - Fix: the development bridge preserves exact `sourceStartTicks/sourceEndTicks` from B0 and chooses the component's own default local animation duration only when the source region falls outside the component's authoring window. The 25-second region remains 25 seconds; Product UI Story previews with its 7-second local motion window.
 - Boundary: this is a preview/integration seam, not the future production compiler. A future compiler still owns hold/loop/exit scheduling across the full placement region.
 - One-line solution: preserve B timing and A timing separately instead of weakening either contract.
+
+## CREATIVE-FAIL-007 — Percentage rule rejected the percent-symbol form
+
+- Status: FIXED
+- Milestone: B1
+- Date: 2026-08-10
+- What: the first deterministic semantic-rule test detected `65 percent` but missed `65%` because the regex required a word boundary after `%`, which is not a word character.
+- Impact: an explicit statistic could disappear from source understanding and therefore never become traceable creative evidence.
+- Fix: made the percent-symbol branch terminate on `%` itself while retaining a word boundary for the spelled `percent` form; kept the original failing test.
+- One-line solution: treat `%` as punctuation, not a word token.
+
+## CREATIVE-FAIL-008 — First B1 browser proof captured before source understanding resolved
+
+- Status: FIXED
+- Milestone: B1
+- Date: 2026-08-10
+- What: the first real-Edge screenshot showed `Analyzing deterministic fixture…` because the headless capture happened before the async local fixture promise committed to React.
+- Impact: code/tests were green but the screenshot did not prove the Source Understanding UI.
+- Fix: rejected the capture and recaptured with a bounded virtual-time budget; retained evidence shows all five lanes and the selected 68% observation/provenance inspector.
+- One-line solution: browser evidence must wait for the state it claims to prove.

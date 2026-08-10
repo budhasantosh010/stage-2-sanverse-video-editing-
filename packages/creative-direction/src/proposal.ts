@@ -13,6 +13,7 @@ export interface CreativeComponentPlacementV1 {
   readonly startTicks: number
   readonly endTicks: number
   readonly sourceDirectiveId: string
+  readonly sourceObservationIds?: readonly string[]
   readonly communicationIntent: string
   readonly candidateComponentIds: readonly string[]
   readonly selectedComponentId: string | null
@@ -27,6 +28,7 @@ export interface CreativeStyleAssignmentV1 {
   readonly startTicks: number
   readonly endTicks: number
   readonly sourceDirectiveId: string
+  readonly sourceObservationIds?: readonly string[]
   readonly semanticIntent: string
   readonly candidateStylePackIds: readonly string[]
   readonly selectedStylePackId: string | null
@@ -37,6 +39,7 @@ export interface CreativeMotionAssignmentV1 {
   readonly startTicks: number
   readonly endTicks: number
   readonly sourceDirectiveId: string
+  readonly sourceObservationIds?: readonly string[]
   readonly character: CreativeMotionCharacterV1
   readonly intensity?: number
   readonly targetPlacementIds: readonly string[]
@@ -47,6 +50,7 @@ export interface CreativeFootageTreatmentAssignmentV1 {
   readonly startTicks: number
   readonly endTicks: number
   readonly sourceDirectiveId: string
+  readonly sourceObservationIds?: readonly string[]
   readonly treatment: CreativeFootageTreatmentV1
   readonly placementIntent?: CreativePlacementIntentV1
   readonly intensity?: number
@@ -57,6 +61,7 @@ export interface CreativeProposalConstraintV1 {
   readonly startTicks: number
   readonly endTicks: number
   readonly sourceDirectiveId: string
+  readonly sourceObservationIds?: readonly string[]
   readonly constraint: string
   readonly maximumGraphics?: number
   readonly customText?: string

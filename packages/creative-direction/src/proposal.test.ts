@@ -33,6 +33,16 @@ describe('Plan B0 Creative Edit Proposal and planner boundary', () => {
     expect(JSON.stringify(proposal)).not.toMatch(/css|dom|html|selector/iu)
   })
 
+  it('preserves stable B1 observation references from a directive into its proposal placement', async () => {
+    const sourceObservationId = 'semantic:transcript:1:percentage:0'
+    const document = Object.freeze({
+      ...PRODUCT_LAUNCH_CREATIVE_DIRECTION_FIXTURE,
+      directives: Object.freeze(PRODUCT_LAUNCH_CREATIVE_DIRECTION_FIXTURE.directives.map((directive) => directive.id === 'graphic:semantic-highlight' ? Object.freeze({ ...directive, sourceObservationIds: Object.freeze([sourceObservationId]) }) : directive)),
+    })
+    const proposal = await new FixtureCreativePlanner().propose({ document, catalog: PRODUCT_LAUNCH_FIXTURE_CATALOG })
+    expect(proposal.placements.find((placement) => placement.sourceDirectiveId === 'graphic:semantic-highlight')?.sourceObservationIds).toEqual([sourceObservationId])
+  })
+
   it('targets every overlapping placement from the long-form motion directive', async () => {
     const proposal = await new FixtureCreativePlanner().propose({ document: PRODUCT_LAUNCH_CREATIVE_DIRECTION_FIXTURE, catalog: PRODUCT_LAUNCH_FIXTURE_CATALOG })
     expect(proposal.motionAssignments[0]?.targetPlacementIds).toEqual(proposal.placements.map((placement) => placement.id))

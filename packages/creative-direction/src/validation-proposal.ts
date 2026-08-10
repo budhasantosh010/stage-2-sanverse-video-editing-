@@ -59,6 +59,7 @@ export const validateCreativeEditProposal = (
       else if (allItemIds.has(entry.id)) issues.push(issue(`${path}.id`, 'DUPLICATE_ID', `duplicate proposal item id: ${entry.id}`)); else allItemIds.add(entry.id)
       if (!stableCreativeId(entry.sourceDirectiveId)) issues.push(issue(`${path}.sourceDirectiveId`, 'REFERENCE_INVALID', 'sourceDirectiveId must be stable.'))
       else if (knownDirectiveIds && !knownDirectiveIds.has(entry.sourceDirectiveId)) issues.push(issue(`${path}.sourceDirectiveId`, 'REFERENCE_INVALID', `proposal item references missing directive ${entry.sourceDirectiveId}.`))
+      if (entry.sourceObservationIds !== undefined && (!Array.isArray(entry.sourceObservationIds) || entry.sourceObservationIds.length > 32 || new Set(entry.sourceObservationIds).size !== entry.sourceObservationIds.length || !entry.sourceObservationIds.every(stableCreativeId))) issues.push(issue(`${path}.sourceObservationIds`, 'VALUE_INVALID', 'sourceObservationIds must be at most 32 unique stable B1 observation IDs.'))
 
       if (key === 'placements') {
         if (stableCreativeId(entry.id)) placementIds.add(entry.id)

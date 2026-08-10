@@ -47,6 +47,19 @@ describe('Plan B0 Creative Direction Lab', () => {
     expect(container.textContent).toContain('Document valid')
   })
 
+  it('shows B1 source understanding lanes and an inspectable semantic observation', async () => {
+    expect(container.querySelector('[data-source-understanding="true"]')).not.toBeNull()
+    expect(container.querySelectorAll('[data-source-lane]')).toHaveLength(5)
+    const percentage = [...container.querySelectorAll<HTMLButtonElement>('[data-source-lane="semantics"] button')].find((entry) => entry.textContent?.includes('percentage: 68%'))
+    expect(percentage).toBeDefined()
+    await act(async () => { percentage?.click(); await Promise.resolve() })
+    await settle()
+    const inspector = container.querySelector('[aria-label="Source observation inspector"]')
+    expect(inspector?.textContent).toContain('transcript-rule')
+    expect(inspector?.textContent).toContain('68%')
+    expect(inspector?.textContent).toContain('transcript:1')
+  })
+
   it('selects a graphic region and shows deterministic fixture component resolution', async () => {
     const region = container.querySelector<HTMLButtonElement>('[data-directive-id="graphic:floating-prompt"]')!
     await act(async () => { region.click(); await Promise.resolve() })

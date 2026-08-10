@@ -1,7 +1,7 @@
 # Sanverse Creative Engine — Master Plan
 
 Date: 2026-08-10
-Status: **ABC-1 COMPLETE** — B0 + C4 + A20 + cross-plan proof verified; stop before B1/C5/A21
+Status: **ABC-2 ACTIVE** — B1 source-understanding foundation verified; C5 + A21 + source-to-curve proof remain
 
 ## Mission
 

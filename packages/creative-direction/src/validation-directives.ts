@@ -74,6 +74,7 @@ export const validateCreativeDirective = (input: unknown, durationTicks: number,
   if (typeof input.source !== 'string' || !CREATIVE_DIRECTIVE_SOURCES.includes(input.source as never)) issues.push(issue(`${path}.source`, 'VALUE_INVALID', 'directive source must be human, ai or system.'))
   if (typeof input.priority !== 'string' || !CREATIVE_DIRECTIVE_PRIORITIES.includes(input.priority as never)) issues.push(issue(`${path}.priority`, 'VALUE_INVALID', 'directive priority is unsupported.'))
   if (typeof input.status !== 'string' || !CREATIVE_DIRECTIVE_STATUSES.includes(input.status as never)) issues.push(issue(`${path}.status`, 'VALUE_INVALID', 'directive status is unsupported.'))
+  if (input.sourceObservationIds !== undefined && (!Array.isArray(input.sourceObservationIds) || input.sourceObservationIds.length > 32 || new Set(input.sourceObservationIds).size !== input.sourceObservationIds.length || !input.sourceObservationIds.every(stableCreativeId))) issues.push(issue(`${path}.sourceObservationIds`, 'VALUE_INVALID', 'sourceObservationIds must be at most 32 unique stable B1 observation IDs.'))
   if (kindValid) {
     const kind = input.kind as CreativeDirectiveV1['kind']
     const expectedTrack = directiveTrackForKind(kind)
