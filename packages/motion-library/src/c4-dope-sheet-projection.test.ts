@@ -7,8 +7,8 @@ import type { MotionSceneV1 } from '@sanverse/motion-graph'
 import { MOTION_COMPONENT_CATALOG, MOTION_COMPONENT_MODULES } from './catalog.ts'
 
 describe('MOTION-C4 all-component dope-sheet projection', () => {
-  it('projects all 77 public Motion components at all four reference ratios from the same C2 Animatable authority', () => {
-    expect(MOTION_COMPONENT_CATALOG).toHaveLength(77)
+  it('projects all 83 public Motion components at all four reference ratios from the same C2 Animatable authority', () => {
+    expect(MOTION_COMPONENT_CATALOG).toHaveLength(83)
     for (const definition of MOTION_COMPONENT_CATALOG) {
       const module = MOTION_COMPONENT_MODULES[definition.id]
       expect(module, definition.id).toBeDefined()

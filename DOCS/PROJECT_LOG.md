@@ -1,5 +1,16 @@
 # Project Log
 
+## 2026-08-10 — Sanverse Creative Engine MOTION-A20 Product Storytelling pack complete
+
+- Re-audited the 77-component library before implementation. Rejected duplicate public modules for Semantic Highlight, Picture-in-Picture, Soft Product Backdrop, Application Window Reveal and Lower Third; those jobs are handled by an existing Kinetic Headline variant, reusable primitives/treatments, Browser Demo/window vocabulary and existing Lower Third.
+- Added six genuinely distinct first-party product-story components: Conversation Toast Stack, Floating Prompt Composer, Product UI Story Scene, Agent Work Log, Scoped Access Comparison and Keyword-to-Brand Lockup. Public catalog: **77 → 83**.
+- Added deterministic seven-anchor footage-safe placement and analytic picture-in-picture transition primitives. A20 Family props expose placement and bounded safe offset without introducing another layout store.
+- Strengthened Kinetic Headline with typed `highlight-box` emphasis and real C2 opacity/scale tracks. The six new modules are C2 keyframe-native with exact 1.5–12s durations, reduced-motion final constants and product-story motion events for future Plan-B alignment.
+- Real Edge review spans all eight style packs and all four ratios across busy/white/neutral/black footage-like backgrounds. The first Toast Stack failed visual QA because one text child occupied a false 42px grid column; it was rejected, fixed and recaptured (`MOTION-FAIL-017`). Reduced-motion Agent Log and Product UI Story in real C3 Layers + C4 timeline are retained.
+- A20 performance across 192 component/style/ratio combinations repeated five times: graph creation + exact evaluation + C3 + C4 averaged **0.739 ms** (p95 1.333 ms); SSR markup averaged **1.110 ms** (p95 2.189 ms). Average scene: 11.83 nodes / 26.33 tracks / 107.33 keys. These are local engineering timings, not FPS claims.
+- Fresh A20 release candidate: **378/378 combined Creative + Motion tests**, **8/8 builds**. Evidence: `DOCS/motion/evidence/MOTION-A20.md`. No `apps/web` or production editor source changed; next gate is the separate `motion-library-v1.4` checkpoint followed by ABC integration.
+
+
 ## 2026-08-10 — Sanverse Creative Engine MOTION-C4 Professional Animation Timeline complete
 
 - Added `projectMotionDopeSheet(...)` as a pure derived control projection over existing C2 `deriveTimelineTrackGroups(...)`. C4 stores no second keyframes, Layers or animation clock; stable track/key selection IDs point back to the real typed C2 targets/keyframe IDs.

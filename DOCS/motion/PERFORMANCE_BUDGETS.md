@@ -172,3 +172,13 @@ Interpretation:
 - if realistic future components/workflows approach hundreds of simultaneous tracks, add rendering-only virtualization over the same projection and separately profile graph validation.
 
 The first standalone C4 benchmark produced no valid measurements because its temporary `tsx` runner required the classic JSX `React` global for an existing Lab component. The benchmark harness supplied the global and reran the same matrix; only the corrected measurements above are retained.
+
+## MOTION-A20 product-story pack measured review — 2026-08-10
+
+The local development sweep covered **6 A20 components × 8 style packs × 4 ratios = 192 combinations**, repeated five times for **960 iterations** at a settled exact tick. Each graph timing includes scene creation, exact-tick evaluation, C3 Layer projection and C4 dope-sheet projection:
+
+- graph + evaluation + C3 + C4: **0.739 ms average**, **1.333 ms p95**;
+- server-side component markup: **1.110 ms average**, **2.189 ms p95**;
+- average A20 scene: **11.83 graph nodes**, **26.33 projected tracks**, **107.33 keyframes**.
+
+These are local engineering/JIT measurements, not FPS, paint-time, or production-device guarantees.

@@ -322,3 +322,24 @@ VERIFIED FIX: the retained second browser proof moved the selected pair from `3,
 
 ONE-LINE SOLUTION: nearest-frame snapping now chooses the closer lower/upper frame boundary before applying the existing threshold.
 
+## MOTION-FAIL-017 — First A20 Toast Stack collapsed text into an avatar-width column
+
+- Status: FIXED
+- Severity: medium for visual/readability quality
+- Milestone: MOTION-A20
+- Date: 2026-08-10
+
+WHAT: the first real Edge Toast Stack rendered each notification almost one word per line and pushed the title toward the bottom crop.
+
+WHERE: the initial `conversation-toast-stack` render branch in `component-families.tsx`.
+
+WHY: each toast used a three-column CSS grid (`42px 1fr auto`) but supplied one text child, so the text occupied only the first 42px column.
+
+IMPACT: tests and graph structure were valid, but the actual product-story hook was unusable on footage.
+
+ATTEMPTS: rejected the screenshot, replaced the false three-column row with a single readable block layout, strengthened compact typography/surface presence, reran A20 tests/builds and recaptured both 16:9 Editorial/busy and 9:16 Creator Energetic/busy cases.
+
+VERIFIED FIX: both retained captures show normal message lines, complete title/subtitle and safe placement with no clipping.
+
+ONE-LINE SOLUTION: visible notification rows now match their actual one-child semantic structure instead of pretending an avatar/timestamp DOM structure exists.
+

@@ -111,6 +111,7 @@ const initialStylePackId = INITIAL_MOTION_STYLE_PACKS.find((pack) => requestedSt
 ))?.id ?? SANVERSE_CLEAN_STYLE.id
 const initialText = initialSearch.get('text') ?? 'Build videos 10× faster'
 const initialEmphasisText = initialSearch.get('emphasis') ?? '2'
+const initialEmphasisTreatment: NonNullable<KineticHeadlineProps['emphasisTreatment']> = initialSearch.get('treatment') === 'highlight-box' ? 'highlight-box' : 'accent-text'
 const initialMaxLines = ((): KineticHeadlineProps['maxLines'] => {
   const value = Number(initialSearch.get('maxLines'))
   return value === 1 || value === 2 || value === 3 ? value : 2
@@ -299,6 +300,7 @@ export function MotionLabApp() {
 
   const [text, setText] = useState(initialText)
   const [emphasisText, setEmphasisText] = useState(initialEmphasisText)
+  const [emphasisTreatment, setEmphasisTreatment] = useState<NonNullable<KineticHeadlineProps['emphasisTreatment']>>(initialEmphasisTreatment)
   const [alignment, setAlignment] = useState<KineticHeadlineProps['alignment']>('center')
   const [maxLines, setMaxLines] = useState<KineticHeadlineProps['maxLines']>(initialMaxLines)
 
@@ -395,8 +397,8 @@ export function MotionLabApp() {
   }, [playing, speed, loop, durationTicks])
 
   const headlineProps: KineticHeadlineProps = useMemo(
-    () => ({ text, emphasisIndices: parseEmphasisIndices(emphasisText), alignment, maxLines }),
-    [text, emphasisText, alignment, maxLines],
+    () => ({ text, emphasisIndices: parseEmphasisIndices(emphasisText), alignment, maxLines, emphasisTreatment }),
+    [text, emphasisText, alignment, maxLines, emphasisTreatment],
   )
 
   const checklistLabels = useMemo(
@@ -957,10 +959,13 @@ export function MotionLabApp() {
       if (propertyId === 'subtitle') return familyProps.subtitle
       if (propertyId === 'value') return familyProps.value
       if (propertyId === 'items') return familyProps.items.join('\n')
+      if (propertyId === 'placement') return familyProps.placement ?? 'center'
+      if (propertyId === 'safeOffset') return familyProps.safeOffset ?? 64
     }
     if (isHeadline) {
       if (propertyId === 'text') return text
       if (propertyId === 'emphasisIndices') return emphasisText
+      if (propertyId === 'emphasisTreatment') return emphasisTreatment
       if (propertyId === 'alignment') return alignment
       if (propertyId === 'maxLines') return maxLines
       if (propertyId === 'background') return softPanel ? 'soft-panel' : 'none'
@@ -1019,10 +1024,13 @@ export function MotionLabApp() {
       if (propertyId === 'subtitle') { setFamilyProps((current) => ({ ...current, subtitle: String(value) })); return }
       if (propertyId === 'value') { setFamilyProps((current) => ({ ...current, value: String(value) })); return }
       if (propertyId === 'items') { setFamilyProps((current) => ({ ...current, items: Object.freeze(String(value).split(/\r?\n/u).map((entry) => entry.trim()).filter(Boolean)) })); return }
+      if (propertyId === 'placement') { setFamilyProps((current) => ({ ...current, placement: String(value) as FamilyComponentProps['placement'] })); return }
+      if (propertyId === 'safeOffset') { setFamilyProps((current) => ({ ...current, safeOffset: Number(value) })); return }
     }
     if (isHeadline) {
       if (propertyId === 'text') { setText(String(value)); return }
       if (propertyId === 'emphasisIndices') { setEmphasisText(String(value)); return }
+      if (propertyId === 'emphasisTreatment') { setEmphasisTreatment(String(value) as NonNullable<KineticHeadlineProps['emphasisTreatment']>); return }
       if (propertyId === 'alignment') { setAlignment(String(value) as KineticHeadlineProps['alignment']); return }
       if (propertyId === 'maxLines') { setMaxLines(Number(value) as KineticHeadlineProps['maxLines']); return }
       if (propertyId === 'background') { setSoftPanel(value === 'soft-panel'); return }

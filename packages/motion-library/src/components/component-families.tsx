@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react'
 import type { MotionComponentDefinitionV1, MotionComponentRenderPropsV1, MotionRenderContextV1, MotionStylePackV1, MotionValidationResultV1 } from '@sanverse/motion-contract'
 import type { MotionExposureV1, MotionGraphBackedComponentModuleV1, MotionSceneV1 } from '@sanverse/motion-graph'
 import { constant, createMotionScene, keyframed } from '@sanverse/motion-graph'
-import { SANVERSE_TICKS_PER_SECOND, easeInCubic, easeOutCubic, normalizedProgress, sequenceProgress, staggerProgress } from '@sanverse/motion-primitives'
+import { SANVERSE_TICKS_PER_SECOND, easeInCubic, easeOutCubic, normalizedProgress, resolveProductStorySafePlacement, sequenceProgress, staggerProgress } from '@sanverse/motion-primitives'
 import { mergeMotionGraphNodeStyle, useMotionGraphPresentation } from '@sanverse/motion-native-runtime'
 import { FULL_NATIVE_GRAPH_CAPABILITIES, graphGroup, graphShape, graphText, responsiveGraphLayout } from '../graph-common.ts'
 import { mConst, mEase, mMultiply, mNumber, mOneMinus, mProgress, mReduced, mSequence, mStagger } from '../graph-motion.ts'
@@ -12,12 +12,19 @@ import { A19_HIERARCHY_CONFIGS, a19HierarchyItemLimit, createA19HierarchyScene, 
 
 export type FamilyKind = 'title' | 'value' | 'list' | 'status' | 'diagram' | 'quote' | 'cta'
 
+export const FAMILY_PLACEMENT_INTENTS = Object.freeze(['top-left','top-right','center-left','center','center-right','bottom-left','bottom-right'] as const)
+export type FamilyPlacementIntent = (typeof FAMILY_PLACEMENT_INTENTS)[number]
+
 export interface FamilyComponentProps {
   readonly eyebrow: string
   readonly title: string
   readonly subtitle: string
   readonly value: string
   readonly items: readonly string[]
+  /** Optional semantic placement used by product-storytelling overlays. */
+  readonly placement?: FamilyPlacementIntent
+  /** Composition-space safe inset in pixels for footage-aware placement. */
+  readonly safeOffset?: number
 }
 
 export interface FamilyComponentStyle {
@@ -45,6 +52,8 @@ export interface FamilyVariantConfig {
   readonly subtitle: string
   readonly value: string
   readonly items: readonly string[]
+  readonly defaultPlacement?: FamilyPlacementIntent
+  readonly defaultSafeOffset?: number
   readonly minDurationSeconds?: number
   readonly defaultDurationSeconds?: number
   readonly maxDurationSeconds?: number
@@ -79,14 +88,16 @@ const bounded = (value: unknown, min: number, max: number): value is string => t
 
 export const validateFamilyComponentProps = (input: unknown): MotionValidationResultV1<FamilyComponentProps> => {
   if (!isRecord(input)) return validationFailure(valueIssue('$', 'TYPE_INVALID', 'Family component props must be an object.'))
-  const issues = [...unknownFieldIssues(input, ['eyebrow', 'title', 'subtitle', 'value', 'items'])]
+  const issues = [...unknownFieldIssues(input, ['eyebrow', 'title', 'subtitle', 'value', 'items', 'placement', 'safeOffset'])]
   if (!bounded(input.eyebrow, 0, 32)) issues.push(valueIssue('$.eyebrow', 'VALUE_INVALID', 'eyebrow is limited to 32 characters.'))
   if (!bounded(input.title, 1, 96)) issues.push(valueIssue('$.title', 'VALUE_INVALID', 'title must contain 1–96 characters.'))
   if (!bounded(input.subtitle, 0, 140)) issues.push(valueIssue('$.subtitle', 'VALUE_INVALID', 'subtitle is limited to 140 characters.'))
   if (!bounded(input.value, 0, 48)) issues.push(valueIssue('$.value', 'VALUE_INVALID', 'value is limited to 48 characters.'))
   if (!Array.isArray(input.items) || input.items.length > 6 || input.items.some((item) => !bounded(item, 1, 72))) issues.push(valueIssue('$.items', 'VALUE_INVALID', 'items must contain 0–6 strings of 1–72 characters.'))
+  if (input.placement !== undefined && (typeof input.placement !== 'string' || !FAMILY_PLACEMENT_INTENTS.includes(input.placement as FamilyPlacementIntent))) issues.push(valueIssue('$.placement', 'VALUE_INVALID', 'placement must be one of the supported semantic safe-placement intents.'))
+  if (input.safeOffset !== undefined && (typeof input.safeOffset !== 'number' || !Number.isFinite(input.safeOffset) || input.safeOffset < 0 || input.safeOffset > 240)) issues.push(valueIssue('$.safeOffset', 'VALUE_INVALID', 'safeOffset must be a finite composition-space inset inside [0,240].'))
   if (issues.length > 0) return validationFailure(...issues)
-  return validationSuccess(Object.freeze({ eyebrow: input.eyebrow as string, title: input.title as string, subtitle: input.subtitle as string, value: input.value as string, items: Object.freeze([...(input.items as string[])]) }))
+  return validationSuccess(Object.freeze({ eyebrow: input.eyebrow as string, title: input.title as string, subtitle: input.subtitle as string, value: input.value as string, items: Object.freeze([...(input.items as string[])]), ...(input.placement !== undefined ? { placement: input.placement as FamilyPlacementIntent } : {}), ...(input.safeOffset !== undefined ? { safeOffset: input.safeOffset as number } : {}) }))
 }
 
 export const validateFamilyComponentStyle = (input: unknown): MotionValidationResultV1<FamilyComponentStyle> => {
@@ -133,7 +144,16 @@ export const A18_KEYFRAME_CREATOR_COMPONENT_IDS = Object.freeze([
   'sanverse.keyboard-shortcut-callout',
 ] as const)
 const A18_KEYFRAME_CREATOR_IDS = new Set<string>(A18_KEYFRAME_CREATOR_COMPONENT_IDS)
-const isA18KeyframeCreator = (config: FamilyVariantConfig): boolean => A18_KEYFRAME_CREATOR_IDS.has(config.id)
+export const A20_PRODUCT_STORY_COMPONENT_IDS = Object.freeze([
+  'sanverse.conversation-toast-stack',
+  'sanverse.floating-prompt-composer',
+  'sanverse.product-ui-story-scene',
+  'sanverse.agent-work-log',
+  'sanverse.scoped-access-comparison',
+  'sanverse.keyword-brand-lockup',
+] as const)
+const A20_PRODUCT_STORY_IDS = new Set<string>(A20_PRODUCT_STORY_COMPONENT_IDS)
+const isKeyframeNativeFamily = (config: FamilyVariantConfig): boolean => A18_KEYFRAME_CREATOR_IDS.has(config.id) || A20_PRODUCT_STORY_IDS.has(config.id)
 const durationTicksForConfig = (config: FamilyVariantConfig, field: 'min' | 'default' | 'max'): number => {
   const seconds = field === 'min' ? (config.minDurationSeconds ?? 1) : field === 'default' ? (config.defaultDurationSeconds ?? 4) : (config.maxDurationSeconds ?? 16)
   return Math.round(SANVERSE_TICKS_PER_SECOND * seconds)
@@ -166,8 +186,8 @@ const scaleTrack = (id: string, context: MotionRenderContextV1, start: number, f
 
 export const createFamilyScene = (config: FamilyVariantConfig, props: FamilyComponentProps, style: FamilyComponentStyle, context: MotionRenderContextV1): MotionSceneV1 => {
   validateContext(context)
-  const a18Keyframed = isA18KeyframeCreator(config)
-  if (a18Keyframed && (context.durationTicks < durationTicksForConfig(config, 'min') || context.durationTicks > durationTicksForConfig(config, 'max'))) throw new RangeError(`${config.id} duration is outside its supported keyframe-authoring window.`)
+  const keyframeNative = isKeyframeNativeFamily(config)
+  if (keyframeNative && (context.durationTicks < durationTicksForConfig(config, 'min') || context.durationTicks > durationTicksForConfig(config, 'max'))) throw new RangeError(`${config.id} duration is outside its supported keyframe-authoring window.`)
   const prefix = nodePrefix(config)
   const rootId = `${prefix}.root`
   const surfaceId = `${prefix}.surface`
@@ -182,25 +202,25 @@ export const createFamilyScene = (config: FamilyVariantConfig, props: FamilyComp
   const root = graphGroup(rootId, config.name, null, [surfaceId, accentId, contentId])
   const short = Math.min(context.composition.width, context.composition.height)
   const surfaceBase = graphShape({ id: surfaceId, name: 'Surface', parentId: rootId, width: Math.round(context.composition.width * 0.76), height: Math.round(context.composition.height * 0.56), fillColor: style.surfaceColor, strokeColor: `${style.accentColor}28`, strokeWidth: 2, radius: style.radius })
-  const surface = a18Keyframed ? Object.freeze({ ...surfaceBase, opacity: revealTrack(`${prefix}:surface`, context, 0.02, 0.14) }) : surfaceBase
+  const surface = keyframeNative ? Object.freeze({ ...surfaceBase, opacity: revealTrack(`${prefix}:surface`, context, 0.02, 0.14) }) : surfaceBase
   const accentBase = graphShape({ id: accentId, name: 'Accent', parentId: rootId, width: Math.round(short * 0.16), height: Math.max(6, Math.round(short * 0.012)), fillColor: style.accentColor, strokeColor: 'transparent', strokeWidth: 0, radius: 999 })
-  const accent = a18Keyframed ? Object.freeze({ ...accentBase, opacity: revealTrack(`${prefix}:accent`, context, 0.10, 0.24), transform: Object.freeze({ ...accentBase.transform, scaleX: scaleTrack(`${prefix}:accent-scale`, context, 0.10, 0.35, 1), scaleY: constant(1) }) }) : accentBase
+  const accent = keyframeNative ? Object.freeze({ ...accentBase, opacity: revealTrack(`${prefix}:accent`, context, 0.10, 0.24), transform: Object.freeze({ ...accentBase.transform, scaleX: scaleTrack(`${prefix}:accent-scale`, context, 0.10, 0.35, 1), scaleY: constant(1) }) }) : accentBase
   const contentBase = graphGroup(contentId, 'Content', rootId, [eyebrowId, titleId, subtitleId, valueId, itemsId])
   const reveal = mReduced(mConst(1), mEase('ease-out-cubic', mSequence(0.02, 0.30, mProgress())))
   const remain = mOneMinus(mEase('ease-in-cubic', mSequence(0.84, 1, mProgress())))
-  const content = a18Keyframed ? contentBase : Object.freeze({ ...contentBase, opacity: mNumber(mMultiply(reveal, remain)), transform: Object.freeze({ ...contentBase.transform, positionY: mNumber(mReduced(mConst(0), mMultiply(mConst(26 * style.motionIntensity), mOneMinus(reveal)))) }) })
+  const content = keyframeNative ? contentBase : Object.freeze({ ...contentBase, opacity: mNumber(mMultiply(reveal, remain)), transform: Object.freeze({ ...contentBase.transform, positionY: mNumber(mReduced(mConst(0), mMultiply(mConst(26 * style.motionIntensity), mOneMinus(reveal)))) }) })
   const eyebrowBase = graphText({ id: eyebrowId, name: 'Eyebrow', parentId: contentId, text: props.eyebrow, color: style.accentColor, fontFamily: style.fontFamily, fontSize: Math.round(short * 0.025), fontWeight: 800 })
-  const eyebrow = Object.freeze({ ...eyebrowBase, visible: constant(Boolean(props.eyebrow.trim())), ...(a18Keyframed ? { opacity: revealTrack(`${prefix}:eyebrow`, context, 0.04, 0.16), transform: Object.freeze({ ...eyebrowBase.transform, positionY: translateYTrack(`${prefix}:eyebrow-y`, context, 0.04, 18 * style.motionIntensity) }) } : {}) })
+  const eyebrow = Object.freeze({ ...eyebrowBase, visible: constant(Boolean(props.eyebrow.trim())), ...(keyframeNative ? { opacity: revealTrack(`${prefix}:eyebrow`, context, 0.04, 0.16), transform: Object.freeze({ ...eyebrowBase.transform, positionY: translateYTrack(`${prefix}:eyebrow-y`, context, 0.04, 18 * style.motionIntensity) }) } : {}) })
   const titleBase = graphText({ id: titleId, name: 'Title', parentId: contentId, text: props.title, color: style.textColor, fontFamily: style.fontFamily, fontSize: Math.round(short * 0.064), fontWeight: style.titleWeight })
-  const title = a18Keyframed ? Object.freeze({ ...titleBase, opacity: revealTrack(`${prefix}:title`, context, 0.10, 0.28), transform: Object.freeze({ ...titleBase.transform, positionY: translateYTrack(`${prefix}:title-y`, context, 0.10, 34 * style.motionIntensity), scaleX: scaleTrack(`${prefix}:title-sx`, context, 0.10, 0.92, 1.04), scaleY: scaleTrack(`${prefix}:title-sy`, context, 0.10, 0.92, 1.04) }) }) : titleBase
+  const title = keyframeNative ? Object.freeze({ ...titleBase, opacity: revealTrack(`${prefix}:title`, context, 0.10, 0.28), transform: Object.freeze({ ...titleBase.transform, positionY: translateYTrack(`${prefix}:title-y`, context, 0.10, 34 * style.motionIntensity), scaleX: scaleTrack(`${prefix}:title-sx`, context, 0.10, 0.92, 1.04), scaleY: scaleTrack(`${prefix}:title-sy`, context, 0.10, 0.92, 1.04) }) }) : titleBase
   const subtitleBase = graphText({ id: subtitleId, name: 'Subtitle', parentId: contentId, text: props.subtitle, color: style.mutedColor, fontFamily: style.fontFamily, fontSize: Math.round(short * 0.027), fontWeight: style.bodyWeight })
-  const subtitle = Object.freeze({ ...subtitleBase, visible: constant(Boolean(props.subtitle.trim())), ...(a18Keyframed ? { opacity: revealTrack(`${prefix}:subtitle`, context, 0.22, 0.40), transform: Object.freeze({ ...subtitleBase.transform, positionY: translateYTrack(`${prefix}:subtitle-y`, context, 0.22, 22 * style.motionIntensity) }) } : {}) })
+  const subtitle = Object.freeze({ ...subtitleBase, visible: constant(Boolean(props.subtitle.trim())), ...(keyframeNative ? { opacity: revealTrack(`${prefix}:subtitle`, context, 0.22, 0.40), transform: Object.freeze({ ...subtitleBase.transform, positionY: translateYTrack(`${prefix}:subtitle-y`, context, 0.22, 22 * style.motionIntensity) }) } : {}) })
   const valueBase = graphText({ id: valueId, name: 'Value', parentId: contentId, text: props.value, color: style.accentColor, fontFamily: style.fontFamily, fontSize: Math.round(short * 0.085), fontWeight: style.titleWeight })
-  const value = Object.freeze({ ...valueBase, visible: constant(Boolean(props.value.trim())), ...(a18Keyframed ? { opacity: revealTrack(`${prefix}:value`, context, 0.28, 0.46), transform: Object.freeze({ ...valueBase.transform, positionY: translateYTrack(`${prefix}:value-y`, context, 0.28, 26 * style.motionIntensity), scaleX: scaleTrack(`${prefix}:value-sx`, context, 0.28, 0.72, 1.10), scaleY: scaleTrack(`${prefix}:value-sy`, context, 0.28, 0.72, 1.10) }) } : {}) })
+  const value = Object.freeze({ ...valueBase, visible: constant(Boolean(props.value.trim())), ...(keyframeNative ? { opacity: revealTrack(`${prefix}:value`, context, 0.28, 0.46), transform: Object.freeze({ ...valueBase.transform, positionY: translateYTrack(`${prefix}:value-y`, context, 0.28, 26 * style.motionIntensity), scaleX: scaleTrack(`${prefix}:value-sx`, context, 0.28, 0.72, 1.10), scaleY: scaleTrack(`${prefix}:value-sy`, context, 0.28, 0.72, 1.10) }) } : {}) })
   const items = graphGroup(itemsId, 'Items', contentId, itemIds)
   const itemNodes = Object.fromEntries(props.items.map((item, index) => {
     const base = graphText({ id: itemIds[index]!, name: `Item ${index + 1}`, parentId: itemsId, text: item, color: style.textColor, fontFamily: style.fontFamily, fontSize: Math.round(short * 0.027), fontWeight: style.bodyWeight })
-    if (a18Keyframed) {
+    if (keyframeNative) {
       const start = Math.min(0.18 + index * 0.11, 0.58)
       return [base.id, Object.freeze({ ...base, opacity: revealTrack(`${prefix}:item:${index + 1}`, context, start, Math.min(start + 0.16, 0.78)), transform: Object.freeze({ ...base.transform, positionY: translateYTrack(`${prefix}:item:${index + 1}:y`, context, start, 30 * style.motionIntensity), scaleX: scaleTrack(`${prefix}:item:${index + 1}:sx`, context, start, 0.88, 1.03), scaleY: scaleTrack(`${prefix}:item:${index + 1}:sy`, context, start, 0.88, 1.03) }) })]
     }
@@ -213,6 +233,8 @@ export const createFamilyScene = (config: FamilyVariantConfig, props: FamilyComp
     { id: `${prefix}.subtitle`, label: 'Subtitle', group: 'Content', level: 'creator', target: { kind: 'component', propertyId: 'subtitle' }, editor: { type: 'textarea' }, keyframeable: false },
     { id: `${prefix}.value`, label: 'Value / CTA', group: 'Content', level: 'creator', target: { kind: 'component', propertyId: 'value' }, editor: { type: 'text' }, keyframeable: false },
     { id: `${prefix}.items`, label: 'Items · one per line', group: 'Content', level: 'creator', target: { kind: 'component', propertyId: 'items' }, editor: { type: 'textarea' }, keyframeable: false },
+    { id: `${prefix}.placement`, label: 'Safe placement', group: 'Layout', level: 'creator', target: { kind: 'component', propertyId: 'placement' }, editor: { type: 'select', options: FAMILY_PLACEMENT_INTENTS.map((placement) => ({ label: placement.replace(/-/gu, ' '), value: placement })) }, keyframeable: false },
+    { id: `${prefix}.safe-offset`, label: 'Safe offset', group: 'Layout', level: 'designer', target: { kind: 'component', propertyId: 'safeOffset' }, editor: { type: 'slider' }, keyframeable: false, constraints: { minimum: 0, maximum: 240, step: 1 } },
     { id: `${prefix}.text-color`, label: 'Text color', group: 'Style', level: 'creator', target: { kind: 'component', propertyId: 'textColor' }, editor: { type: 'color' }, keyframeable: false },
     { id: `${prefix}.accent-color`, label: 'Accent color', group: 'Style', level: 'creator', target: { kind: 'component', propertyId: 'accentColor' }, editor: { type: 'color' }, keyframeable: false },
     { id: `${prefix}.radius`, label: 'Surface roundness', group: 'Surface', level: 'designer', target: { kind: 'node', nodeId: surfaceId, property: 'shape.radius' }, editor: { type: 'slider' }, keyframeable: true, constraints: { minimum: 0, maximum: 120, step: 1 } },
@@ -248,6 +270,27 @@ const renderFamilyVisual = (config: FamilyVariantConfig, props: FamilyComponentP
   const subtitle = props.subtitle.trim() ? <div data-motion-node-id={`${prefix}.subtitle`} style={graphStyle(`${prefix}.subtitle`, subtitleStyle)}>{props.subtitle}</div> : null
   const value = props.value.trim() ? <div data-motion-node-id={`${prefix}.value`} style={graphStyle(`${prefix}.value`, valueStyle)}>{props.value}</div> : null
   const item = (text: string, index: number, extra: CSSProperties = {}) => <div key={`${text}:${index}`} data-motion-node-id={`${prefix}.item:${index + 1}`} style={graphStyle(`${prefix}.item:${index + 1}`, { color: style.textColor, fontSize: state.layout === 'wide' ? 26 : 22, lineHeight: 1.22, fontWeight: style.bodyWeight, ...extra })}>{text}</div>
+
+  if (config.variant === 'conversation-toast-stack') {
+    return <div style={{ display: 'grid', gap: 12, textAlign: 'left' }}>{eyebrow}<div style={{ display: 'grid', gap: 10 }}>{props.items.slice(0, 4).map((entry, index) => item(entry, index, { display: 'block', padding: state.layout === 'wide' ? '16px 18px' : '18px 20px', marginLeft: state.layout === 'wide' ? index * 18 : index * 7, borderRadius: Math.max(14, style.radius), border: `1px solid ${style.textColor}20`, background: index === 0 ? `${style.accentColor}16` : `${style.textColor}0b`, boxShadow: '0 12px 30px rgba(0,0,0,.18)', fontSize: state.layout === 'wide' ? 23 : 25, lineHeight: 1.25, overflowWrap: 'break-word' }))}</div><div style={{ display: 'grid', gap: 5 }}>{title}{subtitle}</div></div>
+  }
+  if (config.variant === 'floating-prompt-composer') {
+    return <div style={{ display: 'grid', gap: 14, textAlign: 'left' }}>{eyebrow}<div data-motion-node-id={`${prefix}.title`} style={graphStyle(`${prefix}.title`, { minHeight: state.layout === 'wide' ? 132 : 176, padding: '20px 22px', borderRadius: Math.max(16, style.radius), border: `1px solid ${style.textColor}24`, background: `${style.textColor}08`, color: style.textColor, fontSize: state.layout === 'wide' ? 30 : 26, lineHeight: 1.35, fontWeight: 650 })}>{props.title}</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{props.items.map((entry, index) => item(entry, index, { padding: '8px 12px', borderRadius: 999, border: `1px solid ${style.accentColor}3d`, background: `${style.accentColor}0d`, color: style.accentColor, fontSize: state.layout === 'wide' ? 18 : 16, fontWeight: 750 }))}</div><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><div data-motion-node-id={`${prefix}.subtitle`} style={graphStyle(`${prefix}.subtitle`, { color: style.mutedColor, fontSize: 17 })}>{props.subtitle}</div><div data-motion-node-id={`${prefix}.value`} style={graphStyle(`${prefix}.value`, { padding: '10px 16px', borderRadius: 999, background: style.accentColor, color: '#080808', fontSize: 17, fontWeight: 900 })}>{props.value || 'SEND'}</div></div></div>
+  }
+  if (config.variant === 'product-ui-story') {
+    return <div style={{ display: 'grid', gap: 12, textAlign: 'left' }}><div data-motion-node-id={`${prefix}.accent`} style={graphStyle(`${prefix}.accent`, { display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 10, background: `${style.textColor}0a`, border: `1px solid ${style.textColor}18`, color: style.mutedColor, fontSize: 15 })}><span style={{ color: style.dangerColor }}>●</span><span style={{ color: '#ffd166' }}>●</span><span style={{ color: style.successColor }}>●</span><strong style={{ marginLeft: 8, color: style.textColor }}>Workspace</strong><span style={{ marginLeft: 'auto' }}>{props.value || 'LIVE'}</span></div><div style={{ display: 'grid', gridTemplateColumns: state.layout === 'wide' ? '180px 1fr' : '1fr', gap: 12 }}><div style={{ display: 'grid', gap: 8, alignContent: 'start', padding: 12, borderRadius: Math.max(12, style.radius * .75), background: `${style.textColor}07`, border: `1px solid ${style.textColor}12` }}>{eyebrow}{props.items.slice(0, 2).map((entry, index) => item(entry, index, { padding: '9px 10px', borderRadius: 8, background: index === 0 ? `${style.accentColor}16` : 'transparent', color: index === 0 ? style.accentColor : style.mutedColor, fontSize: 17 }))}</div><div style={{ display: 'grid', gap: 12, padding: state.layout === 'wide' ? 18 : 14, borderRadius: Math.max(14, style.radius), border: `1px solid ${style.accentColor}24`, background: `${style.surfaceColor}` }}>{title}{subtitle}<div style={{ display: 'grid', gap: 8 }}>{props.items.slice(2).map((entry, index) => item(entry, index + 2, { padding: '11px 12px', borderRadius: 9, border: `1px solid ${style.textColor}14`, background: `${style.textColor}06`, fontSize: state.layout === 'wide' ? 19 : 17 }))}</div></div></div></div>
+  }
+  if (config.variant === 'agent-work-log') {
+    return <div style={{ display: 'grid', gap: 14, textAlign: 'left' }}>{eyebrow}<div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 12 }}><div>{title}{subtitle}</div><div data-motion-node-id={`${prefix}.value`} style={graphStyle(`${prefix}.value`, { color: style.successColor, fontSize: 18, fontWeight: 900, letterSpacing: '.08em' })}>{props.value}</div></div><div style={{ display: 'grid', gap: 9 }}>{props.items.map((entry, index) => item(entry, index, { padding: '12px 14px', borderRadius: 10, border: `1px solid ${index === props.items.length - 1 ? style.successColor : style.textColor}25`, background: index === props.items.length - 1 ? `${style.successColor}0d` : `${style.textColor}06`, fontFamily: 'Consolas, monospace', fontSize: state.layout === 'wide' ? 19 : 17 }))}</div></div>
+  }
+  if (config.variant === 'scoped-access') {
+    const left = props.items[0] ?? 'Legal · contracts + policy'
+    const right = props.items[1] ?? 'Engineering · code + issues'
+    return <div style={{ display: 'grid', gap: 16, textAlign: 'center' }}>{eyebrow}{title}{subtitle}<div style={{ display: 'grid', gridTemplateColumns: state.layout === 'wide' ? '1fr auto 1fr' : '1fr', gap: 12, alignItems: 'stretch' }}><div data-motion-node-id={`${prefix}.item:1`} style={graphStyle(`${prefix}.item:1`, { display: 'grid', alignContent: 'center', gap: 10, minHeight: 130, padding: 18, borderRadius: Math.max(14, style.radius), border: `1px solid ${style.accentColor}45`, background: `${style.accentColor}0b`, color: style.textColor, fontSize: state.layout === 'wide' ? 25 : 21, lineHeight: 1.25, fontWeight: 800 })}>{left}</div><div data-motion-node-id={`${prefix}.accent`} style={graphStyle(`${prefix}.accent`, { alignSelf: 'center', color: style.mutedColor, fontSize: 30, fontWeight: 900 })}>≠</div><div data-motion-node-id={`${prefix}.item:2`} style={graphStyle(`${prefix}.item:2`, { display: 'grid', alignContent: 'center', gap: 10, minHeight: 130, padding: 18, borderRadius: Math.max(14, style.radius), border: `1px solid ${style.successColor}45`, background: `${style.successColor}0b`, color: style.textColor, fontSize: state.layout === 'wide' ? 25 : 21, lineHeight: 1.25, fontWeight: 800 })}>{right}</div></div><div data-motion-node-id={`${prefix}.value`} style={graphStyle(`${prefix}.value`, { color: style.accentColor, fontSize: state.layout === 'wide' ? 22 : 19, fontWeight: 850 })}>{props.value}</div></div>
+  }
+  if (config.variant === 'keyword-brand-lockup') {
+    return <div style={{ display: 'grid', gap: 16, justifyItems: 'center', textAlign: 'center' }}>{eyebrow}<div data-motion-node-id={`${prefix}.title`} style={graphStyle(`${prefix}.title`, { color: style.mutedColor, fontSize: state.layout === 'wide' ? 38 : 31, fontWeight: 750, letterSpacing: '-.02em' })}>{props.title}</div><div data-motion-node-id={`${prefix}.accent`} style={graphStyle(`${prefix}.accent`, { width: state.layout === 'wide' ? 160 : 110, height: 5, borderRadius: 999, background: style.accentColor })} /><div data-motion-node-id={`${prefix}.value`} style={graphStyle(`${prefix}.value`, { color: style.textColor, fontSize: state.layout === 'wide' ? 92 : 66, lineHeight: .92, fontWeight: 950, letterSpacing: '-.06em', textTransform: 'uppercase' })}>{props.value}</div><div data-motion-node-id={`${prefix}.subtitle`} style={graphStyle(`${prefix}.subtitle`, { color: style.mutedColor, fontSize: state.layout === 'wide' ? 23 : 20 })}>{props.subtitle}</div></div>
+  }
 
   if (config.family === 'title') {
     if (config.variant === 'keyword-slam') {
@@ -377,7 +420,14 @@ const renderFamilyVisual = (config: FamilyVariantConfig, props: FamilyComponentP
 
 const createFamilyComponent = (config: FamilyVariantConfig): MotionGraphBackedComponentModuleV1<FamilyComponentProps, FamilyComponentStyle> => {
   const hierarchyHeavy = isA19HierarchyConfig(config)
-  const defaultProps: FamilyComponentProps = Object.freeze({ eyebrow: config.eyebrow, title: config.title, subtitle: config.subtitle, value: config.value, items: Object.freeze([...config.items]) })
+  const defaultProps: FamilyComponentProps = Object.freeze({
+    eyebrow: config.eyebrow,
+    title: config.title,
+    subtitle: config.subtitle,
+    value: config.value,
+    items: Object.freeze([...config.items]),
+    ...(A20_PRODUCT_STORY_IDS.has(config.id) ? { placement: config.defaultPlacement ?? 'center', safeOffset: config.defaultSafeOffset ?? 64 } : {}),
+  })
   const definition: MotionComponentDefinitionV1 = Object.freeze({
     id: config.id, version: 1, name: config.name, purpose: config.purpose, category: categoryForFamily(config.family), performanceClass: config.family === 'diagram' || config.family === 'list' ? 'medium' : 'light',
     supportedAspectRatios: Object.freeze(['16:9', '9:16', '1:1', '4:5'] as const),
@@ -397,8 +447,24 @@ const createFamilyComponent = (config: FamilyVariantConfig): MotionGraphBackedCo
     const shape = surface?.type === 'shape' ? surface : null
     const graphBacked = Boolean(graph.scene)
     const localTransform = context.reducedMotion ? undefined : `translate3d(0, ${(1 - state.reveal) * 26 * style.motionIntensity}px, 0)`
-    return <div data-motion-root="family-component" data-motion-family={config.family} data-motion-variant={config.variant} data-motion-module-id={config.id} data-motion-node-id={`${prefix}.root`} style={graphStyle(`${prefix}.root`, { position: 'absolute', inset: 0, display: 'grid', placeItems: config.variant === 'lower-third' ? 'end start' : 'center', padding: Math.round(short * 0.075), overflow: 'hidden', fontFamily: style.fontFamily })}>
-      <section data-motion-node-id={`${prefix}.surface`} style={graphStyle(`${prefix}.surface`, { position: 'relative', width: state.layout === 'wide' ? '72%' : '86%', maxWidth: 1380, minHeight: config.family === 'title' ? '28%' : '42%', display: 'grid', alignContent: 'center', padding: config.variant === 'lower-third' ? Math.round(short * .045) : Math.round(short * .06), borderRadius: shape?.radius ?? style.radius, border: familySurfaceVisible(config.family, config.variant) ? `2px solid ${style.accentColor}22` : '0', background: familySurfaceVisible(config.family, config.variant) ? (shape?.fillColor ?? style.surfaceColor) : 'transparent', boxShadow: familySurfaceVisible(config.family, config.variant) ? '0 24px 70px rgba(0,0,0,.28)' : 'none' })}>
+    const productStory = A20_PRODUCT_STORY_IDS.has(config.id)
+    const largeProductScene = config.variant === 'product-ui-story' || config.variant === 'scoped-access'
+    const placement = productStory ? resolveProductStorySafePlacement({
+      width: context.composition.width,
+      height: context.composition.height,
+      placement: props.placement ?? config.defaultPlacement ?? 'center',
+      safeOffset: props.safeOffset ?? config.defaultSafeOffset ?? Math.round(short * .055),
+      widthFraction: state.layout === 'wide' ? (largeProductScene ? .68 : .44) : .84,
+      heightFraction: state.layout === 'wide' ? .72 : .68,
+    }) : null
+    const rootBase: CSSProperties = productStory
+      ? { position: 'absolute', inset: 0, overflow: 'hidden', fontFamily: style.fontFamily }
+      : { position: 'absolute', inset: 0, display: 'grid', placeItems: config.variant === 'lower-third' ? 'end start' : 'center', padding: Math.round(short * 0.075), overflow: 'hidden', fontFamily: style.fontFamily }
+    const surfaceBaseStyle: CSSProperties = productStory && placement
+      ? { position: 'absolute', left: placement.left, top: placement.top, width: placement.maxWidth, maxHeight: placement.maxHeight, minHeight: Math.min(placement.maxHeight, state.layout === 'wide' ? (largeProductScene ? 380 : 320) : (config.variant === 'product-ui-story' ? 620 : 520)) }
+      : { position: 'relative', width: state.layout === 'wide' ? '72%' : '86%', maxWidth: 1380, minHeight: config.family === 'title' ? '28%' : '42%' }
+    return <div data-motion-root="family-component" data-motion-family={config.family} data-motion-variant={config.variant} data-motion-module-id={config.id} data-motion-node-id={`${prefix}.root`} style={graphStyle(`${prefix}.root`, rootBase)}>
+      <section data-motion-node-id={`${prefix}.surface`} style={graphStyle(`${prefix}.surface`, { ...surfaceBaseStyle, display: 'grid', alignContent: 'center', overflow: 'hidden', padding: config.variant === 'lower-third' ? Math.round(short * .045) : productStory ? Math.round(short * .038) : Math.round(short * .06), borderRadius: shape?.radius ?? style.radius, border: familySurfaceVisible(config.family, config.variant) ? `2px solid ${style.accentColor}22` : '0', background: familySurfaceVisible(config.family, config.variant) ? (shape?.fillColor ?? style.surfaceColor) : 'transparent', boxShadow: familySurfaceVisible(config.family, config.variant) ? '0 24px 70px rgba(0,0,0,.28)' : 'none' })}>
         <div data-motion-node-id={`${prefix}.content`} style={graphStyle(`${prefix}.content`, { opacity: graphBacked ? 1 : state.reveal, transform: graphBacked ? undefined : localTransform })}>
           {renderFamilyVisual(config, props, style, state, graphStyle, graph.scene)}
         </div>
@@ -482,7 +548,14 @@ const configs = Object.freeze([
   { id:'sanverse.search-results', name:'Search Results', purpose:'Show a query with a concise ranked set of software or web search results.', family:'list', variant:'search', eyebrow:'SEARCH', title:'AI workflow automation', subtitle:'3 relevant results', value:'', items:['Best AI workflow tools for creator teams','How creators automate research without losing judgment','Case study · 4× weekly output'] },
   { id:'sanverse.upload-status', name:'Upload Status', purpose:'Show file upload progress with filename, transfer state and supporting detail.', family:'status', variant:'upload', eyebrow:'UPLOAD', title:'Episode 12.mp4', subtitle:'Uploading master file · 1.8 GB of 2.5 GB', value:'72%', items:['Encoding starts automatically after upload'] },
   { id:'sanverse.cursor-callout', name:'Cursor Callout', purpose:'Point to one software UI target with a labeled cursor-style emphasis.', family:'status', variant:'cursor', eyebrow:'CLICK HERE', title:'Choose the winning format', subtitle:'This row drove the highest retention in the current batch.', value:'OUTLIER 8.9', items:['Highest 30-second retention'] },
-  // MOTION-A18 — keyframe-native short-form creator pack. Existing 60 components stay on their established motion paths.
+  // MOTION-A20 — premium product-storytelling pack. Six new semantic jobs; headline/lower-third/browser/PIP ideas reuse existing capabilities.
+  { id:'sanverse.conversation-toast-stack', name:'Floating Conversation Toast Stack', purpose:'Stage several lightweight conversation notifications as a sequential product-story hook.', family:'list', variant:'conversation-toast-stack', eyebrow:'INBOX', title:'The workflow changed in one message', subtitle:'Conversation notifications stack without becoming a full chat thread.', value:'', items:['Maya · Can the agent review launch notes?','System · Access granted to Product Space','Agent · Drafting the release summary'], defaultPlacement:'top-right', defaultSafeOffset:72, minDurationSeconds:1.5, defaultDurationSeconds:4.5, maxDurationSeconds:12, events:[{name:'message-1',normalizedTime:.12},{name:'message-2',normalizedTime:.28},{name:'message-3',normalizedTime:.44},{name:'settled',normalizedTime:.68},{name:'exit-start',normalizedTime:.92}] },
+  { id:'sanverse.floating-prompt-composer', name:'Floating Prompt Composer', purpose:'Show a focused AI/product prompt composer with context chips and a clear send action.', family:'list', variant:'floating-prompt-composer', eyebrow:'ASK THE WORKSPACE', title:'Summarize the launch feedback and draft three reply options.', subtitle:'Uses only the selected project context.', value:'SEND', items:['Launch notes','Customer feedback','Roadmap'], defaultPlacement:'center-right', defaultSafeOffset:72, minDurationSeconds:1.5, defaultDurationSeconds:5, maxDurationSeconds:12, events:[{name:'composer-open',normalizedTime:.08},{name:'type-reveal',normalizedTime:.18},{name:'context-chip-1',normalizedTime:.32},{name:'context-chip-2',normalizedTime:.42},{name:'send-ready',normalizedTime:.58},{name:'exit-start',normalizedTime:.92}] },
+  { id:'sanverse.product-ui-story-scene', name:'Product UI Story Scene', purpose:'Tell a software workflow as a structured evolving application scene instead of a static screenshot.', family:'list', variant:'product-ui-story', eyebrow:'PROJECT SPACE', title:'Launch review', subtitle:'The agent turns scattered feedback into an actionable brief.', value:'SYNCED', items:['Overview','Sources','Reading 12 feedback notes','Grouping repeated requests','Draft brief ready'], defaultPlacement:'center', defaultSafeOffset:64, minDurationSeconds:1.5, defaultDurationSeconds:7, maxDurationSeconds:12, events:[{name:'window-open',normalizedTime:.06},{name:'source-focus',normalizedTime:.20},{name:'ui-content-append',normalizedTime:.34},{name:'scroll-to-focus',normalizedTime:.50},{name:'workflow-ready',normalizedTime:.70},{name:'exit-start',normalizedTime:.94}] },
+  { id:'sanverse.agent-work-log', name:'Agent Work Log', purpose:'Combine agent messages, tasks, statuses and completion into one compact progress story.', family:'list', variant:'agent-work-log', eyebrow:'AGENT WORK LOG', title:'Preparing launch brief', subtitle:'Each row is an addressable step, not fake terminal output.', value:'COMPLETE', items:['01 · Reading source notes · done','02 · Extracting requests · done','03 · Checking conflicts · done','04 · Drafting summary · done'], defaultPlacement:'center-left', defaultSafeOffset:72, minDurationSeconds:1.5, defaultDurationSeconds:6, maxDurationSeconds:12, events:[{name:'agent-working',normalizedTime:.10},{name:'task-1',normalizedTime:.22},{name:'task-2',normalizedTime:.34},{name:'task-3',normalizedTime:.46},{name:'agent-complete',normalizedTime:.68},{name:'exit-start',normalizedTime:.94}] },
+  { id:'sanverse.scoped-access-comparison', name:'Scoped Access Comparison', purpose:'Compare two permission or knowledge contexts and make their boundaries visually explicit.', family:'value', variant:'scoped-access', eyebrow:'SCOPED ACCESS', title:'Same agent. Different context.', subtitle:'Each workspace exposes only what that team has approved.', value:'BOUNDARIES PRESERVED', items:['LEGAL · contracts + policy + approvals','ENGINEERING · code + issues + technical docs'], defaultPlacement:'center', defaultSafeOffset:72, minDurationSeconds:1.5, defaultDurationSeconds:5.5, maxDurationSeconds:12, events:[{name:'left-context',normalizedTime:.14},{name:'right-context',normalizedTime:.34},{name:'boundary-emphasis',normalizedTime:.52},{name:'comparison-ready',normalizedTime:.68},{name:'exit-start',normalizedTime:.94}] },
+  { id:'sanverse.keyword-brand-lockup', name:'Keyword-to-Brand Lockup', purpose:'Resolve a final semantic keyword into an original brand/product lockup for a clean outro.', family:'cta', variant:'keyword-brand-lockup', eyebrow:'THE RESULT', title:'One trusted workspace becomes', subtitle:'Original fixture identity · no copied commercial branding.', value:'NORTHSTAR', items:[], defaultPlacement:'center', defaultSafeOffset:72, minDurationSeconds:1.5, defaultDurationSeconds:4, maxDurationSeconds:12, events:[{name:'keyword',normalizedTime:.12},{name:'lockup-build',normalizedTime:.34},{name:'brand-lockup',normalizedTime:.58},{name:'settled',normalizedTime:.72},{name:'exit-start',normalizedTime:.94}] },
+  // MOTION-A18 — keyframe-native short-form creator pack. Existing pre-A18 components stay on their established motion paths.
   { id:'sanverse.keyword-slam', name:'Keyword Slam', purpose:'Isolate one decisive keyword as the temporal payoff to a short setup line.', family:'title', variant:'keyword-slam', eyebrow:'THE LEVER', title:'The format lives or dies on', subtitle:'One word carries the promise.', value:'RETENTION', items:[], minDurationSeconds:.75, defaultDurationSeconds:2, maxDurationSeconds:8, events:[{name:'setup',normalizedTime:.10},{name:'keyword-slam',normalizedTime:.28},{name:'settled',normalizedTime:.56},{name:'exit-start',normalizedTime:.92}] },
   { id:'sanverse.three-beat-headline', name:'Three-Beat Headline', purpose:'Deliver a hook as three explicit sequential beats with a final payoff.', family:'title', variant:'three-beat', eyebrow:'3-BEAT HOOK', title:'Three beats. One promise.', subtitle:'Each beat advances the viewer instead of repeating the same headline.', value:'THEN PROVE IT', items:['STOP THE SCROLL','OPEN A LOOP','PAY IT OFF'], minDurationSeconds:.75, defaultDurationSeconds:2, maxDurationSeconds:8, events:[{name:'beat-1',normalizedTime:.18},{name:'beat-2',normalizedTime:.29},{name:'beat-3',normalizedTime:.40},{name:'settled',normalizedTime:.62},{name:'exit-start',normalizedTime:.92}] },
   { id:'sanverse.stacked-hook', name:'Stacked Hook', purpose:'Build a short-form hook from three stacked escalating lines rather than one flat headline.', family:'title', variant:'stacked-hook', eyebrow:'STACKED HOOK', title:'You do not need more content.', subtitle:'You need a format people finish.', value:'Then repeat the winner.', items:[], minDurationSeconds:.75, defaultDurationSeconds:2, maxDurationSeconds:8, events:[{name:'line-1',normalizedTime:.10},{name:'line-2',normalizedTime:.22},{name:'line-3',normalizedTime:.34},{name:'settled',normalizedTime:.58},{name:'exit-start',normalizedTime:.92}] },

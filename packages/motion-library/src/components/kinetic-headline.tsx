@@ -17,7 +17,7 @@ import {
   wordRevealProgress,
 } from '@sanverse/motion-primitives'
 import type { MotionExposureV1, MotionGraphBackedComponentModuleV1, MotionSceneV1 } from '@sanverse/motion-graph'
-import { constant, createMotionScene } from '@sanverse/motion-graph'
+import { constant, createMotionScene, keyframed } from '@sanverse/motion-graph'
 import { mergeMotionGraphNodeDecorationStyle, mergeMotionGraphNodeStyle, useMotionGraphPresentation } from '@sanverse/motion-native-runtime'
 import { FULL_NATIVE_GRAPH_CAPABILITIES, graphGroup, graphShape, graphText, responsiveGraphLayout, stableWordNodeIds } from '../graph-common.ts'
 import { mAdd, mConst, mEase, mLerp, mMax, mMultiply, mNumber, mOneMinus, mProgress, mReduced, mSequence, mSpring, mStagger, mSubtract } from '../graph-motion.ts'
@@ -29,6 +29,8 @@ export interface KineticHeadlineProps {
   readonly emphasisIndices: readonly number[]
   readonly alignment: 'left' | 'center' | 'right'
   readonly maxLines: 1 | 2 | 3
+  /** A20 variant: preserve the original accent-text default or draw a semantic highlight box. */
+  readonly emphasisTreatment?: 'accent-text' | 'highlight-box'
 }
 
 export interface KineticHeadlineStyle {
@@ -92,7 +94,7 @@ export const DEFAULT_KINETIC_HEADLINE_STYLE: KineticHeadlineStyle = Object.freez
   kineticHeadlineStyleFromPack(SANVERSE_CLEAN_STYLE),
 )
 
-const propsFields = ['text', 'emphasisIndices', 'alignment', 'maxLines'] as const
+const propsFields = ['text', 'emphasisIndices', 'alignment', 'maxLines', 'emphasisTreatment'] as const
 const styleFields = ['textColor', 'accentColor', 'fontFamily', 'fontWeight', 'background', 'motionIntensity'] as const
 
 export const validateKineticHeadlineProps = (input: unknown): MotionValidationResultV1<KineticHeadlineProps> => {
@@ -119,6 +121,7 @@ export const validateKineticHeadlineProps = (input: unknown): MotionValidationRe
 
   if (input.alignment !== 'left' && input.alignment !== 'center' && input.alignment !== 'right') issues.push(valueIssue('$.alignment', 'VALUE_INVALID', 'alignment must be left, center or right.'))
   if (input.maxLines !== 1 && input.maxLines !== 2 && input.maxLines !== 3) issues.push(valueIssue('$.maxLines', 'VALUE_INVALID', 'maxLines must be 1, 2 or 3.'))
+  if (input.emphasisTreatment !== undefined && input.emphasisTreatment !== 'accent-text' && input.emphasisTreatment !== 'highlight-box') issues.push(valueIssue('$.emphasisTreatment', 'VALUE_INVALID', 'emphasisTreatment must be accent-text or highlight-box.'))
   if (issues.length > 0) return validationFailure(...issues)
 
   return validationSuccess(Object.freeze({
@@ -126,6 +129,7 @@ export const validateKineticHeadlineProps = (input: unknown): MotionValidationRe
     emphasisIndices: Object.freeze([...(emphasisInput as number[])]),
     alignment: input.alignment as KineticHeadlineProps['alignment'],
     maxLines: input.maxLines as KineticHeadlineProps['maxLines'],
+    ...(input.emphasisTreatment !== undefined ? { emphasisTreatment: input.emphasisTreatment as KineticHeadlineProps['emphasisTreatment'] } : {}),
   }))
 }
 
@@ -243,9 +247,10 @@ export const createKineticHeadlineScene = (props: KineticHeadlineProps, style: K
     )),
   })
   const textGroup = graphGroup(textGroupId, 'Headline Text', root.id, wordIds)
+  const semanticHighlight = props.emphasisTreatment === 'highlight-box'
   const wordNodes = Object.fromEntries(words.map((word, index) => {
     const emphasized = props.emphasisIndices.includes(index)
-    const base = graphText({ id: wordIds[index]!, name: `Word ${index + 1}: ${word}`, parentId: textGroupId, text: word, color: emphasized ? style.accentColor : style.textColor, fontFamily: style.fontFamily, fontSize: layout.fontSize, fontWeight: style.fontWeight, textAlign: props.alignment })
+    const base = graphText({ id: wordIds[index]!, name: `Word ${index + 1}: ${word}`, parentId: textGroupId, text: word, color: emphasized && !semanticHighlight ? style.accentColor : style.textColor, fontFamily: style.fontFamily, fontSize: layout.fontSize, fontWeight: style.fontWeight, textAlign: props.alignment })
     const wordEnter = mEase('ease-out-cubic', mStagger(enter, index, words.length, 0.58))
     const opacity = mNumber(mReduced(mMultiply(reducedReveal, remain), mMultiply(wordEnter, remain)))
     const distance = 34 * lerp(0.45, 1.2, style.motionIntensity)
@@ -253,12 +258,29 @@ export const createKineticHeadlineScene = (props: KineticHeadlineProps, style: K
     const settle = mSpring(settleWindow, lerp(8.6, 5.6, style.motionIntensity), lerp(0.72, 1.08, style.motionIntensity))
     const overshoot = emphasized ? mMultiply(mMax(mConst(0), mSubtract(settle, mConst(1))), mConst(0.18 * style.motionIntensity)) : mConst(0)
     const scale = mNumber(mReduced(mConst(1), mAdd(mLerp(mConst(0.96), mConst(1), wordEnter), overshoot)))
+    if (semanticHighlight && emphasized) {
+      const startTick = Math.round(context.durationTicks * Math.min(0.12 + index * 0.035, 0.28))
+      const settleTick = Math.round(context.durationTicks * Math.min(0.28 + index * 0.035, 0.44))
+      const highlightedOpacity = context.reducedMotion ? constant(1) : keyframed([
+        { id: `${wordIds[index]}:highlight-hidden`, tick: 0, value: 0, interpolation: 'hold' },
+        { id: `${wordIds[index]}:highlight-start`, tick: startTick, value: 0, interpolation: 'bezier', bezier: { inX: 0.7, inY: 1, outX: 0.2, outY: 0.84 } },
+        { id: `${wordIds[index]}:highlight-visible`, tick: settleTick, value: 1, interpolation: 'linear' },
+      ])
+      const highlightScale = context.reducedMotion ? constant(1) : keyframed([
+        { id: `${wordIds[index]}:highlight-scale-small`, tick: 0, value: 0.72, interpolation: 'hold' },
+        { id: `${wordIds[index]}:highlight-scale-start`, tick: startTick, value: 0.72, interpolation: 'bezier', bezier: { inX: 0.7, inY: 1, outX: 0.18, outY: 0.9 } },
+        { id: `${wordIds[index]}:highlight-scale-settled`, tick: settleTick, value: 1, interpolation: 'linear' },
+      ])
+      const node = Object.freeze({ ...base, opacity: highlightedOpacity, transform: Object.freeze({ ...base.transform, positionY: constant(0), scaleX: highlightScale, scaleY: constant(1) }) })
+      return [node.id, node]
+    }
     const node = Object.freeze({ ...base, opacity, transform: Object.freeze({ ...base.transform, positionY: translateY, scaleX: scale, scaleY: scale }) })
     return [node.id, node]
   }))
   const exposures: MotionExposureV1[] = [
     { id: 'headline.text', label: 'Headline text', group: 'Content', level: 'creator', target: { kind: 'component', propertyId: 'text' }, editor: { type: 'textarea' }, keyframeable: false },
     { id: 'headline.emphasis', label: 'Emphasis words', group: 'Content', level: 'creator', target: { kind: 'component', propertyId: 'emphasisIndices' }, editor: { type: 'text' }, keyframeable: false },
+    { id: 'headline.emphasis-treatment', label: 'Emphasis treatment', group: 'Content', level: 'creator', target: { kind: 'component', propertyId: 'emphasisTreatment' }, editor: { type: 'select', options: [{ label: 'Accent text', value: 'accent-text' }, { label: 'Highlight box', value: 'highlight-box' }] }, keyframeable: false },
     { id: 'headline.max-lines', label: 'Maximum lines', group: 'Content', level: 'creator', target: { kind: 'component', propertyId: 'maxLines' }, editor: { type: 'select', options: [{ label: '1', value: 1 }, { label: '2', value: 2 }, { label: '3', value: 3 }] }, keyframeable: false },
     { id: 'headline.text-color', label: 'Text color', group: 'Style', level: 'creator', target: { kind: 'part', semanticPartId: 'headline', property: 'text.fillColor' }, editor: { type: 'color' }, keyframeable: true },
     { id: 'headline.accent-color', label: 'Accent color', group: 'Style', level: 'creator', target: { kind: 'part', semanticPartId: 'emphasis', property: 'text.fillColor' }, editor: { type: 'color' }, keyframeable: true },
@@ -355,7 +377,8 @@ export function KineticHeadline({ props, style, context }: MotionComponentRender
             const transform = textNode
               ? `translate3d(${textNode.transform.positionX === 0 ? '0' : `${textNode.transform.positionX}px`}, ${textNode.transform.positionY}px, 0)${textNode.transform.rotationDeg === 0 ? '' : ` rotate(${textNode.transform.rotationDeg}deg)`} ${textNode.transform.scaleX === textNode.transform.scaleY ? `scale(${textNode.transform.scaleX})` : `scale(${textNode.transform.scaleX}, ${textNode.transform.scaleY})`}`
               : `translate3d(0, ${word.translateY}px, 0) scale(${word.scale})`
-            const wordStyle = mergeMotionGraphNodeDecorationStyle({ display:'inline-block', color:textNode?.fillColor ?? (word.emphasized?style.accentColor:style.textColor), fontSize:textNode?.fontSize, fontWeight:textNode?.fontWeight, opacity:textNode?.opacity ?? word.opacity, transform, transformOrigin:'50% 70%' }, textNode, graph.selectedNodeId === nodeId)
+            const semanticHighlight = props.emphasisTreatment === 'highlight-box' && word.emphasized
+            const wordStyle = mergeMotionGraphNodeDecorationStyle({ display:'inline-block', color:textNode?.fillColor ?? (word.emphasized?style.accentColor:style.textColor), fontSize:textNode?.fontSize, fontWeight:textNode?.fontWeight, opacity:textNode?.opacity ?? word.opacity, transform, transformOrigin:'50% 70%', ...(semanticHighlight ? { padding:'0.04em 0.18em 0.07em', margin:'0 -0.03em', borderRadius:'0.16em', background:`${style.accentColor}38`, boxShadow:`inset 0 0 0 0.035em ${style.accentColor}88` } : {}) }, textNode, graph.selectedNodeId === nodeId)
             return (
               <span key={`${word.index}:${word.word}`}>
                 <span data-motion-node-id={nodeId} data-motion-word={word.index} data-motion-emphasis={word.emphasized ? 'true' : 'false'} style={wordStyle}>{textNode?.text ?? word.word}</span>

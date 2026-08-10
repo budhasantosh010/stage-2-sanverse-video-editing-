@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { deriveTimelineTracks } from '@sanverse/motion-graph'
 import { SANVERSE_TICKS_PER_SECOND } from '@sanverse/motion-primitives'
 import {
   RATIO_COMPOSITIONS,
@@ -39,6 +40,19 @@ describe('Kinetic Headline contract', () => {
     expect(validateKineticHeadlineProps({ ...DEFAULT_KINETIC_HEADLINE_PROPS, text: '   ' }).ok).toBe(false)
     expect(validateKineticHeadlineProps({ text: 'AI makes AI easier', emphasisIndices: [2], alignment: 'center', maxLines: 2 }).ok).toBe(true)
     expect(validateKineticHeadlineProps({ text: 'AI makes AI easier', emphasisIndices: [4], alignment: 'center', maxLines: 2 }).ok).toBe(false)
+    expect(validateKineticHeadlineProps({ ...DEFAULT_KINETIC_HEADLINE_PROPS, emphasisTreatment: 'highlight-box' }).ok).toBe(true)
+    expect(validateKineticHeadlineProps({ ...DEFAULT_KINETIC_HEADLINE_PROPS, emphasisTreatment: 'unknown' }).ok).toBe(false)
+  })
+
+  it('adds a C2-keyframed semantic highlight variant without changing the default headline contract', () => {
+    const props = { ...DEFAULT_KINETIC_HEADLINE_PROPS, text: 'Tag Northstar in', emphasisIndices: [1], emphasisTreatment: 'highlight-box' as const }
+    const scene = KineticHeadlineModule.createScene(props, DEFAULT_KINETIC_HEADLINE_STYLE, context(0))
+    const emphasizedTracks = deriveTimelineTracks(scene).filter((track) => track.nodeId.includes('northstar') && track.animationKind === 'keyframes')
+    expect(emphasizedTracks.some((track) => track.property === 'opacity')).toBe(true)
+    expect(emphasizedTracks.some((track) => track.property === 'transform.scaleX')).toBe(true)
+    const markup = renderComponentMarkup(KineticHeadlineModule, props, DEFAULT_KINETIC_HEADLINE_STYLE, context(Math.round(durationTicks * .4)))
+    expect(markup).toContain('data-motion-emphasis="true"')
+    expect(markup).toContain('background:')
   })
 
   it('declares valid metadata and the fixture matrix', () => {

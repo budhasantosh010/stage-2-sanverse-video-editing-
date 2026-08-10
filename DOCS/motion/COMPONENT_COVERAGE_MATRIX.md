@@ -340,3 +340,36 @@ The bounded dense proof is a 5-lane × 5-step Swimlane: **127 graph nodes** with
 All eight A19 designs are first-party Sanverse compositions. No commercial template, proprietary screenshot, logo asset or external animation runtime was copied or imported. The generic communication ideas—branching decisions, swimlanes, journey stages, matrices, value chains, stacks, ecosystems and dependencies—are expressed using the existing Sanverse Motion Graph, shared style tokens, C2 keyframes and C3 Layers architecture.
 
 A19 browser evidence includes manually inspected 16:9 baselines for all eight plus 9:16 captures distributed across all eight style packs. The portrait set includes a busy-background Creator Energetic Ecosystem and a reduced-motion Dependency Map. The first flat relationship renderer and the first undersized portrait scale were rejected and corrected before acceptance.
+
+## MOTION-A20 inventory gate — product storytelling + YouTube motion pack
+
+The 77-component catalog was re-read before A20. The following reference ideas were deliberately **not** added as new public components because a smaller existing abstraction already owns the job:
+
+- Semantic Highlight Headline → strengthened existing `sanverse.kinetic-headline` with a typed `highlight-box` emphasis treatment and exact-tick C2 highlight motion.
+- Picture-in-Picture Product Transition → added a reusable analytic PIP transition primitive rather than a catalog component.
+- Soft Product Backdrop → remains a decorative/background treatment, not a communication component.
+- Application Window Reveal → existing Browser Demo/product-window vocabulary plus motion events already owns this job.
+- Lower Third → existing `sanverse.lower-third-title`.
+
+A20 adds six genuinely distinct public components, taking the catalog **77 → 83**:
+
+| Component ID | Display name | Distinct product-story job | Exact C2 keys | Safe placement | Ratios | Styles | Visual |
+|---|---|---|---|---|---|---|---|
+| `sanverse.conversation-toast-stack` | Floating Conversation Toast Stack | Sequential conversation notifications/callback hook | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.floating-prompt-composer` | Floating Prompt Composer | Prompt input + context chips + send action | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.product-ui-story-scene` | Product UI Story Scene | Structured evolving software-workflow scene | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.agent-work-log` | Agent Work Log | Agent messages + task/status/completion story | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.scoped-access-comparison` | Scoped Access Comparison | Explicit permission/context boundary comparison | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.keyword-brand-lockup` | Keyword-to-Brand Lockup | Semantic keyword resolving into an original outro lockup | ✓ | ✓ | 4 | 8 | A |
+
+### A20 shared capability changes
+
+- `FamilyComponentProps` now carries optional semantic placement plus a bounded composition-space safe inset. The seven supported anchors are top-left, top-right, center-left, center, center-right, bottom-left and bottom-right.
+- `resolveProductStorySafePlacement(...)` is a deterministic composition-space primitive; it does not use browser history or wall-clock state.
+- `pictureInPictureTransition(...)` is an analytic exact-progress scene-treatment primitive rather than a new public component.
+- A20 normal motion is C2 keyframe-native; reduced motion replaces authored entrance keys with final constants while preserving semantic text.
+- A20 components declare 1.5–12 second authoring windows and publish product-story events such as `message-1`, `composer-open`, `window-open`, `agent-working`, `comparison-ready` and `brand-lockup` for future Plan-B alignment.
+
+### A20 provenance / originality
+
+All fixtures, UI surfaces, names and lockups are original Sanverse/generic content. No commercial logo, copied screenshot, proprietary template, source-video frame, brand-specific type treatment or external animation runtime was committed. The retained reference principles are generic: notification sequencing, prompt composition, UI state progression, work-log progress, scoped comparison and semantic outro resolution.
