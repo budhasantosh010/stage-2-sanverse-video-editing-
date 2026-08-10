@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ChangeEvent, ReactNode } from 'react'
 import type { MotionAspectRatio, MotionExposureLevel, MotionStylePackV1 } from '@sanverse/motion-contract'
-import { applyMotionOperations, constant, createDefaultEffect, createDefaultMask, createMotionAuthoringMetadata, createMotionSelectionState, evaluateScene, projectMotionLayers, selectMotionNode, selectMotionNodeRange, selectionFallbackAfterDelete, setMotionNodeLocked, toggleMotionNodeSelection } from '@sanverse/motion-graph'
-import type { MotionAuthoringMetadataV1, MotionExposureV1, MotionGraphOperationV1, MotionNodePropertyNameV1, MotionPropertyPrimitiveV1, MotionSceneV1, MotionSelectionStateV1, ResolvedMotionNodeV1 } from '@sanverse/motion-graph'
+import { applyMotionOperations, constant, createDefaultEffect, createDefaultMask, createMotionAuthoringMetadata, createMotionKeyframeSelection, createMotionSelectionState, evaluateScene, projectMotionLayers, selectMotionNode, selectMotionNodeRange, selectionFallbackAfterDelete, setMotionNodeLocked, toggleMotionNodeSelection } from '@sanverse/motion-graph'
+import type { MotionAuthoringMetadataV1, MotionExposureV1, MotionGraphOperationV1, MotionKeyframeSelectionStateV1, MotionNodePropertyNameV1, MotionPropertyPrimitiveV1, MotionSceneV1, MotionSelectionStateV1, ResolvedMotionNodeV1 } from '@sanverse/motion-graph'
 import {
   CHECKLIST_CARD_DEFINITION,
   ChecklistCardModule,
@@ -75,6 +75,7 @@ import { LayerPanel } from './LayerPanel.tsx'
 import type { LayerDropIntent } from './LayerPanel.tsx'
 import { CompositorInspector } from './CompositorInspector.tsx'
 import { AnimationDopeSheet } from './AnimationDopeSheet.tsx'
+import { MotionCurveEditor } from './MotionCurveEditor.tsx'
 import { createCompositorHistory, pushCompositorHistory, redoCompositorHistory, undoCompositorHistory } from './compositor-history.ts'
 import type { MotionLabCompositorSnapshotV1 } from './compositor-history.ts'
 
@@ -296,6 +297,9 @@ export function MotionLabApp() {
   const [background, setBackground] = useState<PreviewBackground>(initialBackground)
   const [exposureLevel, setExposureLevel] = useState<MotionExposureLevel>(initialSearch.get('level') === 'advanced' || initialSearch.get('level') === 'compositor' ? 'advanced' : initialSearch.get('level') === 'designer' ? 'designer' : 'creator')
   const [compositorMode, setCompositorMode] = useState(initialSearch.get('level') === 'compositor')
+  const [keyframeSelection, setKeyframeSelection] = useState<MotionKeyframeSelectionStateV1>(() => createMotionKeyframeSelection())
+  const [selectedAnimationTrackId, setSelectedAnimationTrackId] = useState<string | null>(null)
+  const [animationPanelMode, setAnimationPanelMode] = useState<'timeline' | 'curves'>(initialSearch.get('panel') === 'curves' || initialSearch.get('c5') === '1' ? 'curves' : 'timeline')
   const [graphOperations, setGraphOperations] = useState<readonly MotionGraphOperationV1[]>(initialGraphOperations)
   const [graphOperationError, setGraphOperationError] = useState<string | null>(null)
   const graphOperationCounterRef = useRef(1)
@@ -750,6 +754,8 @@ export function MotionLabApp() {
     setGraphOperationError(null)
     setAuthoringMetadata(createMotionAuthoringMetadata())
     setSelection(createMotionSelectionState())
+    setKeyframeSelection(createMotionKeyframeSelection())
+    setSelectedAnimationTrackId(null)
     setCompositorHistory(createCompositorHistory(50))
     setInspectorFocus(null)
   }
@@ -800,6 +806,8 @@ export function MotionLabApp() {
     setGraphOperations(Object.freeze([]))
     setAuthoringMetadata(createMotionAuthoringMetadata())
     setSelection(createMotionSelectionState())
+    setKeyframeSelection(createMotionKeyframeSelection())
+    setSelectedAnimationTrackId(null)
     setGraphOperationError(null)
   }
 
@@ -1255,24 +1263,58 @@ export function MotionLabApp() {
           </div>
 
           {compositorMode ? (
-            <AnimationDopeSheet
-              scene={currentGraphScene}
-              selectedNodeId={selectedGraphNodeId}
-              localTicks={localTicks}
-              durationTicks={durationTicks}
-              composition={composition}
-              events={currentDefinition.events}
-              initialSelectedKeyframeId={initialSearch.get('c4key')}
-              errorMessage={graphOperationError}
-              canUndo={compositorHistory.undo.length > 0}
-              canRedo={compositorHistory.redo.length > 0}
-              onSeek={seek}
-              onSelectNode={(nodeId) => setSelectedGraphNodeId(nodeId)}
-              onOperations={(operations) => appendGraphOperations(operations)}
-              nextOperationId={nextGraphOperationId}
-              onUndo={undoCompositor}
-              onRedo={redoCompositor}
-            />
+            <>
+              <div className="motion-lab__animation-switch" aria-label="Animation editor view">
+                <strong>ANIMATION</strong>
+                <button type="button" aria-pressed={animationPanelMode === 'timeline'} onClick={() => setAnimationPanelMode('timeline')}>Timeline</button>
+                <button type="button" aria-pressed={animationPanelMode === 'curves'} onClick={() => setAnimationPanelMode('curves')}>Curves</button>
+              </div>
+              {animationPanelMode === 'timeline' ? (
+                <AnimationDopeSheet
+                  scene={currentGraphScene}
+                  selectedNodeId={selectedGraphNodeId}
+                  localTicks={localTicks}
+                  durationTicks={durationTicks}
+                  composition={composition}
+                  events={currentDefinition.events}
+                  initialSelectedKeyframeId={initialSearch.get('c4key')}
+                  sharedSelection={keyframeSelection}
+                  onSharedSelectionChange={setKeyframeSelection}
+                  sharedTrackId={selectedAnimationTrackId}
+                  onSharedTrackChange={setSelectedAnimationTrackId}
+                  errorMessage={graphOperationError}
+                  canUndo={compositorHistory.undo.length > 0}
+                  canRedo={compositorHistory.redo.length > 0}
+                  onSeek={seek}
+                  onSelectNode={(nodeId) => setSelectedGraphNodeId(nodeId)}
+                  onOperations={(operations) => appendGraphOperations(operations)}
+                  nextOperationId={nextGraphOperationId}
+                  onUndo={undoCompositor}
+                  onRedo={redoCompositor}
+                />
+              ) : (
+                <MotionCurveEditor
+                  scene={currentGraphScene}
+                  selectedNodeId={selectedGraphNodeId}
+                  localTicks={localTicks}
+                  durationTicks={durationTicks}
+                  selection={keyframeSelection}
+                  selectedTrackId={selectedAnimationTrackId}
+                  initialSelectedKeyframeId={initialSearch.get('c4key')}
+                  errorMessage={graphOperationError}
+                  canUndo={compositorHistory.undo.length > 0}
+                  canRedo={compositorHistory.redo.length > 0}
+                  onSeek={seek}
+                  onSelectNode={(nodeId) => setSelectedGraphNodeId(nodeId)}
+                  onSelectionChange={setKeyframeSelection}
+                  onTrackChange={setSelectedAnimationTrackId}
+                  onOperations={(operations) => appendGraphOperations(operations)}
+                  nextOperationId={nextGraphOperationId}
+                  onUndo={undoCompositor}
+                  onRedo={redoCompositor}
+                />
+              )}
+            </>
           ) : (
             <div className="motion-lab__event-strip">
               {currentDefinition.events.map((event) => (

@@ -1,5 +1,16 @@
 # Project Log
 
+## 2026-08-10 — MOTION-C5 Professional Curve Editor complete
+
+- Added a pure C5 Value Graph projection over the same C2 numeric keyframe authority; no second graph, keyframe store, Layer tree or animation clock exists.
+- C4 Timeline and C5 Curves now share one stable keyframe selection, selected animation track and Motion Lab playhead. Selecting either surface selects/seeks the same real C2 key.
+- Added Hold/Linear/Bezier curve visualization, real incoming/outgoing Bezier handles, deterministic easing presets, exact tick/value/interpolation/handle Inspector, Fit Track/Fit Selection, time/value zoom-pan and read-only authored-driver tracks.
+- C5 handle/preset/value/time edits compile only to existing typed Motion Graph operations and reuse the compositor Undo/Redo journal as one transaction per user action.
+- The required 10,000-key stress exposed a real large-array call-stack bug in Fit Track; the implementation now computes min/max iteratively (`MOTION-FAIL-018`). Real Edge then exposed an unchanged controlled-selection React loop; C4 reconciliation is now idempotent (`MOTION-FAIL-019`).
+- Real Edge retained `motion/visual-baselines/c5-value-graph.png`, showing the real Cost Card `transform.scaleX` key at tick 3,024,000/value 1.08, its Bezier handle, shared playhead and Curve Inspector. Repeat console evidence contained no React/Uncaught error.
+- Fresh C5 release candidate: **422/422 Creative + Motion + B1 tests**, **9/9 builds**. Evidence: `DOCS/motion/evidence/MOTION-C5.md`; architecture: `DOCS/motion/CURVE_EDITOR_ARCHITECTURE.md`. `apps/web` remains untouched. Next lane is A21, then the ABC-2 source-to-curve integration proof.
+
+
 ## 2026-08-10 — Sanverse Creative Engine Plan B1 Video Understanding Foundation complete
 
 - Added one bounded `@sanverse/video-understanding` package using the existing Sanverse exact-tick authority. V1 source understanding includes source metadata, timed transcript/optional word timing, shots, overlapping visual regions, normalized spatial observations, semantic moments, generic observations, finite confidence and required provenance.

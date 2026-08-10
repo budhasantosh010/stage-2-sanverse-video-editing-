@@ -35,6 +35,10 @@ export interface AnimationDopeSheetProps {
   readonly composition: MotionCompositionV1
   readonly events: readonly AnimationDopeSheetEventV1[]
   readonly initialSelectedKeyframeId?: string | null
+  readonly sharedSelection?: MotionKeyframeSelectionStateV1
+  readonly onSharedSelectionChange?: (selection: MotionKeyframeSelectionStateV1) => void
+  readonly sharedTrackId?: string | null
+  readonly onSharedTrackChange?: (trackId: string | null) => void
   readonly errorMessage?: string | null
   readonly canUndo: boolean
   readonly canRedo: boolean
@@ -60,6 +64,10 @@ export function AnimationDopeSheet({
   composition,
   events,
   initialSelectedKeyframeId = null,
+  sharedSelection,
+  onSharedSelectionChange,
+  sharedTrackId,
+  onSharedTrackChange,
   errorMessage,
   canUndo,
   canRedo,
@@ -71,8 +79,18 @@ export function AnimationDopeSheet({
   onRedo,
 }: AnimationDopeSheetProps) {
   const projection = useMemo(() => scene ? projectMotionDopeSheet(scene) : null, [scene])
-  const [selection, setSelection] = useState<MotionKeyframeSelectionStateV1>(() => createMotionKeyframeSelection())
-  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null)
+  const [internalSelection, setInternalSelection] = useState<MotionKeyframeSelectionStateV1>(() => createMotionKeyframeSelection())
+  const selection = sharedSelection ?? internalSelection
+  const selectionRef = useRef(selection)
+  selectionRef.current = selection
+  const setSelection = (update: MotionKeyframeSelectionStateV1 | ((current: MotionKeyframeSelectionStateV1) => MotionKeyframeSelectionStateV1)) => {
+    const next = typeof update === 'function' ? update(selectionRef.current) : update
+    selectionRef.current = next
+    if (onSharedSelectionChange) onSharedSelectionChange(next); else setInternalSelection(next)
+  }
+  const [internalSelectedTrackId, setInternalSelectedTrackId] = useState<string | null>(null)
+  const selectedTrackId = sharedTrackId !== undefined ? sharedTrackId : internalSelectedTrackId
+  const setSelectedTrackId = (trackId: string | null) => { if (onSharedTrackChange) onSharedTrackChange(trackId); else setInternalSelectedTrackId(trackId) }
   const [collapsedLayers, setCollapsedLayers] = useState<ReadonlySet<string>>(() => new Set())
   const [rulerMode, setRulerMode] = useState<RulerMode>('seconds')
   const [snapEnabled, setSnapEnabled] = useState(true)
@@ -92,12 +110,15 @@ export function AnimationDopeSheet({
 
   useEffect(() => {
     if (!projection) { setSelection(createMotionKeyframeSelection()); setSelectedTrackId(null); return }
-    setSelection((current) => {
-      const retained = current.selectedIds.filter((id) => Boolean(projection.keyframesById[id]))
-      const primary = current.primaryId && projection.keyframesById[current.primaryId] ? current.primaryId : retained.at(-1) ?? null
-      const anchor = current.anchorId && projection.keyframesById[current.anchorId] ? current.anchorId : retained[0] ?? null
-      return createMotionKeyframeSelection(retained, primary, anchor)
-    })
+    const current = selectionRef.current
+    const retained = current.selectedIds.filter((id) => Boolean(projection.keyframesById[id]))
+    const primary = current.primaryId && projection.keyframesById[current.primaryId] ? current.primaryId : retained.at(-1) ?? null
+    const anchor = current.anchorId && projection.keyframesById[current.anchorId] ? current.anchorId : retained[0] ?? null
+    const unchanged = retained.length === current.selectedIds.length
+      && retained.every((id, index) => id === current.selectedIds[index])
+      && primary === current.primaryId
+      && anchor === current.anchorId
+    if (!unchanged) setSelection(createMotionKeyframeSelection(retained, primary, anchor))
     if (selectedTrackId && !projection.tracksById[selectedTrackId]) setSelectedTrackId(null)
     if (!initialSelectionAppliedRef.current && initialSelectedKeyframeId) {
       const keyframe = Object.values(projection.keyframesById).find((candidate) => candidate.keyframeId === initialSelectedKeyframeId)

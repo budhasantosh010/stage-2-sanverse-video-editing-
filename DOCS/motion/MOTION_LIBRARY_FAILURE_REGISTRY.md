@@ -343,3 +343,45 @@ VERIFIED FIX: both retained captures show normal message lines, complete title/s
 
 ONE-LINE SOLUTION: visible notification rows now match their actual one-child semantic structure instead of pretending an avatar/timestamp DOM structure exists.
 
+## MOTION-FAIL-018 — C5 10,000-key Fit Track overflowed the JavaScript call stack
+
+- Status: FIXED
+- Severity: medium for large-curve development tooling
+- Milestone: MOTION-C5
+- Date: 2026-08-10
+
+WHAT: the required 10,000-key Value Graph development render failed with `Maximum call stack size exceeded`.
+
+WHERE: `fitMotionCurveValueRange(...)` in `packages/motion-graph/src/curves.ts` while the C5 React view constructed its fitted value range.
+
+WHY: the first implementation used `Math.min(...finite)` and `Math.max(...finite)`. Spreading a large array into function arguments is limited by the JavaScript engine's call stack/argument handling.
+
+IMPACT: pure curve projection was valid, but the actual development Value Graph could not construct the required 10,000-key stress view.
+
+ATTEMPTS: the stress size was not reduced. The min/max implementation was changed to a bounded loop and the identical 10/100/1k/5k/10k tests were rerun.
+
+VERIFIED FIX: 10,000-key pure projection/path/operation measurement and 10,000-key development React/SVG construction both pass; the fresh full C5 gate is 422/422 tests.
+
+ONE-LINE SOLUTION: compute large-track min/max iteratively instead of spreading every value into `Math.min/Math.max`.
+
+## MOTION-FAIL-019 — Shared C4/C5 controlled selection caused an infinite React update loop
+
+- Status: FIXED
+- Severity: high for C5 browser usability
+- Milestone: MOTION-C5
+- Date: 2026-08-10
+
+WHAT: the first real Edge run after wiring one shared C4/C5 keyframe selection rendered a blank Motion Lab and logged `Maximum update depth exceeded`.
+
+WHERE: C4's projection-reconciliation effect in `apps/motion-lab/src/AnimationDopeSheet.tsx`.
+
+WHY: Motion Lab regenerates the derived scene/projection as normal React state changes occur. The controlled C4 reconciliation path published a freshly allocated selection object even when the retained stable IDs, primary ID and anchor ID had not changed. Parent state updated, projection regenerated, and the effect repeated.
+
+IMPACT: unit behavior was green, but the real browser compositor was unusable; the screenshot correctly failed visual acceptance.
+
+ATTEMPTS: browser console logging identified the React maximum-depth error. The reconciliation path now compares retained stable IDs/primary/anchor and publishes only when the controlled selection actually changes.
+
+VERIFIED FIX: a repeat real Edge console run contains no `Uncaught`, `Maximum update`, or React error, and `motion/visual-baselines/c5-value-graph.png` shows the real Cost Card Value Graph, selected key, Bezier handle and Inspector.
+
+ONE-LINE SOLUTION: controlled C4 selection reconciliation is now idempotent—unchanged stable selection is not re-published.
+

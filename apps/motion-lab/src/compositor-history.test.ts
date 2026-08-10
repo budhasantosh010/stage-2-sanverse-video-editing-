@@ -18,6 +18,26 @@ describe('Motion Lab compositor history',()=>{
     expect(branched.redo).toEqual([])
   })
 
+  it('records a C5 curve gesture as one Undo and restores exact Bezier-operation history on Redo',()=>{
+    const before=snapshot('value')
+    const curveOperations=Object.freeze([
+      Object.freeze({operationId:'c5-interpolation',type:'set-keyframe-interpolation' as const,target:{kind:'node' as const,nodeId:'value',property:'transform.scaleX' as const},keyframeId:'scale-0',interpolation:'bezier' as const}),
+      Object.freeze({operationId:'c5-left',type:'set-keyframe-bezier' as const,target:{kind:'node' as const,nodeId:'value',property:'transform.scaleX' as const},keyframeId:'scale-0',bezier:Object.freeze({inX:.67,inY:.67,outX:.18,outY:.88})}),
+      Object.freeze({operationId:'c5-right',type:'set-keyframe-bezier' as const,target:{kind:'node' as const,nodeId:'value',property:'transform.scaleX' as const},keyframeId:'scale-1',bezier:Object.freeze({inX:.32,inY:1,outX:.33,outY:.33})}),
+    ])
+    const after={...before,graphOperations:curveOperations}
+    let history=createCompositorHistory(10)
+    history=pushCompositorHistory(history,before)
+    expect(history.undo).toHaveLength(1)
+    const undone=undoCompositorHistory(history,after)
+    expect(undone.snapshot?.graphOperations).toEqual([])
+    expect(undone.history.redo).toHaveLength(1)
+    const redone=redoCompositorHistory(undone.history,undone.snapshot!)
+    expect(redone.snapshot?.graphOperations).toEqual(curveOperations)
+    const branched=pushCompositorHistory(undone.history,{...before,graphOperations:Object.freeze([curveOperations[1]!])})
+    expect(branched.redo).toEqual([])
+  })
+
   it('caps retained debug history',()=>{
     let history=createCompositorHistory(2)
     history=pushCompositorHistory(history,snapshot('a'))

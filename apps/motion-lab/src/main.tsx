@@ -6,6 +6,7 @@ import './styles.css'
 import './creative-direction.css'
 import './source-understanding.css'
 import './dope-sheet.css'
+import './curve-editor.css'
 
 const rootElement = document.getElementById('root')
 if (!rootElement) throw new Error('Motion Lab root element not found.')
