@@ -81,3 +81,15 @@
 - Impact: code/tests were green but the screenshot did not prove the Source Understanding UI.
 - Fix: rejected the capture and recaptured with a bounded virtual-time budget; retained evidence shows all five lanes and the selected 68% observation/provenance inspector.
 - One-line solution: browser evidence must wait for the state it claims to prove.
+
+## CREATIVE-FAIL-009 — First ABC-2 statistic target had no explicit C2 keys for C5
+
+- Status: FIXED
+- Milestone: ABC-2 integration
+- Date: 2026-08-11
+- What: the first source-statistic proof resolved the real B1 68% observation to `sanverse.single-metric`. The component is valid and graph-native, but it predates the keyframe-native Family authoring added later, so C4/C5 correctly projected zero explicit keys/curves.
+- Impact: B1→B0→Plan-A traceability passed, but the required source→curve proof could not truthfully demonstrate a C5 edit.
+- Rejected fix: do not inject fake keyframes into Single Metric only to satisfy the test, and do not weaken the C5 requirement.
+- Fix: percentage statistics in the ABC-2 integration resolve to the new A21 `sanverse.donut-breakdown`, which is exact C2-keyframe-native and expresses the real 68% as `Observed · 68` plus the deterministic complement `Remaining · 32`.
+- Verification: focused ABC-2 integration is 4/4; final full release gate is 439/439 tests + 9/9 builds; the real browser Donut screenshot shows the source-derived 68% content and active C5 curves.
+- One-line solution: choose a semantically correct keyframe-native Plan-A capability instead of manufacturing curve authority on a legacy component.

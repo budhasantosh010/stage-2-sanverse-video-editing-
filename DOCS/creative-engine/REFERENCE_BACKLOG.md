@@ -46,3 +46,12 @@ Copyright/provenance note:
 - **Status:** implemented in ABC-1.
 - **Implementation:** 77-component audit completed; Lower Third/Kinetic Headline/Browser Demo were reused where adequate; six missing public scenes were added (toast/composer/product-story/work-log/scoped-comparison/lockup), semantic highlight became a Kinetic Headline variant, safe placement/PIP became primitives, B0 expresses semantic timing/feel, and two real C4 manual-retiming proofs preserve component/node/keyframe identity. Evidence: `DOCS/motion/evidence/MOTION-A20.md` and `DOCS/creative-engine/evidence/ABC-1.md`.
 - **Copyright/provenance:** extract only generic motion principles, information hierarchy, timing, layout grammar and scene patterns. Do not commit source logos, screenshots, exact brand layout, proprietary type, or distinctive copied compositions.
+
+## ABC-2 internal coverage note
+
+- **Source:** no new external visual reference was required for B1/C5/A21 or the final source-to-curve proof.
+- **A21 selection:** derived from the complete 83-component Sanverse coverage audit and intentionally rejected near-duplicates before adding six missing generic information-design jobs.
+- **B1/ABC-2 source fixture:** original generic product-launch transcript/visual metadata authored for deterministic testing; no commercial footage/frame is committed.
+- **Status:** implemented in ABC-2.
+- **Implementation:** B1 exact-tick source understanding + C5 curve control + A21 creator/WOW pack + source→B0→Plan-A→C3/C4/C5 typed proof. Evidence: `DOCS/creative-engine/evidence/B1.md`, `DOCS/motion/evidence/MOTION-C5.md`, `DOCS/motion/evidence/MOTION-A21.md`, `DOCS/creative-engine/evidence/ABC-2.md`.
+- **Copyright/provenance:** all added fixtures and retained browser visuals are first-party/generic Sanverse material; no new copied reference asset was introduced.

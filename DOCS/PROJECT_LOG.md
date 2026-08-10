@@ -1,5 +1,15 @@
 # Project Log
 
+## 2026-08-11 — Sanverse Creative Engine ABC-2 source-to-curve integration complete
+
+- Added a development-only B1→B0 trace adapter that resolves stable Video Understanding observation IDs into exact evidence ticks/provenance, creates deterministic source-statistic Creative Direction, and links verified B1 observations to existing B0 directives without introducing a Motion dependency into the B0 package.
+- Extended the existing proposal→Motion bridge with semantic family-value mapping and exact reversible B0 placement↔Plan-A local tick projection; both continue to use the canonical 1,440,000-tick authorities rather than a new clock.
+- Required statistic proof: real B1 `68%` at 4–8s → B0 source-statistic directive/proposal → A21 Donut Breakdown (`Observed 68`, deterministic `Remaining 32`) → one Motion Scene → C3/C4/C5. A real C5 `soft` preset edit preserves observation/directive/component/node/keyframe identity.
+- Required security proof: real B1 security evidence at 49–57s is linked to existing B0 Scoped Access at 72–80s → `sanverse.scoped-access-comparison` → C3/C4/C5. A real C5 `smooth` edit preserves all Motion IDs and the B1 trace, proving evidence time, edit placement time and local component time can remain intentionally distinct.
+- The first statistic proof truthfully failed its C5 requirement because legacy `Single Metric` has no explicit C2 keys. The proof was not weakened or backfilled with fake keys; percentage statistics in this integration use keyframe-native A21 Donut instead (`CREATIVE-FAIL-009`).
+- Real Edge retained `abc2-source-statistic-c5.png` and `abc2-scoped-security-c5.png`, paired with the B1 source-understanding screenshot. Fresh final gate: **439/439 tests**, **9/9 builds**. Evidence: `DOCS/creative-engine/evidence/ABC-2.md`. `apps/web` remains untouched. ABC-2 stops before A22/B2/B3/C6.
+
+
 ## 2026-08-10 — MOTION-A21 Creator Utility + Advanced Visual Pack complete
 
 - Re-audited all 83 public components after C5 and rejected duplicate jobs: generic bar chart, another roadmap/timeline, another screenshot/cursor focus, another KPI dashboard, another logo cloud and another before/after card.

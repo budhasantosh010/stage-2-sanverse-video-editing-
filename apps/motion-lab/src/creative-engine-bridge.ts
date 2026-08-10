@@ -35,6 +35,26 @@ export interface CreativePlacementMotionPreviewV1 {
   readonly scene: MotionSceneV1
 }
 
+/**
+ * Maps exact edit/source time into the component's local authored-motion clock.
+ * This is a proportional projection only; it does not create another clock.
+ */
+export const sourceTickToPlacementLocalTicks = (preview: CreativePlacementMotionPreviewV1, sourceTick: number): number => {
+  if (!Number.isSafeInteger(sourceTick) || sourceTick < preview.sourceStartTicks || sourceTick > preview.sourceEndTicks) throw new RangeError('sourceTick must be an exact tick inside the placement source region.')
+  const sourceDurationTicks = preview.sourceEndTicks - preview.sourceStartTicks
+  if (sourceDurationTicks <= 0) throw new RangeError('Creative placement source duration must be positive.')
+  const normalized = (sourceTick - preview.sourceStartTicks) / sourceDurationTicks
+  return Math.round(normalized * preview.context.durationTicks)
+}
+
+/** Reverse projection used by trace/evidence surfaces. */
+export const placementLocalTicksToSourceTick = (preview: CreativePlacementMotionPreviewV1, localTicks: number): number => {
+  if (!Number.isSafeInteger(localTicks) || localTicks < 0 || localTicks > preview.context.durationTicks) throw new RangeError('localTicks must be an exact tick inside the component local duration.')
+  const sourceDurationTicks = preview.sourceEndTicks - preview.sourceStartTicks
+  if (sourceDurationTicks <= 0) throw new RangeError('Creative placement source duration must be positive.')
+  return Math.round(preview.sourceStartTicks + (localTicks / preview.context.durationTicks) * sourceDurationTicks)
+}
+
 const localPreviewDurationTicks = (requestedTicks: number, definition: Readonly<{ minDurationTicks: number; defaultDurationTicks: number; maxDurationTicks: number }>): number =>
   requestedTicks >= definition.minDurationTicks && requestedTicks <= definition.maxDurationTicks ? requestedTicks : definition.defaultDurationTicks
 
@@ -73,10 +93,12 @@ export const createCreativePlacementMotionPreview = (
   const context = previewContext(durationTicks, composition, localTicks)
   const placementIntent = placement.placementIntent === 'auto' ? module.defaultProps.placement : placement.placementIntent
   const brandLockup = componentId === 'sanverse.keyword-brand-lockup'
+  const semanticValue = placement.content.fields?.value
   const props: FamilyComponentProps = Object.freeze({
     ...module.defaultProps,
     ...(!brandLockup && placement.content.primaryText ? { title: placement.content.primaryText } : {}),
     ...(brandLockup && placement.content.primaryText ? { value: placement.content.primaryText } : {}),
+    ...(!brandLockup && (typeof semanticValue === 'string' || typeof semanticValue === 'number') ? { value: String(semanticValue) } : {}),
     ...(placement.content.secondaryText ? { subtitle: placement.content.secondaryText } : {}),
     ...(placement.content.items ? { items: Object.freeze([...placement.content.items]) } : {}),
     ...(placementIntent ? { placement: placementIntent } : {}),
@@ -99,7 +121,9 @@ export const creativePlacementMotionLabUrl = (placement: CreativeComponentPlacem
     if (placement.content.secondaryText) params.set('storySubtitle', placement.content.secondaryText)
     if (placement.content.items?.length) params.set('storyItems', placement.content.items.join('\n'))
     if (placement.placementIntent !== 'auto') params.set('storyPlacement', placement.placementIntent)
+    const semanticValue = placement.content.fields?.value
     if (placement.selectedComponentId === 'sanverse.keyword-brand-lockup' && placement.content.primaryText) params.set('storyValue', placement.content.primaryText)
+    else if (typeof semanticValue === 'string' || typeof semanticValue === 'number') params.set('storyValue', String(semanticValue))
   }
   return `/?${params.toString()}`
 }
