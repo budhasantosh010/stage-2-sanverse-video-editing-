@@ -181,7 +181,7 @@ describe('Studio workspace integration', () => {
 
     const horizontal = screen.getByRole('slider', { name: 'Timeline horizontal zoom' })
     const vertical = screen.getByRole('slider', { name: 'Timeline vertical zoom' })
-    const v1Header = container.querySelector<HTMLElement>('[data-track-id="V1"]')
+    const v1Header = container.querySelector<HTMLElement>('[data-track-display-id="V1"]')
     if (!v1Header) throw new Error('V1 header missing')
     const baseHeight = v1Header.style.getPropertyValue('--timeline-lane-height')
 

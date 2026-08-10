@@ -89,7 +89,7 @@ describe('v8 makes retiming and linked-audio state explicit', () => {
 
   it('moves exactly once to v8 for freeze, linked audio, and transition-edge truth', () => {
     expect(planOf(multiClipProject()).schemaVersion).toBe(RENDER_PLAN_SCHEMA_VERSION)
-    expect(RENDER_PLAN_SCHEMA_VERSION).toBe('sanverse.render-plan/v8')
+    expect(RENDER_PLAN_SCHEMA_VERSION).toBe('sanverse.render-plan/v9')
   })
 })
 

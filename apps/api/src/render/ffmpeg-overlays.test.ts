@@ -70,6 +70,7 @@ const musicNode = (overrides: Record<string, unknown> = {}) => ({
   assetId: 'asset_dddddddd',
   sourceStartTicks: 0,
   gainDb: -18,
+  pan: 0,
   fadeInTicks: ms(1_000).ticks,
   fadeOutTicks: ms(2_000).ticks,
   ...overrides,

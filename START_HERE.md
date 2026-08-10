@@ -8,15 +8,15 @@ Take a cleaned talking-head video plus natural multimodal user intent—chat, po
 
 ## Current gate
 
-- **P1-F.1E Complete Timeline Experience is complete through Gate T4.** T0 through T4 are DONE; T5 through T7 are NOT STARTED.
+- **P1-F.1E Complete Timeline Experience is complete through Gate T5.** T0 through T5 are DONE; T6 and T7 are NOT STARTED.
 - The authoritative gate table and invariants live in `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md`.
-- Final T4 evidence is `DOCS/evidence/2026-08-04-timeline-completion/T4_FINAL_CLOSURE.md`, with `T4_BROWSER_WORKFLOW.md`, `T4_TEST_RESULTS.md`, `T4_EXPORT_EVIDENCE.md`, `t4-browser-report.json`, screenshots, ffprobe output and decoded export frames beside it.
-- T4 adds Editor-owned keyframe lanes, shared keyframe selection/clipboard, truthful interpolation, an Editor-local Property Graph, Inspector/Canvas synchronization, source-vs-visual time projection, and bounded long-form behavior without adding a second project, video, playhead or animation authority.
-- Final suites: API 404/404, Web 1,334/1,334, edit-domain 536/536, intent-domain 27/27, render-contract 118/118 — **2,419/2,419 total** — plus an all-workspace production build PASS.
-- Final real Edge 151 workflow proved detached Graph point and Bezier-handle movement, exactly one accepted revision on release, zero-revision Graph zoom/workspace changes, Undo/Redo/reopen continuity, one video element and no HTTP 4xx/5xx responses.
-- Final revision-7 export succeeded in one attempt: 30.033333 s, 1920×1080 H.264 High at 30 fps with AAC-LC stereo/48 kHz, 10,977,559 bytes, SHA-256 `6d4c704fad146f312c63b047a7b53f53f14207ecf7aece7662bfa430123b9f7d`.
+- Final T5 evidence is `DOCS/evidence/2026-08-04-timeline-completion/T5_FINAL_CLOSURE.md`, with `T5_BROWSER_WORKFLOW.md`, `T5_TEST_RESULTS.md`, `T5_EXPORT_EVIDENCE.md`, `t5-browser-screenshots/`, machine-readable export metadata and decoded export frames beside it.
+- T5 adds stable typed video/audio/caption track identities, dynamic rows, add/rename/reorder/delete and Place On Top, independent Lock/Sync Lock/Targeting/Output, static audio mix state, truthful Combined/Separate L/R waveforms, render-order authority, caption-track independence and T4 animation preservation without adding a second project, Preview or export authority.
+- Final suites: API 405/405, Web 1,365/1,365, edit-domain 562/562, intent-domain 27/27, render-contract 142/142 — **2,501/2,501 total** — plus an all-workspace production build PASS.
+- Final real Edge 151 workflow proved stable track add/rename/reorder/delete, Lock/Sync Lock/Targeting, audio mix/output, Separate L/R presentation, reload/reopen continuity, one video element, responsive 1440/1024/390 behavior, zero runtime/console errors and zero HTTP responses >=400.
+- Final revision-13 export succeeded: 30.000000 s, 1280×720 H.264 High at 30 fps with AAC-LC stereo/48 kHz, 16,338,429 bytes, SHA-256 `d7ef76f49d80021e2a8798519fb1f723e1cebbd15b2e892c927abc31edf6ea10`; the downloaded and server-side hashes match.
 - Hold interpolation remains deliberately unavailable because the current Editor contract cannot represent it truthfully end-to-end; T4 does not fake Auto-Key or Hold.
-- **Do not start T5 without explicit owner authorization.** A separate agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from the Timeline program.
+- **Do not start T6 without explicit owner authorization.** A separate agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from the Timeline program.
 - Open human evidence remains human-only: repeated owner workflows, representative non-editor workflows, and agreed performance budgets.
 - Real-provider connection still requires the owner's data-leaving-machine decision and keys. Accounts and SaaS operations remain conditional.
 

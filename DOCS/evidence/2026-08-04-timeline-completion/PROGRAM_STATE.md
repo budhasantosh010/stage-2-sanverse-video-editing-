@@ -250,13 +250,20 @@ Final commit: `[verified] feat(timeline): add keyframe lanes and graph editing`
 
 Final automated gate: **2,419 / 2,419**. All-workspace production build PASS. Real Edge 151 proved detached Graph point and Bezier-handle drag with exactly one revision on release, zero-revision Graph zoom/workspace continuity, Undo/Redo/reopen, one-video continuity and responsive 1440/1024/390 behavior. Real revision-7 export: 1920×1080 H.264 High 30 fps + AAC-LC stereo 48 kHz, 30.033333 s, 10,977,559 bytes, SHA-256 `6d4c704fad146f312c63b047a7b53f53f14207ecf7aece7662bfa430123b9f7d`. T5 was not started.
 
-### T5 — ADVANCED TRACK CONTROLS
+### T5 — ADVANCED TRACK CONTROLS — **DONE**
 
 Commit: `[verified] feat(timeline): add advanced track controls and expandable tracks`
 
-- [ ] T5.1 track model V2 - [ ] T5.2 track operations - [ ] T5.3 output controls
-- [ ] T5.4 sync lock - [ ] T5.5 targeting - [ ] T5.6 track select
-- [ ] T5.7 track effects/keyframes - [ ] T5.8 audio channel display
+- [x] T5.1 stable typed track model V2 + deterministic legacy migration
+- [x] T5.2 add/rename/reorder/delete + stable item assignment + Place On Top
+- [x] T5.3 output controls + static audio mute/solo/gain/pan in Preview/export
+- [x] T5.4 Sync Lock with safe source-anchor compensation and music ripple policy
+- [x] T5.5 workspace-only Targeting with stable track IDs
+- [x] T5.6 Track Select Forward/Backward
+- [x] T5.7 stable track move/reorder preserves T4 animation/keyframe identity
+- [x] T5.8 Combined/Separate L/R waveform presentation using real channel-aware analysis
+
+Final automated gate: **2,501 / 2,501**. All-workspace production build PASS. Real Edge 151 proved stable track add/rename/reorder/delete, Lock/Sync Lock/Targeting, audio mix/output, Separate L/R presentation, reload/reopen persistence, one-video continuity and responsive 1440/1024/390 behavior. Real revision-13 export: 1280×720 H.264 High 30 fps + AAC-LC stereo 48 kHz, 30.000000 s, 16,338,429 bytes, SHA-256 `d7ef76f49d80021e2a8798519fb1f723e1cebbd15b2e892c927abc31edf6ea10`. T6 was not started.
 
 ### T6 — SEQUENCES AND SOURCE EDITING
 

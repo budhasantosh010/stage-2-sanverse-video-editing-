@@ -38,7 +38,6 @@ import {
   timelineContentWidthPx,
   ticksToPixels,
   toggleSelection,
-  trackIdForLane,
   updateMarquee,
   visibleTickRange,
   nextHorizontalZoom,
@@ -69,10 +68,17 @@ import {
   animationPresentationForTarget,
   animationTargetExpanded,
   readTimelineAnimationPresentation,
+  readTimelineWaveformPresentation,
   reconcileEditorKeyframeSelection,
+  reconcileTrackPresentation,
+  reconcileTimelineWaveformPresentation,
+  setWaveformDisplayMode,
+  waveformDisplayModeForTrack,
   writeTimelineAnimationPresentation,
+  writeTimelineWaveformPresentation,
   type TimelineAnimationPresentationV1,
   type TimelineAnimationSubjectV1,
+  type TimelineWaveformPresentationV1,
 } from '../../features/timeline'
 import {
   canonicalKeyBinding,
@@ -81,7 +87,7 @@ import {
   setTrackHeight as setTrackHeightIn,
   toggleTrackCollapsed as toggleTrackCollapsedIn,
 } from '../../features/timeline'
-import { markerAfter, markerBefore } from '@sanverse/edit-domain'
+import { isTimelineTrackId, markerAfter, markerBefore } from '@sanverse/edit-domain'
 import type { MediaDragPayloadV1 } from '../../features/media'
 import {
   ANALYSIS_PRIORITY,
@@ -160,6 +166,20 @@ export type TimelineProps = Readonly<{
   snappingEnabled: boolean
   onToggleTrackLock(trackId: TimelineTrackId): void
   onToggleTrackOutput(trackId: TimelineTrackId): void
+  targetedTrackIds?: readonly string[]
+  onToggleTrackTarget?(trackId: TimelineTrackId): void
+  onToggleTrackSyncLock?(trackId: TimelineTrackId): void
+  onToggleTrackMute?(trackId: TimelineTrackId): void
+  onToggleTrackSolo?(trackId: TimelineTrackId): void
+  onTrackGainDb?(trackId: TimelineTrackId, gainDb: number): void
+  onTrackPan?(trackId: TimelineTrackId, pan: number): void
+  onRenameTrack?(trackId: TimelineTrackId, name: string | null): void
+  onReorderTrack?(trackId: TimelineTrackId, direction: 'up' | 'down'): void
+  onDeleteTrack?(trackId: TimelineTrackId, mode: 'empty-only' | 'with-contents'): void
+  onTrackSelectDirection?(trackId: TimelineTrackId, direction: 'forward' | 'backward'): void
+  onAddTrack?(kind: 'video' | 'audio' | 'caption'): void
+  onMoveItemToTrack?(itemId: string, trackId: TimelineTrackId): void
+  onPlaceItemOnTop?(itemId: string): void
   onPlacementMode(mode: PlacementMode): void
   onToggleSnapping(): void
   onItemAction(itemId: string, action: TimelineItemAction): void
@@ -288,6 +308,20 @@ export function Timeline({
   snappingEnabled,
   onToggleTrackLock,
   onToggleTrackOutput,
+  targetedTrackIds = Object.freeze([]),
+  onToggleTrackTarget = () => undefined,
+  onToggleTrackSyncLock = () => undefined,
+  onToggleTrackMute = () => undefined,
+  onToggleTrackSolo = () => undefined,
+  onTrackGainDb = () => undefined,
+  onTrackPan = () => undefined,
+  onRenameTrack = () => undefined,
+  onReorderTrack = () => undefined,
+  onDeleteTrack = () => undefined,
+  onTrackSelectDirection = () => undefined,
+  onAddTrack = () => undefined,
+  onMoveItemToTrack = () => undefined,
+  onPlaceItemOnTop = () => undefined,
   onPlacementMode,
   onToggleSnapping,
   onItemAction,
@@ -341,7 +375,17 @@ export function Timeline({
   )
   const [animationClipboard, setAnimationClipboard] = useState<EditorKeyframeClipboardV1 | null>(null)
   const [animationNotice, setAnimationNotice] = useState<string | null>(null)
+  const [waveformPresentation, setWaveformPresentation] = useState<TimelineWaveformPresentationV1>(() =>
+    readTimelineWaveformPresentation(model.projectId),
+  )
   const [pendingAnimationExpandItemId, setPendingAnimationExpandItemId] = useState<string | null>(null)
+  const stableTrackPresentation = useMemo(() => reconcileTrackPresentation(
+    trackPresentation,
+    model.lanes.map((lane) => Object.freeze({
+      trackId: lane.trackId,
+      legacyDisplayId: isTimelineTrackId(lane.label) ? lane.label : null,
+    })),
+  ), [trackPresentation, model.lanes])
   /**
    * Whether the Speed panel is showing. Kept here, next to the button that
    * opens it, because it is a view state and nothing else: no operation, no
@@ -367,9 +411,22 @@ export function Timeline({
 
   useEffect(() => {
     setAnimationPresentation(readTimelineAnimationPresentation(model.projectId))
+    setWaveformPresentation(readTimelineWaveformPresentation(model.projectId))
     setAnimationClipboard(null)
     setAnimationNotice(null)
   }, [model.projectId])
+
+  useEffect(() => {
+    const reconciled = reconcileTimelineWaveformPresentation(
+      waveformPresentation,
+      model.lanes.map((lane) => lane.trackId),
+    )
+    const same = Object.keys(reconciled.modes).length === Object.keys(waveformPresentation.modes).length &&
+      Object.entries(reconciled.modes).every(([trackId, mode]) => waveformPresentation.modes[trackId] === mode)
+    if (same) return
+    setWaveformPresentation(reconciled)
+    writeTimelineWaveformPresentation(model.projectId, reconciled)
+  }, [model.projectId, model.lanes, waveformPresentation])
 
   useEffect(() => {
     if (!pendingAnimationExpandItemId || animationSubject?.itemId !== pendingAnimationExpandItemId) return
@@ -392,6 +449,13 @@ export function Timeline({
     writeTimelineAnimationPresentation(model.projectId, next)
   }
 
+  const changeWaveformDisplayMode = (trackId: string, mode: 'combined' | 'separate') => {
+    const next = setWaveformDisplayMode(waveformPresentation, trackId, mode)
+    if (next === waveformPresentation) return
+    setWaveformPresentation(next)
+    writeTimelineWaveformPresentation(model.projectId, next)
+  }
+
   const allItems = useMemo(() => model.lanes.flatMap((lane) => lane.items), [model])
   const soleSelectedId = primarySelectedItemId(selection)
   const selectedItem = useMemo<TimelineItemView | null>(() => {
@@ -401,6 +465,19 @@ export function Timeline({
   const contextItem = contextMenu
     ? allItems.find((item) => item.id === contextMenu.itemId) ?? null
     : null
+  const contextDestinationTracks = contextItem
+    ? model.lanes
+        .filter((lane) => {
+          if (lane.trackId === contextItem.trackId) return false
+          if (contextItem.kind === 'music') return lane.trackKind === 'audio' && lane.trackRole !== 'dialogue'
+          if (contextItem.kind === 'caption') return lane.trackKind === 'caption'
+          if (contextItem.kind === 'title' || contextItem.kind === 'callout' || contextItem.kind === 'media-overlay' || contextItem.kind === 'nameplate') {
+            return lane.trackKind === 'video' && lane.trackRole !== 'primary-video'
+          }
+          return false
+        })
+        .map((lane) => Object.freeze({ trackId: lane.trackId, label: lane.label, name: lane.trackName }))
+    : Object.freeze([])
 
   /*
    * What the pointer may snap to.
@@ -745,14 +822,28 @@ export function Timeline({
    * and the keyboard shortcut all agree. A greyed-out button with no reason is
    * the product refusing to explain itself.
    */
-  const selectedTrackId = selectedItem ? trackIdForLane(selectedItem.laneId) : null
+  const selectedTrackId = selectedItem ? selectedItem.trackId as TimelineTrackId : null
+  const selectedTrackLabel = selectedTrackId === null
+    ? null
+    : model.lanes.find((lane) => lane.trackId === selectedTrackId)?.label ?? 'That track'
   const selectedLocked = selectedTrackId !== null && lockedTrackIds.includes(selectedTrackId)
+  // Kept as a compatibility projection for older T0–T4 callers/tests while
+  // stable T5 lanes carry accepted output truth. Real Studio supplies both from
+  // the same project, so they agree; added T5 tracks have no legacy alias.
+  const legacyOutputEnabledForLane = (lane: TimelineViewModel['lanes'][number]): boolean =>
+    lane.trackRole === 'overlay-video' ? trackOutputs.V2
+      : lane.trackRole === 'primary-video' ? trackOutputs.V1
+        : lane.trackRole === 'captions' ? trackOutputs.C1
+          : lane.trackRole === 'dialogue' ? trackOutputs.A1
+            : lane.trackRole === 'music' ? trackOutputs.A2
+              : true
+  const anyAudioSolo = model.lanes.some((lane) => lane.audioState?.solo === true)
   const playheadInsideSelection = selectedItem !== null
     && playheadTicks > selectedItem.startTicks
     && playheadTicks < selectedItem.startTicks + selectedItem.durationTicks
   const nothingPicked = selection.itemIds.length === 0
   const lockedReason = selectedLocked
-    ? `${selectedTrackId} is locked. Unlock it to change anything on it.`
+    ? `${selectedTrackLabel} is locked. Unlock it to change anything on it.`
     : null
   const selectedGap = selectedItem !== null && selectedItem.kind === 'gap'
     ? parseGapItemId(selectedItem.id)
@@ -783,7 +874,9 @@ export function Timeline({
     'add-marker': null,
     'close-gap': selectedGap === null
       ? 'Choose an empty space on the video track first.'
-      : lockedTrackIds.includes('V1') ? 'Track V1 is locked. Unlock it to change anything on it.' : null,
+      : lockedTrackIds.includes(model.lanes.find((lane) => lane.trackRole === 'primary-video')?.trackId ?? '')
+        ? 'V1 is locked. Unlock it to change anything on it.'
+        : null,
     transition: transitionSubject === null
       ? 'Choose a main-video piece that has another piece directly after it.'
       : lockedReason,
@@ -1043,7 +1136,7 @@ export function Timeline({
     const availableBaseHeight = Math.round(
       availableEffectiveHeight * DEFAULT_VERTICAL_ZOOM_BASIS_POINTS / verticalZoom.scaleBasisPoints,
     )
-    onTrackPresentationChange(fitTrackHeights(trackPresentation, availableBaseHeight))
+    onTrackPresentationChange(fitTrackHeights(stableTrackPresentation, availableBaseHeight))
   }
 
   const onWheel = (event: WheelEvent<HTMLDivElement>) => {
@@ -1545,6 +1638,13 @@ export function Timeline({
       ) : null}
       {animationNotice ? <p className="timeline-animation__notice" role="status">{animationNotice}</p> : null}
 
+      <div className="timeline-v1__track-add" role="group" aria-label="Add Timeline track" data-t5-track-add>
+        <span>Add track</span>
+        <button type="button" disabled={busy} onClick={() => onAddTrack('video')}>+ Video</button>
+        <button type="button" disabled={busy} onClick={() => onAddTrack('audio')}>+ Audio</button>
+        <button type="button" disabled={busy} onClick={() => onAddTrack('caption')}>+ Captions</button>
+      </div>
+
       <div ref={viewportGridRef} className="timeline-v1__viewport-grid">
         {/*
           The track headers are real controls, so this column can no longer be
@@ -1553,30 +1653,54 @@ export function Timeline({
         <div className="timeline-v1__headers">
           <div className="timeline-v1__ruler-header" aria-hidden="true">Time</div>
           {model.lanes.map((lane) => {
-            const trackId = trackIdForLane(lane.id)
+            const trackId = lane.trackId as TimelineTrackId
+            const peers = model.lanes.filter((candidate) => candidate.trackKind === lane.trackKind)
+            const peerIndex = peers.findIndex((candidate) => candidate.trackId === lane.trackId)
+            const required = lane.trackRole === 'primary-video' || lane.trackRole === 'dialogue'
             return (
               <TimelineTrackHeader
                 key={lane.id}
                 trackId={trackId}
                 label={lane.label}
                 kind={lane.kind}
+                trackRole={lane.trackRole}
+                trackName={lane.trackName}
+                audioState={lane.audioState}
+                waveformDisplayMode={waveformDisplayModeForTrack(waveformPresentation, trackId)}
                 locked={lockedTrackIds.includes(trackId)}
-                outputEnabled={trackOutputs[trackId]}
+                syncLockEnabled={lane.syncLockEnabled}
+                targeted={targetedTrackIds.includes(trackId)}
+                outputEnabled={lane.outputEnabled}
                 outputDisabledReason={busy ? 'Project edits are paused right now.' : null}
                 heightPx={effectiveTrackHeightPx(
-                  trackPresentation,
+                  stableTrackPresentation,
                   verticalZoom,
                   trackId,
                   laneHeightPx(lane.kind, windowWidthPx),
                 )}
-                collapsed={trackPresentation.collapsed.includes(trackId)}
+                collapsed={stableTrackPresentation.collapsed.includes(trackId)}
+                canMoveUp={!required && peerIndex > 0}
+                canMoveDown={!required && peerIndex >= 0 && peerIndex < peers.length - 1}
+                canDelete={!required}
                 onToggleLock={() => onToggleTrackLock(trackId)}
+                onToggleSyncLock={() => onToggleTrackSyncLock(trackId)}
+                onToggleTarget={() => onToggleTrackTarget(trackId)}
                 onToggleOutput={() => onToggleTrackOutput(trackId)}
+                onToggleMute={() => onToggleTrackMute(trackId)}
+                onToggleSolo={() => onToggleTrackSolo(trackId)}
+                onGainDb={(gainDb) => onTrackGainDb(trackId, gainDb)}
+                onPan={(pan) => onTrackPan(trackId, pan)}
+                onWaveformDisplayMode={(mode) => changeWaveformDisplayMode(trackId, mode)}
+                onRename={(name) => onRenameTrack(trackId, name)}
+                onMoveUp={() => onReorderTrack(trackId, 'up')}
+                onMoveDown={() => onReorderTrack(trackId, 'down')}
+                onDelete={(mode) => onDeleteTrack(trackId, mode)}
+                onSelectDirection={(direction) => onTrackSelectDirection(trackId, direction)}
                 onToggleCollapsed={() => onTrackPresentationChange(
-                  toggleTrackCollapsedIn(trackPresentation, trackId),
+                  toggleTrackCollapsedIn(stableTrackPresentation, trackId),
                 )}
                 onHeight={(height) => onTrackPresentationChange(
-                  setTrackHeightIn(trackPresentation, trackId, height),
+                  setTrackHeightIn(stableTrackPresentation, trackId, height),
                 )}
               />
             )
@@ -1674,12 +1798,13 @@ export function Timeline({
                   lane={lane}
                   projectId={model.projectId}
                   assetFacts={assetFacts ?? EMPTY_ASSET_FACTS}
-                  muted={trackOutputs[trackIdForLane(lane.id)] === false}
+                  muted={lane.outputEnabled === false || legacyOutputEnabledForLane(lane) === false || lane.audioState?.muted === true || (lane.audioState !== null && anyAudioSolo && !lane.audioState.solo)}
+                  waveformDisplayMode={waveformDisplayModeForTrack(waveformPresentation, lane.trackId)}
                   layoutWidthPx={windowWidthPx}
                   heightPx={effectiveTrackHeightPx(
-                    trackPresentation,
+                    stableTrackPresentation,
                     verticalZoom,
-                    trackIdForLane(lane.id),
+                    lane.trackId,
                     laneHeightPx(lane.kind, windowWidthPx),
                   )}
                   marqueeActive={marquee !== null}
@@ -1861,6 +1986,9 @@ export function Timeline({
           }}
           onGesture={onGesture}
           onSeek={onSeek}
+          compatibleDestinationTracks={contextDestinationTracks}
+          onMoveToTrack={(trackId) => onMoveItemToTrack(contextItem.id, trackId as TimelineTrackId)}
+          onPlaceOnTop={() => onPlaceItemOnTop(contextItem.id)}
           onOpenProposal={onOpenProposal}
           onClose={() => {
             setContextMenu(null)

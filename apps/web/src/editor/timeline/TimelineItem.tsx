@@ -29,6 +29,7 @@ export type TimelineItemProps = Readonly<{
   decorationHeightPx: number
   /** A silenced track still shows its shape, drawn faintly. */
   muted: boolean
+  waveformDisplayMode: 'combined' | 'separate'
   timescale: number
   pixelsPerSecond: number
   busy: boolean
@@ -127,6 +128,7 @@ export function TimelineItem({
   derivedMedia,
   decorationHeightPx,
   muted,
+  waveformDisplayMode,
   timescale,
   pixelsPerSecond,
   busy,
@@ -385,6 +387,7 @@ export function TimelineItem({
           widthPx={Math.max(2, widthPx)}
           heightPx={decorationHeightPx}
           muted={muted}
+          channelDisplayMode={waveformDisplayMode}
           selected={item.selected}
           onStateChange={onDecorationState}
         />

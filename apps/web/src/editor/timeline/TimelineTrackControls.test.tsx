@@ -88,21 +88,24 @@ describe('the Timeline toolbar', () => {
   })
 
   it('names the locked track in the reason, so the user knows which padlock to open', () => {
-    const model = buildTimelineViewModel({
+    const unselected = buildTimelineViewModel({
       project: projectWithAllTimelineFamilies(),
       selectedItemIds: [],
       pending: null,
     })
-    const clip = model.lanes.flatMap((lane) => lane.items).find((item) => item.kind === 'clip')
+    const primaryLane = unselected.lanes.find((lane) => lane.trackRole === 'primary-video')
+    const clip = primaryLane?.items.find((item) => item.kind === 'clip')
     const selectedItemId = clip?.id ?? null
+    const model = buildTimelineViewModel({
+      project: projectWithAllTimelineFamilies(),
+      selectedItemIds: selectedItemId === null ? [] : [selectedItemId],
+      pending: null,
+    })
+    const primaryTrackId = model.lanes.find((lane) => lane.trackRole === 'primary-video')?.trackId
     renderTimeline({
       selection: { itemIds: selectedItemId === null ? [] : [selectedItemId], anchorItemId: selectedItemId },
-      model: buildTimelineViewModel({
-        project: projectWithAllTimelineFamilies(),
-        selectedItemIds: selectedItemId === null ? [] : [selectedItemId],
-        pending: null,
-      }),
-      lockedTrackIds: ['V1'],
+      model,
+      lockedTrackIds: primaryTrackId ? [primaryTrackId] : [],
     })
     const lift = document.querySelector('[data-timeline-action="lift"]')
     expect(lift).toBeDisabled()
@@ -131,8 +134,8 @@ describe('the two track switches', () => {
       expect(screen.getByRole('button', { name: new RegExp(`Lock ${track}`, 'i') })).toBeInTheDocument()
     }
     expect(screen.getByRole('button', { name: /Hide V1/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Mute A1/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Mute A2/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Disable output A1/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Disable output A2/i })).toBeInTheDocument()
   })
 
   it('says out loud that a padlock does not change the video', () => {
@@ -140,34 +143,48 @@ describe('the two track switches', () => {
     // believed a padlock removed the track would export something wrong.
     renderTimeline()
     expect(screen.getByRole('button', { name: /Lock V2/i }))
-      .toHaveAttribute('aria-label', expect.stringContaining('never changes your video'))
+      .toHaveAttribute('title', expect.stringContaining('video is unaffected'))
   })
 
   it('says out loud that the output switch DOES change the video', () => {
     renderTimeline()
-    expect(screen.getByRole('button', { name: /Mute A2/i }))
+    expect(screen.getByRole('button', { name: /Disable output A2/i }))
       .toHaveAttribute('title', expect.stringContaining('changes what you export'))
   })
 
-  it('reports a lock and an output change through two different callbacks', () => {
+  it('reports a lock and an output change through two different callbacks using the stable track id', () => {
     const { props } = renderTimeline()
+    const musicTrackId = props.model.lanes.find((lane) => lane.trackRole === 'music')?.trackId
+    expect(musicTrackId).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Lock A2/i }))
-    expect(props.onToggleTrackLock).toHaveBeenCalledWith('A2')
+    expect(props.onToggleTrackLock).toHaveBeenCalledWith(musicTrackId)
     expect(props.onToggleTrackOutput).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: /Mute A2/i }))
-    expect(props.onToggleTrackOutput).toHaveBeenCalledWith('A2')
+    fireEvent.click(screen.getByRole('button', { name: /Disable output A2/i }))
+    expect(props.onToggleTrackOutput).toHaveBeenCalledWith(musicTrackId)
   })
 
   it('marks a locked track and a hidden track in the header, not by colour alone', () => {
-    const { container } = renderTimeline({
-      lockedTrackIds: ['V2'],
-      trackOutputs: { ...ALL_ON, A2: false },
+    const baseModel = buildTimelineViewModel({
+      project: projectWithAllTimelineFamilies(),
+      selectedItemIds: [],
+      pending: null,
     })
-    expect(container.querySelector('[data-track-id="V2"]')).toHaveAttribute('data-track-locked', 'yes')
-    expect(container.querySelector('[data-track-id="A2"]')).toHaveAttribute('data-track-output', 'off')
+    const overlayTrackId = baseModel.lanes.find((lane) => lane.trackRole === 'overlay-video')?.trackId
+    const hiddenModel = Object.freeze({
+      ...baseModel,
+      lanes: Object.freeze(baseModel.lanes.map((lane) => lane.trackRole === 'music'
+        ? Object.freeze({ ...lane, outputEnabled: false })
+        : lane)),
+    })
+    const { container } = renderTimeline({
+      model: hiddenModel,
+      lockedTrackIds: overlayTrackId ? [overlayTrackId] : [],
+    })
+    expect(container.querySelector('[data-track-display-id="V2"]')).toHaveAttribute('data-track-locked', 'yes')
+    expect(container.querySelector('[data-track-display-id="A2"]')).toHaveAttribute('data-track-output', 'off')
     // A locked track stays fully visible: locking is not hiding.
-    expect(container.querySelector('[data-track-id="V2"]')).toHaveAttribute('data-track-output', 'on')
+    expect(container.querySelector('[data-track-display-id="V2"]')).toHaveAttribute('data-track-output', 'on')
   })
 
   it('offers the padlock even while edits are paused, because it is not an edit', () => {

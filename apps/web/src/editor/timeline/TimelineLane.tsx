@@ -17,7 +17,6 @@ import {
   type MediaDragKind,
   type MediaDragPayloadV1,
 } from '../../features/media'
-import { acceptsMediaKind } from '../../features/timeline'
 import {
   clipDerivedMedia,
   derivedMediaClipFor,
@@ -39,6 +38,7 @@ export type TimelineLaneProps = Readonly<{
   assetFacts: Readonly<Record<string, AssetFacts>>
   /** True when this row has been silenced, so its shape is drawn faintly. */
   muted: boolean
+  waveformDisplayMode?: 'combined' | 'separate'
   /** How wide the window is, which decides how tall rows are. */
   layoutWidthPx: number
   /** The height the user chose for this row, if they chose one. */
@@ -85,6 +85,7 @@ export function TimelineLane({
   projectId,
   assetFacts,
   muted,
+  waveformDisplayMode = 'combined',
   layoutWidthPx,
   heightPx,
   marqueeActive,
@@ -158,7 +159,15 @@ export function TimelineLane({
    * changing its mind after the user had committed to the gesture.
    */
   const dragKind = dragPreview?.mediaKind ?? null
-  const accepts = dragKind !== null && acceptsMediaKind(lane.id, dragKind)
+  const accepts = dragKind !== null && (
+    lane.trackRole === 'primary-video'
+      ? dragKind === 'video'
+      : lane.trackKind === 'video'
+        ? dragKind === 'video' || dragKind === 'image'
+        : lane.trackKind === 'audio' && lane.trackRole !== 'dialogue'
+          ? dragKind === 'audio'
+          : false
+  )
 
   // How much detail this row has room for, decided ONCE for the row rather than
   // by each clip, so two clips in the same row can never disagree about it.
@@ -247,6 +256,7 @@ export function TimelineLane({
           derivedMedia={mediaFor(item)}
           decorationHeightPx={decorationPx}
           muted={muted}
+          waveformDisplayMode={waveformDisplayMode}
           timescale={timescale}
           pixelsPerSecond={viewport.pixelsPerSecond}
           busy={busy}

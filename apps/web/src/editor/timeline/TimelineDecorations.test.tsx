@@ -277,7 +277,7 @@ describe('rows are the same height everywhere', () => {
   it('gives the header and the lane one number, so labels line up with clips', async () => {
     const { container } = await renderTimeline()
     const videoLane = container.querySelector<HTMLElement>('[data-lane-id="lane:video"]')
-    const videoHeader = container.querySelector<HTMLElement>('[data-track-id="V1"]')
+    const videoHeader = container.querySelector<HTMLElement>('[data-track-display-id="V1"]')
     expect(videoLane?.style.getPropertyValue('--timeline-lane-height'))
       .toBe(`${TIMELINE_LANE_HEIGHTS.video}px`)
     expect(videoHeader?.style.getPropertyValue('--timeline-lane-height'))

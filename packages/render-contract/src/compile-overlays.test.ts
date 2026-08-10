@@ -136,7 +136,7 @@ describe('render-plan v6 visual properties', () => {
     }])
 
     const plan = compile(project)
-    expect(plan.schemaVersion).toBe('sanverse.render-plan/v8')
+    expect(plan.schemaVersion).toBe('sanverse.render-plan/v9')
     expect(plan.visuals).toHaveLength(1)
     expect(plan.visuals[0]).toMatchObject({
       visualId: 'title_visual01',

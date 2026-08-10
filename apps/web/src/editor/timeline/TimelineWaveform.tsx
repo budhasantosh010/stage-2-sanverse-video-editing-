@@ -6,6 +6,7 @@ import {
   useMediaAnalysisVersion,
   type ClipDerivedMedia,
 } from '../../features/media-analysis'
+import type { AudioChannelDisplayMode } from '../../features/timeline/timeline-waveform-presentation'
 
 /**
  * The shape of the sound drawn inside a piece of audio.
@@ -44,6 +45,7 @@ export type TimelineWaveformProps = Readonly<{
   heightPx: number
   /** A muted track still shows its shape, drawn faintly. */
   muted: boolean
+  channelDisplayMode: AudioChannelDisplayMode
   selected: boolean
   onStateChange?: (state: 'loading' | 'ready' | 'missing' | 'error' | 'none') => void
 }>
@@ -58,6 +60,7 @@ export function TimelineWaveform({
   widthPx,
   heightPx,
   muted,
+  channelDisplayMode,
   selected,
   onStateChange,
 }: TimelineWaveformProps) {
@@ -114,22 +117,44 @@ export function TimelineWaveform({
       const sliceFrom = Math.max(fromTicks, block.blockStartTicks)
       const sliceTo = Math.min(toTicks, block.blockStartTicks + block.blockSpanTicks)
       if (sliceTo <= sliceFrom) continue
-      const peaks = slicePeaks(resource.value, {
-        blockStartTicks: block.blockStartTicks,
-        blockSpanTicks: block.blockSpanTicks,
-        fromTicks: sliceFrom,
-        toTicks: sliceTo,
-      })
-      if (peaks.length === 0) continue
-
+      const value = resource.value
+      const detailed = Array.isArray(value)
+        ? null
+        : value as Exclude<typeof value, readonly number[]>
+      const combined = detailed?.peaks ?? value as readonly number[]
+      const stereoChannels = detailed?.channels ?? []
       const leftPx = ((sliceFrom - fromTicks) / spanTicks) * width
       const sliceWidthPx = ((sliceTo - sliceFrom) / spanTicks) * width
-      const barWidth = sliceWidthPx / peaks.length
-      for (let index = 0; index < peaks.length; index += 1) {
-        // Drawn from the middle outwards in both directions, which is what a
-        // person recognises as the shape of their own audio.
-        const halfHeight = Math.max(0.5, (peaks[index] * height) / 2)
-        context.fillRect(leftPx + index * barWidth, middle - halfHeight, Math.max(0.5, barWidth), halfHeight * 2)
+
+      const drawPeaks = (source: readonly number[], centerY: number, availableHeight: number): void => {
+        const peaks = slicePeaks(source, {
+          blockStartTicks: block.blockStartTicks,
+          blockSpanTicks: block.blockSpanTicks,
+          fromTicks: sliceFrom,
+          toTicks: sliceTo,
+        })
+        if (peaks.length === 0) return
+        const barWidth = sliceWidthPx / peaks.length
+        for (let index = 0; index < peaks.length; index += 1) {
+          const halfHeight = Math.max(0.5, (peaks[index] * availableHeight) / 2)
+          context.fillRect(leftPx + index * barWidth, centerY - halfHeight, Math.max(0.5, barWidth), halfHeight * 2)
+        }
+      }
+
+      if (channelDisplayMode === 'separate' && stereoChannels.length === 2) {
+        const half = height / 2
+        drawPeaks(stereoChannels[0].peaks, half / 2, half * 0.82)
+        drawPeaks(stereoChannels[1].peaks, half + half / 2, half * 0.82)
+        // These are decoder-probed stereo channels, not duplicated Combined
+        // peaks. If the layout is unknown we intentionally draw Combined only.
+        context.save()
+        context.font = '9px system-ui, sans-serif'
+        context.globalAlpha = muted ? 0.45 : 0.68
+        context.fillText('L', leftPx + 2, Math.min(height - 2, 9))
+        context.fillText('R', leftPx + 2, Math.max(10, half + 9))
+        context.restore()
+      } else {
+        drawPeaks(combined, middle, height)
       }
     }
 
@@ -141,7 +166,7 @@ export function TimelineWaveform({
             : pending > 0 && ready === 0 ? 'loading'
               : 'ready',
     )
-  }, [controller, version, blocks, fromTicks, toTicks, widthPx, heightPx, muted, selected, onStateChange])
+  }, [controller, version, blocks, fromTicks, toTicks, widthPx, heightPx, muted, channelDisplayMode, selected, onStateChange])
 
   if (media.kind !== 'waveform') return null
 
@@ -152,6 +177,7 @@ export function TimelineWaveform({
       data-testid="timeline-waveform"
       data-block-count={media.blocks.length}
       data-muted={muted ? 'true' : undefined}
+      data-channel-display-mode={channelDisplayMode}
       data-truncated={media.truncated ? 'true' : undefined}
       aria-hidden="true"
       style={{ width: `${Math.max(1, widthPx)}px`, height: `${Math.max(1, heightPx)}px` }}

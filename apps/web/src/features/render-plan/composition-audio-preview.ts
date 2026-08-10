@@ -206,7 +206,7 @@ export const compositionAudioStateAt = (
         music.fadeInTicks,
         music.fadeOutTicks,
       ),
-      pan: 0,
+      pan: Math.min(1, Math.max(-1, music.pan / 10_000)),
     }))
   }
 

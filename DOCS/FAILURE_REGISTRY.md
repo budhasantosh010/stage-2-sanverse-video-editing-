@@ -398,18 +398,18 @@ No unresolved T4 P0/P1 blocker remains. The first broad regression sweep also fo
 
 ### UX-009 — Dialogue lane has no waveform yet
 
-- **What:** A1 dialogue currently mirrors clip timing with a temporary visual pattern rather than a rendered waveform.
-- **Where:** Production Timeline V1 dialogue lane.
-- **When:** Carried into P1-C on 2026-07-30.
-- **Who is affected:** Users judging speech intensity visually.
-- **Why:** Waveform generation, caching, and rendering are a separate media-analysis milestone and were explicitly excluded from P1-B and P1-C.
-- **How reproduced:** Open Studio and inspect the A1 lane.
-- **Attempted fix:** None inside P1-C; the Inspector exposes the linked clip's truthful gain and fades without pretending waveform data exists.
-- **Status:** PLANNED.
-- **One-line solution:** Add derived waveform assets in the dedicated audio-waveform milestone.
+- **What:** A1 dialogue previously mirrored clip timing with a temporary visual pattern rather than a rendered waveform.
+- **Where:** Production Timeline dialogue/audio lanes.
+- **When:** Carried into P1-C on 2026-07-30; waveform rendering landed in Gate D and channel-presentation truth closed in Gate T5 on 2026-08-10.
+- **Who was affected:** Users judging speech intensity visually.
+- **Why:** Waveform generation, caching and rendering were deliberately separated from P1-B/P1-C; T5 additionally required real channel identity rather than a fake stereo split.
+- **How verified:** Gate D real derived-media evidence plus T5 Combined/Separate L/R tests and real Edge persistence/export evidence.
+- **Attempted fix:** Gate D added bounded FFmpeg-derived waveforms; T5 added FFprobe channel truth, stable per-track presentation preferences and Combined fallback for unsupported layouts.
+- **Status:** RESOLVED.
+- **One-line solution:** Implemented real derived waveform assets and truthful per-track channel presentation.
 - **Severity:** P2.
 - **Owner:** Media/render pipeline.
-- **Target:** Audio waveform milestone.
+- **Closed by:** Gate D / Gate T5.
 
 ### UX-010 — Studio video preview collapses below a usable Canvas height
 

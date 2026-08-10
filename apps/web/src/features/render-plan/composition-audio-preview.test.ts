@@ -139,6 +139,7 @@ describe('composition audio preview projection', () => {
         assetId: 'asset_music001',
         sourceStartTicks: S,
         gainDb: -12,
+        pan: 0,
         fadeInTicks: S,
         fadeOutTicks: 0,
       }],

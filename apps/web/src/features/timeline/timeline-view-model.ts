@@ -17,6 +17,14 @@ import {
   type Track,
 } from '@sanverse/edit-domain'
 import {
+  dialogueTimelineTrack,
+  resolvedTrackForTimelineItem,
+  timelineTrackAssignmentKey,
+  trackDisplayLabel,
+  tracksOfKind,
+  type TimelineTrackV2,
+} from '@sanverse/edit-domain/timeline-tracks'
+import {
   clipCompositionDurationTicks,
   isFreezeClip,
   linkedAudioCompositionDurationTicks,
@@ -74,6 +82,13 @@ type OrderedDiagnostic = TimelineDiagnostic & Readonly<{ order: number }>
 
 type LaneDraft = {
   id: string
+  trackId: string
+  trackKind: TimelineLaneView['trackKind']
+  trackRole: TimelineLaneView['trackRole']
+  trackName: string | null
+  syncLockEnabled: boolean
+  outputEnabled: boolean
+  audioState: TimelineTrackV2['audioState']
   kind: TimelineLaneKind
   label: string
   order: number
@@ -104,14 +119,15 @@ const previewText = (value: string, fallback: string): string => {
 }
 
 type TimelineItemInput =
-  Omit<TimelineItemView, 'selected' | 'captionSetId' | 'cueId' | 'visualId' | 'pan' | 'speedBadge'> &
-  Partial<Pick<TimelineItemView, 'captionSetId' | 'cueId' | 'visualId' | 'pan' | 'speedBadge'>>
+  Omit<TimelineItemView, 'selected' | 'captionSetId' | 'cueId' | 'visualId' | 'pan' | 'speedBadge' | 'trackId'> &
+  Partial<Pick<TimelineItemView, 'captionSetId' | 'cueId' | 'visualId' | 'pan' | 'speedBadge' | 'trackId'>>
 
 const makeItem = (input: TimelineItemInput, selectedItemIds: ReadonlySet<string>): TimelineItemView =>
   Object.freeze({
     captionSetId: null,
     cueId: null,
     visualId: null,
+    trackId: input.trackId ?? '',
     ...input,
     // Nothing has a badge or a left/right position unless it says so. Written
     // AFTER the spread with an explicit fallback, so a row that does say so
@@ -199,12 +215,6 @@ const videoTracks = (tracks: readonly Track[]): readonly Track[] =>
       .slice()
       .sort((left, right) => left.order - right.order || left.trackId.localeCompare(right.trackId)),
   )
-
-const laneIdFor = (kind: 'video' | 'dialogue', track: Track, trackCount: number): string =>
-  trackCount === 1 ? `lane:${kind}` : `lane:${kind}:${track.trackId}`
-
-const videoLabel = (index: number): string => (index === 0 ? 'V1' : `V1.${index + 1}`)
-const dialogueLabel = (index: number): string => (index === 0 ? 'A1' : `A1.${index + 1}`)
 
 /**
  * Validate presentation invariants without consulting or changing the project.
@@ -298,6 +308,7 @@ export const buildTimelineViewModel = (
   // cannot spend several full history replays or observe two derived answers.
   const evaluation = evaluateProject(project)
   const composition = evaluation.composition
+  const trackState = evaluation.trackState
   const durationTicks = compositionDuration(composition).ticks
   const active = Object.freeze(
     evaluation.records
@@ -338,73 +349,108 @@ export const buildTimelineViewModel = (
   }
 
   const addItem = (lane: LaneDraft, item: TimelineItemView): void => {
-    if (itemIds.has(item.id)) {
+    const normalizedItem = item.trackId === lane.trackId
+      ? item
+      : Object.freeze({ ...item, trackId: lane.trackId })
+    if (itemIds.has(normalizedItem.id)) {
       addDiagnostic(
         'DUPLICATE_PRESENTATION_ID',
-        `Timeline item ${item.id} appears more than once.`,
-        item.operationId,
-        item.changeSetId,
+        `Timeline item ${normalizedItem.id} appears more than once.`,
+        normalizedItem.operationId,
+        normalizedItem.changeSetId,
       )
       return
     }
-    if (!Number.isSafeInteger(item.durationTicks) || item.durationTicks <= 0) {
+    if (!Number.isSafeInteger(normalizedItem.durationTicks) || normalizedItem.durationTicks <= 0) {
       addDiagnostic(
         'ITEM_DURATION_INVALID',
-        `Timeline item ${item.id} has no positive whole-tick duration.`,
-        item.operationId,
-        item.changeSetId,
+        `Timeline item ${normalizedItem.id} has no positive whole-tick duration.`,
+        normalizedItem.operationId,
+        normalizedItem.changeSetId,
       )
       return
     }
-    const endTicks = item.startTicks + item.durationTicks
+    const endTicks = normalizedItem.startTicks + normalizedItem.durationTicks
     if (
-      !Number.isSafeInteger(item.startTicks) ||
-      item.startTicks < 0 ||
+      !Number.isSafeInteger(normalizedItem.startTicks) ||
+      normalizedItem.startTicks < 0 ||
       !Number.isSafeInteger(endTicks) ||
       endTicks > durationTicks
     ) {
       addDiagnostic(
         'ITEM_OUTSIDE_COMPOSITION',
-        `Timeline item ${item.id} falls outside the finished video.`,
-        item.operationId,
-        item.changeSetId,
+        `Timeline item ${normalizedItem.id} falls outside the finished video.`,
+        normalizedItem.operationId,
+        normalizedItem.changeSetId,
       )
       return
     }
-    itemIds.add(item.id)
-    lane.items.push(item)
+    itemIds.add(normalizedItem.id)
+    lane.items.push(normalizedItem)
   }
-
-  const overlayLane = registerLane({ id: 'lane:overlay', kind: 'overlay', label: 'V2', order: 0 })
-  const captionLane = registerLane({ id: 'lane:caption', kind: 'caption', label: 'C1', order: 2 })
-  const musicLane = registerLane({ id: 'lane:music', kind: 'music', label: 'A2', order: 4 })
 
   const canonicalVideoTracks = videoTracks(composition.tracks)
-  const videoLanes: LaneDraft[] = []
-  const dialogueLanes: LaneDraft[] = []
-  if (canonicalVideoTracks.length === 0) {
-    videoLanes.push(registerLane({ id: 'lane:video', kind: 'video', label: 'V1', order: 1 }))
-    dialogueLanes.push(registerLane({ id: 'lane:dialogue', kind: 'dialogue', label: 'A1', order: 3 }))
-  } else {
-    canonicalVideoTracks.forEach((track, index) => {
-      videoLanes.push(registerLane({
-        id: laneIdFor('video', track, canonicalVideoTracks.length),
-        kind: 'video',
-        label: videoLabel(index),
-        order: 1,
-      }))
-      dialogueLanes.push(registerLane({
-        id: laneIdFor('dialogue', track, canonicalVideoTracks.length),
-        kind: 'dialogue',
-        label: dialogueLabel(index),
-        order: 3,
-      }))
+  const compositionTrackIds = new Set(canonicalVideoTracks.map((track) => track.trackId))
+  const videoModels = [...tracksOfKind(trackState, 'video')]
+  const captionModels = [...tracksOfKind(trackState, 'caption')]
+  const audioModels = [...tracksOfKind(trackState, 'audio')]
+  // Canonical video state is bottom-to-top. The editor lists the highest layer first.
+  const orderedTrackModels = [...videoModels].reverse().concat(captionModels, audioModels)
+  const laneByTrackId = new Map<string, LaneDraft>()
+
+  const legacyLaneId = (track: TimelineTrackV2): string | null => {
+    if (track.role === 'primary-video') return 'lane:video'
+    if (track.role === 'overlay-video') return 'lane:overlay'
+    if (track.role === 'dialogue') return 'lane:dialogue'
+    if (track.role === 'music') return 'lane:music'
+    if (track.role === 'captions' && captionModels[0]?.trackId === track.trackId) return 'lane:caption'
+    if (compositionTrackIds.has(track.trackId)) return `lane:video:${track.trackId}`
+    return null
+  }
+  const laneKindFor = (track: TimelineTrackV2): TimelineLaneKind => {
+    if (track.kind === 'caption') return 'caption'
+    if (track.kind === 'audio') return track.role === 'dialogue' ? 'dialogue' : 'music'
+    return track.role === 'primary-video' || compositionTrackIds.has(track.trackId) ? 'video' : 'overlay'
+  }
+  orderedTrackModels.forEach((track, order) => {
+    const lane = registerLane({
+      id: legacyLaneId(track) ?? `lane:track:${track.trackId}`,
+      trackId: track.trackId,
+      trackKind: track.kind,
+      trackRole: track.role,
+      trackName: track.name,
+      syncLockEnabled: track.syncLockEnabled,
+      outputEnabled: track.outputEnabled,
+      audioState: track.audioState,
+      kind: laneKindFor(track),
+      label: trackDisplayLabel(trackState, track.trackId) ?? 'Track',
+      order,
     })
+    laneByTrackId.set(track.trackId, lane)
+  })
+
+  const dialogueModel = dialogueTimelineTrack(trackState)
+  const overlayModel = trackState.tracks.find((track) => track.role === 'overlay-video') ?? null
+  const captionModel = captionModels[0] ?? null
+  const musicModel = trackState.tracks.find((track) => track.role === 'music') ?? audioModels.find((track) => track.role !== 'dialogue') ?? null
+  const defaultOverlayLane = overlayModel ? laneByTrackId.get(overlayModel.trackId) ?? null : null
+  const defaultCaptionLane = captionModel ? laneByTrackId.get(captionModel.trackId) ?? null : null
+  const defaultMusicLane = musicModel ? laneByTrackId.get(musicModel.trackId) ?? null : null
+  const dialogueLane = dialogueModel ? laneByTrackId.get(dialogueModel.trackId) ?? null : null
+
+  const assignedLane = (
+    family: 'visual' | 'caption' | 'audio',
+    identity: string,
+    fallback: LaneDraft | null,
+  ): LaneDraft | null => {
+    const key = timelineTrackAssignmentKey(family, identity)
+    const resolved = resolvedTrackForTimelineItem(trackState, key, family)
+    return resolved ? laneByTrackId.get(resolved.trackId) ?? fallback : fallback
   }
 
-  canonicalVideoTracks.forEach((track, trackIndex) => {
-    const videoLane = videoLanes[trackIndex]
-    const dialogueLane = dialogueLanes[trackIndex]
+  canonicalVideoTracks.forEach((track) => {
+    const videoLane = laneByTrackId.get(track.trackId)
+    if (!videoLane) return
     const orderedClips = track.clips
       .slice()
       .sort((left, right) =>
@@ -480,35 +526,37 @@ export const buildTimelineViewModel = (
             : audioEnd > pictureEnd
               ? `L-cut · ends ${Math.round((audioEnd - pictureEnd) / 1_440)} ms late`
               : 'Linked audio adjusted'
-      addItem(dialogueLane, makeItem({
-        id: `dialogue:${clip.clipId}`,
-        laneId: dialogueLane.id,
-        kind: 'clip',
-        state: 'committed',
-        label: freeze ? 'Silent hold' : `Dialogue · ${displayAsset(
-          clip.assetId,
-          orderedClips.length === 1 ? 'Video' : `Video ${clipIndex + 1}`,
-        )}`,
-        detail: audioDetail,
-        startTicks: freeze ? clip.compositionStart.ticks : audioStart,
-        durationTicks: freeze ? clipCompositionDurationTicks(clip) : audioDuration,
-        enabled: freeze ? false : clip.enabled,
-        blockedReason: null,
-        clipId: null,
-        linkedClipId: clip.clipId,
-        assetId: clip.assetId,
-        operationId: null,
-        changeSetId: null,
-        sourceStartTicks: freeze ? clip.sourceRange.start.ticks : audioSource.start.ticks,
-        sourceDurationTicks: freeze ? 1 : audioSource.duration.ticks,
-        gainDb: freeze ? null : clip.gainDb,
-        fadeInTicks: freeze ? null : clip.fadeIn.ticks,
-        fadeOutTicks: freeze ? null : clip.fadeOut.ticks,
-        pan: freeze ? null : clip.pan,
-        speedBadge: freeze ? 'Freeze' : speedBadgeFor(clip.timeTransform),
-        proposalId: null,
-        proposalBaseRevision: null,
-      }, selectedItemIds))
+      if (dialogueLane) {
+        addItem(dialogueLane, makeItem({
+          id: `dialogue:${clip.clipId}`,
+          laneId: dialogueLane.id,
+          kind: 'clip',
+          state: 'committed',
+          label: freeze ? 'Silent hold' : `Dialogue · ${displayAsset(
+            clip.assetId,
+            orderedClips.length === 1 ? 'Video' : `Video ${clipIndex + 1}`,
+          )}`,
+          detail: audioDetail,
+          startTicks: freeze ? clip.compositionStart.ticks : audioStart,
+          durationTicks: freeze ? clipCompositionDurationTicks(clip) : audioDuration,
+          enabled: freeze ? false : clip.enabled,
+          blockedReason: null,
+          clipId: null,
+          linkedClipId: clip.clipId,
+          assetId: clip.assetId,
+          operationId: null,
+          changeSetId: null,
+          sourceStartTicks: freeze ? clip.sourceRange.start.ticks : audioSource.start.ticks,
+          sourceDurationTicks: freeze ? 1 : audioSource.duration.ticks,
+          gainDb: freeze ? null : clip.gainDb,
+          fadeInTicks: freeze ? null : clip.fadeIn.ticks,
+          fadeOutTicks: freeze ? null : clip.fadeOut.ticks,
+          pan: freeze ? null : clip.pan,
+          speedBadge: freeze ? 'Freeze' : speedBadgeFor(clip.timeTransform),
+          proposalId: null,
+          proposalBaseRevision: null,
+        }, selectedItemIds))
+      }
     })
 
     let cursor = 0
@@ -571,15 +619,20 @@ export const buildTimelineViewModel = (
 
   for (const operation of active.filter(isNameplateOperation)) {
     const trace = traces.get(operation.operationId)
+    const lane = assignedLane('visual', operation.operationId, defaultOverlayLane)
+    if (!lane) {
+      addDiagnostic('OPERATION_UNSUPPORTED', 'Nameplate has no compatible video track.', operation.operationId, trace?.changeSetId ?? null)
+      continue
+    }
     const placements = enabledPlacements(operation.assetId, operation.sourceInterval)
     if (placements.length === 0) {
       addPlacementDiagnostic('Nameplate', operation.operationId, trace?.changeSetId ?? null, trace?.order ?? diagnosticOrder++)
       continue
     }
     placements.forEach((placement, placementIndex) => {
-      addItem(overlayLane, makeItem({
+      addItem(lane, makeItem({
         id: `overlay:${operation.operationId}:${placementIndex}`,
-        laneId: overlayLane.id,
+        laneId: lane.id,
         kind: 'nameplate',
         state: 'committed',
         label: previewText(operation.primaryText, 'Nameplate'),
@@ -606,6 +659,11 @@ export const buildTimelineViewModel = (
   }
 
   for (const set of foldCaptionOperations(active.filter(isCaptionOperation))) {
+    const lane = assignedLane('caption', set.captionSetId, defaultCaptionLane)
+    if (!lane) {
+      addDiagnostic('OPERATION_UNSUPPORTED', 'Captions have no compatible caption track.', null, null)
+      continue
+    }
     for (const cue of set.cues) {
       const cueTrace = captionTraces.cue.get(`${set.captionSetId}:${cue.cueId}`) ?? captionTraces.set.get(set.captionSetId)
       const placements = enabledPlacements(set.assetId, cue.sourceInterval)
@@ -621,9 +679,9 @@ export const buildTimelineViewModel = (
       const text = cue.lines.join(' ')
       placements.forEach((placement, placementIndex) => {
         const operationId = cueTrace?.operationId ?? null
-        addItem(captionLane, makeItem({
+        addItem(lane, makeItem({
           id: `caption:${set.captionSetId}:${cue.cueId}:${placementIndex}`,
-          laneId: captionLane.id,
+          laneId: lane.id,
           kind: 'caption',
           state: 'committed',
           label: previewText(text, 'Caption'),
@@ -655,6 +713,11 @@ export const buildTimelineViewModel = (
   const addResolvedOverlay = (operation: ResolvedOverlayOperation): void => {
     const trace = traces.get(operation.operationId)
     if (operation.kind === 'add-music') {
+      const lane = assignedLane('audio', operation.musicId, defaultMusicLane)
+      if (!lane) {
+        addDiagnostic('OPERATION_UNSUPPORTED', 'Music has no compatible audio track.', operation.operationId, trace?.changeSetId ?? null)
+        return
+      }
       const asset = findAsset(project.assets, operation.assetId)
       const videoLeft = durationTicks - operation.compositionStart.ticks
       const songLeft = asset?.mediaKind === 'audio'
@@ -667,9 +730,9 @@ export const buildTimelineViewModel = (
       }
       const fadeInTicks = Math.min(operation.fadeIn.ticks, playable)
       const fadeOutTicks = Math.min(operation.fadeOut.ticks, playable - fadeInTicks)
-      addItem(musicLane, makeItem({
+      addItem(lane, makeItem({
         id: `music:${operation.musicId}:0`,
-        laneId: musicLane.id,
+        laneId: lane.id,
         kind: 'music',
         state: 'committed',
         label: displayAsset(operation.assetId, 'Music'),
@@ -694,6 +757,16 @@ export const buildTimelineViewModel = (
       return
     }
 
+    const visualIdentity = operation.kind === 'add-title'
+      ? operation.titleId
+      : operation.kind === 'add-callout'
+        ? operation.calloutId
+        : operation.overlayId
+    const lane = assignedLane('visual', visualIdentity, defaultOverlayLane)
+    if (!lane) {
+      addDiagnostic('OPERATION_UNSUPPORTED', 'Visual has no compatible video track.', operation.operationId, trace?.changeSetId ?? null)
+      return
+    }
     const placements = enabledPlacements(operation.assetId, operation.sourceInterval)
     if (placements.length === 0) {
       const label = operation.kind === 'add-title'
@@ -708,9 +781,9 @@ export const buildTimelineViewModel = (
     placements.forEach((placement, placementIndex) => {
       const sourceOffset = placement.sourceRange.start.ticks - operation.sourceInterval.start.ticks
       if (operation.kind === 'add-title') {
-        addItem(overlayLane, makeItem({
+        addItem(lane, makeItem({
           id: `overlay:${operation.titleId}:${placementIndex}`,
-          laneId: overlayLane.id,
+          laneId: lane.id,
           kind: 'title',
           state: 'committed',
           label: previewText(operation.headline, 'Title'),
@@ -734,9 +807,9 @@ export const buildTimelineViewModel = (
           proposalBaseRevision: null,
         }, selectedItemIds))
       } else if (operation.kind === 'add-callout') {
-        addItem(overlayLane, makeItem({
+        addItem(lane, makeItem({
           id: `overlay:${operation.calloutId}:${placementIndex}`,
-          laneId: overlayLane.id,
+          laneId: lane.id,
           kind: 'callout',
           state: 'committed',
           label: previewText(operation.label, 'Callout'),
@@ -761,9 +834,9 @@ export const buildTimelineViewModel = (
         }, selectedItemIds))
       } else {
         const overlayAsset = findAsset(project.assets, operation.overlayAssetId)
-        addItem(overlayLane, makeItem({
+        addItem(lane, makeItem({
           id: `overlay:${operation.overlayId}:${placementIndex}`,
-          laneId: overlayLane.id,
+          laneId: lane.id,
           kind: 'media-overlay',
           state: 'committed',
           label: displayAsset(
@@ -845,6 +918,11 @@ export const buildTimelineViewModel = (
     sourceStartFor: (placement: SourceSpanPlacement) => number,
     visualId: string,
   ): void => {
+    const lane = assignedLane('visual', visualId, defaultOverlayLane)
+    if (!lane) {
+      addDiagnostic('OPERATION_UNSUPPORTED', `Proposed ${kind} has no compatible video track.`, operation.operationId, null)
+      return
+    }
     const placements = enabledPlacements(operation.assetId, operation.sourceInterval)
     if (placements.length === 0) {
       addDiagnostic(
@@ -856,9 +934,9 @@ export const buildTimelineViewModel = (
       return
     }
     placements.forEach((placement, placementIndex) => {
-      addItem(overlayLane, makeItem({
+      addItem(lane, makeItem({
         id: `proposal:${proposal.proposalId}:${operation.operationId}:${placementIndex}`,
-        laneId: overlayLane.id,
+        laneId: lane.id,
         kind,
         state: 'proposed',
         label,
@@ -964,6 +1042,11 @@ export const buildTimelineViewModel = (
         return
       }
       if (operation.kind === 'add-music' || operation.kind === 'set-music') {
+        const lane = assignedLane('audio', operation.musicId, defaultMusicLane)
+        if (!lane) {
+          addDiagnostic('OPERATION_UNSUPPORTED', 'Proposed music has no compatible audio track.', operation.operationId, null)
+          return
+        }
         const asset = findAsset(project.assets, operation.assetId)
         const playable = asset?.mediaKind === 'audio'
           ? Math.min(
@@ -982,9 +1065,9 @@ export const buildTimelineViewModel = (
         }
         const fadeInTicks = Math.min(operation.fadeIn.ticks, playable)
         const fadeOutTicks = Math.min(operation.fadeOut.ticks, playable - fadeInTicks)
-        addItem(musicLane, makeItem({
+        addItem(lane, makeItem({
           id: `proposal:${proposal.proposalId}:${operation.operationId}:0`,
-          laneId: musicLane.id,
+          laneId: lane.id,
           kind: 'music',
           state: 'proposed',
           label: displayAsset(operation.assetId, 'Music'),
@@ -1009,6 +1092,11 @@ export const buildTimelineViewModel = (
         return
       }
       if (operation.kind === 'add-captions') {
+        const lane = assignedLane('caption', operation.captionSetId, defaultCaptionLane)
+        if (!lane) {
+          addDiagnostic('OPERATION_UNSUPPORTED', 'Proposed captions have no compatible caption track.', operation.operationId, null)
+          return
+        }
         operation.cues.forEach((cue) => {
           const placements = enabledPlacements(operation.assetId, cue.sourceInterval)
           if (placements.length === 0) {
@@ -1022,9 +1110,9 @@ export const buildTimelineViewModel = (
           }
           placements.forEach((placement, placementIndex) => {
             const text = cue.lines.join(' ')
-            addItem(captionLane, makeItem({
+            addItem(lane, makeItem({
               id: `proposal:${proposal.proposalId}:${operation.operationId}:${cue.cueId}:${placementIndex}`,
-              laneId: captionLane.id,
+              laneId: lane.id,
               kind: 'caption',
               state: 'proposed',
               label: previewText(text, 'Caption'),
@@ -1069,6 +1157,13 @@ export const buildTimelineViewModel = (
     [...laneDrafts.values()]
       .map((lane) => Object.freeze({
         id: lane.id,
+        trackId: lane.trackId,
+        trackKind: lane.trackKind,
+        trackRole: lane.trackRole,
+        trackName: lane.trackName,
+        syncLockEnabled: lane.syncLockEnabled,
+        outputEnabled: lane.outputEnabled,
+        audioState: lane.audioState,
         kind: lane.kind,
         label: lane.label,
         order: lane.order,

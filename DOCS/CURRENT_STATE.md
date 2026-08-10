@@ -9,14 +9,9 @@ gate table, per-gate checklist and invariants are in
 `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md` — **read that
 file first in any new session.**
 
-**Gates T0 through T4 are DONE. T5 through T7 are NOT STARTED.** Final T4 gate: **2,419/2,419 tests**, all-workspace production build PASS, real Microsoft Edge 151 keyframe/Graph workflow on owner media, detached Graph/Bezier drag proof, one-video continuity, responsive proof, Undo/Redo/reopen, and a real revision-7 1920×1080 H.264/AAC export. T4 evidence is under `DOCS/evidence/2026-08-04-timeline-completion/T4_*.md` plus the adjacent `t4-*` machine-readable/screenshots/frame artifacts.
+**Gates T0 through T5 are DONE. T6 and T7 are NOT STARTED.** Final T5 gate: **2,501/2,501 tests**, all-workspace production build PASS, real Microsoft Edge 151 advanced-track workflow on real 30-second H.264/AAC media, reload/reopen and one-video continuity, responsive 1440/1024/390 proof, zero runtime/console errors, zero HTTP responses >=400, and a real revision-13 1280×720 H.264/AAC export whose downloaded and server-side SHA-256 match. T5 evidence is under `DOCS/evidence/2026-08-04-timeline-completion/T5_*.md` plus the adjacent `t5-*` machine-readable/screenshots/frame artifacts.
 
-T2's final verification found and fixed two real defects before closure: Hold
-Frame was enabled but not routed to its panel, and Rate Stretch silently removed
-Reverse because the Studio adapter hard-coded `forward`. Both are now held by
-regression/browser evidence.
-
-**Gate T4 Keyframe Lanes and Graph Editing is complete in the dedicated editor branch `timeline-t4-keyframe-graph`, based exactly on verified T3 SHA `aed76ac0232e8a920812b800d234a96e32de7396`.** Permanent ownership enforcement remains active through `DOCS/PROGRAM_OWNERSHIP.md` and `tools/program-ownership/check-editor-boundary.mjs`. T4 adds closed Editor animation capabilities/time projection, full-state keyframe planners, expandable property lanes, shared selection/clipboard, truthful interpolation, a bounded Timeline-local Property Graph, Inspector/Canvas synchronization, T2/T3 timing interaction coverage and real Preview/export proof. T5 remains not started.
+**Gate T5 Advanced Track Controls and Expandable Tracks is complete in the dedicated editor branch `timeline-t5-advanced-tracks`, continuing from the verified T4 program tip `99dcb6a71085b314414f2a4e0d526b9c5348855d`.** Permanent ownership enforcement remains active through `DOCS/PROGRAM_OWNERSHIP.md` and `tools/program-ownership/check-editor-boundary.mjs`. T5 adds stable typed track identities, dynamic video/audio/caption rows, track operations/output/Sync Lock/Targeting/Track Select, static audio mix state, real Combined/Separate L/R waveform presentation, stable render ordering, caption-track independence, T4 animation preservation and bounded stress coverage without creating a second project, Preview or export authority. T6 remains not started and requires explicit owner authorization.
 
 ### Gate T0, thing one: the preview stopped lying
 

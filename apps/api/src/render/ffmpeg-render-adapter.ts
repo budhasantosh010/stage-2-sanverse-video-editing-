@@ -1123,6 +1123,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
     sourceStartTicks: number,
     durationTicks: number,
     gainDb: number,
+    pan: number,
     fadeInTicks: number,
     fadeOutTicks: number,
   ): void => {
@@ -1135,6 +1136,8 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
       `aformat=sample_fmts=fltp:channel_layouts=${AUDIO_CHANNEL_LAYOUT}`,
     ]
     if (gainDb !== 0) steps.push(`volume=${gainDb}dB`)
+    const trackPan = panFilter(pan)
+    if (trackPan !== null) steps.push(trackPan)
     if (fadeInTicks > 0) steps.push(`afade=t=in:st=0:d=${ticksToSeconds(fadeInTicks)}`)
     if (fadeOutTicks > 0) {
       steps.push(`afade=t=out:st=${ticksToSeconds(durationTicks - fadeOutTicks)}:d=${ticksToSeconds(fadeOutTicks)}`)
@@ -1207,6 +1210,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
       node.sourceStartTicks,
       node.interval.duration.ticks,
       node.gainDb,
+      node.pan,
       node.fadeInTicks,
       node.fadeOutTicks,
     )
@@ -1221,6 +1225,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
       node.interval.start.ticks,
       node.sourceStartTicks,
       node.interval.duration.ticks,
+      0,
       0,
       0,
       0,

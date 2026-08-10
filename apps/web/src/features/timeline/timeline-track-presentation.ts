@@ -1,4 +1,5 @@
-import { TIMELINE_TRACK_IDS, type TimelineTrackId } from '@sanverse/edit-domain'
+import { TIMELINE_TRACK_IDS, isTimelineTrackId } from '@sanverse/edit-domain'
+import { isStableTimelineTrackId } from '@sanverse/edit-domain/timeline-tracks'
 
 import {
   DEFAULT_VERTICAL_ZOOM_BASIS_POINTS,
@@ -8,37 +9,13 @@ import {
 /**
  * How tall each row is drawn, and whether it is folded away.
  *
- * ## Why this is NOT part of the project
- *
- * Exactly the same argument as the padlocks in `timeline-lock-state.ts`. Making
- * a row taller so you can see the waveform changes nothing about the finished
- * video. If it lived in the project it would:
- *
- *   - take a revision, so resizing a row would look like an edit;
- *   - take a slot in Undo, so pressing Undo after resizing would put the row
- *     back instead of undoing the cut the user actually wants back;
- *   - and — before the export key was fixed — throw away a finished export.
- *
- * There is a fourth reason that is specific to this one. Row height is about the
- * SCREEN, and two people opening the same project do not have the same screen. A
- * height that suits a 27-inch monitor is unusable on a laptop. Carrying it in
- * the project would push one person's monitor onto another person's laptop.
- *
- * So it lives in the browser, keyed by project, exactly like the padlocks.
+ * This is workspace presentation, never project/edit authority. T5 stores new
+ * values by stable Track Model V2 id (`track_...`). Legacy V/A/C display ids are
+ * still accepted on read so a T4 browser preference can be migrated when the
+ * project first opens after T5.
  */
 export const TRACK_PRESENTATION_SCHEMA_VERSION = 'sanverse.timeline-track-presentation/v1'
 
-/**
- * The three named sizes, and what each is for.
- *
- * Named rather than free numbers because a user asked to pick a number picks
- * badly — too small to read, or so tall that two rows fill the panel. The names
- * describe the JOB, not the pixels: "I need to see more rows" versus "I need to
- * see this waveform properly".
- *
- * A custom height still exists for the one person who genuinely wants 92 pixels,
- * and it is bounded so it can never be dragged to nothing.
- */
 export const TRACK_HEIGHT_PRESETS = Object.freeze(['compact', 'standard', 'tall'] as const)
 export type TrackHeightPreset = (typeof TRACK_HEIGHT_PRESETS)[number]
 
@@ -48,18 +25,15 @@ export const TRACK_HEIGHT_PX: Readonly<Record<TrackHeightPreset, number>> = Obje
   tall: 96,
 })
 
-/** A row can never be dragged smaller than this. Below it the label is unreadable. */
 export const MIN_TRACK_HEIGHT_PX = 24
-/** Nor larger than this. Beyond it one row fills the panel and hides the rest. */
 export const MAX_TRACK_HEIGHT_PX = 240
-/** A folded row keeps a thin strip so it can still be found and unfolded. */
 export const COLLAPSED_TRACK_HEIGHT_PX = 14
 
 export type TrackPresentationV1 = Readonly<{
   schemaVersion: typeof TRACK_PRESENTATION_SCHEMA_VERSION
-  /** Named size or an exact number of pixels, per track. */
-  heights: Readonly<Partial<Record<TimelineTrackId, TrackHeightPreset | number>>>
-  collapsed: readonly TimelineTrackId[]
+  /** Stable ids after reconciliation; legacy aliases may exist only immediately after parsing old storage. */
+  heights: Readonly<Record<string, TrackHeightPreset | number>>
+  collapsed: readonly string[]
 }>
 
 export const DEFAULT_TRACK_PRESENTATION: TrackPresentationV1 = Object.freeze({
@@ -71,16 +45,12 @@ export const DEFAULT_TRACK_PRESENTATION: TrackPresentationV1 = Object.freeze({
 const isTrackHeightPreset = (value: unknown): value is TrackHeightPreset =>
   typeof value === 'string' && (TRACK_HEIGHT_PRESETS as readonly string[]).includes(value)
 
-/**
- * How tall this row actually is, right now.
- *
- * `fallbackPx` is what the timeline already worked out from the window width, so
- * a user who has never touched any of this gets exactly the behaviour they had
- * before — the rows still shrink sensibly on a small screen.
- */
+const isPresentationTrackReference = (value: unknown): value is string =>
+  isTimelineTrackId(value) || isStableTimelineTrackId(value)
+
 export const trackHeightPx = (
   state: TrackPresentationV1,
-  trackId: TimelineTrackId,
+  trackId: string,
   fallbackPx: number,
 ): number => {
   if (state.collapsed.includes(trackId)) return COLLAPSED_TRACK_HEIGHT_PX
@@ -92,16 +62,10 @@ export const trackHeightPx = (
   return fallbackPx
 }
 
-/**
- * Apply the global vertical zoom to the stored BASE height.
- *
- * Folding stays a fixed 14-pixel strip. The multiplier never overwrites a
- * preset or custom height, so returning to 100% restores the exact base value.
- */
 export const effectiveTrackHeightPx = (
   state: TrackPresentationV1,
   zoom: TimelineVerticalZoomV1,
-  trackId: TimelineTrackId,
+  trackId: string,
   fallbackPx: number,
 ): number => {
   if (state.collapsed.includes(trackId)) return COLLAPSED_TRACK_HEIGHT_PX
@@ -115,12 +79,12 @@ export const effectiveTrackHeightPx = (
   )
 }
 
-export const isTrackCollapsed = (state: TrackPresentationV1, trackId: TimelineTrackId): boolean =>
+export const isTrackCollapsed = (state: TrackPresentationV1, trackId: string): boolean =>
   state.collapsed.includes(trackId)
 
 export const setTrackHeight = (
   state: TrackPresentationV1,
-  trackId: TimelineTrackId,
+  trackId: string,
   height: TrackHeightPreset | number,
 ): TrackPresentationV1 =>
   Object.freeze({
@@ -131,14 +95,12 @@ export const setTrackHeight = (
         ? Math.min(MAX_TRACK_HEIGHT_PX, Math.max(MIN_TRACK_HEIGHT_PX, Math.round(height)))
         : height,
     }),
-    // Setting a height unfolds the row. Asking for a height and getting a folded
-    // strip would look like the control was ignored.
     collapsed: Object.freeze(state.collapsed.filter((id) => id !== trackId)),
   })
 
 export const toggleTrackCollapsed = (
   state: TrackPresentationV1,
-  trackId: TimelineTrackId,
+  trackId: string,
 ): TrackPresentationV1 =>
   Object.freeze({
     schemaVersion: TRACK_PRESENTATION_SCHEMA_VERSION,
@@ -150,27 +112,17 @@ export const toggleTrackCollapsed = (
     ),
   })
 
-/**
- * Fit tracks — make every row fit the space there is.
- *
- * Divides the available height between the rows that are not folded away, then
- * holds the result inside the same bounds a dragged row obeys. Folded rows keep
- * their thin strip and are not counted, which is the point of folding one.
- *
- * When there is not enough room even at the minimum, every row gets the minimum
- * and the timeline scrolls. Squeezing them below the readable size to avoid a
- * scrollbar would trade a scrollbar for rows nobody can read.
- */
 export const fitTrackHeights = (
   state: TrackPresentationV1,
   availableHeightPx: number,
+  trackIds: readonly string[] = TIMELINE_TRACK_IDS,
 ): TrackPresentationV1 => {
-  const open = TIMELINE_TRACK_IDS.filter((trackId) => !state.collapsed.includes(trackId))
+  const open = trackIds.filter((trackId) => !state.collapsed.includes(trackId))
   if (open.length === 0) return state
-  const usedByFolded = (TIMELINE_TRACK_IDS.length - open.length) * COLLAPSED_TRACK_HEIGHT_PX
+  const usedByFolded = (trackIds.length - open.length) * COLLAPSED_TRACK_HEIGHT_PX
   const each = Math.floor(Math.max(0, availableHeightPx - usedByFolded) / open.length)
   const bounded = Math.min(MAX_TRACK_HEIGHT_PX, Math.max(MIN_TRACK_HEIGHT_PX, each))
-  const heights: Partial<Record<TimelineTrackId, number>> = {}
+  const heights: Record<string, number> = {}
   for (const trackId of open) heights[trackId] = bounded
   return Object.freeze({
     schemaVersion: TRACK_PRESENTATION_SCHEMA_VERSION,
@@ -179,51 +131,66 @@ export const fitTrackHeights = (
   })
 }
 
-/** Every row back to the size the window decides. */
 export const resetTrackPresentation = (): TrackPresentationV1 => DEFAULT_TRACK_PRESENTATION
 
-/**
- * Read whatever is stored, and refuse to trust any of it.
- *
- * Anything unrecognised produces the default, exactly as the padlocks do. A
- * corrupted workspace setting must never stop somebody opening their project,
- * and the safe direction here is "the sizes the window would have chosen".
- */
 export const parseTrackPresentation = (raw: unknown): TrackPresentationV1 => {
   if (typeof raw !== 'string' || raw.length === 0) return DEFAULT_TRACK_PRESENTATION
   let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    return DEFAULT_TRACK_PRESENTATION
-  }
+  try { parsed = JSON.parse(raw) } catch { return DEFAULT_TRACK_PRESENTATION }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return DEFAULT_TRACK_PRESENTATION
   const record = parsed as Record<string, unknown>
   if (record.schemaVersion !== TRACK_PRESENTATION_SCHEMA_VERSION) return DEFAULT_TRACK_PRESENTATION
 
-  const heights: Partial<Record<TimelineTrackId, TrackHeightPreset | number>> = {}
+  const heights: Record<string, TrackHeightPreset | number> = {}
   if (typeof record.heights === 'object' && record.heights !== null && !Array.isArray(record.heights)) {
     for (const [key, value] of Object.entries(record.heights as Record<string, unknown>)) {
-      if (!(TIMELINE_TRACK_IDS as readonly string[]).includes(key)) continue
-      if (isTrackHeightPreset(value)) heights[key as TimelineTrackId] = value
+      if (!isPresentationTrackReference(key)) continue
+      if (isTrackHeightPreset(value)) heights[key] = value
       else if (typeof value === 'number' && Number.isFinite(value)) {
-        heights[key as TimelineTrackId] = Math.min(
-          MAX_TRACK_HEIGHT_PX,
-          Math.max(MIN_TRACK_HEIGHT_PX, Math.round(value)),
-        )
+        heights[key] = Math.min(MAX_TRACK_HEIGHT_PX, Math.max(MIN_TRACK_HEIGHT_PX, Math.round(value)))
       }
     }
   }
-
   const collapsed = Array.isArray(record.collapsed)
-    ? record.collapsed.filter((id): id is TimelineTrackId =>
-      (TIMELINE_TRACK_IDS as readonly string[]).includes(id as string))
+    ? record.collapsed.filter(isPresentationTrackReference)
     : []
-
   return Object.freeze({
     schemaVersion: TRACK_PRESENTATION_SCHEMA_VERSION,
     heights: Object.freeze(heights),
     collapsed: Object.freeze([...new Set(collapsed)]),
+  })
+}
+
+export type TrackPresentationIdentity = Readonly<{
+  trackId: string
+  /** T0–T4 row alias, such as V1/A2, when this is a migrated legacy row. */
+  legacyDisplayId: string | null
+}>
+
+/**
+ * Convert legacy V1/V2/C1/A1/A2 workspace preferences to the exact current
+ * stable ids and discard preferences for tracks that no longer exist.
+ */
+export const reconcileTrackPresentation = (
+  state: TrackPresentationV1,
+  tracks: readonly TrackPresentationIdentity[],
+): TrackPresentationV1 => {
+  const heights: Record<string, TrackHeightPreset | number> = {}
+  const collapsed: string[] = []
+  for (const track of tracks) {
+    if (!isStableTimelineTrackId(track.trackId)) continue
+    const stored = state.heights[track.trackId]
+      ?? (track.legacyDisplayId ? state.heights[track.legacyDisplayId] : undefined)
+    if (stored !== undefined) heights[track.trackId] = stored
+    if (
+      state.collapsed.includes(track.trackId) ||
+      (track.legacyDisplayId !== null && state.collapsed.includes(track.legacyDisplayId))
+    ) collapsed.push(track.trackId)
+  }
+  return Object.freeze({
+    schemaVersion: TRACK_PRESENTATION_SCHEMA_VERSION,
+    heights: Object.freeze(heights),
+    collapsed: Object.freeze(collapsed),
   })
 }
 
@@ -233,8 +200,6 @@ export const readTrackPresentation = (projectId: string): TrackPresentationV1 =>
   try {
     return parseTrackPresentation(globalThis.localStorage?.getItem(storageKey(projectId)))
   } catch {
-    // Private browsing and blocked storage both throw. Losing a row height is an
-    // inconvenience; refusing to open the editor is not acceptable.
     return DEFAULT_TRACK_PRESENTATION
   }
 }
@@ -243,6 +208,6 @@ export const writeTrackPresentation = (projectId: string, state: TrackPresentati
   try {
     globalThis.localStorage?.setItem(storageKey(projectId), JSON.stringify(state))
   } catch {
-    // Same reasoning: this is a preference, not the user's work.
+    // Presentation can be lost; the project must remain usable.
   }
 }

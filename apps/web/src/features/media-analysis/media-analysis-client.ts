@@ -145,9 +145,18 @@ export const reversePreviewRequestUrl = (
   return `${base}?${params.toString()}`
 }
 
+export type WaveformChannelPeaksV2 = Readonly<{ label: 'L' | 'R'; peaks: readonly number[] }>
+export type WaveformAnalysisValue = readonly number[] | Readonly<{
+  schemaVersion: 'sanverse.waveform-block/v2'
+  channelCount: number
+  channelLayout: string | null
+  peaks: readonly number[]
+  channels: readonly WaveformChannelPeaksV2[]
+}>
+
 export type MediaAnalysisClient = Readonly<{
   picture(projectId: string, key: MediaAnalysisKeyV1, signal: AbortSignal): Promise<ImageBitmap>
-  peaks(projectId: string, key: MediaAnalysisKeyV1, signal: AbortSignal): Promise<readonly number[]>
+  peaks(projectId: string, key: MediaAnalysisKeyV1, signal: AbortSignal): Promise<WaveformAnalysisValue>
   normalization?(
     projectId: string,
     request: AudioNormalizationRequestV1,
@@ -259,17 +268,44 @@ export const createMediaAnalysisClient = (options: Readonly<{
  * spilling out of its lane, or drawing upside down. Every value has to be a real
  * number between 0 and 1.
  */
-export const parseWaveformBlock = (value: unknown): readonly number[] | null => {
+export const parseWaveformBlock = (value: unknown): WaveformAnalysisValue | null => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
   const record = value as Record<string, unknown>
-  if (record.schemaVersion !== 'sanverse.waveform-block/v1') return null
-  if (!Array.isArray(record.peaks) || record.peaks.length === 0) return null
-  const peaks: number[] = []
-  for (const entry of record.peaks) {
-    if (typeof entry !== 'number' || !Number.isFinite(entry) || entry < 0 || entry > 1) return null
-    peaks.push(entry)
+  const readPeaks = (input: unknown): readonly number[] | null => {
+    if (!Array.isArray(input) || input.length === 0) return null
+    const peaks: number[] = []
+    for (const entry of input) {
+      if (typeof entry !== 'number' || !Number.isFinite(entry) || entry < 0 || entry > 1) return null
+      peaks.push(entry)
+    }
+    return Object.freeze(peaks)
   }
-  return Object.freeze(peaks)
+  const peaks = readPeaks(record.peaks)
+  if (peaks === null) return null
+  // v1 remains readable so an in-flight/cached Gate-D block never breaks a
+  // Timeline opened during this upgrade. v2 is what new analysis writes.
+  if (record.schemaVersion === 'sanverse.waveform-block/v1') return peaks
+  if (record.schemaVersion !== 'sanverse.waveform-block/v2') return null
+  if (!Number.isSafeInteger(record.channelCount) || (record.channelCount as number) < 1 || (record.channelCount as number) > 32) return null
+  if (record.channelLayout !== null && typeof record.channelLayout !== 'string') return null
+  if (!Array.isArray(record.channels)) return null
+  const channels: WaveformChannelPeaksV2[] = []
+  for (const rawChannel of record.channels) {
+    if (typeof rawChannel !== 'object' || rawChannel === null || Array.isArray(rawChannel)) return null
+    const channel = rawChannel as Record<string, unknown>
+    if (channel.label !== 'L' && channel.label !== 'R') return null
+    const channelPeaks = readPeaks(channel.peaks)
+    if (channelPeaks === null || channelPeaks.length !== peaks.length) return null
+    channels.push(Object.freeze({ label: channel.label, peaks: channelPeaks }))
+  }
+  if (channels.length !== 0 && (record.channelCount !== 2 || record.channelLayout !== 'stereo' || channels.length !== 2)) return null
+  return Object.freeze({
+    schemaVersion: 'sanverse.waveform-block/v2' as const,
+    channelCount: record.channelCount as number,
+    channelLayout: record.channelLayout as string | null,
+    peaks,
+    channels: Object.freeze(channels),
+  })
 }
 
 export const parseAudioNormalizationEvidence = (value: unknown): AudioNormalizationEvidenceV1 | null => {

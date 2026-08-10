@@ -25,12 +25,14 @@ import {
   OVERLAY_REMOVE_PRIMITIVE_ID,
   activeTimelineGroups,
   activeTimelineMarkers,
+  activeTimelineTrackState,
   activeTrackOutputs,
   type MarkerColor,
   OPERATION_SCHEMA_VERSION,
   type SetFootageMotionOperation,
 } from '@sanverse/edit-domain'
 import { TRACK_OUTPUT_PRIMITIVE_ID } from '@sanverse/edit-domain/capabilities'
+import { trackById, tracksOfKind } from '@sanverse/edit-domain/timeline-tracks'
 import { proposalPlacement } from '../../app/app-state'
 import type { ConversationState, PendingProposal, ProposalRepair, StudioState } from '../../app/app-state'
 import { ChatComposer } from '../../features/conversation/ChatComposer'
@@ -42,6 +44,7 @@ import {
   DEFAULT_TRACK_PRESENTATION,
   EMPTY_CLIPBOARD,
   EMPTY_SELECTION,
+  EMPTY_TIMELINE_TARGETING,
   TIMELINE_LOCK_SCHEMA_VERSION,
   adaptTimelineGesture,
   advanceShuttle,
@@ -62,10 +65,27 @@ import {
   planPrecisionTrimRequest,
   planTimelineItemAction,
   planTimelinePlacement,
+  planAddTimelineTrack,
+  planDeleteTimelineTrack,
+  planMoveItemToTopTrack,
+  planAssignTimelineItemTrack,
+  familyAndIdentityForTimelineItem,
+  planRenameTimelineTrack,
+  planReorderTimelineTrack,
+  planSetTrackAudioState,
+  planSetTrackSyncLock,
+  selectTrackDirection,
+  planOperationsForSyncLock,
+  augmentOperationsForTimelineTargeting,
+  reconcileTimelineTargetingState,
+  readTimelineTargetingState,
+  toggleTimelineTrackTarget,
+  writeTimelineTargetingState,
   planUngroupItem,
   planUpdateMarker,
   readKeymap,
   readTimelineLockState,
+  reconcileTimelineLockState,
   readTrackPresentation,
   readTimelineZoomPresentation,
   shuttleDeltaTicks,
@@ -541,7 +561,8 @@ export function StudioScreen({
    * change the export key, re-encoding an identical video for a minute and a
    * half. Hiding a track is the opposite and belongs in the project.
    */
-  const [lockedTrackIds, setLockedTrackIds] = useState<readonly TimelineTrackId[]>([])
+  const [lockedTrackIds, setLockedTrackIds] = useState<readonly string[]>([])
+  const [timelineTargeting, setTimelineTargeting] = useState(EMPTY_TIMELINE_TARGETING)
 
   /**
    * How a drop lands, and whether edges snap. Both are workspace preferences,
@@ -557,13 +578,38 @@ export function StudioScreen({
    * are the same fact.
    */
   const trackOutputs = useMemo(() => activeTrackOutputs(editProject), [editProject])
+  const timelineTrackState = useMemo(() => activeTimelineTrackState(editProject), [editProject])
+  const plannerLockedTrackIds = useMemo<readonly string[]>(() => {
+    const ids = new Set<string>(lockedTrackIds)
+    const legacyAliases: readonly [string, 'V2' | 'V1' | 'C1' | 'A1' | 'A2'][] = Object.freeze([
+      ['overlay-video', 'V2'],
+      ['primary-video', 'V1'],
+      ['captions', 'C1'],
+      ['dialogue', 'A1'],
+      ['music', 'A2'],
+    ])
+    for (const [role, alias] of legacyAliases) {
+      const track = timelineTrackState.tracks.find((candidate) => candidate.role === role)
+      if (track && ids.has(track.trackId)) ids.add(alias)
+    }
+    return Object.freeze([...ids])
+  }, [lockedTrackIds, timelineTrackState])
 
   // Padlocks are remembered per project in this browser. They are read once
   // when a project opens, and never sent to the server: they are about this
   // person's mouse, not about the video.
   useEffect(() => {
-    setLockedTrackIds(readTimelineLockState(editProject.projectId).lockedTrackIds)
+    const reconciledLocks = reconcileTimelineLockState(
+      readTimelineLockState(editProject.projectId),
+      activeTimelineTrackState(editProject),
+    )
+    setLockedTrackIds(reconciledLocks.lockedTrackIds)
+    writeTimelineLockState(editProject.projectId, reconciledLocks)
     setTrackPresentation(readTrackPresentation(editProject.projectId))
+    setTimelineTargeting(reconcileTimelineTargetingState(
+      readTimelineTargetingState(editProject.projectId),
+      activeTimelineTrackState(editProject),
+    ))
   }, [editProject.projectId])
 
   // Shortcuts belong to the PERSON, not to one video, so they are read once and
@@ -1904,7 +1950,7 @@ export function StudioScreen({
     : null
   const animationSubject = useMemo<TimelineAnimationSubjectV1 | null>(() => {
     if (!selectedTimelineItem) return null
-    const trackId = trackIdForLane(selectedTimelineItem.laneId)
+    const trackId = selectedTimelineItem.trackId as TimelineTrackId
     const locked = lockedTrackIds.includes(trackId)
     if (selectedVideoSelection && footageMotionDraft && !isFreezeClip(selectedVideoSelection.clip)) {
       return Object.freeze({
@@ -2386,25 +2432,28 @@ export function StudioScreen({
       atTicks,
       placementMode: timelinePlacementMode,
       includeLinkedAudio: false,
-      trackState: { lockedTrackIds: lockedTrackIds },
+      trackState: { lockedTrackIds: plannerLockedTrackIds },
       proposalPending: Boolean(proposal),
       exportInProgress: isRendering,
       expectedRevision: editProject.revision,
       idFactory: createIdFactory(changeSetId),
     }, {
-      // What is already on the target lane, named, so Insert knows which clips
-      // to push along and Overwrite knows which to cut back.
-      spans: laneSpans(editProject, trackIdForLane(laneId) === 'A2' ? 'A2' : 'V2'),
+      // Default V2/A2 retain the mature rearrangement planner. Added T5 tracks
+      // still expose truthful collision spans for Normal placement; Insert and
+      // Overwrite refuse there until their contents can be rewritten safely.
+      spans: laneId === 'lane:overlay'
+        ? laneSpans(editProject, 'V2')
+        : laneId === 'lane:music'
+          ? laneSpans(editProject, 'A2')
+          : (timelineModel.lanes.find((lane) => lane.id === laneId)?.items ?? [])
+              .filter((item) => item.kind !== 'gap')
+              .map((item) => Object.freeze({ startTicks: item.startTicks, durationTicks: item.durationTicks })),
     })
     if (!plan.ok) {
       setTimelineNotice(plan.error.message)
       return
     }
-    setTimelineNotice(null)
-    void (async () => {
-      const failure = await onApplyOperations(plan.value.operations, changeSetId)
-      if (failure) setTimelineNotice(failure)
-    })()
+    applyPlanned(Object.freeze({ ok: true as const, operations: plan.value.operations }), changeSetId)
   }
 
   /**
@@ -2420,7 +2469,7 @@ export function StudioScreen({
       project: editProject,
       itemId,
       action,
-      lockedTrackIds,
+      lockedTrackIds: plannerLockedTrackIds,
       pendingProposalExists: Boolean(proposal),
       exportInProgress: isRendering,
       expectedRevision: editProject.revision,
@@ -2430,11 +2479,7 @@ export function StudioScreen({
       setTimelineNotice(plan.refusal.message)
       return
     }
-    setTimelineNotice(null)
-    void (async () => {
-      const failure = await onApplyOperations(plan.operations, changeSetId)
-      if (failure) setTimelineNotice(failure)
-    })()
+    applyPlanned(Object.freeze({ ok: true as const, operations: plan.operations }), changeSetId)
   }
 
   /**
@@ -2451,7 +2496,7 @@ export function StudioScreen({
       project: editProject,
       itemIds: timelineSelection.itemIds,
       gesture,
-      lockedTrackIds,
+      lockedTrackIds: plannerLockedTrackIds,
       pendingProposalExists: Boolean(proposal),
       exportInProgress: isRendering,
       expectedRevision: editProject.revision,
@@ -2461,11 +2506,7 @@ export function StudioScreen({
       setTimelineNotice(plan.refusal.message)
       return
     }
-    setTimelineNotice(null)
-    void (async () => {
-      const failure = await onApplyOperations(plan.operations, changeSetId)
-      if (failure) setTimelineNotice(failure)
-    })()
+    applyPlanned(Object.freeze({ ok: true as const, operations: plan.operations }), changeSetId)
   }
 
   /** Send one already-planned set of operations as one change set. */
@@ -2479,9 +2520,36 @@ export function StudioScreen({
       setTimelineNotice(plan.refusal.message)
       return
     }
+    const ids = createIdFactory(changeSetId)
+    const targetedOperations = augmentOperationsForTimelineTargeting({
+      project: editProject,
+      operations: plan.operations as readonly EditOperation[],
+      targeting: timelineTargeting,
+      ids,
+      operationSlotOffset: plan.operations.length,
+    })
+    const syncPlan = planOperationsForSyncLock({
+      project: editProject,
+      operations: targetedOperations,
+      ids,
+      operationSlotOffset: targetedOperations.length,
+    })
+    if (!syncPlan.ok) {
+      setTimelineNotice(syncPlan.refusal.message)
+      return
+    }
+    const operations = syncPlan.operations
     setTimelineNotice(null)
+    // Preserve the original single-Timeline-operation boundary for T0–T4.
+    // T5 uses the multi-operation path only when targeting/Sync Lock actually
+    // adds work. This keeps the established direct cut/trim API contract while
+    // still making compound T5 gestures one atomic change set.
+    if (operations.length === 1 && isTimelineOperation(operations[0])) {
+      onTimelineEdit(operations[0])
+      return
+    }
     void (async () => {
-      const failure = await onApplyOperations(plan.operations as never, changeSetId)
+      const failure = await onApplyOperations(operations, changeSetId)
       if (failure) setTimelineNotice(failure)
     })()
   }
@@ -2791,7 +2859,7 @@ export function StudioScreen({
     const ids = createIdFactory(changeSetId)
     const common = {
       project: editProject,
-      lockedTrackIds,
+      lockedTrackIds: plannerLockedTrackIds,
       pendingProposalExists: Boolean(proposal),
       exportInProgress: isRendering,
       expectedRevision: editProject.revision,
@@ -3035,20 +3103,147 @@ export function StudioScreen({
   function handleToggleTrackOutput(trackId: TimelineTrackId) {
     const changeSetId = createChangeSetId()
     const factory = createIdFactory(changeSetId)
+    const stable = trackById(timelineTrackState, trackId)
     const operation = {
       schemaVersion: OPERATION_SCHEMA_VERSION,
       operationId: factory.operation(0),
       kind: 'set-track-output' as const,
       capabilityId: TRACK_OUTPUT_PRIMITIVE_ID,
       trackId,
-      outputEnabled: !trackOutputs[trackId],
+      outputEnabled: !(stable?.outputEnabled ?? trackOutputs[trackId] ?? true),
       extensions: {},
     }
+    applyPlanned(Object.freeze({ ok: true as const, operations: [operation] }), changeSetId)
+  }
+
+  function handleToggleTrackTarget(trackId: TimelineTrackId) {
+    const track = trackById(timelineTrackState, trackId)
+    if (!track) {
+      setTimelineNotice('That track is no longer here.')
+      return
+    }
+    setTimelineTargeting((current) => {
+      const next = toggleTimelineTrackTarget(current, track)
+      writeTimelineTargetingState(editProject.projectId, next)
+      return next
+    })
     setTimelineNotice(null)
-    void (async () => {
-      const failure = await onApplyOperations([operation as never], changeSetId)
-      if (failure) setTimelineNotice(failure)
-    })()
+  }
+
+  function handleToggleTrackSyncLock(trackId: TimelineTrackId) {
+    const track = trackById(timelineTrackState, trackId)
+    if (!track) return setTimelineNotice('That track is no longer here.')
+    const changeSetId = createChangeSetId()
+    applyPlanned(planSetTrackSyncLock({
+      project: editProject,
+      trackId: track.trackId,
+      enabled: !track.syncLockEnabled,
+      ids: createIdFactory(changeSetId),
+    }), changeSetId)
+  }
+
+  function updateTrackAudioState(trackId: TimelineTrackId, patch: Partial<{ muted: boolean; solo: boolean; gainDb: number; pan: number }>) {
+    const track = trackById(timelineTrackState, trackId)
+    if (!track?.audioState) return setTimelineNotice('That is not an audio track.')
+    const changeSetId = createChangeSetId()
+    applyPlanned(planSetTrackAudioState({
+      project: editProject,
+      trackId: track.trackId,
+      audioState: Object.freeze({ ...track.audioState, ...patch }),
+      lockedTrackIds: plannerLockedTrackIds,
+      ids: createIdFactory(changeSetId),
+    }), changeSetId)
+  }
+
+  function handleRenameTrack(trackId: TimelineTrackId, name: string | null) {
+    const changeSetId = createChangeSetId()
+    applyPlanned(planRenameTimelineTrack({
+      project: editProject,
+      trackId,
+      name,
+      lockedTrackIds: plannerLockedTrackIds,
+      ids: createIdFactory(changeSetId),
+    }), changeSetId)
+  }
+
+  function handleReorderTrack(trackId: TimelineTrackId, direction: 'up' | 'down') {
+    const track = trackById(timelineTrackState, trackId)
+    if (!track) return setTimelineNotice('That track is no longer here.')
+    const peers = tracksOfKind(timelineTrackState, track.kind)
+    const current = peers.findIndex((candidate) => candidate.trackId === track.trackId)
+    const delta = track.kind === 'video'
+      ? direction === 'up' ? 1 : -1
+      : direction === 'up' ? -1 : 1
+    const changeSetId = createChangeSetId()
+    applyPlanned(planReorderTimelineTrack({
+      project: editProject,
+      trackId: track.trackId,
+      toIndex: current + delta,
+      lockedTrackIds: plannerLockedTrackIds,
+      ids: createIdFactory(changeSetId),
+    }), changeSetId)
+  }
+
+  function handleDeleteTrack(trackId: TimelineTrackId, mode: 'empty-only' | 'with-contents') {
+    const changeSetId = createChangeSetId()
+    applyPlanned(planDeleteTimelineTrack({
+      project: editProject,
+      model: timelineModel,
+      trackId,
+      mode,
+      lockedTrackIds: plannerLockedTrackIds,
+      ids: createIdFactory(changeSetId),
+    }), changeSetId)
+  }
+
+  function handleAddTrack(kind: 'video' | 'audio' | 'caption') {
+    const changeSetId = createChangeSetId()
+    applyPlanned(planAddTimelineTrack({
+      project: editProject,
+      kind,
+      ids: createIdFactory(changeSetId),
+    }), changeSetId)
+  }
+
+  function handleMoveItemToTrack(itemId: string, trackId: TimelineTrackId) {
+    const item = timelineModel.lanes.flatMap((lane) => lane.items).find((candidate) => candidate.id === itemId)
+    if (!item) return setTimelineNotice('That item is no longer on the timeline.')
+    const family = familyAndIdentityForTimelineItem(item)
+    if (!family || family.family === 'primary' || family.family === 'dialogue') {
+      return setTimelineNotice('That item cannot be moved between tracks.')
+    }
+    const changeSetId = createChangeSetId()
+    applyPlanned(planAssignTimelineItemTrack({
+      project: editProject,
+      item,
+      family: family.family,
+      identity: family.identity,
+      destinationTrackId: trackId,
+      lockedTrackIds: plannerLockedTrackIds,
+      ids: createIdFactory(changeSetId),
+    }), changeSetId)
+  }
+
+  function handlePlaceItemOnTop(itemId: string) {
+    const changeSetId = createChangeSetId()
+    applyPlanned(planMoveItemToTopTrack({
+      project: editProject,
+      model: timelineModel,
+      itemId,
+      lockedTrackIds: plannerLockedTrackIds,
+      ids: createIdFactory(changeSetId),
+      createIfNeeded: true,
+    }), changeSetId)
+  }
+
+  function handleTrackSelectDirection(trackId: TimelineTrackId, direction: 'forward' | 'backward') {
+    setTimelineSelection(selectTrackDirection({
+      model: timelineModel,
+      trackIds: [trackId],
+      direction,
+      playheadTicks,
+    }))
+    setTimelineNotice(null)
   }
 
   function handleTimelineGesture(gesture: TimelineGesture) {
@@ -3068,8 +3263,8 @@ export function StudioScreen({
       setTimelineNotice('That timeline action produced an unsupported edit. Nothing changed.')
       return
     }
-    setTimelineNotice(null)
-    onTimelineEdit(result.value)
+    const changeSetId = createChangeSetId()
+    applyPlanned(Object.freeze({ ok: true as const, operations: [result.value] }), changeSetId)
   }
 
   /** Keep the proven controls as a temporary fallback, but route them through P1-A. */
@@ -4194,6 +4389,30 @@ export function StudioScreen({
           snappingEnabled={snappingEnabled}
           onToggleTrackLock={handleToggleTrackLock}
           onToggleTrackOutput={handleToggleTrackOutput}
+          targetedTrackIds={[
+            ...timelineTargeting.targetedVideoTrackIds,
+            ...timelineTargeting.targetedAudioTrackIds,
+            ...timelineTargeting.targetedCaptionTrackIds,
+          ]}
+          onToggleTrackTarget={handleToggleTrackTarget}
+          onToggleTrackSyncLock={handleToggleTrackSyncLock}
+          onToggleTrackMute={(trackId) => {
+            const track = trackById(timelineTrackState, trackId)
+            if (track?.audioState) updateTrackAudioState(trackId, { muted: !track.audioState.muted })
+          }}
+          onToggleTrackSolo={(trackId) => {
+            const track = trackById(timelineTrackState, trackId)
+            if (track?.audioState) updateTrackAudioState(trackId, { solo: !track.audioState.solo })
+          }}
+          onTrackGainDb={(trackId, gainDb) => updateTrackAudioState(trackId, { gainDb })}
+          onTrackPan={(trackId, pan) => updateTrackAudioState(trackId, { pan })}
+          onRenameTrack={handleRenameTrack}
+          onReorderTrack={handleReorderTrack}
+          onDeleteTrack={handleDeleteTrack}
+          onTrackSelectDirection={handleTrackSelectDirection}
+          onAddTrack={handleAddTrack}
+          onMoveItemToTrack={handleMoveItemToTrack}
+          onPlaceItemOnTop={handlePlaceItemOnTop}
           onPlacementMode={setTimelinePlacementMode}
           onToggleSnapping={() => setSnappingEnabled((current) => !current)}
           onItemAction={handleTimelineItemAction}

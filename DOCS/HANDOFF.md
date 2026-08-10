@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-**P1-F.1E — Complete Timeline Experience is complete through Gate T4.**
+**P1-F.1E — Complete Timeline Experience is complete through Gate T5.**
 
 The live gate table, per-gate checklist, program rules and traps are in:
 
@@ -12,35 +12,35 @@ DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md
 
 **Read that file before anything else.** Do not reconstruct state from chat.
 
-**Gates T0 through T4 are DONE. T5 through T7 are NOT STARTED.** Final T4 gate:
-**2,419/2,419 tests**, all-workspace production build PASS, a real Edge 151
-keyframe/Graph workflow with one-video continuity, and a real revision-7 MP4
-whose renderer SHA matches the file on disk.
+**Gates T0 through T5 are DONE. T6 and T7 are NOT STARTED.** Final T5 gate:
+**2,501/2,501 tests**, all-workspace production build PASS, a real Edge 151
+advanced-track workflow with reload/reopen and one-video continuity, responsive
+1440/1024/390 proof, and a real revision-13 MP4 whose downloaded SHA matches the
+server artifact.
 
-Final T4 closure evidence:
+Final T5 closure evidence:
 
 ```
-DOCS/evidence/2026-08-04-timeline-completion/T4_FINAL_CLOSURE.md
-DOCS/evidence/2026-08-04-timeline-completion/T4_BROWSER_WORKFLOW.md
-DOCS/evidence/2026-08-04-timeline-completion/T4_TEST_RESULTS.md
-DOCS/evidence/2026-08-04-timeline-completion/T4_EXPORT_EVIDENCE.md
-DOCS/evidence/2026-08-04-timeline-completion/t4-browser-report.json
-DOCS/evidence/2026-08-04-timeline-completion/t4-browser-screenshots/
-DOCS/evidence/2026-08-04-timeline-completion/t4-export-frames/
+DOCS/evidence/2026-08-04-timeline-completion/T5_FINAL_CLOSURE.md
+DOCS/evidence/2026-08-04-timeline-completion/T5_BROWSER_WORKFLOW.md
+DOCS/evidence/2026-08-04-timeline-completion/T5_TEST_RESULTS.md
+DOCS/evidence/2026-08-04-timeline-completion/T5_EXPORT_EVIDENCE.md
+DOCS/evidence/2026-08-04-timeline-completion/t5-browser-screenshots/
+DOCS/evidence/2026-08-04-timeline-completion/t5-export-metadata.json
 ```
 
-T4 now includes source-vs-visual animation time projection, closed full-state
-keyframe planners, expandable Timeline property lanes, shared keyframe
-selection/clipboard, truthful interpolation, a Timeline-local Property Graph,
-and Inspector/Canvas synchronization. Pointer movement remains detached; real
-Edge point and Bezier-handle drags produced exactly one accepted revision on
-release. Graph zoom and Studio workspace changes produced zero revisions.
+T5 now includes stable typed video/audio/caption track identities, dynamic rows,
+add/rename/reorder/delete and Place On Top, independent Lock/Sync
+Lock/Targeting/Output, Track Select, static audio mix state, truthful
+Combined/Separate L/R waveforms, stable render ordering, caption-track
+independence and T4 animation preservation. The project still has one accepted
+history, Timeline, playhead, Preview, native video and export compiler.
 
-The final revision-7 export is 30.033333 s, 1920×1080 H.264 High at 30 fps with
-AAC-LC stereo/48 kHz, 10,977,559 bytes, SHA-256
-`6d4c704fad146f312c63b047a7b53f53f14207ecf7aece7662bfa430123b9f7d`.
+The final revision-13 export is 30.000000 s, 1280×720 H.264 High at 30 fps with
+AAC-LC stereo/48 kHz, 16,338,429 bytes, SHA-256
+`d7ef76f49d80021e2a8798519fb1f723e1cebbd15b2e892c927abc31edf6ea10`.
 
-**Do not start T5 without explicit owner instruction.** A separate coding agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from this timeline program. Resume T4 only for evidence archaeology or a specifically authorized repair.
+**Do not start T6 without explicit owner instruction.** A separate coding agent owns the Motion Graphics Library workstream; do not integrate or modify its protected paths from this timeline program. Resume T5 only for evidence archaeology or a specifically authorized repair.
 
 ## Completed: P1-F.1A
 

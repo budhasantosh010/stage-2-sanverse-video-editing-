@@ -20,8 +20,10 @@ import type { ProjectRepository } from '../projects/project-repository.ts'
 import { AnalysisError, type AnalysisRequest } from './analysis-request.ts'
 import {
   AUDIO_NORMALIZATION_SCHEMA_VERSION,
+  channelPeaksFromInterleavedPcm,
   createMediaAnalysisService,
   parseLoudnormMeasurement,
+  peaksFromInterleavedPcm,
   peaksFromPcm,
   WAVEFORM_SAMPLE_RATE,
 } from './media-analysis-service.ts'
@@ -74,6 +76,8 @@ const harness = async (options: Readonly<{
   project?: EditProject
   missingAsset?: boolean
   onRun?: (invocation: CommandInvocation) => Promise<void>
+  channels?: number
+  channelLayout?: string | null
 }> = {}): Promise<Harness> => {
   const root = await temporaryRoot()
   const invocations: CommandInvocation[] = []
@@ -91,6 +95,13 @@ const harness = async (options: Readonly<{
   const runCommand = async (invocation: CommandInvocation): Promise<CommandResult> => {
     invocations.push(invocation)
     await options.onRun?.(invocation)
+    if (invocation.executable === 'ffprobe') {
+      return {
+        exitCode: 0,
+        stdout: JSON.stringify({ streams: [{ channels: options.channels ?? 2, channel_layout: options.channelLayout === undefined ? 'stereo' : options.channelLayout }] }),
+        stderr: '',
+      }
+    }
     const exitCode = options.exitCode ?? 0
     if (exitCode === 0 && outputPath(invocation) !== '-') {
       await writeFile(outputPath(invocation), options.bytes?.(invocation) ?? Buffer.from('WEBPfake'))
@@ -107,6 +118,7 @@ const harness = async (options: Readonly<{
       loadProject: async () => project,
       runCommand,
       ffmpegExecutable: 'ffmpeg',
+      ffprobeExecutable: 'ffprobe',
     }),
   }
 }
@@ -352,7 +364,7 @@ describe('measuring a stretch of sound', () => {
   it('decodes only the stretch asked for, at a known rate and channel count', async () => {
     const { service, invocations } = await harness({ bytes: () => pcm(() => undefined) })
     await service.produce({ projectId: TEST_PROJECT_ID, request: waveform() })
-    const args = invocations[0].args
+    const args = invocations.find((invocation) => invocation.executable === 'ffmpeg')!.args
     expect(args[args.indexOf('-ss') + 1]).toBe('3.000000000')
     expect(args[args.indexOf('-t') + 1]).toBe('1.000000000')
     expect(args[args.indexOf('-ar') + 1]).toBe(String(WAVEFORM_SAMPLE_RATE))
@@ -368,8 +380,11 @@ describe('measuring a stretch of sound', () => {
     const artifact = await service.produce({ projectId: TEST_PROJECT_ID, request: waveform() })
     expect(artifact.contentType).toBe('application/json; charset=utf-8')
     const body = JSON.parse(artifact.bytes.toString('utf8'))
-    expect(body.schemaVersion).toBe('sanverse.waveform-block/v1')
+    expect(body.schemaVersion).toBe('sanverse.waveform-block/v2')
     expect(body.assetId).toBe(TEST_MUSIC_ASSET_ID)
+    expect(body.channelCount).toBe(2)
+    expect(body.channelLayout).toBe('stereo')
+    expect(body.channels.map((channel: { label: string }) => channel.label)).toEqual(['L', 'R'])
     expect(body.peaks).toHaveLength(64)
     expect(Math.max(...body.peaks)).toBeCloseTo(0.5, 2)
   })
@@ -582,6 +597,23 @@ describe('turning raw sound numbers into a shape', () => {
 
   it('answers with exactly as many numbers as were asked for', () => {
     expect(peaksFromPcm(stereo(() => undefined), expected, 37)).toHaveLength(37)
+  })
+
+  it('buckets interleaved channels on audio frames and can read one named channel without time skew', () => {
+    const frames = 8
+    const samples = new Int16Array(frames * 2)
+    samples[0] = 32_767
+    samples[(frames - 1) * 2 + 1] = 16_384
+    const raw = Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength)
+    const combined = peaksFromInterleavedPcm(raw, frames, 2, 2)
+    const left = channelPeaksFromInterleavedPcm(raw, frames, 2, 2, 0)
+    const right = channelPeaksFromInterleavedPcm(raw, frames, 2, 2, 1)
+    expect(combined[0]).toBeCloseTo(1, 3)
+    expect(combined[1]).toBeCloseTo(0.5, 3)
+    expect(left[0]).toBeCloseTo(1, 3)
+    expect(left[1]).toBe(0)
+    expect(right[0]).toBe(0)
+    expect(right[1]).toBeCloseTo(0.5, 3)
   })
 })
 

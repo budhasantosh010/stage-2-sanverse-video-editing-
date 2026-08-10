@@ -1,44 +1,20 @@
-import { TIMELINE_TRACK_IDS, type TimelineTrackId } from '@sanverse/edit-domain'
+import { isTimelineTrackId } from '@sanverse/edit-domain'
+import {
+  isStableTimelineTrackId,
+  resolveTimelineTrackReference,
+  type TimelineTrackStateV2,
+} from '@sanverse/edit-domain/timeline-tracks'
 
 /**
- * Padlocks on the five tracks.
- *
- * ## Why this is NOT part of the project
- *
- * A padlock protects the user from their own mouse. It does not change one
- * frame of the finished video. If it lived in the project it would:
- *
- *   - consume a revision, so locking a track would look like an edit;
- *   - take a slot in Undo, so pressing Undo after locking would unlock instead
- *     of undoing the cut the user actually wants back;
- *   - change the export key, so locking a track would throw away a finished
- *     export and make the user wait for an identical file to be built again.
- *
- * All three are wrong, and the third is the one that costs real minutes. So the
- * padlocks live beside the project, in the browser, keyed by project id.
- *
- *   TRACK LOCK (this file)            TRACK OUTPUT (an accepted operation)
- *   ──────────────────────            ───────────────────────────────────
- *   "stop me touching this"           "keep this out of the video"
- *   changes nothing in the export     changes the export
- *   no revision, no Undo              one revision, one Undo
- *   per browser, per project          part of the project, travels with it
- *
- * They are deliberately never merged. One switch doing both would mean a user
- * could not protect a track without also removing it from their video.
- *
- * ## What a lock actually stops
- *
- * Everything that would change something ON the locked track: dropping media
- * onto it, moving, trimming, splitting, deleting, and any future AI edit aimed
- * at it. It stops nothing else. A locked track is still fully visible, still
- * plays, and still exports — because hiding it is the other switch.
+ * Browser-only padlocks. T5 persists current locks by stable Track Model V2 id.
+ * Legacy V1/V2/C1/A1/A2 aliases remain readable only so an existing T4 browser
+ * preference can migrate when the same project is reopened.
  */
 export const TIMELINE_LOCK_SCHEMA_VERSION = 'sanverse.timeline-locks/v1'
 
 export type TimelineLockStateV1 = Readonly<{
   schemaVersion: typeof TIMELINE_LOCK_SCHEMA_VERSION
-  lockedTrackIds: readonly TimelineTrackId[]
+  lockedTrackIds: readonly string[]
 }>
 
 export const EMPTY_LOCK_STATE: TimelineLockStateV1 = Object.freeze({
@@ -48,32 +24,37 @@ export const EMPTY_LOCK_STATE: TimelineLockStateV1 = Object.freeze({
 
 const storageKey = (projectId: string): string => `sanverse.timeline-locks.${projectId}`
 
-/**
- * Read whatever is stored, and refuse to trust any of it.
- *
- * Anything unrecognised produces "nothing is locked" rather than an error. A
- * corrupted workspace setting must never stop somebody opening their project,
- * and the safe direction is unlocked: the worst case is that the user has to
- * put a padlock back, not that they cannot edit at all.
- */
+const isLockReference = (value: unknown): value is string =>
+  isTimelineTrackId(value) || isStableTimelineTrackId(value)
+
 export const parseTimelineLockState = (raw: unknown): TimelineLockStateV1 => {
   if (typeof raw !== 'string' || raw.length === 0) return EMPTY_LOCK_STATE
   let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    return EMPTY_LOCK_STATE
-  }
+  try { parsed = JSON.parse(raw) } catch { return EMPTY_LOCK_STATE }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return EMPTY_LOCK_STATE
   const record = parsed as Record<string, unknown>
-  if (record.schemaVersion !== TIMELINE_LOCK_SCHEMA_VERSION) return EMPTY_LOCK_STATE
-  if (!Array.isArray(record.lockedTrackIds)) return EMPTY_LOCK_STATE
-  const known = record.lockedTrackIds.filter(
-    (id): id is TimelineTrackId => (TIMELINE_TRACK_IDS as readonly string[]).includes(id as string),
-  )
+  if (record.schemaVersion !== TIMELINE_LOCK_SCHEMA_VERSION || !Array.isArray(record.lockedTrackIds)) {
+    return EMPTY_LOCK_STATE
+  }
   return Object.freeze({
     schemaVersion: TIMELINE_LOCK_SCHEMA_VERSION,
-    lockedTrackIds: Object.freeze([...new Set(known)]),
+    lockedTrackIds: Object.freeze([...new Set(record.lockedTrackIds.filter(isLockReference))]),
+  })
+}
+
+/** Resolve legacy aliases and discard locks for tracks that no longer exist. */
+export const reconcileTimelineLockState = (
+  state: TimelineLockStateV1,
+  trackState: TimelineTrackStateV2,
+): TimelineLockStateV1 => {
+  const ids: string[] = []
+  for (const reference of state.lockedTrackIds) {
+    const resolved = resolveTimelineTrackReference(trackState, reference)
+    if (resolved !== null && !ids.includes(resolved)) ids.push(resolved)
+  }
+  return Object.freeze({
+    schemaVersion: TIMELINE_LOCK_SCHEMA_VERSION,
+    lockedTrackIds: Object.freeze(ids),
   })
 }
 
@@ -81,8 +62,6 @@ export const readTimelineLockState = (projectId: string): TimelineLockStateV1 =>
   try {
     return parseTimelineLockState(globalThis.localStorage?.getItem(storageKey(projectId)))
   } catch {
-    // Private browsing and blocked storage both throw here. Losing padlocks is
-    // an inconvenience; refusing to open the editor is not acceptable.
     return EMPTY_LOCK_STATE
   }
 }
@@ -91,14 +70,19 @@ export const writeTimelineLockState = (projectId: string, state: TimelineLockSta
   try {
     globalThis.localStorage?.setItem(storageKey(projectId), JSON.stringify(state))
   } catch {
-    // Same reasoning as above: this is a preference, not the user's work.
+    // A padlock preference may be lost; the user's project must still open.
   }
 }
 
 export const toggleTrackLock = (
   state: TimelineLockStateV1,
-  trackId: TimelineTrackId,
+  trackId: string,
 ): TimelineLockStateV1 => {
+  // Current T5 callers pass stable ids. Keeping the five legacy aliases valid
+  // here preserves the T1 public helper contract for old saved browser state
+  // and old callers; Studio reconciles them to stable ids before writing T5
+  // state, so new product interactions still persist stable identities.
+  if (!isLockReference(trackId)) return state
   const locked = state.lockedTrackIds.includes(trackId)
   return Object.freeze({
     schemaVersion: TIMELINE_LOCK_SCHEMA_VERSION,
@@ -111,4 +95,4 @@ export const toggleTrackLock = (
 }
 
 export const isTrackLocked = (state: TimelineLockStateV1, trackId: string): boolean =>
-  (state.lockedTrackIds as readonly string[]).includes(trackId)
+  state.lockedTrackIds.includes(trackId)

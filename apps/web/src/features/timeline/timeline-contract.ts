@@ -1,4 +1,5 @@
 import type { EditOperation, EditProject } from '@sanverse/edit-domain'
+import type { AudioTrackStateV1, TimelineTrackKindV2, TimelineTrackRoleV2 } from '@sanverse/edit-domain/timeline-tracks'
 
 /**
  * Presentation rows, deliberately named lanes rather than tracks.
@@ -30,6 +31,8 @@ export type TimelineItemState = 'committed' | 'proposed' | 'blocked'
 export type TimelineItemView = Readonly<{
   id: string
   laneId: string
+  /** Canonical T5 track identity. Display V/A/C labels are derived from it. */
+  trackId: string
   kind: TimelineItemKind
   state: TimelineItemState
 
@@ -88,6 +91,15 @@ export type TimelineItemView = Readonly<{
 
 export type TimelineLaneView = Readonly<{
   id: string
+  /** Canonical stable T5 identity; never derived back from this lane id. */
+  trackId: string
+  trackKind: TimelineTrackKindV2
+  trackRole: TimelineTrackRoleV2
+  /** User metadata, separate from derived V/A/C numbering. */
+  trackName: string | null
+  syncLockEnabled: boolean
+  outputEnabled: boolean
+  audioState: AudioTrackStateV1 | null
   kind: TimelineLaneKind
   label: string
   order: number

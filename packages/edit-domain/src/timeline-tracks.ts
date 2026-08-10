@@ -525,6 +525,18 @@ export const applyTimelineTrackOperation = (
     return ok(freezeState(tracks, state.assignments))
   }
 
+  const family: TimelineItemTrackFamilyV1 | null = operation.itemId.startsWith('visual:') || operation.itemId.startsWith('overlay:')
+    ? 'visual'
+    : operation.itemId.startsWith('caption:')
+      ? 'caption'
+      : operation.itemId.startsWith('audio:') || operation.itemId.startsWith('music:')
+        ? 'audio'
+        : null
+  if (family === null) {
+    return err({ code: 'TRACK_ITEM_INCOMPATIBLE', message: 'That item assignment does not name a supported Timeline item family.' })
+  }
+  const compatibility = canTrackAcceptTimelineItem(track, family)
+  if (!compatibility.ok) return compatibility
   const assignments = state.assignments.filter((assignment) => assignment.itemId !== operation.itemId)
   assignments.push(Object.freeze({ itemId: operation.itemId, trackId: operation.trackId }))
   return ok(freezeState(state.tracks, assignments))
@@ -544,6 +556,16 @@ export const foldTimelineTrackOperations = (
 }
 
 export type TimelineItemTrackFamilyV1 = 'primary' | 'dialogue' | 'visual' | 'caption' | 'audio'
+
+/**
+ * Stable assignment keys name the logical authored thing, never one projected
+ * placement occurrence. Compiler and Timeline use this same key, so a source-
+ * anchored visual that appears twice after a cut cannot land on two tracks.
+ */
+export const timelineTrackAssignmentKey = (
+  family: Exclude<TimelineItemTrackFamilyV1, 'primary' | 'dialogue'>,
+  identity: string,
+): string => `${family}:${identity}`
 
 const defaultTrackForFamily = (state: TimelineTrackStateV2, family: TimelineItemTrackFamilyV1): TimelineTrackV2 | null => {
   if (family === 'primary') return primaryTimelineTrack(state)

@@ -176,11 +176,48 @@ describe('the address a name becomes', () => {
 })
 
 describe('reading loudness numbers back off the wire', () => {
-  it('accepts a well-formed block', () => {
+  it('accepts the legacy Combined block and a truthful stereo v2 block', () => {
     expect(parseWaveformBlock({
       schemaVersion: 'sanverse.waveform-block/v1',
       peaks: [0, 0.5, 1],
     })).toEqual([0, 0.5, 1])
+
+    expect(parseWaveformBlock({
+      schemaVersion: 'sanverse.waveform-block/v2',
+      channelCount: 2,
+      channelLayout: 'stereo',
+      peaks: [1, 0.5],
+      channels: [
+        { label: 'L', peaks: [1, 0] },
+        { label: 'R', peaks: [0, 0.5] },
+      ],
+    })).toEqual({
+      schemaVersion: 'sanverse.waveform-block/v2',
+      channelCount: 2,
+      channelLayout: 'stereo',
+      peaks: [1, 0.5],
+      channels: [
+        { label: 'L', peaks: [1, 0] },
+        { label: 'R', peaks: [0, 0.5] },
+      ],
+    })
+  })
+
+  it('refuses fake separate channels when the decoder did not confirm ordinary stereo', () => {
+    expect(parseWaveformBlock({
+      schemaVersion: 'sanverse.waveform-block/v2',
+      channelCount: 1,
+      channelLayout: 'mono',
+      peaks: [0.5],
+      channels: [{ label: 'L', peaks: [0.5] }, { label: 'R', peaks: [0.5] }],
+    })).toBeNull()
+    expect(parseWaveformBlock({
+      schemaVersion: 'sanverse.waveform-block/v2',
+      channelCount: 2,
+      channelLayout: null,
+      peaks: [0.5],
+      channels: [{ label: 'L', peaks: [0.5] }, { label: 'R', peaks: [0.5] }],
+    })).toBeNull()
   })
 
   it('refuses numbers that would draw outside the lane', () => {

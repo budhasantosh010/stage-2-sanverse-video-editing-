@@ -756,3 +756,17 @@ Real Edge 151 on owner media proved first-track creation, midpoint creation, a G
 The real revision-7 export succeeded in one attempt: 30.033333 s, 1920×1080 H.264 High at 30 fps with AAC-LC stereo/48 kHz, 10,977,559 bytes, SHA-256 `6d4c704fad146f312c63b047a7b53f53f14207ecf7aece7662bfa430123b9f7d`; decoded 5s/15s/25s frames visibly show the authored horizontal animation moving out and returning.
 
 Motion and Plan-B protected files were not changed. T5 was not started.
+
+## 2026-08-10 — Gate T5 Advanced Track Controls and Expandable Tracks complete
+
+Gate T5 closed on the dedicated Editor branch `timeline-t5-advanced-tracks`, continuing from the exact verified T4 SHA `99dcb6a71085b314414f2a4e0d526b9c5348855d`. T5 replaced hidden display-label identity with stable typed video/audio/caption track IDs and deterministic legacy migration while preserving one accepted EditProject, one history, one Timeline selection/playhead, one Preview authority, one native video and one export compiler.
+
+The Editor now supports dynamic track rows; add, rename, reorder and bounded delete; stable item assignment and Place On Top; independent Lock, Sync Lock, Targeting and Output semantics; Track Select Forward/Backward; per-audio-track mute, solo, gain and pan; truthful Combined/Separate L/R waveform presentation backed by FFprobe channel truth; stable video/caption render ordering; and T4 animation/keyframe identity preservation across track movement. Source-anchored Sync-Lock-OFF content is compensated only when exact old placement can be reproduced; otherwise ripple refuses atomically.
+
+Final automated gate: **2,501/2,501** — API 405, Web 1,365, edit-domain 562, intent-domain 27, render-contract 142. All-workspace production build passed. The bounded stress fixture covers 20 video, 24 audio and 8 caption tracks.
+
+Real Edge 151 drove a real 30-second H.264/AAC project through add/rename/reorder/delete, Lock/Sync Lock/Targeting, audio mix/output, Separate L/R presentation, reload/reopen and Export. Revision 13, stable track state and exactly one native video survived reopen; 1440×900, 1024×768 and 390×844 had no horizontal page overflow; final observation recorded zero runtime exceptions, zero console errors and zero HTTP responses >=400.
+
+The real revision-13 export is 30.000000 s, 1280×720 H.264 High at 30 fps with AAC-LC stereo/48 kHz, 16,338,429 bytes, SHA-256 `d7ef76f49d80021e2a8798519fb1f723e1cebbd15b2e892c927abc31edf6ea10`. The downloaded file and server artifact match byte-for-byte; three decoded frames were inspected.
+
+Motion and Plan-B protected files were not changed. T6 and T7 were not started.

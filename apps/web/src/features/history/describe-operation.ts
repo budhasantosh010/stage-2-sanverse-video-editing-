@@ -154,6 +154,20 @@ export const describeOperation = (operation: EditOperation): string => {
       return operation.tracks.length > 0
         ? 'Changed how the main footage moves'
         : 'Reframed the main footage'
+    case 'add-timeline-track':
+      return `Added a ${operation.track.kind} track`
+    case 'remove-timeline-track':
+      return 'Removed a track'
+    case 'rename-timeline-track':
+      return operation.name ? `Named a track “${operation.name}”` : 'Removed a track name'
+    case 'reorder-timeline-track':
+      return 'Reordered tracks'
+    case 'set-track-sync-lock':
+      return operation.enabled ? 'Turned Sync Lock on' : 'Turned Sync Lock off'
+    case 'set-track-audio-state':
+      return 'Changed a track mix'
+    case 'assign-timeline-item-track':
+      return 'Moved an item to another track'
     default: {
       const unreachable: never = operation
       void unreachable

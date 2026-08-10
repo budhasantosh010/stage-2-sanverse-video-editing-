@@ -21,6 +21,9 @@ export type TimelineContextMenuProps = Readonly<{
   onAction(action: TimelineToolbarAction): void
   onGesture(gesture: TimelineGesture): void
   onSeek(ticks: number): void
+  compatibleDestinationTracks?: readonly Readonly<{ trackId: string; label: string; name: string | null }>[]
+  onMoveToTrack?(trackId: string): void
+  onPlaceOnTop?(): void
   onOpenProposal(): void
   onClose(): void
 }>
@@ -57,6 +60,9 @@ export function TimelineContextMenu({
   onAction,
   onGesture,
   onSeek,
+  compatibleDestinationTracks = Object.freeze([]),
+  onMoveToTrack = () => undefined,
+  onPlaceOnTop = () => undefined,
   onOpenProposal,
   onClose,
 }: TimelineContextMenuProps) {
@@ -119,6 +125,33 @@ export function TimelineContextMenu({
           </button>
         )
       })}
+      {item.state === 'committed' && item.kind !== 'clip' && item.kind !== 'gap' ? (
+        <>
+          {item.kind !== 'caption' && item.kind !== 'music' ? (
+            <button
+              role="menuitem"
+              type="button"
+              disabled={busy}
+              data-context-action="place-on-top"
+              onClick={() => run(onPlaceOnTop)}
+            >
+              Place on top
+            </button>
+          ) : null}
+          {compatibleDestinationTracks.map((track) => (
+            <button
+              key={track.trackId}
+              role="menuitem"
+              type="button"
+              disabled={busy}
+              data-context-move-track={track.trackId}
+              onClick={() => run(() => onMoveToTrack(track.trackId))}
+            >
+              Move to {track.label}{track.name ? ` · ${track.name}` : ''}
+            </button>
+          ))}
+        </>
+      ) : null}
       {editableClip && clipId ? (
         <>
           <button

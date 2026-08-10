@@ -4,7 +4,7 @@ Use this runbook when a new session, agent, or context window resumes the projec
 
 ## Current handoff
 
-**P1-F.1E is complete through Gate T4. T5 through T7 have not started.**
+**P1-F.1E is complete through Gate T5. T6 and T7 have not started.**
 
 Read in this order when resuming:
 
@@ -12,23 +12,22 @@ Read in this order when resuming:
 2. `DOCS/HANDOFF.md`
 3. `DOCS/CURRENT_STATE.md`
 4. `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md`
-5. `DOCS/evidence/2026-08-04-timeline-completion/T4_FINAL_CLOSURE.md`
+5. `DOCS/evidence/2026-08-04-timeline-completion/T5_FINAL_CLOSURE.md`
 
-Final T4 verification: **2,419/2,419 tests**, all-workspace production build
-PASS, real Microsoft Edge 151 Graph/keyframe workflow with zero runtime/console
-errors and zero HTTP 4xx/5xx responses on the final reopen, and a real revision-7
-1920×1080 H.264/AAC export whose renderer SHA matches the MP4 on disk.
+Final T5 verification: **2,501/2,501 tests**, all-workspace production build
+PASS, real Microsoft Edge 151 advanced-track workflow with zero runtime/console
+errors and zero HTTP responses >=400, responsive 1440/1024/390 proof, and a real
+revision-13 1280×720 H.264/AAC export whose downloaded SHA matches the server
+artifact.
 
-T4 owns Editor keyframe presentation/editing only. Preserve the core rules: one
-gesture = one change set = one Undo, integer ticks only, primary motion keyframes
-follow source time, visual keyframes follow visual-relative time, graph/layout
-changes create zero revisions, and Preview/export share the existing animation
-evaluator and accepted project authority.
+T5 owns only the Editor track/routing/mix/presentation layer. Preserve stable
+typed track identity separately from visible row labels; keep Lock and Targeting
+workspace-only; keep Output, Sync Lock and audio mix state in accepted history;
+use confirmed channel truth for Separate L/R waveforms; preserve T4 animation
+identity across track moves; and keep Preview/export on the existing shared
+render authority.
 
-Hold remains unavailable rather than faked, and primary Canvas does not imply
-Auto-Key.
-
-**Do not start T5 without explicit owner authorization.** Do not integrate or modify the separately owned Motion Graphics Library or Plan-B workstreams from this branch.
+**Do not start T6 without explicit owner authorization.** Do not integrate or modify the separately owned Motion Graphics Library or Plan-B workstreams from this branch.
 
 ### Previous handoff
 ## Fast resume

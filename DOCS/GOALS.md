@@ -115,3 +115,6 @@ Never publish one invented percentage-complete number. A box closes only when it
 - [x] Speed, reverse and freeze frame — Gate T2, complete 2026-08-08
 - [x] Precision trimming — Ripple/Roll/Slip/Slide, playhead commands, J/K/L, Dynamic Trim, Audio Scrubbing, multi-edit-point, numeric precision and exact-frame Trim View — Gate T3, complete 2026-08-08
 - [x] Keyframe lanes and graph editing — closed property/time authority, expandable property lanes, shared keyframe selection/clipboard, truthful interpolation, bounded Property Graph, Inspector/Canvas synchronization and real Preview/export parity — Gate T4, complete 2026-08-10
+- [x] Advanced track controls and expandable tracks — stable typed video/audio/caption identity, dynamic rows, add/rename/reorder/delete and Place On Top, independent Lock/Sync Lock/Targeting/Output, static audio mix state, truthful Combined/Separate L/R waveforms, stable render order and T4 animation preservation — Gate T5, complete 2026-08-10
+- [ ] Gate T6 sequences and source editing — not started; requires explicit owner authorization
+- [ ] Gate T7 transcript and AI-ready contracts — not started

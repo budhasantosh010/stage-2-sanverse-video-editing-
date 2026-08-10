@@ -294,8 +294,9 @@ describe('T1.13 an empty space is something you can act on', () => {
     const project = removedProject(false)
     const model = buildTimelineViewModel({ project, selectedItemIds: [], pending: null })
     const gap = model.lanes.flatMap((lane) => lane.items).find((item) => item.kind === 'gap')
-    if (!gap) throw new Error('fixture has no empty space')
-    renderTimeline({ project, selectedItemIds: [gap.id], lockedTrackIds: ['V1'] })
+    const primaryTrackId = model.lanes.find((lane) => lane.trackRole === 'primary-video')?.trackId
+    if (!gap || !primaryTrackId) throw new Error('fixture has no empty space or primary track')
+    renderTimeline({ project, selectedItemIds: [gap.id], lockedTrackIds: [primaryTrackId] })
     expect(screen.getByRole('button', { name: 'Close the empty space' })).toBeDisabled()
   })
 })

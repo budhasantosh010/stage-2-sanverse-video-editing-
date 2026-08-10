@@ -1,0 +1,130 @@
+{
+  "browser": "Edg/151.0.4129.72",
+  "persistedState": {
+    "revision": 13,
+    "tracks": [
+      {
+        "label": "V3",
+        "id": "track_overlay0001",
+        "role": "overlay-video",
+        "locked": "no",
+        "sync": "on",
+        "targeted": "no",
+        "output": "on",
+        "collapsed": "no",
+        "text": "V3Overlay▾How tall V3 isShortNormalTall○🔓🔗👁•••NameMove upMove downSelect ←Select →Delete emptyDelete + contents"
+      },
+      {
+        "label": "V2",
+        "id": "track_jm7ujufeju3e",
+        "role": "generic-video",
+        "locked": "no",
+        "sync": "off",
+        "targeted": "yes",
+        "output": "on",
+        "collapsed": "no",
+        "text": "V2Cutaways T5▾How tall V2 isShortNormalTall◎🔓⛓👁•••NameMove upMove downSelect ←Select →Delete emptyDelete + contents"
+      },
+      {
+        "label": "V1",
+        "id": "track_38e764c3925f",
+        "role": "primary-video",
+        "locked": "no",
+        "sync": "on",
+        "targeted": "no",
+        "output": "on",
+        "collapsed": "no",
+        "text": "V1Primary video▾How tall V1 isShortNormalTall○🔓🔗👁•••NameMove upMove downSelect ←Select →Delete emptyDelete + contents"
+      },
+      {
+        "label": "C1",
+        "id": "track_caption0001",
+        "role": "captions",
+        "locked": "no",
+        "sync": "on",
+        "targeted": "no",
+        "output": "on",
+        "collapsed": "no",
+        "text": "C1Captions▾How tall C1 isShortNormalTall○🔓🔗👁•••NameMove upMove downSelect ←Select →Delete emptyDelete + contents"
+      },
+      {
+        "label": "A1",
+        "id": "track_dialogue01",
+        "role": "dialogue",
+        "locked": "no",
+        "sync": "on",
+        "targeted": "no",
+        "output": "on",
+        "collapsed": "no",
+        "text": "A1Dialogue▾How tall A1 isShortNormalTall○🔓🔗🔊MS•••NameGain dBWaveformCombinedSeparate L/RPan %Move upMove downSelect ←Select →Delete emptyDelete + contents"
+      },
+      {
+        "label": "A2",
+        "id": "track_music000001",
+        "role": "music",
+        "locked": "no",
+        "sync": "off",
+        "targeted": "no",
+        "output": "on",
+        "collapsed": "no",
+        "text": "A2Music▾How tall A2 isShortNormalTall○🔓⛓🔊MS•••NameGain dBWaveformCombinedSeparate L/RPan %Move upMove downSelect ←Select →Delete emptyDelete + contents"
+      },
+      {
+        "label": "A3",
+        "id": "track_psd4lg9wxk54",
+        "role": "generic-audio",
+        "locked": "no",
+        "sync": "on",
+        "targeted": "no",
+        "output": "on",
+        "collapsed": "no",
+        "text": "A3Audio▾How tall A3 isShortNormalTall○🔓🔗🔊MS•••NameGain dBWaveformCombinedSeparate L/RPan %Move upMove downSelect ←Select →Delete emptyDelete + contents"
+      }
+    ],
+    "generic": {
+      "label": "V2",
+      "id": "track_jm7ujufeju3e",
+      "role": "generic-video",
+      "locked": "no",
+      "sync": "off",
+      "targeted": "yes",
+      "output": "on",
+      "collapsed": "no",
+      "text": "V2Cutaways T5▾How tall V2 isShortNormalTall◎🔓⛓👁•••NameMove upMove downSelect ←Select →Delete emptyDelete + contents"
+    },
+    "dialogueMode": "separate",
+    "dialogueGain": "-3",
+    "dialoguePan": "20",
+    "videoCount": 1,
+    "innerWidth": 1440,
+    "scrollWidth": 1440,
+    "exportDisabled": false,
+    "waveformCanvases": [
+      "separate"
+    ]
+  },
+  "exportInfo": {
+    "text": "Export ready1280 × 720 · 30sDownload MP4",
+    "href": "http://127.0.0.1:2000/api/projects/project_38e764c3925fd17fa5164db62a68d08e/exports/export_fef7f7b832bfe300cd01bbd340696591/media"
+  },
+  "runtimeErrors": [],
+  "consoleErrors": [],
+  "failedHttp": [],
+  "loadingFailed": [
+    {
+      "errorText": "net::ERR_ABORTED",
+      "canceled": true,
+      "type": "Fetch"
+    },
+    {
+      "errorText": "net::ERR_ABORTED",
+      "canceled": true,
+      "type": "Fetch"
+    },
+    {
+      "errorText": "net::ERR_ABORTED",
+      "canceled": true,
+      "type": "Media"
+    }
+  ]
+}

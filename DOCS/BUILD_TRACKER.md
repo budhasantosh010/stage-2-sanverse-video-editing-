@@ -169,4 +169,16 @@ Last updated: 2026-08-10
 - [x] T2/T3 interaction matrix + export identity + evaluator overshoot safety + 60-minute/250-placement/50-target bounds
 - [x] Final verification — **2,419/2,419**, all-workspace build PASS, real Edge 151 Graph/Bezier/Undo/Redo/reopen + responsive evidence, real revision-7 MP4 export
 - [x] Ownership checker PASS against exact T3 base; protected Motion/Plan-B changes NONE
-- [ ] Gate T5 — not started; requires explicit owner authorization
+
+## P1-F.1E Gate T5 — 2026-08-10
+
+- [x] Dedicated editor branch/worktree `timeline-t5-advanced-tracks` from exact verified T4 SHA `99dcb6a71085b314414f2a4e0d526b9c5348855d`
+- [x] Stable typed video/audio/caption tracks with deterministic legacy migration and stable display-order labels
+- [x] Add/rename/reorder/delete, stable item assignment, Place On Top and bounded 20-video/24-audio/8-caption stress proof
+- [x] Independent Lock, Sync Lock, Targeting and Output semantics with safe compensation/refusal rules
+- [x] Static audio mute/solo/gain/pan shared by Preview/export
+- [x] Truthful Combined/Separate L/R waveform preference backed by real FFprobe channel truth
+- [x] Stable video/caption render ordering and T4 animation identity preservation across track move/reorder
+- [x] Final verification — **2,501/2,501**, all-workspace build PASS, real Edge 151 workflow/reload/responsive evidence, real revision-13 MP4 export
+- [x] Ownership boundary preserved; Motion/Plan-B protected workstreams not integrated
+- [ ] Gate T6 — not started; requires explicit owner authorization

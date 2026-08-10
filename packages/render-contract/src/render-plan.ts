@@ -274,6 +274,8 @@ export type MusicNode = Readonly<{
   assetId: string
   sourceStartTicks: number
   gainDb: number
+  /** Constant-power pan in hundredths of a percent: -10000 left, 0 center, +10000 right. */
+  pan: number
   fadeInTicks: number
   fadeOutTicks: number
 }>
@@ -363,7 +365,7 @@ export type RenderPlanError = {
  * user who muted the dialogue and pressed Export would be handed the cached
  * file from before the mute, and would have no way to tell.
  */
-export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v8'
+export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v9'
 /**
  * Raised from 512 because captions produce one node per line of speech. A
  * ten-minute talk is roughly 200 cues before cutting, and a cut through a cue
@@ -838,6 +840,9 @@ export const validateRenderPlan = (
       }
       if (typeof node.gainDb !== 'number' || !Number.isFinite(node.gainDb)) {
         issues.push({ path: `${path}.gainDb`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      if (!Number.isSafeInteger(node.pan) || (node.pan as number) < -10_000 || (node.pan as number) > 10_000) {
+        issues.push({ path: `${path}.pan`, code: 'VALUE_OUT_OF_RANGE' })
       }
       const interval = readInterval(node.interval)
       if (interval === null) {

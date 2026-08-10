@@ -2,7 +2,7 @@ import {
   activeCaptionSets,
   activeOverlayOperations,
   activeOperations,
-  activeTrackOutputs,
+  activeTimelineTrackState,
   activeVisualProperties,
   compositionDuration,
   effectiveComposition,
@@ -13,6 +13,15 @@ import {
   placeSourceSpan,
   type EditProject,
 } from '@sanverse/edit-domain'
+import {
+  dialogueTimelineTrack,
+  primaryTimelineTrack,
+  resolvedTrackForTimelineItem,
+  timelineTrackAssignmentKey,
+  trackById,
+  tracksOfKind,
+  type TimelineTrackV2,
+} from '@sanverse/edit-domain/timeline-tracks'
 import {
   clipCompositionDurationTicks,
   isFreezeClip,
@@ -80,14 +89,28 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
   }
   const operations = activeOperations(project)
   const footageMotions = effectiveFootageMotions(project)
-  /**
-   * Which of the five tracks reach the finished video.
-   *
-   * Read once, here, and applied in exactly one place per track below. A
-   * renderer never sees this state and never has to reapply it: what it gets is
-   * a plan that already describes the video the user asked for.
-   */
-  const trackOutputs = activeTrackOutputs(project)
+  const trackState = activeTimelineTrackState(project)
+  const videoTracks = tracksOfKind(trackState, 'video')
+  const captionTracks = tracksOfKind(trackState, 'caption')
+  const audioTracks = tracksOfKind(trackState, 'audio')
+  const primaryTrack = primaryTimelineTrack(trackState)
+  const dialogueTrack = dialogueTimelineTrack(trackState)
+  const anyAudioSolo = audioTracks.some((track) => track.audioState?.solo === true)
+  const trackAudible = (track: TimelineTrackV2 | null): boolean =>
+    track !== null &&
+    track.outputEnabled &&
+    track.audioState !== null &&
+    !track.audioState.muted &&
+    (!anyAudioSolo || track.audioState.solo)
+  const clampPan = (value: number): number => Math.max(-10_000, Math.min(10_000, Math.round(value)))
+  const visualTrackFor = (identity: string): TimelineTrackV2 | null =>
+    resolvedTrackForTimelineItem(trackState, timelineTrackAssignmentKey('visual', identity), 'visual')
+  const captionTrackFor = (identity: string): TimelineTrackV2 | null =>
+    resolvedTrackForTimelineItem(trackState, timelineTrackAssignmentKey('caption', identity), 'caption')
+  const audioTrackFor = (identity: string): TimelineTrackV2 | null =>
+    resolvedTrackForTimelineItem(trackState, timelineTrackAssignmentKey('audio', identity), 'audio')
+  const videoTrackOrder = new Map(videoTracks.map((track, index) => [track.trackId, index]))
+  const captionTrackOrder = new Map(captionTracks.map((track, index) => [track.trackId, index]))
   type TransitionEdge = { video: number; audio: number; color: 'black' | 'white' }
   const transitionIn = new Map<string, TransitionEdge>()
   const transitionOut = new Map<string, TransitionEdge>()
@@ -132,6 +155,11 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
 
   const segments: PrimarySegmentNode[] = []
   for (const track of composition.tracks) {
+    const timelineVideoTrack = trackById(trackState, track.trackId) ?? primaryTrack
+    const videoEnabledForTrack = timelineVideoTrack?.outputEnabled ?? true
+    const dialogueEnabledForTrack = trackAudible(dialogueTrack)
+    const dialogueGainDb = dialogueTrack?.audioState?.gainDb ?? 0
+    const dialoguePan = dialogueTrack?.audioState?.pan ?? 0
     for (const clip of track.clips) {
       // A hidden piece leaves a hole rather than shifting everything after it,
       // so that switching it back on restores the exact video the user saw.
@@ -172,7 +200,7 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
           sourceTimeTicks: clip.sourceRange.start.ticks,
           sourceStartTicks: clip.sourceRange.start.ticks,
           sourceDurationTicks: 1 as const,
-          videoEnabled: trackOutputs.V1,
+          videoEnabled: videoEnabledForTrack,
           audioEnabled: false as const,
           linkedAudio: null,
           footageMotions: motions,
@@ -210,15 +238,15 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
         playbackRateDenominator: clip.timeTransform.playbackRate.denominator,
         direction: clip.timeTransform.direction,
         maintainAudioPitch: clip.timeTransform.maintainAudioPitch,
-        pan: clip.pan,
-        // V1 carries the picture, A1 the still-linked sound. The sound window
-        // may start before or end after the picture, but it never becomes a
-        // second clip identity.
-        videoEnabled: trackOutputs.V1,
-        audioEnabled: trackOutputs.A1 && linkedAudio !== null,
+        pan: clampPan(clip.pan + dialoguePan),
+        // The stable video track carries picture; Dialogue carries every
+        // still-linked source-audio window. Track gain/pan is baked into the
+        // same plan Preview and FFmpeg consume.
+        videoEnabled: videoEnabledForTrack,
+        audioEnabled: dialogueEnabledForTrack && linkedAudio !== null,
         linkedAudio,
         footageMotions: motions,
-        gainDb: clip.gainDb,
+        gainDb: clip.gainDb + dialogueGainDb,
         fadeInTicks: clip.fadeIn.ticks,
         fadeOutTicks: clip.fadeOut.ticks,
       }))
@@ -250,6 +278,7 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
 
   const overlays: RenderNode[] = []
   const music: MusicNode[] = []
+  const nodeTrackOrder = new Map<string, number>()
 
   /**
    * One overlay operation can produce two on-screen appearances if a cut passed
@@ -261,6 +290,7 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
   const placeAnchored = (
     assetId: string,
     sourceInterval: { start: { ticks: number }; duration: { ticks: number } },
+    trackOrder: number,
     build: (nodeIdSuffix: string, interval: RenderNode['interval'], sourceOffsetTicks: number) => RenderNode,
   ): void => {
     const placements = placeSourceSpan(composition, assetId, sourceInterval as never)
@@ -269,18 +299,24 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
       // How far into the original span this surviving piece begins. A B-roll
       // clip cut in half must resume where it left off, not restart.
       const offset = placement.sourceRange.start.ticks - sourceInterval.start.ticks
-      overlays.push(build(index === 0 ? '' : `.${placement.clip.clipId}`, placement.compositionRange, offset))
+      const node = build(index === 0 ? '' : `.${placement.clip.clipId}`, placement.compositionRange, offset)
+      overlays.push(node)
+      nodeTrackOrder.set(node.nodeId, trackOrder)
     }
   }
 
-  // V2 holds everything laid on top of the picture: B-roll, pictures, titles,
-  // callouts, and nameplates. Switching it off draws none of them. They are
-  // left out of the plan rather than drawn transparent, because a renderer that
-  // still opens a B-roll file to draw nothing wastes the time of an export the
-  // user is waiting on.
-  for (const operation of trackOutputs.V2 ? operations : []) {
-    if (isNameplateOperation(operation)) {
-      placeAnchored(operation.assetId, operation.sourceInterval, (suffix, interval) => Object.freeze({
+  // Every visual is resolved to one stable video track before it reaches a
+  // renderer. Track order is recorded beside the concrete node so drawing order
+  // comes from the accepted model, never from DOM order or a display label.
+  for (const operation of operations) {
+    if (!isNameplateOperation(operation)) continue
+    const owner = visualTrackFor(operation.operationId)
+    if (!owner?.outputEnabled) continue
+    placeAnchored(
+      operation.assetId,
+      operation.sourceInterval,
+      videoTrackOrder.get(owner.trackId) ?? 0,
+      (suffix, interval) => Object.freeze({
         nodeId: `${operation.operationId}${suffix}`,
         kind: 'text-overlay' as const,
         interval,
@@ -288,18 +324,53 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
         primaryText: operation.primaryText,
         secondaryText: operation.secondaryText,
         styleId: NAMEPLATE_STYLE_ID,
-      }))
-    }
+      }),
+    )
   }
 
   for (const operation of activeOverlayOperations(project)) {
-    // Music sits on A2 and everything else in this family sits on V2, so each
-    // is asked about its own track rather than sharing one answer.
-    const onTrack = operation.kind === 'add-music' ? trackOutputs.A2 : trackOutputs.V2
-    if (!onTrack) continue
+    if (operation.kind === 'add-music') {
+      const owner = audioTrackFor(operation.musicId)
+      if (!trackAudible(owner)) continue
+      if (music.length >= MAX_MUSIC_NODES) continue
+      const asset = findAsset(project.assets, operation.assetId)
+      if (!asset || asset.mediaKind !== 'audio') continue
+      const videoLeft = duration.ticks - operation.compositionStart.ticks
+      const songLeft = asset.duration.ticks - operation.sourceStart.ticks
+      const asked = operation.durationTicks === null ? Number.MAX_SAFE_INTEGER : operation.durationTicks.ticks
+      const playable = Math.min(videoLeft, songLeft, asked)
+      if (playable <= 0) continue
+      if (!useSource(operation.assetId)) continue
+      const fadeIn = Math.min(operation.fadeIn.ticks, playable)
+      const fadeOut = Math.min(operation.fadeOut.ticks, playable - fadeIn)
+      music.push(Object.freeze({
+        nodeId: operation.musicId,
+        kind: 'music' as const,
+        interval: Object.freeze({
+          start: operation.compositionStart,
+          duration: Object.freeze({ ticks: playable, timescale: duration.timescale }),
+        }),
+        assetId: operation.assetId,
+        sourceStartTicks: operation.sourceStart.ticks,
+        gainDb: operation.gainDb + (owner?.audioState?.gainDb ?? 0),
+        pan: clampPan(owner?.audioState?.pan ?? 0),
+        fadeInTicks: fadeIn,
+        fadeOutTicks: fadeOut,
+      }))
+      continue
+    }
+
+    const visualIdentity = operation.kind === 'add-title'
+      ? operation.titleId
+      : operation.kind === 'add-callout'
+        ? operation.calloutId
+        : operation.overlayId
+    const owner = visualTrackFor(visualIdentity)
+    if (!owner?.outputEnabled) continue
+    const ownerOrder = videoTrackOrder.get(owner.trackId) ?? 0
 
     if (operation.kind === 'add-title') {
-      placeAnchored(operation.assetId, operation.sourceInterval, (suffix, interval) => Object.freeze({
+      placeAnchored(operation.assetId, operation.sourceInterval, ownerOrder, (suffix, interval) => Object.freeze({
         nodeId: `${operation.titleId}${suffix}`,
         kind: 'title-overlay' as const,
         interval,
@@ -312,7 +383,7 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     }
 
     if (operation.kind === 'add-callout') {
-      placeAnchored(operation.assetId, operation.sourceInterval, (suffix, interval) => Object.freeze({
+      placeAnchored(operation.assetId, operation.sourceInterval, ownerOrder, (suffix, interval) => Object.freeze({
         nodeId: `${operation.calloutId}${suffix}`,
         kind: 'callout-overlay' as const,
         interval,
@@ -332,13 +403,11 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
       if (!useSource(operation.overlayAssetId)) continue
       const asset = findAsset(project.assets, operation.overlayAssetId)
       const isStill = asset?.mediaKind === 'image'
-      placeAnchored(operation.assetId, operation.sourceInterval, (suffix, interval, offset) => Object.freeze({
+      placeAnchored(operation.assetId, operation.sourceInterval, ownerOrder, (suffix, interval, offset) => Object.freeze({
         nodeId: `${operation.overlayId}${suffix}`,
         kind: 'media-overlay' as const,
         interval,
         assetId: operation.overlayAssetId,
-        // A still picture has nowhere to seek to, so it always starts at zero.
-        // A B-roll video resumes where the cut interrupted it.
         sourceStartTicks: isStill ? 0 : operation.overlaySourceStart.ticks + offset,
         region: Object.freeze({
           x: operation.region.x,
@@ -348,42 +417,6 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
         }),
         opacity: operation.opacity,
         useOverlayAudio: operation.useOverlayAudio,
-      }))
-      continue
-    }
-
-    if (operation.kind === 'add-music') {
-      if (music.length >= MAX_MUSIC_NODES) continue
-      const asset = findAsset(project.assets, operation.assetId)
-      if (!asset || asset.mediaKind !== 'audio') continue
-      // Music is measured on the FINISHED video, so cutting the middle out does
-      // not cut the middle out of the song. It plays for as long as there is
-      // both video left to cover and song left to play, whichever runs out
-      // first — never looped, because a loop point nobody chose is audible.
-      //
-      // A length the user set is a third limit alongside those two, never an
-      // override of them: asking for thirty seconds of a song with two seconds
-      // left gets two seconds, not thirty seconds padded with silence.
-      const videoLeft = duration.ticks - operation.compositionStart.ticks
-      const songLeft = asset.duration.ticks - operation.sourceStart.ticks
-      const asked = operation.durationTicks === null ? Number.MAX_SAFE_INTEGER : operation.durationTicks.ticks
-      const playable = Math.min(videoLeft, songLeft, asked)
-      if (playable <= 0) continue
-      if (!useSource(operation.assetId)) continue
-      const fadeIn = Math.min(operation.fadeIn.ticks, playable)
-      const fadeOut = Math.min(operation.fadeOut.ticks, playable - fadeIn)
-      music.push(Object.freeze({
-        nodeId: operation.musicId,
-        kind: 'music' as const,
-        interval: Object.freeze({
-          start: operation.compositionStart,
-          duration: Object.freeze({ ticks: playable, timescale: duration.timescale }),
-        }),
-        assetId: operation.assetId,
-        sourceStartTicks: operation.sourceStart.ticks,
-        gainDb: operation.gainDb,
-        fadeInTicks: fadeIn,
-        fadeOutTicks: fadeOut,
       }))
     }
   }
@@ -395,9 +428,13 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
   // deleted simply produces no node — it is not an error, and the rest of the
   // captions are unaffected. See `validateOperationAgainstComposition` for why
   // that differs from a nameplate.
-  for (const set of trackOutputs.C1 ? activeCaptionSets(project) : []) {
+  for (const set of activeCaptionSets(project)) {
+    const owner = captionTrackFor(set.captionSetId)
+    if (!owner?.outputEnabled) continue
+    // Caption tracks live above all video tracks in the fixed section order.
+    const ownerOrder = videoTracks.length + (captionTrackOrder.get(owner.trackId) ?? 0)
     for (const cue of set.cues) {
-      placeAnchored(set.assetId, cue.sourceInterval, (suffix, interval) => Object.freeze({
+      placeAnchored(set.assetId, cue.sourceInterval, ownerOrder, (suffix, interval) => Object.freeze({
         nodeId: `${set.captionSetId}.${cue.cueId}${suffix}`,
         kind: 'caption-overlay' as const,
         interval,
@@ -407,13 +444,16 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     }
   }
 
-  // Drawing order is the order of this list, and it is sorted by when each
-  // thing appears. Within one instant, B-roll must sit UNDER the words, or a
-  // clip dropped over a caption would hide it. Media overlays are therefore
-  // pulled ahead of everything else that starts at the same moment.
+  // Drawing order is accepted track order first. Within one track, retain the
+  // old deterministic rule: earlier nodes first, and B-roll under words that
+  // begin at the same instant. This makes reorder-track a real stacking edit
+  // without using DOM position as a hidden rendering authority.
   const drawRank = (node: RenderNode): number => (node.kind === 'media-overlay' ? 0 : 1)
   overlays.sort((left, right) =>
-    left.interval.start.ticks - right.interval.start.ticks || drawRank(left) - drawRank(right),
+    (nodeTrackOrder.get(left.nodeId) ?? 0) - (nodeTrackOrder.get(right.nodeId) ?? 0) ||
+    left.interval.start.ticks - right.interval.start.ticks ||
+    drawRank(left) - drawRank(right) ||
+    left.nodeId.localeCompare(right.nodeId),
   )
 
   // A visual adjustment always names something drawn on V2. With V2 switched
@@ -433,7 +473,7 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
   // The owner recorded exactly that. An adjustment pointing at nothing now
   // draws nothing, which is what it already meant.
   const visuals: VisualPropertiesNode[] = []
-  for (const operation of trackOutputs.V2 ? activeVisualProperties(project) : []) {
+  for (const operation of activeVisualProperties(project)) {
     const nodeIds = overlays
       .filter((node) => node.nodeId === operation.visualId || node.nodeId.startsWith(`${operation.visualId}.`))
       .map((node) => node.nodeId)

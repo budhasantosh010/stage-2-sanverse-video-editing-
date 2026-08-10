@@ -5,6 +5,7 @@ import {
   type AnalysisRefusal,
   type DerivedMediaResource,
   type MediaAnalysisClient,
+  type WaveformAnalysisValue,
 } from './media-analysis-client'
 import { mediaAnalysisKeyId, type MediaAnalysisKeyV1 } from './media-analysis-key'
 
@@ -94,7 +95,7 @@ export type MediaAnalysisController = Readonly<{
   setWanted(projectId: string, wanted: readonly WantedAnalysis[]): void
   /** What is known about one piece right now. Pure: never starts work. */
   picture(keyId: string): DerivedMediaResource<ImageBitmap>
-  peaks(keyId: string): DerivedMediaResource<readonly number[]>
+  peaks(keyId: string): DerivedMediaResource<WaveformAnalysisValue>
   /** Ask again for something that failed. */
   retry(keyId: string): void
   subscribe(listener: () => void): () => void
@@ -137,7 +138,7 @@ export const createMediaAnalysisController = (options: Readonly<{
       bitmap.close?.()
     },
   })
-  const peakBlocks: BoundedCache<readonly number[]> = createBoundedCache<readonly number[]>({
+  const peakBlocks: BoundedCache<WaveformAnalysisValue> = createBoundedCache<WaveformAnalysisValue>({
     maxEntries: options.maxPeakBlocks ?? MAX_CACHED_PEAK_BLOCKS,
   })
 

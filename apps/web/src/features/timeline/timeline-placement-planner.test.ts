@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { acceptChangeSet, createIdFactory, serializeProject, type EditProject } from '@sanverse/edit-domain'
+import { acceptChangeSet, activeTimelineTrackState, createIdFactory, serializeProject, type EditOperation, type EditProject } from '@sanverse/edit-domain'
+import { TIMELINE_TRACKS_PRIMITIVE_ID } from '@sanverse/edit-domain/capabilities'
+import { tracksOfKind } from '@sanverse/edit-domain/timeline-tracks'
 import {
   PLACEMENT_REFUSAL_CODES,
   TIMELINE_LANE_IDS,
@@ -488,5 +490,94 @@ describe('placement modes rearrange what is already on the lane', () => {
       { spans: laneSpans(subject, 'V2') },
     )
     expect(serializeProject(subject)).toEqual(before)
+  })
+})
+
+describe('T5 placement on added stable tracks', () => {
+  const addTrack = (subject: EditProject, kind: 'video' | 'audio', changeSetId: string): Readonly<{ project: EditProject; trackId: string }> => {
+    const ids = createIdFactory(changeSetId)
+    const state = activeTimelineTrackState(subject)
+    const operation = Object.freeze({
+      schemaVersion: 'sanverse.operation/v3' as const,
+      operationId: ids.operation(0),
+      kind: 'add-timeline-track' as const,
+      capabilityId: TIMELINE_TRACKS_PRIMITIVE_ID,
+      track: Object.freeze({
+        trackId: ids.entity('track', 0),
+        kind,
+        role: kind === 'video' ? 'generic-video' as const : 'generic-audio' as const,
+        name: null,
+        syncLockEnabled: true,
+        outputEnabled: true,
+        audioState: kind === 'audio' ? Object.freeze({ muted: false, solo: false, gainDb: 0, pan: 0 }) : null,
+      }),
+      insertIndex: tracksOfKind(state, kind).length,
+      extensions: Object.freeze({}),
+    }) as EditOperation
+    const result = acceptChangeSet(subject, changeSetOf(changeSetId, subject.revision, [operation]))
+    if (!result.ok) throw new Error(JSON.stringify(result.error))
+    return Object.freeze({ project: result.value, trackId: ids.entity('track', 0) })
+  }
+
+  it('drops video or images on an added video track and persists that exact destination atomically', () => {
+    const added = addTrack(testMultiAssetProject(), 'video', 'changeset_t5dropv01')
+    const laneId = laneIdForTrack(added.trackId as never)
+    const result = planTimelinePlacement(request({
+      project: added.project,
+      targetLaneId: laneId,
+      assetId: TEST_IMAGE_ASSET_ID,
+      atTicks: ms(2_000).ticks,
+      idFactory: createIdFactory('changeset_t5dropv02'),
+    }), { spans: [] })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.operations.map((operation) => operation.kind)).toEqual([
+      'add-media-overlay',
+      'assign-timeline-item-track',
+    ])
+    expect((result.value.operations[1] as Extract<EditOperation, { kind: 'assign-timeline-item-track' }>).trackId).toBe(added.trackId)
+  })
+
+  it('drops audio on an added audio track and persists that exact destination', () => {
+    const added = addTrack(testMultiAssetProject(), 'audio', 'changeset_t5dropa01')
+    const result = planTimelinePlacement(request({
+      project: added.project,
+      targetLaneId: laneIdForTrack(added.trackId as never),
+      assetId: TEST_MUSIC_ASSET_ID,
+      atTicks: ms(2_000).ticks,
+      idFactory: createIdFactory('changeset_t5dropa02'),
+    }), { spans: [] })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.operations.map((operation) => operation.kind)).toEqual([
+      'add-music',
+      'assign-timeline-item-track',
+    ])
+    expect((result.value.operations[1] as Extract<EditOperation, { kind: 'assign-timeline-item-track' }>).trackId).toBe(added.trackId)
+  })
+
+  it('refuses incompatible media and direct drops on a stable locked track', () => {
+    const added = addTrack(testMultiAssetProject(), 'video', 'changeset_t5dropv03')
+    const laneId = laneIdForTrack(added.trackId as never)
+    expect(refusalOf(planTimelinePlacement(request({
+      project: added.project,
+      targetLaneId: laneId,
+      assetId: TEST_MUSIC_ASSET_ID,
+    }), { spans: [] }))).toBe('TRACK_INCOMPATIBLE')
+    expect(refusalOf(planTimelinePlacement(request({
+      project: added.project,
+      targetLaneId: laneId,
+      assetId: TEST_IMAGE_ASSET_ID,
+      trackState: { lockedTrackIds: [added.trackId as never] },
+    }), { spans: [] }))).toBe('TRACK_LOCKED')
+  })
+
+  it('allows Normal/Append but truthfully refuses Insert/Overwrite on added tracks', () => {
+    const added = addTrack(testMultiAssetProject(), 'video', 'changeset_t5dropv04')
+    const laneId = laneIdForTrack(added.trackId as never)
+    expect(planTimelinePlacement(request({ project: added.project, targetLaneId: laneId, assetId: TEST_IMAGE_ASSET_ID, placementMode: 'normal' }), { spans: [] }).ok).toBe(true)
+    expect(planTimelinePlacement(request({ project: added.project, targetLaneId: laneId, assetId: TEST_IMAGE_ASSET_ID, placementMode: 'append' }), { spans: [] }).ok).toBe(true)
+    expect(refusalOf(planTimelinePlacement(request({ project: added.project, targetLaneId: laneId, assetId: TEST_IMAGE_ASSET_ID, placementMode: 'insert' }), { spans: [{ startTicks: ms(5_000).ticks, durationTicks: ms(1_000).ticks, targetId: 'existing' }] }))).toBe('OPERATION_UNSUPPORTED')
+    expect(refusalOf(planTimelinePlacement(request({ project: added.project, targetLaneId: laneId, assetId: TEST_IMAGE_ASSET_ID, placementMode: 'overwrite' }), { spans: [{ startTicks: 0, durationTicks: ms(5_000).ticks, targetId: 'existing' }] }))).toBe('OPERATION_UNSUPPORTED')
   })
 })

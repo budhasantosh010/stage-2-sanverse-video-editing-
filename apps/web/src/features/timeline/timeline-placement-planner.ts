@@ -2,6 +2,7 @@ import {
   OPERATION_SCHEMA_VERSION,
   PROJECT_TIMESCALE,
   applyTimelineOperation,
+  activeTimelineTrackState,
   effectiveComposition,
   findAsset,
   isAudioAsset,
@@ -12,8 +13,10 @@ import {
   type EditProject,
   type IdFactory,
   type MediaAsset,
+  type TimelineTrackId,
 } from '@sanverse/edit-domain'
-import { PLACE_PRIMARY_CLIP_PRIMITIVE_ID } from '@sanverse/edit-domain/capabilities'
+import { PLACE_PRIMARY_CLIP_PRIMITIVE_ID, TIMELINE_TRACKS_PRIMITIVE_ID } from '@sanverse/edit-domain/capabilities'
+import { resolveTimelineTrackReference, timelineTrackAssignmentKey, trackById, type TimelineTrackV2 } from '@sanverse/edit-domain/timeline-tracks'
 
 import { buildAddAsBrollOperation, buildAddAsMusicOperation } from '../media/media-actions'
 import { applyLaneEdits, type LaneEdit } from './timeline-item-operations'
@@ -57,7 +60,7 @@ export const TIMELINE_LANE_IDS = Object.freeze([
 export type TimelineLaneId = (typeof TIMELINE_LANE_IDS)[number]
 
 export const TIMELINE_TRACK_IDS = Object.freeze(['V2', 'V1', 'C1', 'A1', 'A2'] as const)
-export type TimelineTrackId = (typeof TIMELINE_TRACK_IDS)[number]
+export type { TimelineTrackId } from '@sanverse/edit-domain'
 
 const LANE_TO_TRACK = Object.freeze({
   'lane:overlay': 'V2', 'lane:video': 'V1', 'lane:caption': 'C1',
@@ -80,13 +83,16 @@ const TRACK_TO_LANE = Object.freeze({
 export const trackIdForLane = (laneId: string): TimelineTrackId => {
   const known = LANE_TO_TRACK[laneId as TimelineLaneId]
   if (known) return known
+  const stable = laneId.match(/^lane:(?:track|video):(track_[a-z0-9]{8,64})$/)?.[1]
+  if (stable) return stable as TimelineTrackId
   if (laneId.startsWith('lane:video')) return 'V1'
   if (laneId.startsWith('lane:dialogue')) return 'A1'
   if (laneId.startsWith('lane:music')) return 'A2'
   if (laneId.startsWith('lane:caption')) return 'C1'
   return 'V2'
 }
-export const laneIdForTrack = (trackId: TimelineTrackId): TimelineLaneId => TRACK_TO_LANE[trackId]
+export const laneIdForTrack = (trackId: TimelineTrackId): string =>
+  TRACK_TO_LANE[trackId as keyof typeof TRACK_TO_LANE] ?? `lane:track:${trackId}`
 
 export const PLACEMENT_MODES = Object.freeze(['normal', 'insert', 'overwrite', 'append'] as const)
 export type PlacementMode = (typeof PLACEMENT_MODES)[number]
@@ -123,7 +129,7 @@ export type TimelinePlacementRefusal = Readonly<{
  * than a thing this planner has to be careful about.
  */
 export type AtomicTimelinePlan = Readonly<{
-  targetLaneId: TimelineLaneId
+  targetLaneId: string
   placementMode: PlacementMode
   /** Finished-video time where the thing lands, after snapping. */
   atTicks: number
@@ -143,7 +149,7 @@ export type PlacementResult =
  * changes what is exported and never whether an edit is allowed.
  */
 export type TrackStateSnapshot = Readonly<{
-  lockedTrackIds: readonly TimelineTrackId[]
+  lockedTrackIds: readonly string[]
 }>
 
 /**
@@ -243,6 +249,37 @@ const compatibility = (laneId: TimelineLaneId, asset: MediaAsset): TimelinePlace
   return Object.freeze({
     code: 'TRACK_INCOMPATIBLE' as const,
     message: 'The captions lane is written from your words, not from a file. Add captions from the Captions panel.',
+  })
+}
+
+const compatibilityForTrack = (track: TimelineTrackV2, asset: MediaAsset): TimelinePlacementRefusal | null => {
+  if (track.role === 'primary-video') {
+    return isVideoAsset(asset) ? null : Object.freeze({
+      code: 'TRACK_INCOMPATIBLE' as const,
+      message: 'The primary track takes video. Put pictures on a video layer above it, or sound on an audio track.',
+    })
+  }
+  if (track.kind === 'video') {
+    return isVideoAsset(asset) || isImageAsset(asset) ? null : Object.freeze({
+      code: 'TRACK_INCOMPATIBLE' as const,
+      message: 'Video tracks above the primary take video and pictures. Put sound on an audio track.',
+    })
+  }
+  if (track.kind === 'audio' && track.role !== 'dialogue') {
+    return isAudioAsset(asset) ? null : Object.freeze({
+      code: 'TRACK_INCOMPATIBLE' as const,
+      message: 'Audio tracks take sound only. Put video and pictures on a video track.',
+    })
+  }
+  if (track.role === 'dialogue') {
+    return Object.freeze({
+      code: 'OPERATION_UNSUPPORTED' as const,
+      message: 'Dialogue is the linked sound of the primary video and cannot be replaced by a file drop.',
+    })
+  }
+  return Object.freeze({
+    code: 'TRACK_INCOMPATIBLE' as const,
+    message: 'Caption tracks are written from words, not from a file drop.',
   })
 }
 
@@ -420,9 +457,19 @@ export const planTimelinePlacement = (
     trackState, proposalPending, exportInProgress, expectedRevision, idFactory,
   } = request
 
-  // Closed contracts first. An unknown lane or mode is refused, never guessed at.
-  if (!isLaneId(targetLaneId)) {
-    return refuse('TRACK_INCOMPATIBLE', 'That is not a lane this editor has.')
+  // Closed contracts first. T5 dynamic lanes are accepted only when their
+  // stable id resolves to one of the project's typed tracks; arbitrary strings
+  // are still refused rather than guessed at.
+  const timelineTracks = activeTimelineTrackState(project)
+  const legacyLane = isLaneId(targetLaneId)
+  const stableLane = /^lane:(?:track|video):track_[a-z0-9]{8,64}$/.test(targetLaneId)
+  if (!legacyLane && !stableLane) {
+    return refuse('TRACK_INCOMPATIBLE', 'That is not a track in this project.')
+  }
+  const targetStableId = resolveTimelineTrackReference(timelineTracks, trackIdForLane(targetLaneId))
+  const targetTrack = targetStableId ? trackById(timelineTracks, targetStableId) : null
+  if (targetTrack === null) {
+    return refuse('TRACK_INCOMPATIBLE', 'That is not a track in this project.')
   }
   if (!PLACEMENT_MODES.includes(placementMode)) {
     return refuse('OPERATION_UNSUPPORTED', 'That placement mode does not exist.')
@@ -438,14 +485,19 @@ export const planTimelinePlacement = (
   if (expectedRevision != null && expectedRevision !== project.revision) {
     return refuse('PROJECT_STALE', 'The project changed while you were dragging. Try that again.')
   }
-  if (trackState?.lockedTrackIds.includes(trackIdForLane(targetLaneId)) === true) {
-    return refuse('TRACK_LOCKED', `The ${trackIdForLane(targetLaneId)} lane is locked. Unlock it to make changes.`)
+  const targetReference = trackIdForLane(targetLaneId)
+  if (trackState?.lockedTrackIds.includes(targetReference) === true || (targetTrack && trackState?.lockedTrackIds.includes(targetTrack.trackId as TimelineTrackId) === true)) {
+    return refuse('TRACK_LOCKED', `${legacyLane ? targetReference : 'That track'} is locked. Unlock it to make changes.`)
   }
 
   const asset = findAsset(project.assets, assetId)
   if (!asset) return refuse('ASSET_MISSING', 'That file is not in this project any more.')
 
-  const incompatible = compatibility(targetLaneId, asset)
+  const incompatible = legacyLane
+    ? compatibility(targetLaneId as TimelineLaneId, asset)
+    : targetTrack
+      ? compatibilityForTrack(targetTrack, asset)
+      : Object.freeze({ code: 'TRACK_INCOMPATIBLE' as const, message: 'That is not a track in this project.' })
   if (incompatible) return refuse(incompatible.code, incompatible.message)
 
   const natural = naturalDurationTicks(asset)
@@ -459,7 +511,7 @@ export const planTimelinePlacement = (
     return refuse('OUT_OF_RANGE', 'That is not a place on the timeline.')
   }
 
-  if (includeLinkedAudio && targetLaneId === 'lane:overlay' && isVideoAsset(asset) && asset.hasAudio) {
+  if (includeLinkedAudio && targetTrack?.kind === 'video' && targetTrack.role !== 'primary-video' && isVideoAsset(asset) && asset.hasAudio) {
     // There is no operation that would place B-roll sound as its own item and
     // keep it tied to the picture. A copy that can drift apart is worse than
     // none, so this is refused truthfully rather than dropped in silence.
@@ -478,7 +530,6 @@ export const planTimelinePlacement = (
    * "Normal" would lose the very thing it was supposed to push along, and the
    * user would not find out until export.
    */
-  const trackId = trackIdForLane(targetLaneId)
   const laneEdits: LaneEdit[] = []
 
   if (resolved.shiftFromTicks !== null) {
@@ -542,7 +593,7 @@ export const planTimelinePlacement = (
   // The main sequence is built here rather than in `media-actions`, because a
   // piece of the main video is not anchored to anything: it IS the footage. It
   // says which recording, which stretch of it, and where it goes.
-  if (targetLaneId === 'lane:video') {
+  if (targetTrack?.role === 'primary-video') {
     return planPrimaryPlacement({
       project, asset, atTicks: resolved.atTicks, durationTicks: natural, placementMode, idFactory,
     })
@@ -550,7 +601,7 @@ export const planTimelinePlacement = (
 
   // Construction is delegated: `media-actions` is the one authority on how a
   // placement is anchored, and it validates against the composition too.
-  const built = targetLaneId === 'lane:music'
+  const built = targetTrack?.kind === 'audio'
     ? buildAddAsMusicOperation({
         project,
         expectedRevision: project.revision,
@@ -578,13 +629,38 @@ export const planTimelinePlacement = (
   // item, so the rearrangement starts at slot 1 and the names never collide.
   let rearrangement: readonly EditOperation[] = Object.freeze([])
   if (laneEdits.length > 0) {
-    if (trackId !== 'V2' && trackId !== 'A2') {
-      return refuse('OPERATION_UNSUPPORTED', 'That lane cannot be rearranged.')
+    const legacyEditTrack = targetTrack?.role === 'overlay-video'
+      ? 'V2' as const
+      : targetTrack?.role === 'music'
+        ? 'A2' as const
+        : null
+    if (legacyEditTrack === null) {
+      return refuse('OPERATION_UNSUPPORTED', 'Insert and Overwrite are not available on this added track yet. Use Normal or Append.')
     }
-    const edited = applyLaneEdits({ project, trackId, edits: laneEdits, ids: idFactory, slotOffset: 1 })
+    const edited = applyLaneEdits({ project, trackId: legacyEditTrack, edits: laneEdits, ids: idFactory, slotOffset: 1 })
     if (!edited.ok) return refuse('OPERATION_UNSUPPORTED', edited.refusal.message)
     rearrangement = edited.operations
   }
+
+  const builtIdentity = 'musicId' in built.operation
+    ? built.operation.musicId
+    : 'overlayId' in built.operation
+      ? built.operation.overlayId
+      : null
+  if (targetTrack && builtIdentity === null) {
+    return refuse('OPERATION_UNSUPPORTED', 'That placement cannot be assigned to a Timeline track.')
+  }
+  const assignment: readonly EditOperation[] = !legacyLane && targetTrack && builtIdentity !== null
+    ? Object.freeze([Object.freeze({
+        schemaVersion: OPERATION_SCHEMA_VERSION,
+        operationId: idFactory.operation(1 + rearrangement.length),
+        kind: 'assign-timeline-item-track' as const,
+        capabilityId: TIMELINE_TRACKS_PRIMITIVE_ID,
+        itemId: timelineTrackAssignmentKey(targetTrack.kind === 'audio' ? 'audio' : 'visual', builtIdentity),
+        trackId: targetTrack.trackId,
+        extensions: Object.freeze({}),
+      }) as EditOperation])
+    : Object.freeze([])
 
   const modeSummary = placementMode === 'insert'
     ? 'and pushed the rest along'
@@ -593,7 +669,7 @@ export const planTimelinePlacement = (
       : placementMode === 'append'
         ? 'at the end'
         : ''
-  const what = targetLaneId === 'lane:music'
+  const what = targetTrack?.kind === 'audio'
     ? 'Added music'
     : isImageAsset(asset) ? 'Added a picture over your video' : 'Added B-roll over your video'
 
@@ -604,7 +680,7 @@ export const planTimelinePlacement = (
       placementMode,
       atTicks: resolved.atTicks,
       durationTicks,
-      operations: Object.freeze([built.operation, ...rearrangement]) as readonly EditOperation[],
+      operations: Object.freeze([built.operation, ...rearrangement, ...assignment]) as readonly EditOperation[],
       summary: modeSummary ? `${what} ${modeSummary}` : what,
     }),
   })

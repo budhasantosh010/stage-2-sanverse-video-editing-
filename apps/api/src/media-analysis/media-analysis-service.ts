@@ -86,15 +86,24 @@ export const WAVEFORM_SAMPLE_RATE = 48_000
  * back and how much was ASKED for, which needs neither the rate nor the channel
  * count. See `extractWaveform`.
  */
-export type WaveformBlockPayload = Readonly<{
-  schemaVersion: 'sanverse.waveform-block/v1'
-  assetId: string
-  sourceTicks: number
-  spanTicks: number
+export type WaveformChannelPeaksV2 = Readonly<{
+  label: 'L' | 'R'
   peaks: readonly number[]
 }>
 
-export const WAVEFORM_BLOCK_SCHEMA_VERSION = 'sanverse.waveform-block/v1'
+export type WaveformBlockPayload = Readonly<{
+  schemaVersion: 'sanverse.waveform-block/v2'
+  assetId: string
+  sourceTicks: number
+  spanTicks: number
+  channelCount: number
+  channelLayout: string | null
+  peaks: readonly number[]
+  /** Present only when FFprobe truthfully identifies an ordinary stereo stream. */
+  channels: readonly WaveformChannelPeaksV2[]
+}>
+
+export const WAVEFORM_BLOCK_SCHEMA_VERSION = 'sanverse.waveform-block/v2'
 
 export const AUDIO_NORMALIZATION_SCHEMA_VERSION = 'sanverse.audio-normalization-evidence/v1' as const
 export const AUDIO_NORMALIZATION_ANALYSIS_VERSION = 'ffmpeg-loudnorm-v1' as const
@@ -160,6 +169,7 @@ export type MediaAnalysisServiceOptions = Readonly<{
   loadProject: (projectId: string) => Promise<EditProject>
   runCommand?: CommandRunner
   ffmpegExecutable?: string
+  ffprobeExecutable?: string
   coordinator?: AnalysisCoordinator
   cache?: DerivedMediaCache
   limits?: AnalysisCoordinatorLimits
@@ -208,7 +218,9 @@ const ACCEPTS: Readonly<Record<AnalysisRequest['kind'], readonly MediaAsset['med
 export function createMediaAnalysisService(options: MediaAnalysisServiceOptions): MediaAnalysisService {
   const runCommand = options.runCommand ?? createCommandRunner()
   const ffmpegExecutable = options.ffmpegExecutable ?? 'ffmpeg'
+  const ffprobeExecutable = options.ffprobeExecutable ?? 'ffprobe'
   const coordinator = options.coordinator ?? createAnalysisCoordinator(options.limits ?? DEFAULT_ANALYSIS_LIMITS)
+  const channelInfoCache = new Map<string, Promise<Readonly<{ channels: number; layout: string | null }>>>()
 
   /**
    * The project's own folder, reached through the SAME checked resolution that
@@ -301,6 +313,47 @@ export function createMediaAnalysisService(options: MediaAnalysisServiceOptions)
     if (result.exitCode !== 0) {
       throw new AnalysisError('DECODER_FAILED', 'That part of the file could not be read.', 502)
     }
+  }
+
+  const probeAudioChannels = async (
+    cacheKey: string,
+    filePath: string,
+    cwd: string,
+    signal: AbortSignal,
+  ): Promise<Readonly<{ channels: number; layout: string | null }>> => {
+    const cached = channelInfoCache.get(cacheKey)
+    if (cached) return cached
+    const pending = (async () => {
+      try {
+        const result = await runCommand({
+          executable: ffprobeExecutable,
+          args: [
+            '-v', 'error',
+            '-select_streams', 'a:0',
+            '-show_entries', 'stream=channels,channel_layout',
+            '-of', 'json',
+            filePath,
+          ],
+          cwd,
+          signal,
+        })
+        if (result.exitCode !== 0) throw new Error('probe failed')
+        const parsed = JSON.parse(result.stdout) as { streams?: readonly { channels?: unknown; channel_layout?: unknown }[] }
+        const stream = parsed.streams?.[0]
+        const channels = stream?.channels
+        if (!Number.isSafeInteger(channels) || (channels as number) < 1 || (channels as number) > 32) throw new Error('invalid channels')
+        return Object.freeze({
+          channels: channels as number,
+          layout: typeof stream?.channel_layout === 'string' && stream.channel_layout.length > 0 ? stream.channel_layout : null,
+        })
+      } catch (error) {
+        channelInfoCache.delete(cacheKey)
+        if (signal.aborted) throw new AnalysisError('ANALYSIS_CANCELLED', 'That preview was no longer needed.', 499)
+        throw new AnalysisError('DECODER_FAILED', 'That sound channel layout could not be read.', 502)
+      }
+    })()
+    channelInfoCache.set(cacheKey, pending)
+    return pending
   }
 
   const runFfmpegForMeasurement = async (
@@ -424,6 +477,7 @@ export function createMediaAnalysisService(options: MediaAnalysisServiceOptions)
     const output = await workFile(projectId, '.pcm')
     const cwd = await projectDirectory(projectId)
     try {
+      const channelInfo = await probeAudioChannels(`${request.assetId}:${request.assetVersion}`, filePath, cwd, signal)
       await runFfmpeg([
         '-hide_banner', '-nostdin', '-v', 'error',
         '-ss', ticksToSeconds(request.sourceTicks),
@@ -448,15 +502,25 @@ export function createMediaAnalysisService(options: MediaAnalysisServiceOptions)
        * second of sound, not as a whole second stretched to fit.
        */
       const actualSamples = Math.floor(raw.byteLength / 2)
+      const actualFrames = Math.floor(actualSamples / channelInfo.channels)
       const covered = Math.max(1, Math.min(availableTicks, request.spanTicks))
-      const expectedSamples = Math.max(1, Math.round((actualSamples * request.spanTicks) / covered))
-      const peaks = peaksFromPcm(raw, expectedSamples, request.peakCount)
+      const expectedFrames = Math.max(1, Math.round((actualFrames * request.spanTicks) / covered))
+      const peaks = peaksFromInterleavedPcm(raw, expectedFrames, request.peakCount, channelInfo.channels)
+      const channels = channelInfo.channels === 2 && channelInfo.layout === 'stereo'
+        ? Object.freeze([
+            Object.freeze({ label: 'L' as const, peaks: channelPeaksFromInterleavedPcm(raw, expectedFrames, request.peakCount, 2, 0) }),
+            Object.freeze({ label: 'R' as const, peaks: channelPeaksFromInterleavedPcm(raw, expectedFrames, request.peakCount, 2, 1) }),
+          ])
+        : Object.freeze([])
       const payload: WaveformBlockPayload = Object.freeze({
         schemaVersion: WAVEFORM_BLOCK_SCHEMA_VERSION,
         assetId: request.assetId,
         sourceTicks: request.sourceTicks,
         spanTicks: request.spanTicks,
+        channelCount: channelInfo.channels,
+        channelLayout: channelInfo.layout,
         peaks,
+        channels,
       })
       return Object.freeze({
         bytes: Buffer.from(JSON.stringify(payload), 'utf8'),
@@ -700,10 +764,62 @@ export const peaksFromPcm = (
       const value = Math.abs(raw.readInt16LE(index * 2))
       if (value > loudest) loudest = value
     }
-    // 32,768 rather than 32,767, because the scale runs from −32,768 upwards and
-    // the quietest possible value must map to exactly 0, the loudest to 1.
     const scaled = loudest / 32_768
     peaks[bucket] = scaled > 1 ? 1 : scaled
+  }
+  return Object.freeze(peaks)
+}
+
+/** Combined peaks on frame boundaries, preserving time alignment across channels. */
+export const peaksFromInterleavedPcm = (
+  raw: Buffer,
+  expectedFrames: number,
+  peakCount: number,
+  channelCount: number,
+): readonly number[] => {
+  const buckets = Math.max(1, Math.floor(peakCount))
+  const channels = Math.max(1, Math.floor(channelCount))
+  const availableFrames = Math.floor(raw.byteLength / 2 / channels)
+  const totalFrames = Math.max(expectedFrames, 1)
+  const peaks = new Array<number>(buckets).fill(0)
+  for (let bucket = 0; bucket < buckets; bucket += 1) {
+    const fromFrame = Math.floor((bucket * totalFrames) / buckets)
+    const toFrame = Math.min(availableFrames, Math.floor(((bucket + 1) * totalFrames) / buckets))
+    let loudest = 0
+    for (let frame = fromFrame; frame < toFrame; frame += 1) {
+      for (let channel = 0; channel < channels; channel += 1) {
+        const value = Math.abs(raw.readInt16LE((frame * channels + channel) * 2))
+        if (value > loudest) loudest = value
+      }
+    }
+    peaks[bucket] = Math.min(1, loudest / 32_768)
+  }
+  return Object.freeze(peaks)
+}
+
+/** One truthful channel from interleaved PCM. Never used unless FFprobe named the layout. */
+export const channelPeaksFromInterleavedPcm = (
+  raw: Buffer,
+  expectedFrames: number,
+  peakCount: number,
+  channelCount: number,
+  channelIndex: number,
+): readonly number[] => {
+  const buckets = Math.max(1, Math.floor(peakCount))
+  const channels = Math.max(1, Math.floor(channelCount))
+  if (!Number.isInteger(channelIndex) || channelIndex < 0 || channelIndex >= channels) return Object.freeze(new Array<number>(buckets).fill(0))
+  const availableFrames = Math.floor(raw.byteLength / 2 / channels)
+  const totalFrames = Math.max(expectedFrames, 1)
+  const peaks = new Array<number>(buckets).fill(0)
+  for (let bucket = 0; bucket < buckets; bucket += 1) {
+    const fromFrame = Math.floor((bucket * totalFrames) / buckets)
+    const toFrame = Math.min(availableFrames, Math.floor(((bucket + 1) * totalFrames) / buckets))
+    let loudest = 0
+    for (let frame = fromFrame; frame < toFrame; frame += 1) {
+      const value = Math.abs(raw.readInt16LE((frame * channels + channelIndex) * 2))
+      if (value > loudest) loudest = value
+    }
+    peaks[bucket] = Math.min(1, loudest / 32_768)
   }
   return Object.freeze(peaks)
 }

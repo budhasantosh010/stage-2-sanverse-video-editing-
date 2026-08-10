@@ -25,7 +25,7 @@ const node = {
   useOverlayAudio: false,
 }
 const plan = {
-  schemaVersion: 'sanverse.render-plan/v8',
+  schemaVersion: 'sanverse.render-plan/v9',
   projectId: 'project_aaaaaaaa',
   projectRevision: 1,
   compositionId: 'composition_aaaaaaaa',
