@@ -43,6 +43,6 @@ Copyright/provenance note:
 - **What owner likes:** clear product storytelling where motion supports the explanation instead of covering it, gentle movement, polished software UI, and recurring visual callbacks.
 - **Type:** component + motion pattern + visual treatment + scene composition.
 - **Potential Plan:** A+B+C.
-- **Status:** planned in ABC-1.
-- **Implementation direction:** audit the 77-component catalog; reuse Lower Third/Kinetic Headline/Browser Demo where adequate; add only missing toast/composer/product-story/work-log/scoped-comparison/lockup capability; express timing/feel through B0 directives; prove manual retiming through C4.
+- **Status:** implemented in ABC-1.
+- **Implementation:** 77-component audit completed; Lower Third/Kinetic Headline/Browser Demo were reused where adequate; six missing public scenes were added (toast/composer/product-story/work-log/scoped-comparison/lockup), semantic highlight became a Kinetic Headline variant, safe placement/PIP became primitives, B0 expresses semantic timing/feel, and two real C4 manual-retiming proofs preserve component/node/keyframe identity. Evidence: `DOCS/motion/evidence/MOTION-A20.md` and `DOCS/creative-engine/evidence/ABC-1.md`.
 - **Copyright/provenance:** extract only generic motion principles, information hierarchy, timing, layout grammar and scene patterns. Do not commit source logos, screenshots, exact brand layout, proprietary type, or distinctive copied compositions.

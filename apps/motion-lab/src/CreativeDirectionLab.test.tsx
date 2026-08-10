@@ -53,6 +53,11 @@ describe('Plan B0 Creative Direction Lab', () => {
     await settle()
     expect(container.querySelector<HTMLInputElement>('[aria-label="Communication intent"]')?.value).toBe('floating-prompt-composer')
     expect(container.textContent).toContain('sanverse.floating-prompt-composer')
+    const previewLink = [...container.querySelectorAll<HTMLAnchorElement>('a')].find((entry) => entry.getAttribute('href')?.includes('component=floating-prompt-composer'))
+    expect(previewLink?.textContent).toContain('Preview in Motion Lab')
+    expect(previewLink?.getAttribute('href')).toContain('level=compositor')
+    expect(previewLink?.getAttribute('href')).toContain('creativePlacement=placement%3Agraphic%3Afloating-prompt')
+    expect(previewLink?.getAttribute('href')).toContain('storyTitle=Summarize+the+launch+feedback+and+assign+next+steps')
   })
 
   it('moves and resizes the selected region using exact ticks', async () => {

@@ -20,6 +20,7 @@ import type {
   CreativeDirectionDocumentV1,
   CreativeEditProposalV1,
 } from '@sanverse/creative-direction'
+import { creativePlacementMotionLabUrl } from './creative-engine-bridge.ts'
 
 const TICKS_PER_SECOND = 1_440_000
 const trackClass = (track: string) => `creative-direction__region creative-direction__region--${track.toLowerCase()}`
@@ -229,7 +230,7 @@ export function CreativeDirectionLab() {
 
           <section>
             <h2>Typed proposal</h2>
-            {proposal ? <><div className="creative-direction__proposal-summary"><strong>{proposal.placements.length} placements</strong><span>{proposal.styleAssignments.length} style · {proposal.motionAssignments.length} motion · {proposal.footageTreatments.length} footage</span></div><div className="creative-direction__proposal-list">{proposal.placements.map((placement) => <div key={placement.id}><small>{formatSeconds(placement.startTicks)} → {formatSeconds(placement.endTicks)}</small><strong>{placement.selectedComponentId ?? 'unresolved'}</strong><span>{placement.communicationIntent}</span></div>)}</div></> : <p>Planning fixture…</p>}
+            {proposal ? <><div className="creative-direction__proposal-summary"><strong>{proposal.placements.length} placements</strong><span>{proposal.styleAssignments.length} style · {proposal.motionAssignments.length} motion · {proposal.footageTreatments.length} footage</span></div><div className="creative-direction__proposal-list">{proposal.placements.map((placement) => { const previewUrl = creativePlacementMotionLabUrl(placement); return <div key={placement.id}><small>{formatSeconds(placement.startTicks)} → {formatSeconds(placement.endTicks)}</small><strong>{placement.selectedComponentId ?? 'unresolved'}</strong><span>{placement.communicationIntent}</span>{previewUrl ? <a href={previewUrl} target="_blank" rel="noreferrer">Preview in Motion Lab ↗</a> : null}</div> })}</div></> : <p>Planning fixture…</p>}
           </section>
 
           <section>

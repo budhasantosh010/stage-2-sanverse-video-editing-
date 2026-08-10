@@ -49,3 +49,15 @@
 - Investigation: listener PID command line proved it was Vite from this exact Motion worktree, not another editor-agent worktree.
 - Fix: stopped only that verified stale process, restarted Motion Lab on strict port 2010, and captured HTTP/browser evidence.
 - One-line solution: verify process ownership before restart; never kill an ambiguous listener.
+
+## CREATIVE-FAIL-006 — B0 long edit region exceeded an A20 component's local motion window
+
+- Status: FIXED at development integration seam
+- Milestone: ABC-1 integration
+- Date: 2026-08-10
+- What: the first all-placement ABC test correctly refused the 25-second `product-ui-story` B0 region because the A20 Product UI Story component intentionally supports 1.5–12 seconds of local authored animation.
+- Why: Creative Direction region duration and component-local motion duration are different authorities. The B region answers how long the graphic belongs in the edit; the A component duration answers how its internal motion progresses.
+- Impact: two explicit retiming proofs already passed, but the generic all-nine preview chain stopped at the 25-second region.
+- Fix: the development bridge preserves exact `sourceStartTicks/sourceEndTicks` from B0 and chooses the component's own default local animation duration only when the source region falls outside the component's authoring window. The 25-second region remains 25 seconds; Product UI Story previews with its 7-second local motion window.
+- Boundary: this is a preview/integration seam, not the future production compiler. A future compiler still owns hold/loop/exit scheduling across the full placement region.
+- One-line solution: preserve B timing and A timing separately instead of weakening either contract.

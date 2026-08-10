@@ -1,5 +1,16 @@
 # Project Log
 
+## 2026-08-10 — Sanverse Creative Engine ABC-1 integrated workflow complete
+
+- Added a development-only proposal→Motion bridge in Motion Lab; the `@sanverse/creative-direction` package remains independent of Motion internals. Resolved B0 proposal rows now expose `Preview in Motion Lab ↗` and carry their actual semantic text/items/placement into the chosen Plan-A component.
+- Added a cross-plan architecture suite proving all **9** product-launch placements flow `Creative Directive → Creative Proposal → Plan-A component → Motion Scene → C3 Layers → C4 tracks` with valid stable references.
+- Required proof 1: `semantic-highlight-statement` resolves to Kinetic Headline; C4 moves a real highlighted-word opacity key by exactly one frame through typed C2 operations while component ID, node IDs and keyframe ID remain unchanged.
+- Required proof 2: `scoped-access-comparison` resolves to Scoped Access; one atomic C4 operation array moves left card, right card, title and emphasis/value keys by exactly two frames while all graph/keyframe IDs remain unchanged.
+- The first all-placement run exposed a real duration-semantics boundary: B0's Product UI Story belongs to the edit for 25 seconds while its A20 local authored motion supports 1.5–12 seconds/default 7. The integration bridge now preserves exact B source-region ticks separately from A local motion ticks; future production compiler scheduling of hold/loop/exit remains deferred (`CREATIVE-FAIL-006`).
+- Real Edge retained the B0 typed proposal with direct Motion Lab links plus matching Semantic Highlight and Legal/Engineering Scoped Access C3+C4 screens.
+- Fresh final integrated release gate: **381/381 Creative + Motion tests**, **8/8 builds**. No `apps/web`, production editor, provider API, copied reference asset, B1, C5 or A21 implementation was added. Evidence: `DOCS/creative-engine/evidence/ABC-1.md`. The integrated rollback checkpoint is `sanverse-creative-engine-abc1`.
+
+
 ## 2026-08-10 — Sanverse Creative Engine MOTION-A20 Product Storytelling pack complete
 
 - Re-audited the 77-component library before implementation. Rejected duplicate public modules for Semantic Highlight, Picture-in-Picture, Soft Product Backdrop, Application Window Reveal and Lower Third; those jobs are handled by an existing Kinetic Headline variant, reusable primitives/treatments, Browser Demo/window vocabulary and existing Lower Third.

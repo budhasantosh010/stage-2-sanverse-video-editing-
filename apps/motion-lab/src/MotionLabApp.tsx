@@ -158,6 +158,15 @@ const initialTimerMode: TimerStatusPillProps['mode'] = timerPreset === 'countup'
 const initialTimerSeconds = timerPreset === 'max' ? 359_999 : 90
 const initialTimerShowHours = timerPreset === 'max'
 const initialFamilyModule = FAMILY_COMPONENT_MODULES_BY_ID[initialComponentId] ?? FAMILY_COMPONENT_MODULES_BY_ID['sanverse.section-title']!
+const initialCreativePlacementId = initialSearch.get('creativePlacement')
+const initialFamilyProps: FamilyComponentProps = initialCreativePlacementId ? Object.freeze({
+  ...initialFamilyModule.defaultProps,
+  ...(initialSearch.get('storyTitle') ? { title: initialSearch.get('storyTitle')! } : {}),
+  ...(initialSearch.get('storySubtitle') ? { subtitle: initialSearch.get('storySubtitle')! } : {}),
+  ...(initialSearch.get('storyItems') ? { items: Object.freeze(initialSearch.get('storyItems')!.split(/\r?\n/u).map((entry) => entry.trim()).filter(Boolean)) } : {}),
+  ...(initialSearch.get('storyValue') ? { value: initialSearch.get('storyValue')! } : {}),
+  ...(initialSearch.get('storyPlacement') ? { placement: initialSearch.get('storyPlacement') as FamilyComponentProps['placement'] } : {}),
+}) : initialFamilyModule.defaultProps
 const networkPreset = initialSearch.get('network')
 const initialNetworkProps: TeamNetworkDiagramProps = networkPreset === 'invalid'
   ? { ...DEFAULT_TEAM_NETWORK_PROPS, nodes: DEFAULT_TEAM_NETWORK_PROPS.nodes.map((node, index) => index === 0 ? { ...node, label: 'X'.repeat(29) } : node) }
@@ -336,7 +345,7 @@ export function MotionLabApp() {
   const [networkCenterId, setNetworkCenterId] = useState(initialNetworkProps.centerId)
   const [networkNodesText, setNetworkNodesText] = useState(networkNodesToText(initialNetworkProps.nodes))
   const [networkConnectionsText, setNetworkConnectionsText] = useState(networkConnectionsToText(initialNetworkProps.connections))
-  const [familyProps, setFamilyProps] = useState<FamilyComponentProps>(initialFamilyModule.defaultProps)
+  const [familyProps, setFamilyProps] = useState<FamilyComponentProps>(initialFamilyProps)
 
   const [stylePackId, setStylePackId] = useState(initialStylePackId)
   const selectedStylePack = stylePackById(stylePackId)
