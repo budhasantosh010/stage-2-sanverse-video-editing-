@@ -1,5 +1,15 @@
 # Project Log
 
+## 2026-08-10 — MOTION-A21 Creator Utility + Advanced Visual Pack complete
+
+- Re-audited all 83 public components after C5 and rejected duplicate jobs: generic bar chart, another roadmap/timeline, another screenshot/cursor focus, another KPI dashboard, another logo cloud and another before/after card.
+- Added exactly six distinct first-party creator/explainer components: Trend Line Chart, Donut Breakdown, Venn Intersection, Feature Comparison Table, Code Diff Spotlight and Terminal Command Story. Public catalog: **83 → 89**.
+- All six reuse the existing Family Creator/Designer/Advanced shell and one Motion Graph; they are exact C2-keyframe-native, C3 Layer-ready, C4 dope-sheet-ready and expose editable numeric C5 curve tracks. Shared authoring window is 1–10 seconds with reduced-motion final constants and fail-closed content bounds.
+- Automated coverage spans all **6 × 4 ratios × 8 styles = 192** combinations, deterministic seeks, maximum valid text density and original/generic fixture checks. A21's dedicated 576-iteration measurement includes create/evaluate/C3/C4/C5 plus SSR markup.
+- Real Edge retained all six across varied ratios/styles/hostile backgrounds plus a real Trend C3+C5 compositor view. The first portrait Terminal capture passed mechanics but failed readability; compact terminal typography was enlarged and recaptured (`MOTION-FAIL-020`).
+- Fresh release gate: **435/435 Creative + Motion + B1 tests**, **9/9 builds**. Evidence: `DOCS/motion/evidence/MOTION-A21.md`; coverage: `DOCS/motion/COMPONENT_COVERAGE_MATRIX.md`. `apps/web` remains untouched. Next and final ABC-2 gate is source → B1 → B0 → Plan A → C3 → C4 → C5 proof.
+
+
 ## 2026-08-10 — MOTION-C5 Professional Curve Editor complete
 
 - Added a pure C5 Value Graph projection over the same C2 numeric keyframe authority; no second graph, keyframe store, Layer tree or animation clock exists.

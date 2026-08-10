@@ -24,12 +24,12 @@ const NEW_COMPONENT_IDS = Object.freeze([
 ] as const)
 
 describe('horizontal family catalog', () => {
-  it('contains 78 distinct complete family modules with the intended category distribution', () => {
-    expect(FAMILY_COMPONENT_MODULES).toHaveLength(78)
+  it('contains 84 distinct complete family modules with the intended category distribution', () => {
+    expect(FAMILY_COMPONENT_MODULES).toHaveLength(84)
     const ids = FAMILY_COMPONENT_MODULES.map((module) => module.definition.id)
-    expect(new Set(ids).size).toBe(78)
+    expect(new Set(ids).size).toBe(84)
     const families = FAMILY_VARIANT_CONFIGS.reduce<Record<string, number>>((counts, config) => ({ ...counts, [config.family]: (counts[config.family] ?? 0) + 1 }), {})
-    expect(families).toEqual({ title: 14, value: 12, list: 16, status: 8, diagram: 13, quote: 8, cta: 7 })
+    expect(families).toEqual({ title: 14, value: 14, list: 19, status: 8, diagram: 14, quote: 8, cta: 7 })
   })
 
   it('adds exactly the 12 selected uncovered communication scenarios without duplicate IDs', () => {
@@ -47,8 +47,8 @@ describe('horizontal family catalog', () => {
   })
 
   it('publishes one stable first-class fixture per horizontal module', () => {
-    expect(FAMILY_COMPONENT_FIXTURES).toHaveLength(78)
-    expect(new Set(FAMILY_COMPONENT_FIXTURES.map((fixture) => fixture.componentId)).size).toBe(78)
+    expect(FAMILY_COMPONENT_FIXTURES).toHaveLength(84)
+    expect(new Set(FAMILY_COMPONENT_FIXTURES.map((fixture) => fixture.componentId)).size).toBe(84)
     for (const fixture of FAMILY_COMPONENT_FIXTURES) expect(validateFixture(fixture), fixture.id).toEqual([])
   })
 

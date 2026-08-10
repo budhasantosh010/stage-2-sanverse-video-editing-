@@ -1,9 +1,9 @@
 # Sanverse Motion Component Coverage Matrix
 
-Date: 2026-08-09
-Milestone: Plan A continuation through MOTION-A19
+Date: 2026-08-10
+Milestone: Plan A continuation through MOTION-A21
 Historical inventory baseline: 48 first-party components
-Current catalog after A17 + A18 + A19: **77 first-party components**
+Current catalog after A17 + A18 + A19 + A20 + A21: **89 first-party components**
 
 ## Visual-review score rubric
 
@@ -373,3 +373,51 @@ A20 adds six genuinely distinct public components, taking the catalog **77 → 8
 ### A20 provenance / originality
 
 All fixtures, UI surfaces, names and lockups are original Sanverse/generic content. No commercial logo, copied screenshot, proprietary template, source-video frame, brand-specific type treatment or external animation runtime was committed. The retained reference principles are generic: notification sequencing, prompt composition, UI state progression, work-log progress, scoped comparison and semantic outro resolution.
+
+## MOTION-A21 inventory gate — creator utility + advanced visual pack
+
+The complete 83-component catalog was re-read after C5 before selecting A21. The batch was intentionally limited to communication jobs that were still structurally absent.
+
+Rejected as duplicates/near-duplicates:
+
+- generic horizontal Bar Chart — `Poll / Vote Result` already owns ranked bar-result semantics; another bar skin would not justify a public component;
+- another Roadmap / Timeline — `Journey Map`, `Milestone Status`, `Step List` and `Sequence Diagram` already cover ordered milestones/history strongly enough;
+- another Screenshot Zoom / Cursor Focus — `Browser Demo` plus `Cursor Callout` already own software screenshot/focus framing;
+- another KPI Dashboard — `Dashboard Snapshot`, `Single Metric`, `Metric Delta` and `Stat Stack` already cover metric dashboards;
+- another Logo Cloud — `Client Proof Strip` already covers compact client/name proof without proprietary logo assets;
+- another Before/After comparison — `Before / After`, `Problem → Solution`, `Myth vs Fact`, `Pros / Cons` and `Scoped Access Comparison` already cover that relation.
+
+A21 therefore adds exactly six distinct public components, taking the catalog **83 → 89**:
+
+| Component ID | Display name | Distinct communication job | C2 keys | C3 | C4 | C5 editable curves | Ratios | Styles | Visual |
+|---|---|---|---|---|---|---|---|---|---|
+| `sanverse.trend-line-chart` | Trend Line Chart | Ordered numeric change over time/categories, including direction/acceleration | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.donut-breakdown` | Donut Breakdown | Part-to-whole composition with explicit legend values | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.venn-intersection` | Venn Intersection | Explain useful overlap/intersection between two ideas/sets | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.feature-comparison-table` | Feature Comparison Table | Multiple options compared against the same aligned criteria | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.code-diff-spotlight` | Code Diff Spotlight | Small added/removed code change used as the explanation itself | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+| `sanverse.terminal-command-story` | Terminal Command Story | One command plus bounded terminal output/result, distinct from agent progress logs | ✓ | ✓ | ✓ | ✓ | 4 | 8 | A |
+
+### A21 authoring contract
+
+All six use the existing Family Creator/Designer/Advanced editing shell and one Motion Graph. Each publishes stable `family.<variant>.*` graph node IDs, exact C2 opacity/position/scale keyframes, C3 Layers, C4 dope-sheet tracks and numeric C5 curves. No chart-specific animation store exists.
+
+All six declare a **1–10 second** authoring window. Reduced motion replaces authored entrance keyframes with final constants while preserving semantic content. Shared family bounds remain 96 characters for title, 140 for subtitle, 48 for value and at most six 72-character structured rows; over-limit input fails closed.
+
+### A21 visual / originality gate
+
+Retained real-browser baselines intentionally vary ratio, style and hostile background:
+
+- `motion/visual-baselines/a21-trend-line-chart.png` — 16:9 Editorial on busy footage-like background;
+- `motion/visual-baselines/a21-donut-breakdown.png` — 9:16 Dark Minimal on busy background;
+- `motion/visual-baselines/a21-venn-intersection.png` — 1:1 Glass on neutral background;
+- `motion/visual-baselines/a21-feature-comparison-table.png` — 4:5 Tech UI on busy background;
+- `motion/visual-baselines/a21-code-diff-spotlight.png` — 16:9 Retro / Neon on black;
+- `motion/visual-baselines/a21-terminal-command-story.png` — 9:16 Creator Energetic, busy background, reduced motion;
+- `motion/visual-baselines/a21-trend-c3-c4-c5.png` — real compositor proof showing A21 Trend through C3 selection and C5 Value Graph.
+
+The first portrait Terminal capture was rejected because the command/output hierarchy was mechanically valid but too small for creator-video reading distance. Compact terminal typography was enlarged and recaptured before acceptance (`MOTION-FAIL-020`).
+
+Manual WOW/readability rubric uses five explicit checks rather than pretending aesthetics are objective: one-glance purpose, hierarchy/readability, distinctness versus existing catalog, hostile-background survival, and motion/compositor usefulness. All retained A21 scenes pass all five after the Terminal correction.
+
+No outside commercial template, proprietary logo, copied screenshot, chart package or external animation runtime was used. The six designs are first-party Sanverse expressions of generic information-design primitives: trend, part-to-whole, intersection, structured comparison, diff and terminal command/output.

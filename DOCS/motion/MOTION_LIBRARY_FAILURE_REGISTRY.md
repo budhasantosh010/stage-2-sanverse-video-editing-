@@ -385,3 +385,24 @@ VERIFIED FIX: a repeat real Edge console run contains no `Uncaught`, `Maximum up
 
 ONE-LINE SOLUTION: controlled C4 selection reconciliation is now idempotent—unchanged stable selection is not re-published.
 
+## MOTION-FAIL-020 — A21 portrait Terminal Command Story passed mechanics but failed readability
+
+- Status: FIXED
+- Severity: medium visual-quality failure
+- Milestone: MOTION-A21
+- Date: 2026-08-10
+
+WHAT: the first retained 9:16 Creator Energetic Terminal Command Story rendered the correct command/output hierarchy, but compact typography was too small at realistic preview scale.
+
+WHERE: the compact branch of `terminal-command-story` in `packages/motion-library/src/components/component-families.tsx`.
+
+WHY: the first renderer reused near-desktop monospace sizes (17px command / 14px output / 13px result) even though the 9:16 composition is displayed substantially smaller inside the desktop Motion Lab shell.
+
+IMPACT: all automated ratio/style/graph tests passed, but the real creator-facing visual did not meet the manual readability/WOW gate.
+
+FIX: increased compact terminal chrome, command, output and result typography and spacing without changing the content contract, graph node IDs, C2 timing, or desktop layout.
+
+VERIFIED FIX: `motion/visual-baselines/a21-terminal-command-story.png` was recaptured at 9:16 Creator Energetic on a busy footage-like background with reduced motion and is readable at the retained preview scale.
+
+ONE-LINE SOLUTION: portrait terminal typography now scales for viewing distance instead of merely satisfying layout bounds.
+
