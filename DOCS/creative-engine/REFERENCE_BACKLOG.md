@@ -55,3 +55,10 @@ Copyright/provenance note:
 - **Status:** implemented in ABC-2.
 - **Implementation:** B1 exact-tick source understanding + C5 curve control + A21 creator/WOW pack + source→B0→Plan-A→C3/C4/C5 typed proof. Evidence: `DOCS/creative-engine/evidence/B1.md`, `DOCS/motion/evidence/MOTION-C5.md`, `DOCS/motion/evidence/MOTION-A21.md`, `DOCS/creative-engine/evidence/ABC-2.md`.
 - **Copyright/provenance:** all added fixtures and retained browser visuals are first-party/generic Sanverse material; no new copied reference asset was introduced.
+
+## L1 Creative Library coverage note
+
+- **Source:** no external visual reference was required for L1; it organizes and reviews the already-built first-party Plan-A catalog.
+- **Status:** implemented and locally verified.
+- **Implementation:** one-registry discovery metadata, generated first-party posters, real Motion detail/showreel playback, durable review metadata and 89/89 canonical 1× Edge motion inspection. Evidence: `DOCS/creative-engine/evidence/L1-CREATIVE-LIBRARY.md`.
+- **Copyright/provenance:** generated posters and retained L1 browser screenshots contain only existing first-party/generic Sanverse component fixtures. No commercial template, source-video frame, copied brand UI or external animation asset was introduced.

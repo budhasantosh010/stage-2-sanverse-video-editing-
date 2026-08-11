@@ -1,7 +1,7 @@
 # Sanverse Creative Engine — Master Plan
 
-Date: 2026-08-10
-Status: **ABC-2 COMPLETE** — B1 + C5 + A21 + source→creative→component→C3→C4→C5 proof verified; stop before A22/B2/B3/C6
+Date: 2026-08-11
+Status: **L1 COMPLETE LOCALLY** — ABC-2 remains preserved; Creative Library + full 89-component 1× motion review verified; local release only; stop before A22/B2/B3/C6
 
 ## Mission
 
@@ -109,3 +109,33 @@ ABC-1 does **not** authorize:
 - copied commercial reference assets.
 
 Those remain future milestones after ABC-1 is independently verified and preserved.
+
+## ABC-2 preservation
+
+ABC-2 subsequently completed B1 Source Understanding, C5 Value Graph, A21 Creator Utility + Advanced Visual Pack and the source→B0→Plan-A→C3→C4→C5 proof without changing the permanent three-lane architecture. Evidence: `DOCS/creative-engine/evidence/ABC-2.md`.
+
+## L1 — Creative Library / Motion Review layer
+
+L1 is an intentionally horizontal usability/review layer over the preserved ABC-2 system rather than a new A/B/C capability milestone. It makes the existing Plan-A catalog inspectable before additional component/intelligence/control work is authorized.
+
+L1 provides:
+
+- one-registry discovery metadata over all 89 public Plan-A components;
+- deterministic posters/search/filter/collections;
+- a static-poster grid with at most one live Motion preview;
+- component detail player + Component Lab/C3-C5 deep links;
+- full-catalog/collection showreel;
+- durable local motion-review schema and queue;
+- real canonical 1× playback audit of every public component;
+- differentiated S/A/B quality tiers independent of mechanical tests;
+- measured browser/accessibility/performance evidence.
+
+Architecture: `DOCS/motion/CREATIVE_LIBRARY_ARCHITECTURE.md`. Acceptance: `DOCS/creative-engine/evidence/L1-CREATIVE-LIBRARY.md`.
+
+L1 keeps `apps/web` untouched and adds no second Motion authority. Final local review is 89/89 Passed after real 1× playback, with 13 S / 35 A / 41 B tiers.
+
+## Current stop boundary
+
+After L1, do **not** begin A22, B2/B3 or C6 without explicit authorization. Production Studio integration and provider-specific AI remain out of scope.
+
+Per owner instruction on 2026-08-11, L1 release history is preserved locally and remote synchronization/parity is deferred until the owner re-authorizes it next month.

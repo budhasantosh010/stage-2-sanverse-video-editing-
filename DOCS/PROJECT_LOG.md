@@ -1,5 +1,16 @@
 # Project Log
 
+## 2026-08-11 — Sanverse Creative Engine L1 Creative Library complete locally
+
+- Added a one-registry development Creative Library over all 89 public Plan-A components with typed discovery metadata, search/filter/sort/tabs/collections and future-B2 pure lookup boundaries.
+- Added deterministic 480×270 generated posters plus preview hashes/freshness manifest; the grid rests with zero live players and permits at most one inline real Motion preview.
+- Added exact component detail playback/scrub, ratio/style/background/reduced-motion controls, Component Lab/C3-C5 deep links, full-catalog/collection showreel and durable local review queue/persistence.
+- Completed a real local Edge audit for every public component from tick 0 to canonical end at exactly 1×, then visually inspected temporal progression. Final durable result: **89/89 Passed = 13 S / 35 A / 41 B**.
+- Final poster freshness: 89 selected, 0 regenerated, 89 fresh. Real browser route checks found 0 unnamed controls and 0 images without alt; first inline live preview measured 208.4 ms in the local engineering run.
+- Fresh affected Creative/Motion/B1 suites: **459/459 tests**. Root all-workspace production build passes. `apps/web` has zero diff; no forbidden external animation runtime was added.
+- Evidence: `DOCS/creative-engine/evidence/L1-CREATIVE-LIBRARY.md`; architecture: `DOCS/motion/CREATIVE_LIBRARY_ARCHITECTURE.md`.
+- Owner requested local-only Git closeout because the current GitHub CI/CD monthly minutes are exhausted. Preserve local commit/tag `sanverse-creative-library-l1`; do not push until the owner re-authorizes next month. Stop before A22/B2/B3/C6.
+
 ## 2026-08-11 — Sanverse Creative Engine ABC-2 source-to-curve integration complete
 
 - Added a development-only B1→B0 trace adapter that resolves stable Video Understanding observation IDs into exact evidence ticks/provenance, creates deterministic source-statistic Creative Direction, and links verified B1 observations to existing B0 directives without introducing a Motion dependency into the B0 package.

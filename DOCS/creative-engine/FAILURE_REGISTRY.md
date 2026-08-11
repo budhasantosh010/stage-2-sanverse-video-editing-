@@ -93,3 +93,36 @@
 - Fix: percentage statistics in the ABC-2 integration resolve to the new A21 `sanverse.donut-breakdown`, which is exact C2-keyframe-native and expresses the real 68% as `Observed · 68` plus the deterministic complement `Remaining · 32`.
 - Verification: focused ABC-2 integration is 4/4; final full release gate is 439/439 tests + 9/9 builds; the real browser Donut screenshot shows the source-derived 68% content and active C5 curves.
 - One-line solution: choose a semantically correct keyframe-native Plan-A capability instead of manufacturing curve authority on a legacy component.
+
+## CREATIVE-FAIL-010 — Vite review persistence crossed the Node/TSX compiler boundary
+
+- Status: FIXED
+- Milestone: L1 Creative Library
+- Date: 2026-08-11
+- What: the first local review-persistence Vite plugin imported the full Motion Library. The Node-only Vite config compiler then traversed React `.tsx` component modules without JSX configured.
+- Impact: Motion Lab build failed even though the browser implementation itself was valid.
+- Fix: keep the Vite persistence endpoint as a bounded Node structural write barrier and keep canonical component/review validation in the browser/domain package that already owns the registry.
+- Verification: Motion Lab build passes; root all-workspace build passes; invalid structural POST receives 422; browser domain loads 89 validated persisted reviews.
+- One-line solution: do not make Node configuration compile the React component graph just to persist development review JSON.
+
+## CREATIVE-FAIL-011 — One long headless Edge audit session accumulated navigation latency
+
+- Status: FIXED
+- Milestone: L1 Creative Library
+- Date: 2026-08-11
+- What: the first 89-item real-playback audit completed several components and then a later navigation exceeded the page-readiness timeout even though that same component passed immediately in a fresh browser.
+- Impact: a browser-session buildup could have been falsely reported as an animation failure.
+- Fix: make the real audit resumable with `--from` / `--limit` and restart Edge in bounded chunks while preserving the exact 1× full-playback requirement.
+- Verification: 89 unique components, 89 `fullPlaybackVerified=true`, zero duplicate component IDs.
+- One-line solution: isolate long browser-session buildup from the component-quality signal.
+
+## CREATIVE-FAIL-012 — Persisted review badge and edit fields could disagree after async load
+
+- Status: FIXED
+- Milestone: L1 Creative Library
+- Date: 2026-08-11
+- What: detail/showreel review controls initialized before persisted review data returned, so the component badge could show `Passed` while the form still displayed `Unreviewed / Experimental`.
+- Impact: the review UI could mislead a human reviewer even though the stored artifact was correct.
+- Fix: synchronize status/tier/scores/notes whenever the persisted review for the active component arrives or changes.
+- Verification: retained `l1-library-detail.png` shows `S · PASSED`, stored 1× verification, S scores and stored review note consistently.
+- One-line solution: async persisted review data must hydrate the editable form, not only the summary badge.

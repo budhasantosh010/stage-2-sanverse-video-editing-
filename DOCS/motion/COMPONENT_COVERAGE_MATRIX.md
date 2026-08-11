@@ -421,3 +421,21 @@ The first portrait Terminal capture was rejected because the command/output hier
 Manual WOW/readability rubric uses five explicit checks rather than pretending aesthetics are objective: one-glance purpose, hierarchy/readability, distinctness versus existing catalog, hostile-background survival, and motion/compositor usefulness. All retained A21 scenes pass all five after the Terminal correction.
 
 No outside commercial template, proprietary logo, copied screenshot, chart package or external animation runtime was used. The six designs are first-party Sanverse expressions of generic information-design primitives: trend, part-to-whole, intersection, structured comparison, diff and terminal command/output.
+
+## L1 full-catalog motion review
+
+L1 upgrades the visual-confidence evidence from milestone-by-milestone browser samples to a durable full-catalog review record.
+
+Every one of the **89** public components completed one real Edge playback from tick 0 to its canonical end at **1×** through the real Motion renderer. Temporal sample frames were inspected across entrance, progression/build, hold/payoff and exit. The final durable review file is `motion/library-reviews/reviews.v1.json`.
+
+Final L1 quality distribution:
+
+| Tier | Count | Meaning in L1 |
+|---|---:|---|
+| S | 13 | signature reusable motion / strongest canonical presentation |
+| A | 35 | excellent production-ready motion |
+| B | 41 | clean production-ready motion with intentionally simpler/restrained ambition |
+| C | 0 | none |
+| Experimental | 0 | none |
+
+All 89 are `passed` because no blocking canonical motion/readability problem remained after real playback inspection. Tier is not a disguised pass/fail status. Architecture: `DOCS/motion/CREATIVE_LIBRARY_ARCHITECTURE.md`; evidence: `DOCS/creative-engine/evidence/L1-CREATIVE-LIBRARY.md`.
