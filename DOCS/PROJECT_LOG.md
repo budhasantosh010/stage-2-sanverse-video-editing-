@@ -1,5 +1,20 @@
 # Project Log
 
+## 2026-08-11 — T5.5 Editor Confidence machine/browser implementation
+
+- Inserted T5.5 before T6 on dedicated Editor branch `timeline-t55-editor-confidence`, based exactly on verified T5 `a89483deea214927bf44b6d82229ca6ffa72650c`; T6/T7 remain not started.
+- Found a real confidence defect during the interaction audit: Razor was visibly enabled but clips never read the active tool, so the promised click-to-cut route was dead. Razor now selects the acted item and routes the exact pointer time through the existing split authority.
+- Added a safe two-stage Escape policy, visible active-tool language/cursors, stronger primary vs secondary selection, selected-track lane/header context, outside trim hit geometry, drag stacking, named snap feedback, synchronized internal Timeline vertical scrolling, sticky ruler/header behavior, and actionable empty-row copy.
+- Standardized owned Inspector editorial/visual numeric editing through one shared primitive and made dirty form state visibly say `Changes not applied yet.` while retaining the existing safe multi-field Apply/Reset transaction and dirty-selection reconciliation.
+- Audited the existing Editor-owned Canvas and retained its selection bounds, handles, guides, one-video authority, keyboard nudging, Escape cancellation and detached draft/commit behavior instead of creating duplicate Preview/Motion systems.
+- Focused Timeline/Inspector/Canvas matrix passes 59/59; Timeline confidence suite passes 19/19; exact full inventory passes API 405, web 1,374, edit-domain 562, intent-domain 27, render-contract 142 — **2,510/2,510 total**. All-workspace production build passes.
+- The first complete regression attempt saw one existing T4 animation pointer-release test fail once; the exact six-test T4 suite passed immediately and the second complete regression passed. No T4 production code was changed; the flake is recorded in T5.5 evidence.
+- Real Edge 151 on the real 30-second T5 Editor source proved real Razor/select/Escape, explicit Inspector draft/reset semantics, sustained one-video playback, 1440/1280/1024/390 no-overflow continuity, zero runtime/console/HTTP/loading failures, and real Export ready.
+- Revision-2 export probes as 1280×720 H.264 30 fps + AAC stereo 48 kHz, 30.000000 s, 16,174,169 bytes. Downloaded/server SHA-256 match at `27689ec436ed1a28d04a64fd22592851a4aca683dbe616d47becd62ff221da0a`.
+- T5.5 is deliberately not marked `[verified]`: the owner’s unscripted edit and same-task OpenCut confidence score are still required. Automated tests cannot satisfy that criterion.
+- Per owner instruction, keep the T5.5 branch/commits local only for now because GitHub CI/CD minutes are exhausted; do not push until the owner explicitly re-authorizes it after the reset.
+- Motion and Plan-B ownership remain protected.
+
 ## 2026-08-03 — P1-F.1A Gate B: Media Library V2 Essentials complete
 
 - Media organization is a **server-owned sidecar**, `media-organization.json` beside the project, never in `EditProject` and never in the browser. Rejected localStorage (per-browser, silently cleared, invisible to the server) and rejected `EditProject` (Undo would step through folder renames, and moving the revision would move the export key so a rename would re-encode an identical MP4 for 60–90 s). Decision: `DOCS/decisions/ADR-MEDIA-ORGANIZATION-V1.md`.

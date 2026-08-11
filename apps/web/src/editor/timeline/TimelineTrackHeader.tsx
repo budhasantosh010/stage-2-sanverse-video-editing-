@@ -10,6 +10,7 @@ export type TimelineTrackHeaderProps = Readonly<{
   trackName: string | null
   audioState: AudioTrackStateV1 | null
   waveformDisplayMode: 'combined' | 'separate'
+  selected?: boolean
   locked: boolean
   syncLockEnabled: boolean
   targeted: boolean
@@ -76,6 +77,7 @@ export function TimelineTrackHeader({
   trackName,
   audioState,
   waveformDisplayMode,
+  selected = false,
   locked,
   syncLockEnabled,
   targeted,
@@ -116,6 +118,7 @@ export function TimelineTrackHeader({
       data-track-id={trackId}
       data-track-display-id={label}
       data-track-role={trackRole}
+      data-track-selected={selected ? 'yes' : 'no'}
       data-track-locked={locked ? 'yes' : 'no'}
       data-track-sync-lock={syncLockEnabled ? 'on' : 'off'}
       data-track-targeted={targeted ? 'yes' : 'no'}

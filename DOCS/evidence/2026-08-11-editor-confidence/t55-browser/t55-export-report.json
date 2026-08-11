@@ -1,0 +1,25 @@
+{
+  "before": {
+    "revision": 2,
+    "videoCount": 1,
+    "button": {
+      "x": 1344.90625,
+      "y": 10.5,
+      "width": 75.09375,
+      "height": 42,
+      "top": 10.5,
+      "right": 1420,
+      "bottom": 52.5,
+      "left": 1344.90625
+    },
+    "disabled": false
+  },
+  "ready": {
+    "text": "Export ready1280 × 720 · 30sDownload MP4",
+    "href": "http://127.0.0.1:2000/api/projects/project_c6e35a734e773844edce1c251627dc2f/exports/export_aa88bb0b3e2b1f35478823fe856149aa/media"
+  },
+  "runtimeErrors": [],
+  "consoleErrors": [],
+  "failedHttp": [],
+  "loadingFailed": []
+}

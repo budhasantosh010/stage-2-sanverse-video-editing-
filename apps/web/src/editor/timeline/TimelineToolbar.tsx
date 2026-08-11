@@ -333,6 +333,9 @@ export function TimelineToolbar({
 
   const reasonFor = (action: TimelineToolbarAction): string | null =>
     busy ? 'Project edits are paused right now.' : disabledReasons[action]
+  const activeToolLabel = tool === 'trim'
+    ? `Trim · ${PRECISION_TOOL_SPECS.find((candidate) => candidate.tool === precisionTool)?.label ?? 'Standard Trim'}`
+    : tool === 'razor' ? 'Razor' : 'Select'
 
   const actionButton = (spec: ButtonSpec, inMenu: boolean) => {
     const reason = reasonFor(spec.action)
@@ -629,6 +632,7 @@ export function TimelineToolbar({
       </details>
 
       <p className="timeline-v1__selection-summary" title={selectedSummary ?? undefined}>
+        <span className="timeline-v1__active-tool" data-active-tool={tool}>Tool: {activeToolLabel}</span>
         <span className="timeline-v1__toolbar-duration">{formatTimelineTime(durationTicks, timescale)}</span>
         {busy
           ? ' · edits paused'

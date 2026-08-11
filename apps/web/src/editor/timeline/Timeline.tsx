@@ -359,6 +359,7 @@ export function Timeline({
 }: TimelineProps) {
   const timelineRef = useRef<HTMLElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
+  const headersRef = useRef<HTMLDivElement>(null)
   const viewportGridRef = useRef<HTMLDivElement>(null)
   const horizontalZoomFrameRef = useRef<number | null>(null)
   const pendingHorizontalZoomRef = useRef<number | null>(null)
@@ -367,6 +368,7 @@ export function Timeline({
   const verticalAnchorFrameRef = useRef<number | null>(null)
   const advancedDetailsRef = useRef<HTMLDetailsElement>(null)
   const [snapGuideTicks, setSnapGuideTicks] = useState<number | null>(null)
+  const [snapGuideLabel, setSnapGuideLabel] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<Readonly<{ itemId: string; x: number; y: number }> | null>(null)
   const [tool, setTool] = useState<TimelineTool>('select')
   const [marquee, setMarquee] = useState<MarqueeSession | null>(null)
@@ -457,6 +459,9 @@ export function Timeline({
   }
 
   const allItems = useMemo(() => model.lanes.flatMap((lane) => lane.items), [model])
+  const selectedTrackIds = useMemo(() => new Set(
+    allItems.filter((item) => selection.itemIds.includes(item.id)).map((item) => item.trackId),
+  ), [allItems, selection.itemIds])
   const soleSelectedId = primarySelectedItemId(selection)
   const selectedItem = useMemo<TimelineItemView | null>(() => {
     if (!soleSelectedId) return null
@@ -630,6 +635,27 @@ export function Timeline({
       timescale: model.timescale,
       pixelsPerSecond: viewport.pixelsPerSecond,
     })
+
+  const showSnapGuide = (ticks: number | null) => {
+    setSnapGuideTicks(ticks)
+    if (ticks === null) {
+      setSnapGuideLabel(null)
+      return
+    }
+    if (ticks === playheadTicks) {
+      setSnapGuideLabel('Playhead')
+      return
+    }
+    if (markers.some((marker) => marker.startTicks === ticks)) {
+      setSnapGuideLabel('Marker')
+      return
+    }
+    if (allItems.some((item) => item.startTicks === ticks || item.startTicks + item.durationTicks === ticks)) {
+      setSnapGuideLabel('Clip edge')
+      return
+    }
+    setSnapGuideLabel('Snap')
+  }
 
   /*
    * ────────────────────────────────────────────────────────────────────────
@@ -1277,7 +1303,15 @@ export function Timeline({
         onShuttleKey('K')
       } else if (marquee) endMarquee(false)
       else if (contextMenu) setContextMenu(null)
-      else onSelectionChange(EMPTY_SELECTION)
+      else if (tool !== 'select' || precisionTool !== 'standard-trim' || rateStretchActive) {
+        // First Escape returns to a safe pointer tool without throwing away
+        // selection. A second Escape may clear selection.
+        setTool('select')
+        setPrecisionTool('standard-trim')
+        setRateStretchActive(false)
+        setPrecisionDraft(null)
+        setSelectedEditPoints(Object.freeze([]))
+      } else onSelectionChange(EMPTY_SELECTION)
       return
     }
 
@@ -1650,7 +1684,7 @@ export function Timeline({
           The track headers are real controls, so this column can no longer be
           hidden from screen readers the way a decorative label column was.
         */}
-        <div className="timeline-v1__headers">
+        <div ref={headersRef} className="timeline-v1__headers">
           <div className="timeline-v1__ruler-header" aria-hidden="true">Time</div>
           {model.lanes.map((lane) => {
             const trackId = lane.trackId as TimelineTrackId
@@ -1667,6 +1701,7 @@ export function Timeline({
                 trackName={lane.trackName}
                 audioState={lane.audioState}
                 waveformDisplayMode={waveformDisplayModeForTrack(waveformPresentation, trackId)}
+                selected={selectedTrackIds.has(trackId)}
                 locked={lockedTrackIds.includes(trackId)}
                 syncLockEnabled={lane.syncLockEnabled}
                 targeted={targetedTrackIds.includes(trackId)}
@@ -1714,6 +1749,9 @@ export function Timeline({
           onScroll={(event) => {
             setContextMenu(null)
             const next = event.currentTarget.scrollLeft
+            if (headersRef.current && Math.abs(headersRef.current.scrollTop - event.currentTarget.scrollTop) > 0.5) {
+              headersRef.current.scrollTop = event.currentTarget.scrollTop
+            }
             if (Math.abs(next - viewport.scrollLeftPx) > 0.5) {
               onViewportChange({ ...viewport, scrollLeftPx: next })
             }
@@ -1815,6 +1853,9 @@ export function Timeline({
                   visibleRange={visibleRange}
                   overscanTicks={overscanTicks}
                   busy={busy}
+                  activeTool={tool}
+                  primarySelectedItemId={soleSelectedId}
+                  selectedTrack={selectedTrackIds.has(lane.trackId)}
                   rateStretchActive={rateStretchActive && soleSelectedId !== null && lane.kind === 'video'}
                   frameTicks={frameTicks}
                   precisionTool={precisionTool}
@@ -1827,7 +1868,7 @@ export function Timeline({
                   onRateStretchCommit={onRateStretchCommit}
                   pointerTicks={pointerTicks}
                   pointerTime={pointerTime}
-                  onSnapGuide={setSnapGuideTicks}
+                  onSnapGuide={showSnapGuide}
                   onSelect={selectItem}
                   animatedItemIds={animatedItemIds}
                   onAnimationBadgeClick={(itemId) => {
@@ -1888,7 +1929,8 @@ export function Timeline({
                 className="timeline-v1__snap-guide"
                 data-testid="timeline-snap-guide"
                 style={{ left: `${ticksToPixels(snapGuideTicks, model.timescale, viewport.pixelsPerSecond)}px` }}
-                aria-hidden="true"
+                data-snap-label={snapGuideLabel ?? 'Snap'}
+                aria-label={snapGuideLabel ? `Snapped to ${snapGuideLabel}` : 'Snapped'}
               />
             ) : null}
             <TimelinePlayhead
@@ -1898,7 +1940,7 @@ export function Timeline({
               leftPx={playheadLeftPx}
               disabled={false}
               pointerTime={pointerTime}
-              onSnapGuide={setSnapGuideTicks}
+              onSnapGuide={showSnapGuide}
               onSeek={onSeek}
             />
           </div>

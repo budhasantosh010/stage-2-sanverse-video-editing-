@@ -37,6 +37,7 @@ import {
   buildTitleOperation,
   type InspectorOperationBuildResult,
 } from './inspector-operations'
+import { InspectorNumberField as NumberField } from './InspectorNumberField'
 import { InspectorRow } from './InspectorRow'
 import { InspectorSection } from './InspectorSection'
 import { InspectorSectionActions } from './InspectorSectionActions'
@@ -76,37 +77,6 @@ function useApplyOperation(onApply: InspectorEditorCommonProps['onApply']) {
   }
 
   return { working, notice, setNotice, submit }
-}
-
-function NumberField({
-  label,
-  value,
-  min,
-  max,
-  step = 0.1,
-  onChange,
-}: Readonly<{
-  label: string
-  value: number
-  min?: number
-  max?: number
-  step?: number
-  onChange(value: number): void
-}>) {
-  return (
-    <label className="inspector-field">
-      <span>{label}</span>
-      <input
-        aria-label={label}
-        type="number"
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(event) => onChange(Number(event.currentTarget.value))}
-      />
-    </label>
-  )
 }
 
 export function ClipEditorialSections({

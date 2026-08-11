@@ -14,7 +14,8 @@ export function InspectorSectionActions({
   onReset(): void
 }>) {
   return (
-    <div className="inspector-section__footer">
+    <div className="inspector-section__footer" data-draft-state={dirty ? 'changed' : 'saved'}>
+      {dirty ? <p className="inspector-section__draft-status" role="status">Changes not applied yet.</p> : null}
       <div className="inspector__actions">
         <button type="button" disabled={!dirty || busy || working} onClick={onApply}>
           {working ? 'Applying…' : 'Apply'}

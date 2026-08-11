@@ -193,6 +193,46 @@ describe('Timeline V1', () => {
     expect(onGesture).not.toHaveBeenCalled()
   })
 
+  it('routes the enabled Razor tool through the exact same split authority as the keyboard', () => {
+    const base = projectWithAllTimelineFamilies()
+    const firstClipId = base.composition.tracks[0].clips[0].clipId
+    const selectedItemId = `clip:${firstClipId}`
+    const model = buildTimelineViewModel({ project: base, selectedItemIds: [selectedItemId], pending: null })
+    const onGesture = vi.fn()
+    const onSelect = vi.fn()
+    const { container } = renderTimeline({ model, selectedItemId, onGesture, onSelect })
+    const viewportElement = container.querySelector<HTMLElement>('[data-timeline-viewport]')
+    if (!viewportElement) throw new Error('timeline viewport missing')
+    vi.spyOn(viewportElement, 'getBoundingClientRect').mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 600, bottom: 300, width: 600, height: 300,
+      toJSON: () => ({}),
+    })
+
+    fireEvent.click(screen.getByRole('radio', { name: /^Razor\./ }))
+    const clip = screen.getByRole('button', { name: /clip, video/i })
+    fireEvent.click(clip, { clientX: 500 })
+
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ anchorItemId: selectedItemId }))
+    expect(onGesture).toHaveBeenCalledWith({ type: 'split', atTicks: ticks(5) })
+  })
+
+  it('uses Escape first to return a special tool to Select without throwing away selection', () => {
+    const base = projectWithAllTimelineFamilies()
+    const firstClipId = base.composition.tracks[0].clips[0].clipId
+    const selectedItemId = `clip:${firstClipId}`
+    const model = buildTimelineViewModel({ project: base, selectedItemIds: [selectedItemId], pending: null })
+    const onSelect = vi.fn()
+    renderTimeline({ model, selectedItemId, onSelect })
+    const timeline = screen.getByRole('region', { name: 'Project timeline' })
+
+    fireEvent.click(screen.getByRole('radio', { name: /^Razor\./ }))
+    expect(screen.getByRole('radio', { name: /^Razor\./ })).toBeChecked()
+    fireEvent.keyDown(timeline, { key: 'Escape' })
+
+    expect(screen.getByRole('radio', { name: /^Select\./ })).toBeChecked()
+    expect(onSelect).not.toHaveBeenCalledWith(expect.objectContaining({ itemIds: [] }))
+  })
+
   it('deletes with Delete and closes the gap with Shift+Delete, as two distinct actions', () => {
     // The old design focused a confirmation button because "remove" and
     // "remove and close the gap" were one control with two outcomes. They are
@@ -389,5 +429,47 @@ describe('Timeline V1', () => {
     fireEvent.keyDown(screen.getByRole('region', { name: 'Project timeline' }), { key: 'Enter' })
     expect(onPrecisionCommit).toHaveBeenCalledTimes(1)
     expect(onShuttleKey).toHaveBeenLastCalledWith('K')
+  })
+
+  it('shows the active tool in words and keeps the selected track obvious', () => {
+    const base = projectWithAllTimelineFamilies()
+    const firstClipId = base.composition.tracks[0].clips[0].clipId
+    const selectedItemId = `clip:${firstClipId}`
+    const model = buildTimelineViewModel({ project: base, selectedItemIds: [selectedItemId], pending: null })
+    const selectedLane = model.lanes.find((lane) => lane.items.some((item) => item.id === selectedItemId))
+    if (!selectedLane) throw new Error('selected lane missing')
+    const { container } = renderTimeline({ model, selectedItemId })
+
+    expect(screen.getByText('Tool: Select')).toBeInTheDocument()
+    expect(container.querySelector(`[data-lane-id="${selectedLane.id}"]`)).toHaveAttribute('data-track-selected', 'yes')
+    expect(container.querySelector(`[data-track-id="${selectedLane.trackId}"]`)).toHaveAttribute('data-track-selected', 'yes')
+
+    fireEvent.click(screen.getByRole('radio', { name: /^Razor\./ }))
+    expect(screen.getByText('Tool: Razor')).toBeInTheDocument()
+  })
+
+  it('synchronizes vertical Timeline scrolling with the track headers', () => {
+    const { container } = renderTimeline()
+    const viewportElement = container.querySelector<HTMLElement>('[data-timeline-viewport]')
+    const headers = container.querySelector<HTMLElement>('.timeline-v1__headers')
+    if (!viewportElement || !headers) throw new Error('timeline scroll surfaces missing')
+
+    Object.defineProperty(viewportElement, 'scrollTop', { value: 96, writable: true, configurable: true })
+    fireEvent.scroll(viewportElement)
+    expect(headers.scrollTop).toBe(96)
+  })
+
+  it('uses actionable copy instead of a dead Empty label', () => {
+    const base = projectWithAllTimelineFamilies()
+    const model = buildTimelineViewModel({ project: base, selectedItemIds: [], pending: null })
+    const firstLane = model.lanes[0]
+    const emptyModel = Object.freeze({
+      ...model,
+      lanes: Object.freeze(model.lanes.map((lane) => lane.id === firstLane.id ? Object.freeze({ ...lane, items: Object.freeze([]) }) : lane)),
+    })
+
+    renderTimeline({ model: emptyModel })
+    expect(screen.getByText('Drop video or an image here.')).toBeInTheDocument()
+    expect(screen.queryByText(/^Empty$/)).not.toBeInTheDocument()
   })
 })

@@ -17,6 +17,7 @@ import { TimelineTrimHandle } from './TimelineTrimHandle'
 import { TimelineFilmstrip } from './TimelineFilmstrip'
 import { TimelineWaveform } from './TimelineWaveform'
 import { TimelineRateStretchHandle, type RateStretchPreview } from './TimelineRateStretchHandle'
+import type { TimelineTool } from './TimelineToolbar'
 import { TimelinePrecisionHandle } from './TimelinePrecisionHandle'
 import { TimelineAudioDirectControls, type TimelineAudioState } from './TimelineAudioDirectControls'
 
@@ -33,6 +34,9 @@ export type TimelineItemProps = Readonly<{
   timescale: number
   pixelsPerSecond: number
   busy: boolean
+  activeTool: TimelineTool
+  primarySelected?: boolean
+  laneLabel: string
   rateStretchActive: boolean
   frameTicks: number
   precisionTool: TimelinePrecisionToolV1
@@ -132,6 +136,9 @@ export function TimelineItem({
   timescale,
   pixelsPerSecond,
   busy,
+  activeTool,
+  primarySelected = false,
+  laneLabel,
   rateStretchActive,
   frameTicks,
   precisionTool,
@@ -186,6 +193,7 @@ export function TimelineItem({
    */
   const dragRef = useRef<Readonly<{ pointerId: number; originClientX: number; moved: boolean }> | null>(null)
   const [dragOffsetTicks, setDragOffsetTicks] = useState<number | null>(null)
+  const [dragSnappingBypassed, setDragSnappingBypassed] = useState(false)
   const canonicalLeftPx = ticksToPixels(item.startTicks, timescale, pixelsPerSecond)
   const canonicalWidthPx = ticksToPixels(item.durationTicks, timescale, pixelsPerSecond)
   const successfulPrecision = precisionDraft?.ok ? precisionDraft : null
@@ -225,7 +233,11 @@ export function TimelineItem({
     && item.fadeInTicks !== null
     && item.fadeOutTicks !== null
     && (laneKind === 'music' || item.pan !== null)
-  const canDragBody = isOverlayFamily && item.state === 'committed' && !busy
+  const canDragBody = activeTool === 'select' && isOverlayFamily && item.state === 'committed' && !busy
+  const canRazorSplit = activeTool === 'razor'
+    && item.state === 'committed'
+    && item.kind !== 'gap'
+    && !busy
 
   const selectAndSeek = (event?: MouseEvent<HTMLButtonElement>) => {
     const modifiers = event
@@ -276,6 +288,7 @@ export function TimelineItem({
     )
     const nextStart = Math.max(0, snapped.ticks - Math.floor(item.durationTicks / 2))
     setDragOffsetTicks(nextStart - item.startTicks)
+    setDragSnappingBypassed(event.shiftKey)
     onSnapGuide(snapped.snappedToTicks)
   }
 
@@ -286,6 +299,7 @@ export function TimelineItem({
     onSnapGuide(null)
     const offset = dragOffsetTicks
     setDragOffsetTicks(null)
+    setDragSnappingBypassed(false)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
@@ -311,6 +325,8 @@ export function TimelineItem({
       style={{ left: `${ghostLeftPx}px`, width: `${Math.max(2, widthPx)}px` }}
       data-testid="timeline-item-shell"
       data-item-id={item.id}
+      data-primary-selected={primarySelected ? 'yes' : 'no'}
+      data-active-tool={activeTool}
       data-canonical-left={canonicalLeftPx}
       data-canonical-width={canonicalWidthPx}
     >
@@ -338,6 +354,16 @@ export function TimelineItem({
           // A drag that moved is not also a click. Selecting AND moving from
           // one gesture would put the Inspector on something that just moved.
           if (dragOffsetTicks !== null) return
+          if (canRazorSplit) {
+            const atTicks = pointerTicks(event.clientX)
+            const endTicks = item.startTicks + item.durationTicks
+            onSelect(item.id)
+            onSeek(atTicks)
+            if (atTicks <= item.startTicks || atTicks >= endTicks) return
+            if (item.kind === 'clip') onGesture({ type: 'split', atTicks })
+            else onItemAction(item.id, { type: 'split', atTicks })
+            return
+          }
           selectAndSeek(event)
         }}
         onPointerDown={beginBodyDrag}
@@ -360,6 +386,7 @@ export function TimelineItem({
             event.stopPropagation()
             dragRef.current = null
             setDragOffsetTicks(null)
+            setDragSnappingBypassed(false)
             onSnapGuide(null)
             return
           }
@@ -596,6 +623,11 @@ export function TimelineItem({
         </>
       ) : null}
 
+      {dragOffsetTicks !== null ? (
+        <output className="timeline-v1__drag-tooltip" aria-live="polite" data-testid="timeline-drag-tooltip">
+          {laneLabel} · {formatTimelineTime(Math.max(0, item.startTicks + dragOffsetTicks), timescale, true)} · Move{dragSnappingBypassed ? ' · Snapping off' : ''}
+        </output>
+      ) : null}
       {trimPreview ? (
         <output className="timeline-v1__trim-tooltip" aria-live="polite">
           Start {formatTimelineTime(previewStartTicks, timescale, true)} · Duration {formatTimelineTime(previewDurationTicks, timescale, true)}

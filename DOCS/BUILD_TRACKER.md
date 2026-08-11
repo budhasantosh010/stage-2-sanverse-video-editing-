@@ -181,4 +181,20 @@ Last updated: 2026-08-10
 - [x] Stable video/caption render ordering and T4 animation identity preservation across track move/reorder
 - [x] Final verification — **2,501/2,501**, all-workspace build PASS, real Edge 151 workflow/reload/responsive evidence, real revision-13 MP4 export
 - [x] Ownership boundary preserved; Motion/Plan-B protected workstreams not integrated
-- [ ] Gate T6 — not started; requires explicit owner authorization
+
+## P1-F.1E Gate T5.5 — 2026-08-11
+
+- [x] Dedicated Editor branch/worktree `timeline-t55-editor-confidence` from exact verified T5 SHA `a89483deea214927bf44b6d82229ca6ffa72650c`
+- [x] Real dead-enabled Razor route repaired through the existing split authority; no second edit engine
+- [x] Safe two-stage Escape, explicit active-tool language/cursors, primary-vs-secondary selection and selected-track context
+- [x] Larger outside trim hit targets, drag layering, named snap feedback, internal Timeline vertical scrolling and sticky ruler/header
+- [x] Creator-first visual hierarchy preserves targeting/Sync Lock/precision depth without giving every pro control equal default emphasis
+- [x] One shared Inspector numeric primitive plus visible unapplied-draft state; existing safe Apply/Reset reconciliation retained
+- [x] Existing Editor-owned Canvas confidence behaviors retained; no Motion integration
+- [x] Full machine regression **2,510/2,510**; all-workspace production build PASS; one first-run T4 pointer test flake recorded, isolated suite and second full run PASS
+- [x] Final real Microsoft Edge 151 T5.5 pass: real Razor/select/Escape, Inspector draft/reset, sustained playback, 1440/1280/1024/390 no-overflow evidence, one video, zero browser/network failures
+- [x] Real revision-2 export: 1280×720 H.264/AAC 30 s; downloaded/server SHA-256 parity `27689ec…`
+- [x] Local Git-only policy recorded by owner request; no GitHub push until explicitly re-authorized after CI/CD minutes reset
+- [ ] Owner 15–20 minute unscripted edit + same-task OpenCut benchmark/scorecard
+- [ ] Final `[verified]` T5.5 closure — blocked on owner confidence acceptance by contract
+- [ ] Gate T6 — not started; requires explicit owner authorization after T5.5 closes

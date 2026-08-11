@@ -20,6 +20,7 @@ import type {
   InspectorNameplateSelection,
   InspectorTitleSelection,
 } from './inspector-contract'
+import { InspectorNumberField as NumberField } from './InspectorNumberField'
 import { createInspectorOperationId } from './inspector-operation-id'
 import { buildVisualPropertiesOperation } from './inspector-operations'
 import { InspectorSection } from './InspectorSection'
@@ -91,37 +92,6 @@ const propertyLabel = (property: VisualProperty): string => ({
 const transitionKinds: readonly VisualTransitionKind[] = [
   'none', 'fade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'zoom',
 ]
-
-function NumberField({
-  label,
-  value,
-  min,
-  max,
-  step = 1,
-  onChange,
-}: Readonly<{
-  label: string
-  value: number
-  min?: number
-  max?: number
-  step?: number
-  onChange(value: number): void
-}>) {
-  return (
-    <label className="inspector-field">
-      <span>{label}</span>
-      <input
-        aria-label={label}
-        type="number"
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(event) => onChange(Number(event.currentTarget.value))}
-      />
-    </label>
-  )
-}
 
 const effectDefault = (kind: VisualEffect['kind']): number =>
   kind === 'contrast' || kind === 'saturation' ? 1 : 0

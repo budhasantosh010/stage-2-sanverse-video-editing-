@@ -4,14 +4,14 @@
 new session. It is updated at the end of every working block, not only at the end
 of a gate.**
 
-Last updated: 2026-08-10
-Branch: `timeline-t4-keyframe-graph`
+Last updated: 2026-08-11
+Branch: `timeline-t55-editor-confidence`
 Program start commit: `45c0c981fb869afd236f10cbea829b1859d5beb6`
-Latest pushed commit: see `git rev-parse HEAD` — this file is committed WITH the
-work it describes, so HEAD is always the commit that made these numbers true.
+Verified T5 base: `a89483deea214927bf44b6d82229ca6ffa72650c`
+Remote policy: T5.5 is **local Git only** until the owner explicitly re-authorizes GitHub pushing after the current CI/CD minute budget resets.
 Test baseline at program start: **1,723**
-Tests now: **2,419** — edit-domain 536 · render-contract 118 · intent-domain 27 ·
-api 404 · web 1,334. All-workspace production build PASS.
+Tests now: **2,510** — edit-domain 562 · render-contract 142 · intent-domain 27 ·
+api 405 · web 1,374. All-workspace production build PASS.
 
 ---
 
@@ -27,18 +27,17 @@ api 404 · web 1,334. All-workspace production build PASS.
          └─ final closure: 2,292 tests + real Edge + real revision-44 export
   T3     Precision trim: ripple/roll/slip/slide       DONE         aed76ac..
          └─ final closure: 2,345 tests + real Edge + real precision export
-  T4     Keyframe lanes + graph editor                DONE         (this commit)
+  T4     Keyframe lanes + graph editor                DONE         99dcb6a..
          └─ final closure: 2,419 tests + real Edge Graph/Bezier + revision-7 export
-  T5     Advanced tracks, expandable tracks           NOT STARTED  —
+  T5     Advanced tracks, expandable tracks           DONE         a89483d..
+         └─ final closure: 2,501 tests + real Edge + revision-13 export
+  T5.5   Editor confidence convergence                OWNER GATE   local only
+         └─ machine/browser complete: 2,510 tests + real Edge + revision-2 export; owner score pending
   T6     Sequences + source-editing workflows         NOT STARTED  —
   T7     Transcript + AI-ready contracts              NOT STARTED  —
 ```
 
-**Next action when a session starts:** T4 is closed. Read `T4_FINAL_CLOSURE.md`
-and the adjacent T4 evidence, verify the branch/working tree, and do not start
-T5 without explicit owner authorization. If T5 is later authorized, create its
-own Editor worktree from the verified T4 tip and run the permanent ownership
-checker before editing. Motion and Plan-B protected paths remain out of scope.
+**Next action when a session starts:** T5 is closed at verified commit `a89483d…`. T5.5 machine/browser implementation is complete in the local Editor branch `timeline-t55-editor-confidence`, but the owner-confidence gate is still open. Read `DOCS/evidence/2026-08-11-editor-confidence/T55_FINAL_CLOSURE.md`, complete the owner unscripted/OpenCut comparison session, and do not start T6/T7 before T5.5 closes. Motion and Plan-B protected paths remain out of scope. Do not push T5.5 to GitHub until the owner explicitly re-authorizes remote pushing.
 
 ---
 
@@ -53,8 +52,7 @@ larger than Gate D.
 This will take **many sessions**. That is not a failure and it is not a reason
 to rush a gate. The rule that protects the owner is:
 
-> A gate is either DONE (tested, real-browser-proven, committed, pushed, local
-> SHA == remote SHA) or it is NOT STARTED. There is no "mostly done" gate.
+> A gate is either DONE (tested, real-browser-proven, and committed) or it remains open. Normally it is also pushed with local SHA == remote SHA. **Temporary owner-authorized exception:** T5.5 stays local-only until GitHub CI/CD minutes reset and the owner explicitly asks to push it. No remote parity claim may be made meanwhile.
 
 A half-finished gate that is committed is worse than no gate, because the next
 session cannot tell what is trustworthy.
@@ -264,6 +262,33 @@ Commit: `[verified] feat(timeline): add advanced track controls and expandable t
 - [x] T5.8 Combined/Separate L/R waveform presentation using real channel-aware analysis
 
 Final automated gate: **2,501 / 2,501**. All-workspace production build PASS. Real Edge 151 proved stable track add/rename/reorder/delete, Lock/Sync Lock/Targeting, audio mix/output, Separate L/R presentation, reload/reopen persistence, one-video continuity and responsive 1440/1024/390 behavior. Real revision-13 export: 1280×720 H.264 High 30 fps + AAC-LC stereo 48 kHz, 30.000000 s, 16,338,429 bytes, SHA-256 `d7ef76f49d80021e2a8798519fb1f723e1cebbd15b2e892c927abc31edf6ea10`. T6 was not started.
+
+### T5.5 — EDITOR CONFIDENCE & INTERACTION CONVERGENCE — **OWNER GATE OPEN**
+
+Local branch/worktree: `timeline-t55-editor-confidence` from exact verified T5 SHA `a89483deea214927bf44b6d82229ca6ffa72650c`.
+
+- [x] interaction audit found/fixed a real dead-enabled Razor route
+- [x] Razor uses existing split authority and keeps acted clip selected
+- [x] first Escape exits special tools to safe Select without throwing away selection
+- [x] active tool named visibly; Select/Razor cursors match behavior
+- [x] primary vs secondary selection and selected-track context clarified
+- [x] outside trim hit targets enlarged without covering clip content
+- [x] drag stacking and named Playhead/Marker/Clip-edge snap feedback
+- [x] internal Timeline vertical scroll support + synchronized headers/sticky ruler
+- [x] creator-first hierarchy keeps advanced targeting/Sync Lock available but quieter
+- [x] actionable empty-lane copy
+- [x] one shared Inspector NumberField for owned editorial/visual forms + explicit `Changes not applied yet.` state
+- [x] existing Editor-owned Canvas selection/handles/guides/one-video authority retained; no Motion integration
+- [x] full machine suite **2,510 / 2,510**; all-workspace production build PASS
+- [x] real Edge 151 Razor/select/Escape, Inspector draft/reset, sustained playback, 1440/1280/1024/390 no-overflow evidence
+- [x] real revision-2 export: 1280×720 H.264 30 fps + AAC stereo 48 kHz, 30.000000 s; downloaded/server SHA-256 both `27689ec436ed1a28d04a64fd22592851a4aca683dbe616d47becd62ff221da0a`
+- [ ] owner 15–20 minute unscripted edit
+- [ ] same-task OpenCut/Sanverse scorecard; no Sanverse category below 4/5 and overall >= OpenCut
+- [ ] final `[verified]` closure commit only after owner acceptance
+
+Evidence: `DOCS/evidence/2026-08-11-editor-confidence/`.
+
+Per owner instruction, T5.5 is **local Git only** for now; do not push to GitHub until explicitly re-authorized. T6/T7 remain not started.
 
 ### T6 — SEQUENCES AND SOURCE EDITING
 

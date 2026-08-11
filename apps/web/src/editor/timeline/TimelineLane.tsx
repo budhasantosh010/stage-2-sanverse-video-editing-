@@ -29,8 +29,17 @@ import { TimelineEditPointHandle } from './TimelineEditPointHandle'
 import { decorationHeightPx, laneDensity, laneHeightPx } from './timeline-lane-metrics'
 import type { TimelineSnapResult } from './timeline-snap'
 import type { RateStretchPreview } from './TimelineRateStretchHandle'
+import type { TimelineTool } from './TimelineToolbar'
 
 const NO_MEDIA: ClipDerivedMedia = Object.freeze({ kind: 'none' as const })
+
+const emptyLaneMessage = (lane: TimelineLaneView): string => {
+  if (lane.trackRole === 'primary-video') return 'Drag video here to start.'
+  if (lane.trackKind === 'video') return 'Drop video or an image here.'
+  if (lane.trackKind === 'audio' && lane.trackRole !== 'dialogue') return 'Drop audio here.'
+  if (lane.trackKind === 'caption') return 'Captions appear here.'
+  return 'Nothing here yet.'
+}
 
 export type TimelineLaneProps = Readonly<{
   projectId: string
@@ -55,6 +64,9 @@ export type TimelineLaneProps = Readonly<{
   visibleRange: VisibleTickRange
   overscanTicks: number
   busy: boolean
+  activeTool: TimelineTool
+  primarySelectedItemId?: string | null
+  selectedTrack?: boolean
   rateStretchActive: boolean
   /** Exact project ticks in one frame at the Timeline's current frame clock. */
   frameTicks: number
@@ -96,6 +108,9 @@ export function TimelineLane({
   visibleRange,
   overscanTicks,
   busy,
+  activeTool,
+  primarySelectedItemId = null,
+  selectedTrack = false,
   rateStretchActive,
   frameTicks,
   precisionTool,
@@ -222,6 +237,8 @@ export function TimelineLane({
       data-lane-id={lane.id}
       data-testid="timeline-lane"
       data-lane-density={density}
+      data-track-selected={selectedTrack ? 'yes' : 'no'}
+      data-active-tool={activeTool}
       style={{ ['--timeline-lane-height' as string]: `${rowHeightPx}px` }}
       data-drop-target={dragKind === null ? undefined : accepts ? 'accepts' : 'refuses'}
       onDragOver={(event) => {
@@ -260,6 +277,9 @@ export function TimelineLane({
           timescale={timescale}
           pixelsPerSecond={viewport.pixelsPerSecond}
           busy={busy}
+          activeTool={activeTool}
+          primarySelected={primarySelectedItemId === item.id}
+          laneLabel={lane.label}
           rateStretchActive={rateStretchActive}
           frameTicks={frameTicks}
           precisionTool={precisionTool}
@@ -306,7 +326,7 @@ export function TimelineLane({
         />
       ))}
       {lane.items.length === 0 ? (
-        <span className="timeline-v1__lane-empty" style={{ left: `${viewport.scrollLeftPx + 12}px` }}>Empty</span>
+        <span className="timeline-v1__lane-empty" style={{ left: `${viewport.scrollLeftPx + 12}px` }}>{emptyLaneMessage(lane)}</span>
       ) : null}
     </div>
   )

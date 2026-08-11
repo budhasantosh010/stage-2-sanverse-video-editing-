@@ -572,7 +572,7 @@
 }
 
 .timeline-v1__item-shell--dragging .timeline-v1__item {
-  outline: 2px solid var(--color-accent, rgb(64 128 255 / 85%));
+  outline: 2px solid var(--timeline-confidence-selected);
   outline-offset: -2px;
 }
 
@@ -591,7 +591,9 @@
 }
 
 .timeline-v1__ruler {
-  position: relative;
+  position: sticky;
+  z-index: 7;
+  top: 0;
   height: 24px;
   border-bottom: 1px solid var(--color-border-strong);
   background: var(--color-surface-raised);
@@ -1753,6 +1755,67 @@
   cursor: col-resize;
 }
 
+.timeline-v1__drag-tooltip {
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  min-width: max-content;
+  max-width: min(320px, 80vw);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  padding: 5px 7px;
+  background: var(--color-ink);
+  color: var(--color-surface);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 20%);
+  font-size: 0.6rem;
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.timeline-v1__item-shell[data-active-tool='razor'] .timeline-v1__item:not(.timeline-v1__item--gap) {
+  cursor: crosshair;
+}
+
+.timeline-v1__item-shell[data-active-tool='select'] .timeline-v1__item--media-overlay,
+.timeline-v1__item-shell[data-active-tool='select'] .timeline-v1__item--music {
+  cursor: grab;
+}
+
+.timeline-v1__item-shell--dragging .timeline-v1__item {
+  cursor: grabbing;
+}
+
+.timeline-v1__active-tool {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--color-text);
+  font-weight: 720;
+}
+
+.timeline-v1__lane-header [data-track-target],
+.timeline-v1__lane-header [data-track-sync-lock] {
+  opacity: 0.45;
+}
+
+.timeline-v1__lane-header:hover [data-track-target],
+.timeline-v1__lane-header:hover [data-track-sync-lock],
+.timeline-v1__lane-header:focus-within [data-track-target],
+.timeline-v1__lane-header:focus-within [data-track-sync-lock],
+.timeline-v1__lane-header [data-track-target][aria-pressed='true'],
+.timeline-v1__lane-header [data-track-sync-lock][aria-pressed='true'] {
+  opacity: 1;
+}
+
+.timeline-v1__headers::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 .timeline-v1__rate-stretch-handle:focus-visible,
 .timeline-audio-direct button:focus-visible,
 .timeline-audio-direct input:focus-visible {
@@ -2460,4 +2523,175 @@
     height: 32px;
     margin: -16px 0 0 -16px;
   }
+}
+
+/* ── T5.5 Editor confidence convergence ────────────────────────────────────
+ * These are presentation-only invariants. They do not create edit operations,
+ * revisions, export changes, or Motion dependencies. */
+.timeline-v1 {
+  --timeline-confidence-selected: var(--color-accent, #4f8cff);
+  --timeline-confidence-track-selected: color-mix(in srgb, var(--timeline-confidence-selected) 7%, transparent);
+  --timeline-confidence-invalid: #a43b32;
+  --timeline-confidence-snap: var(--timeline-confidence-selected);
+}
+
+.timeline-v1__selection-summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.timeline-v1__viewport-grid {
+  max-height: min(52vh, 620px);
+}
+
+.timeline-v1__headers {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.timeline-v1__headers::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.timeline-v1__ruler-header,
+.timeline-v1__ruler {
+  position: sticky;
+  z-index: 7;
+  top: 0;
+}
+
+.timeline-v1__ruler-header {
+  background: var(--color-surface);
+}
+
+.timeline-v1__viewport {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.timeline-v1__item--selected {
+  outline: 2px solid var(--timeline-confidence-selected);
+  outline-offset: 1px;
+}
+
+.timeline-v1__item-shell[data-primary-selected='yes'] .timeline-v1__item--selected {
+  outline-width: 3px;
+  box-shadow: 0 0 0 1px var(--color-surface), 0 0 0 4px var(--timeline-confidence-selected), 0 3px 8px rgb(0 0 0 / 20%);
+}
+
+.timeline-v1__lane[data-track-selected='yes'],
+.timeline-v1__lane-header[data-track-selected='yes'] {
+  box-shadow: inset 0 0 0 2px var(--timeline-confidence-track-selected);
+  background-image: linear-gradient(var(--timeline-confidence-track-selected), var(--timeline-confidence-track-selected));
+}
+
+.timeline-v1__trim-handle {
+  z-index: 13;
+  top: -2px;
+  bottom: -2px;
+  width: 18px;
+  min-width: 18px;
+  background: transparent;
+  touch-action: none;
+}
+
+.timeline-v1__trim-handle--start {
+  left: -9px;
+  border-radius: 0;
+}
+
+.timeline-v1__trim-handle--end {
+  right: -9px;
+  border-radius: 0;
+}
+
+.timeline-v1__trim-handle > span {
+  width: 4px;
+  height: calc(100% - 8px);
+  min-height: 14px;
+  border-radius: 999px;
+  background: var(--timeline-confidence-selected);
+  box-shadow: 0 0 0 1px var(--color-surface);
+}
+
+.timeline-v1__item-shell--dragging {
+  z-index: 14;
+}
+
+.timeline-v1__playhead {
+  z-index: 18;
+}
+
+.timeline-v1__snap-guide {
+  z-index: 19;
+  border-left-color: var(--timeline-confidence-snap);
+}
+
+.timeline-v1__snap-guide::after {
+  content: attr(data-snap-label);
+}
+
+.timeline-v1__active-tool {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--color-text);
+  font-weight: 720;
+}
+
+.timeline-v1__lane-header [data-track-target],
+.timeline-v1__lane-header [data-track-sync-lock] {
+  opacity: 0.45;
+}
+
+.timeline-v1__lane-header:hover [data-track-target],
+.timeline-v1__lane-header:hover [data-track-sync-lock],
+.timeline-v1__lane-header:focus-within [data-track-target],
+.timeline-v1__lane-header:focus-within [data-track-sync-lock],
+.timeline-v1__lane-header [data-track-target][aria-pressed='true'],
+.timeline-v1__lane-header [data-track-sync-lock][aria-pressed='true'] {
+  opacity: 1;
+}
+
+.timeline-v1__item-shell[data-active-tool='razor'] .timeline-v1__item:not(.timeline-v1__item--gap) {
+  cursor: crosshair;
+}
+
+.timeline-v1__item-shell[data-active-tool='select'] .timeline-v1__item--media-overlay,
+.timeline-v1__item-shell[data-active-tool='select'] .timeline-v1__item--music {
+  cursor: grab;
+}
+
+.timeline-v1__item-shell--dragging .timeline-v1__item {
+  cursor: grabbing;
+}
+
+@container studio-timeline (max-width: 760px) {
+  .timeline-v1__selection-summary {
+    display: flex;
+    flex-basis: 100%;
+  }
+
+  .timeline-v1__toolbar-duration {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .timeline-v1__viewport-grid {
+    max-height: min(48vh, 520px);
+  }
+
+  .timeline-v1__trim-handle {
+    width: 24px;
+    min-width: 24px;
+  }
+
+  .timeline-v1__trim-handle--start { left: -12px; }
+  .timeline-v1__trim-handle--end { right: -12px; }
 }
