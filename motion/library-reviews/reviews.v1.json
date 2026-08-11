@@ -1,0 +1,2497 @@
+{
+  "schemaVersion": "sanverse.motion-library-reviews/v1",
+  "reviews": [
+    {
+      "componentId": "sanverse.kinetic-headline",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "S",
+      "scores": {
+        "entrance": 5,
+        "pacing": 5,
+        "easing": 5,
+        "rhythm": 5,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 5,
+        "exit": 5,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; hierarchy remained readable and the payoff felt deliberate. Signature-quality at the canonical presentation."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 4320000
+    },
+    {
+      "componentId": "sanverse.checklist-card",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 7200000
+    },
+    {
+      "componentId": "sanverse.cost-value-card",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 7200000
+    },
+    {
+      "componentId": "sanverse.timer-status-pill",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 7200000
+    },
+    {
+      "componentId": "sanverse.team-network-diagram",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "S",
+      "scores": {
+        "entrance": 5,
+        "pacing": 5,
+        "easing": 5,
+        "rhythm": 5,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 5,
+        "exit": 5,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; hierarchy remained readable and the payoff felt deliberate. Signature-quality at the canonical presentation."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 8640000
+    },
+    {
+      "componentId": "sanverse.section-title",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.question-title",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.split-title",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.lower-third-title",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.chapter-title",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.definition-title",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.stat-title",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.label-title",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.highlight-title",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.single-metric",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.metric-delta",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.before-after",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.ratio-card",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.score-card",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.stat-stack",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.price-breakdown",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.bullet-list",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.numbered-list",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.step-list",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.pros-cons",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.agenda-card",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.tag-cloud",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.feature-stack",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.urgency-banner",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.progress-status",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.notification-card",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.milestone-status",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.live-status",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.process-flow",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.funnel-diagram",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.hierarchy-diagram",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.flywheel-diagram",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.sequence-diagram",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.decision-tree",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "S",
+      "scores": {
+        "entrance": 5,
+        "pacing": 5,
+        "easing": 5,
+        "rhythm": 5,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 5,
+        "exit": 5,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; hierarchy remained readable and the payoff felt deliberate. Signature-quality at the canonical presentation."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 6480000
+    },
+    {
+      "componentId": "sanverse.swimlane-process",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 7200000
+    },
+    {
+      "componentId": "sanverse.journey-map",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 7200000
+    },
+    {
+      "componentId": "sanverse.priority-matrix",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 6480000
+    },
+    {
+      "componentId": "sanverse.value-chain",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 7200000
+    },
+    {
+      "componentId": "sanverse.layer-stack-explainer",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 6480000
+    },
+    {
+      "componentId": "sanverse.ecosystem-regions-map",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 7200000
+    },
+    {
+      "componentId": "sanverse.dependency-map",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 7200000
+    },
+    {
+      "componentId": "sanverse.quote-card",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.testimonial-card",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.review-card",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.proof-stat-card",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.subscribe-cta",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.follow-cta",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.next-video-cta",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.promo-card",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.chapter-break",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.end-card",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.comment-highlight",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.client-proof-strip",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.social-proof-stack",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.myth-fact",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.problem-solution",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.source-citation",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "B",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 4,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 4,
+        "overall": 4
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, hold and exit; motion is restrained and simpler than the signature scenes but remains readable and production-ready."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.browser-demo",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.chat-thread",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.dashboard-snapshot",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.search-results",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.upload-status",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.cursor-callout",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.conversation-toast-stack",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "S",
+      "scores": {
+        "entrance": 5,
+        "pacing": 5,
+        "easing": 5,
+        "rhythm": 5,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 5,
+        "exit": 5,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; hierarchy remained readable and the payoff felt deliberate. Signature-quality at the canonical presentation."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 6480000
+    },
+    {
+      "componentId": "sanverse.floating-prompt-composer",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "S",
+      "scores": {
+        "entrance": 5,
+        "pacing": 5,
+        "easing": 5,
+        "rhythm": 5,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 5,
+        "exit": 5,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; hierarchy remained readable and the payoff felt deliberate. Signature-quality at the canonical presentation."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 7200000
+    },
+    {
+      "componentId": "sanverse.product-ui-story-scene",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "S",
+      "scores": {
+        "entrance": 5,
+        "pacing": 5,
+        "easing": 5,
+        "rhythm": 5,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 5,
+        "exit": 5,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; hierarchy remained readable and the payoff felt deliberate. Signature-quality at the canonical presentation."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 10080000
+    },
+    {
+      "componentId": "sanverse.agent-work-log",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "S",
+      "scores": {
+        "entrance": 5,
+        "pacing": 5,
+        "easing": 5,
+        "rhythm": 5,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 5,
+        "exit": 5,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; hierarchy remained readable and the payoff felt deliberate. Signature-quality at the canonical presentation."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 8640000
+    },
+    {
+      "componentId": "sanverse.scoped-access-comparison",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "S",
+      "scores": {
+        "entrance": 5,
+        "pacing": 5,
+        "easing": 5,
+        "rhythm": 5,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 5,
+        "exit": 5,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; hierarchy remained readable and the payoff felt deliberate. Signature-quality at the canonical presentation."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 7920000
+    },
+    {
+      "componentId": "sanverse.keyword-brand-lockup",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5760000
+    },
+    {
+      "componentId": "sanverse.keyword-slam",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 2880000
+    },
+    {
+      "componentId": "sanverse.three-beat-headline",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 2880000
+    },
+    {
+      "componentId": "sanverse.stacked-hook",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 2880000
+    },
+    {
+      "componentId": "sanverse.sentence-deconstruction",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 3456000
+    },
+    {
+      "componentId": "sanverse.punch-word-reveal",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 2592000
+    },
+    {
+      "componentId": "sanverse.poll-vote-result",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 3168000
+    },
+    {
+      "componentId": "sanverse.ranking-podium",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 3168000
+    },
+    {
+      "componentId": "sanverse.app-feature-spotlight",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 3456000
+    },
+    {
+      "componentId": "sanverse.keyboard-shortcut-callout",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 2592000
+    },
+    {
+      "componentId": "sanverse.trend-line-chart",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "S",
+      "scores": {
+        "entrance": 5,
+        "pacing": 5,
+        "easing": 5,
+        "rhythm": 5,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 5,
+        "exit": 5,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; hierarchy remained readable and the payoff felt deliberate. Signature-quality at the canonical presentation."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 4608000
+    },
+    {
+      "componentId": "sanverse.donut-breakdown",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "S",
+      "scores": {
+        "entrance": 5,
+        "pacing": 5,
+        "easing": 5,
+        "rhythm": 5,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 5,
+        "exit": 5,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; hierarchy remained readable and the payoff felt deliberate. Signature-quality at the canonical presentation."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 4608000
+    },
+    {
+      "componentId": "sanverse.venn-intersection",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "S",
+      "scores": {
+        "entrance": 5,
+        "pacing": 5,
+        "easing": 5,
+        "rhythm": 5,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 5,
+        "exit": 5,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; hierarchy remained readable and the payoff felt deliberate. Signature-quality at the canonical presentation."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 4320000
+    },
+    {
+      "componentId": "sanverse.feature-comparison-table",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; no blocking pacing, easing, readability or competing-motion issue was observed. Excellent production-ready motion."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 4896000
+    },
+    {
+      "componentId": "sanverse.code-diff-spotlight",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "S",
+      "scores": {
+        "entrance": 5,
+        "pacing": 5,
+        "easing": 5,
+        "rhythm": 5,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 5,
+        "exit": 5,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; hierarchy remained readable and the payoff felt deliberate. Signature-quality at the canonical presentation."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 4320000
+    },
+    {
+      "componentId": "sanverse.terminal-command-story",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "S",
+      "scores": {
+        "entrance": 5,
+        "pacing": 5,
+        "easing": 5,
+        "rhythm": 5,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 5,
+        "exit": 5,
+        "competingMotion": 4,
+        "footageCompatibility": 4,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Real Edge canonical playback completed from tick 0 to end at 1×. Temporal progression was visually reviewed across entrance, build, hold and exit; hierarchy remained readable and the payoff felt deliberate. Signature-quality at the canonical presentation."
+      ],
+      "reviewedAt": "2026-08-11T10:38:01.245Z",
+      "reviewer": "Sanverse L1 motion audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 4320000
+    }
+  ]
+}

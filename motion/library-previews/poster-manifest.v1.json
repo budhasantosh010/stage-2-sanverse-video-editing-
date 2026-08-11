@@ -1,0 +1,362 @@
+{
+  "schemaVersion": "sanverse.library-posters/v1",
+  "generatedAt": "2026-08-11T10:38:12.729Z",
+  "posters": {
+    "sanverse.donut-breakdown": {
+      "previewHash": "985b7306",
+      "file": "posters/sanverse.donut-breakdown.png"
+    },
+    "sanverse.kinetic-headline": {
+      "previewHash": "788fcac8",
+      "file": "posters/sanverse.kinetic-headline.png"
+    },
+    "sanverse.checklist-card": {
+      "previewHash": "ae8cf805",
+      "file": "posters/sanverse.checklist-card.png"
+    },
+    "sanverse.cost-value-card": {
+      "previewHash": "289ef6dd",
+      "file": "posters/sanverse.cost-value-card.png"
+    },
+    "sanverse.timer-status-pill": {
+      "previewHash": "1dca5f04",
+      "file": "posters/sanverse.timer-status-pill.png"
+    },
+    "sanverse.team-network-diagram": {
+      "previewHash": "9bc908b7",
+      "file": "posters/sanverse.team-network-diagram.png"
+    },
+    "sanverse.section-title": {
+      "previewHash": "1027cb87",
+      "file": "posters/sanverse.section-title.png"
+    },
+    "sanverse.question-title": {
+      "previewHash": "137b55d4",
+      "file": "posters/sanverse.question-title.png"
+    },
+    "sanverse.split-title": {
+      "previewHash": "9e2ef15a",
+      "file": "posters/sanverse.split-title.png"
+    },
+    "sanverse.lower-third-title": {
+      "previewHash": "b3f1c64b",
+      "file": "posters/sanverse.lower-third-title.png"
+    },
+    "sanverse.chapter-title": {
+      "previewHash": "708bfcb6",
+      "file": "posters/sanverse.chapter-title.png"
+    },
+    "sanverse.definition-title": {
+      "previewHash": "43b5e5a0",
+      "file": "posters/sanverse.definition-title.png"
+    },
+    "sanverse.stat-title": {
+      "previewHash": "5c31eeb2",
+      "file": "posters/sanverse.stat-title.png"
+    },
+    "sanverse.label-title": {
+      "previewHash": "e0210ef8",
+      "file": "posters/sanverse.label-title.png"
+    },
+    "sanverse.highlight-title": {
+      "previewHash": "9bdcfc9a",
+      "file": "posters/sanverse.highlight-title.png"
+    },
+    "sanverse.single-metric": {
+      "previewHash": "b2e9c11e",
+      "file": "posters/sanverse.single-metric.png"
+    },
+    "sanverse.metric-delta": {
+      "previewHash": "c97876ec",
+      "file": "posters/sanverse.metric-delta.png"
+    },
+    "sanverse.before-after": {
+      "previewHash": "510daeb1",
+      "file": "posters/sanverse.before-after.png"
+    },
+    "sanverse.ratio-card": {
+      "previewHash": "90743939",
+      "file": "posters/sanverse.ratio-card.png"
+    },
+    "sanverse.score-card": {
+      "previewHash": "827ecf30",
+      "file": "posters/sanverse.score-card.png"
+    },
+    "sanverse.stat-stack": {
+      "previewHash": "30bf2200",
+      "file": "posters/sanverse.stat-stack.png"
+    },
+    "sanverse.price-breakdown": {
+      "previewHash": "85aac2de",
+      "file": "posters/sanverse.price-breakdown.png"
+    },
+    "sanverse.bullet-list": {
+      "previewHash": "6018963e",
+      "file": "posters/sanverse.bullet-list.png"
+    },
+    "sanverse.numbered-list": {
+      "previewHash": "9cda2de6",
+      "file": "posters/sanverse.numbered-list.png"
+    },
+    "sanverse.step-list": {
+      "previewHash": "61f1c928",
+      "file": "posters/sanverse.step-list.png"
+    },
+    "sanverse.pros-cons": {
+      "previewHash": "f8c14ff5",
+      "file": "posters/sanverse.pros-cons.png"
+    },
+    "sanverse.agenda-card": {
+      "previewHash": "f0e1a894",
+      "file": "posters/sanverse.agenda-card.png"
+    },
+    "sanverse.tag-cloud": {
+      "previewHash": "6c358fc7",
+      "file": "posters/sanverse.tag-cloud.png"
+    },
+    "sanverse.feature-stack": {
+      "previewHash": "ecbad2ce",
+      "file": "posters/sanverse.feature-stack.png"
+    },
+    "sanverse.urgency-banner": {
+      "previewHash": "29d925e3",
+      "file": "posters/sanverse.urgency-banner.png"
+    },
+    "sanverse.progress-status": {
+      "previewHash": "41c92979",
+      "file": "posters/sanverse.progress-status.png"
+    },
+    "sanverse.notification-card": {
+      "previewHash": "4c232109",
+      "file": "posters/sanverse.notification-card.png"
+    },
+    "sanverse.milestone-status": {
+      "previewHash": "524e9578",
+      "file": "posters/sanverse.milestone-status.png"
+    },
+    "sanverse.live-status": {
+      "previewHash": "f4d238b6",
+      "file": "posters/sanverse.live-status.png"
+    },
+    "sanverse.process-flow": {
+      "previewHash": "3abb4909",
+      "file": "posters/sanverse.process-flow.png"
+    },
+    "sanverse.funnel-diagram": {
+      "previewHash": "c1401051",
+      "file": "posters/sanverse.funnel-diagram.png"
+    },
+    "sanverse.hierarchy-diagram": {
+      "previewHash": "868321d2",
+      "file": "posters/sanverse.hierarchy-diagram.png"
+    },
+    "sanverse.flywheel-diagram": {
+      "previewHash": "030ae54d",
+      "file": "posters/sanverse.flywheel-diagram.png"
+    },
+    "sanverse.sequence-diagram": {
+      "previewHash": "8aecf5f6",
+      "file": "posters/sanverse.sequence-diagram.png"
+    },
+    "sanverse.decision-tree": {
+      "previewHash": "c3302a4d",
+      "file": "posters/sanverse.decision-tree.png"
+    },
+    "sanverse.swimlane-process": {
+      "previewHash": "109df76e",
+      "file": "posters/sanverse.swimlane-process.png"
+    },
+    "sanverse.journey-map": {
+      "previewHash": "1b0041ab",
+      "file": "posters/sanverse.journey-map.png"
+    },
+    "sanverse.priority-matrix": {
+      "previewHash": "0d6570fc",
+      "file": "posters/sanverse.priority-matrix.png"
+    },
+    "sanverse.value-chain": {
+      "previewHash": "723e005d",
+      "file": "posters/sanverse.value-chain.png"
+    },
+    "sanverse.layer-stack-explainer": {
+      "previewHash": "62a98ccd",
+      "file": "posters/sanverse.layer-stack-explainer.png"
+    },
+    "sanverse.ecosystem-regions-map": {
+      "previewHash": "b2c3925b",
+      "file": "posters/sanverse.ecosystem-regions-map.png"
+    },
+    "sanverse.dependency-map": {
+      "previewHash": "35d23db6",
+      "file": "posters/sanverse.dependency-map.png"
+    },
+    "sanverse.quote-card": {
+      "previewHash": "1bd11206",
+      "file": "posters/sanverse.quote-card.png"
+    },
+    "sanverse.testimonial-card": {
+      "previewHash": "7f90d831",
+      "file": "posters/sanverse.testimonial-card.png"
+    },
+    "sanverse.review-card": {
+      "previewHash": "9372320c",
+      "file": "posters/sanverse.review-card.png"
+    },
+    "sanverse.proof-stat-card": {
+      "previewHash": "55add87b",
+      "file": "posters/sanverse.proof-stat-card.png"
+    },
+    "sanverse.subscribe-cta": {
+      "previewHash": "22929f6a",
+      "file": "posters/sanverse.subscribe-cta.png"
+    },
+    "sanverse.follow-cta": {
+      "previewHash": "f7dd473f",
+      "file": "posters/sanverse.follow-cta.png"
+    },
+    "sanverse.next-video-cta": {
+      "previewHash": "581554ed",
+      "file": "posters/sanverse.next-video-cta.png"
+    },
+    "sanverse.promo-card": {
+      "previewHash": "e2d19459",
+      "file": "posters/sanverse.promo-card.png"
+    },
+    "sanverse.chapter-break": {
+      "previewHash": "d4f52cc6",
+      "file": "posters/sanverse.chapter-break.png"
+    },
+    "sanverse.end-card": {
+      "previewHash": "7375cd23",
+      "file": "posters/sanverse.end-card.png"
+    },
+    "sanverse.comment-highlight": {
+      "previewHash": "9f8a9181",
+      "file": "posters/sanverse.comment-highlight.png"
+    },
+    "sanverse.client-proof-strip": {
+      "previewHash": "ca2890c0",
+      "file": "posters/sanverse.client-proof-strip.png"
+    },
+    "sanverse.social-proof-stack": {
+      "previewHash": "93cd55f2",
+      "file": "posters/sanverse.social-proof-stack.png"
+    },
+    "sanverse.myth-fact": {
+      "previewHash": "14916f5e",
+      "file": "posters/sanverse.myth-fact.png"
+    },
+    "sanverse.problem-solution": {
+      "previewHash": "4f531a6e",
+      "file": "posters/sanverse.problem-solution.png"
+    },
+    "sanverse.source-citation": {
+      "previewHash": "9a0e0b83",
+      "file": "posters/sanverse.source-citation.png"
+    },
+    "sanverse.browser-demo": {
+      "previewHash": "2f3984a3",
+      "file": "posters/sanverse.browser-demo.png"
+    },
+    "sanverse.chat-thread": {
+      "previewHash": "13d8e384",
+      "file": "posters/sanverse.chat-thread.png"
+    },
+    "sanverse.dashboard-snapshot": {
+      "previewHash": "64b69130",
+      "file": "posters/sanverse.dashboard-snapshot.png"
+    },
+    "sanverse.search-results": {
+      "previewHash": "2bd8183c",
+      "file": "posters/sanverse.search-results.png"
+    },
+    "sanverse.upload-status": {
+      "previewHash": "0c31c2db",
+      "file": "posters/sanverse.upload-status.png"
+    },
+    "sanverse.cursor-callout": {
+      "previewHash": "4ef32c38",
+      "file": "posters/sanverse.cursor-callout.png"
+    },
+    "sanverse.conversation-toast-stack": {
+      "previewHash": "48a0d457",
+      "file": "posters/sanverse.conversation-toast-stack.png"
+    },
+    "sanverse.floating-prompt-composer": {
+      "previewHash": "a56a67ca",
+      "file": "posters/sanverse.floating-prompt-composer.png"
+    },
+    "sanverse.product-ui-story-scene": {
+      "previewHash": "8b763e4d",
+      "file": "posters/sanverse.product-ui-story-scene.png"
+    },
+    "sanverse.agent-work-log": {
+      "previewHash": "00e0e570",
+      "file": "posters/sanverse.agent-work-log.png"
+    },
+    "sanverse.scoped-access-comparison": {
+      "previewHash": "bb410475",
+      "file": "posters/sanverse.scoped-access-comparison.png"
+    },
+    "sanverse.keyword-brand-lockup": {
+      "previewHash": "5e6d7768",
+      "file": "posters/sanverse.keyword-brand-lockup.png"
+    },
+    "sanverse.keyword-slam": {
+      "previewHash": "2b77919a",
+      "file": "posters/sanverse.keyword-slam.png"
+    },
+    "sanverse.three-beat-headline": {
+      "previewHash": "e5eb90c4",
+      "file": "posters/sanverse.three-beat-headline.png"
+    },
+    "sanverse.stacked-hook": {
+      "previewHash": "6b69e816",
+      "file": "posters/sanverse.stacked-hook.png"
+    },
+    "sanverse.sentence-deconstruction": {
+      "previewHash": "35cc2647",
+      "file": "posters/sanverse.sentence-deconstruction.png"
+    },
+    "sanverse.punch-word-reveal": {
+      "previewHash": "cd69d952",
+      "file": "posters/sanverse.punch-word-reveal.png"
+    },
+    "sanverse.poll-vote-result": {
+      "previewHash": "3d4fd3b4",
+      "file": "posters/sanverse.poll-vote-result.png"
+    },
+    "sanverse.ranking-podium": {
+      "previewHash": "26a57ce9",
+      "file": "posters/sanverse.ranking-podium.png"
+    },
+    "sanverse.app-feature-spotlight": {
+      "previewHash": "25f8112a",
+      "file": "posters/sanverse.app-feature-spotlight.png"
+    },
+    "sanverse.keyboard-shortcut-callout": {
+      "previewHash": "7c8fbbca",
+      "file": "posters/sanverse.keyboard-shortcut-callout.png"
+    },
+    "sanverse.trend-line-chart": {
+      "previewHash": "c2421c69",
+      "file": "posters/sanverse.trend-line-chart.png"
+    },
+    "sanverse.venn-intersection": {
+      "previewHash": "e9f62cac",
+      "file": "posters/sanverse.venn-intersection.png"
+    },
+    "sanverse.feature-comparison-table": {
+      "previewHash": "9f5f3519",
+      "file": "posters/sanverse.feature-comparison-table.png"
+    },
+    "sanverse.code-diff-spotlight": {
+      "previewHash": "2f0aada6",
+      "file": "posters/sanverse.code-diff-spotlight.png"
+    },
+    "sanverse.terminal-command-story": {
+      "previewHash": "f8f39112",
+      "file": "posters/sanverse.terminal-command-story.png"
+    }
+  }
+}

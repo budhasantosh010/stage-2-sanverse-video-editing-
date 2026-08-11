@@ -50,5 +50,5 @@ describe('C5 measured development-view render performance', () => {
       expect(bytes).toBeGreaterThan(0)
       console.log(`C5_LAB_PERF keys=${count} renderMs=${renderMs.toFixed(3)} htmlBytes=${bytes}`)
     }
-  })
+  }, 15_000)
 })

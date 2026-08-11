@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "test": "npm run test --workspaces --if-present --",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "motion-library:posters": "vite-node scripts/generate-library-posters.ts"
   }
 }
