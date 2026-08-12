@@ -1138,6 +1138,7 @@ export function MotionLabApp() {
           <h1>Motion Lab</h1>
         </div>
         <div className="motion-lab__header-status">
+          <a className="motion-lab__library-link" href="/library">Creative Library</a>
           <span>{currentDefinition.id}</span>
           <strong>v{currentDefinition.version}</strong>
           <span>{currentDefinition.performanceClass}</span>

@@ -37,6 +37,9 @@ button { cursor: pointer; }
 .motion-lab__eyebrow { color: #85858d; font-size: 10px; font-weight: 800; letter-spacing: .14em; }
 .motion-lab__header-status { display: flex; align-items: center; gap: 10px; color: #a7a7ad; font-size: 11px; }
 .motion-lab__header-status strong { padding: 4px 7px; border-radius: 6px; color: #0b0b0c; background: #e9e9eb; }
+.motion-lab__library-link { padding: 8px 11px; border: 1px solid #3a3a40; border-radius: 8px; color: #0b0b0c; background: #f3f3f4; text-decoration: none; font-weight: 750; }
+.motion-lab__library-link:hover { background: #dcdce0; }
+.motion-lab__library-link:focus-visible { outline: 2px solid #5fff52; outline-offset: 2px; }
 
 .motion-lab__body {
   min-height: 0;
