@@ -134,8 +134,16 @@ Architecture: `DOCS/motion/CREATIVE_LIBRARY_ARCHITECTURE.md`. Acceptance: `DOCS/
 
 L1 keeps `apps/web` untouched and adds no second Motion authority. Final local review is 89/89 Passed after real 1× playback, with 13 S / 35 A / 41 B tiers.
 
+## Plan-A engineering infrastructure — Approved Component Ingest V1
+
+External visual authoring is now allowed to vary without allowing integration semantics to fragment. One fail-closed intake path classifies owner-approved external packages, preserves immutable hashes/source evidence, productizes them into the existing Motion Graph/customization authorities, proves visual parity and permits public registration only after owner-reviewed integrated parity.
+
+This is Plan-A engineering infrastructure, not A22. It adds no new public component by itself. The first pilot is owner-approved CH1 Frosted Icon Rail; engineering productization/parity evidence is ready, but registration is intentionally blocked until the owner approves the integrated rendering. Remaining CH1 components stay source-approved/inspect-clean but are not bulk-registered before that pilot gate.
+
+Architecture: `DOCS/motion/COMPONENT_INGEST_ARCHITECTURE.md`; evidence: `DOCS/motion/evidence/COMPONENT-INGEST-V1.md`.
+
 ## Current stop boundary
 
-After L1, do **not** begin A22, B2/B3 or C6 without explicit authorization. Production Studio integration and provider-specific AI remain out of scope.
+Do **not** register/bulk-ingest the remaining CH1 components until the first integrated pilot receives owner parity approval. Do **not** begin A22, B2/B3 or C6 without explicit authorization. Production Studio integration and provider-specific AI remain out of scope.
 
 Per owner instruction on 2026-08-11, L1 release history is preserved locally and remote synchronization/parity is deferred until the owner re-authorizes it next month.

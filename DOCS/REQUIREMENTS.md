@@ -104,3 +104,12 @@ Status values: `Approved`, `Proposed`, `Deferred`, `Rejected`, `Superseded`.
 - Screen navigation must use one restrained smooth curve. Direct controls may use a brief, purposeful spring response so presses and focus changes feel physical rather than abrupt; this spring must not become decorative page motion.
 - Motion must reinforce the user's action and be explicitly removed when reduced motion is requested.
 - Source: owner real-video walkthrough and material correction on 2026-07-13.
+
+### REQ-015 — Visual-first external component ingestion
+
+- Status: Approved
+- External visual agents may create reusable motion components in different implementation environments, but every owner-approved visual must enter Sanverse through one fail-closed component-ingestion contract before it becomes public.
+- The approved visual appearance is authority. Engineering may normalize implementation, extract typed properties, semantic nodes, keyframes, expert boundaries and responsive behavior, but may not aesthetically reinterpret or silently approximate the approved result.
+- Public registration requires owner approval, deterministic/direct-seek validation, immutable source evidence, visual parity, canonical Motion Graph/edit controls, review evidence and Library metadata.
+- All ten CH1 source visuals are owner-approved as of 2026-08-14; integrated visual parity remains a separate verification gate.
+- Source: owner-approved Component Ingest V1 contract and owner correction on 2026-08-14.

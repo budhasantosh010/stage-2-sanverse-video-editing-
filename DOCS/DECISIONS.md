@@ -131,3 +131,13 @@ Only durable, approved decisions belong here. Proposals stay in plans or the bla
 - The single adapter needs its first provider-specific branch. That is the signal that the OpenAI shape has stopped being a real common denominator.
 - Measured routing, spend control, or fallback needs exceed what LiteLLM configuration can express.
 - The owner enters a stage where an OpenAI or Anthropic model is required for quality that the four cannot reach.
+
+## DEC-012 — Approved pixels first; one component-ingestion semantics
+
+- Status: Approved by the owner
+- Date: 2026-08-14
+- Decision: external visual agents may use different authoring techniques, but Sanverse owns one canonical fail-closed intake/productization/visual-parity/registration pipeline. The owner's approved visual package is immutable evidence; engineering may change implementation architecture but may not replace it with a visually different interpretation.
+- Source classification is closed (`sdk-native`, `sdk-custom`, `procedural`, `shader`, `hybrid`, `foreign`). Foreign is a compatibility status, not an automatic rejection. Lossless normalization, expert wrapping/source adaptation, or explicit incompatibility are honest outcomes.
+- Public registry mutation happens only after productization and owner-reviewed integrated parity. Staging never creates half-public components.
+- Why: visual diversity is desirable, while separate integration semantics per coding agent would fragment Motion Graph, customization, Library behavior and AI editing.
+- Revisit trigger: a real approved component cannot be preserved through these lanes without either violating visual parity or creating a second animation/editing authority.

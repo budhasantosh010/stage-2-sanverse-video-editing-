@@ -406,3 +406,24 @@ VERIFIED FIX: `motion/visual-baselines/a21-terminal-command-story.png` was recap
 
 ONE-LINE SOLUTION: portrait terminal typography now scales for viewing distance instead of merely satisfying layout bounds.
 
+## MOTION-FAIL-021 — First Component Ingest path boundary identified the CH1 visual root incorrectly
+
+- Status: FIXED
+- Severity: high for intake safety, no approved source changed
+- Milestone: COMPONENT-INGEST-V1
+- Date: 2026-08-14
+
+WHAT: the first ingest unit run rejected an otherwise-valid CH1-shaped package with `RUNTIME_PATH_ESCAPES_WORKSPACE`.
+
+WHERE: `packages/motion-ingest/src/inspect.ts` visual-workspace-root/confinement logic.
+
+WHY: the first root detector inferred the wrong parent around `<visual-root>/components/<component>`, so a legitimate shared runtime such as `../../components.js` appeared to leave the visual workspace.
+
+IMPACT: fail-closed behavior prevented unsafe copying or productization; no public registry or approved source was changed.
+
+FIX: workspace detection now recognizes the literal `components` parent with `path.basename`, and confinement uses `path.relative` + absolute-path rejection instead of brittle normalized-string slicing.
+
+VERIFIED FIX: all 10 CH1 packages now inspect approval/determinism/direct-seek cleanly; the Component Ingest test package passes; the pilot immutable snapshot copies only allowed reusable source files and no reference video.
+
+ONE-LINE SOLUTION: compute visual-root confinement structurally with `path.relative`, never by string-prefix assumptions.
+

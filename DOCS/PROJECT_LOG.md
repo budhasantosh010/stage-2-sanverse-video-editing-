@@ -1,5 +1,17 @@
 # Project Log
 
+## 2026-08-14 — Plan-A Approved Component Ingest V1 + Frosted Icon Rail pilot ready for owner parity
+
+- Added one fail-closed `@sanverse/motion-ingest` pipeline and internal CLI for inspect → immutable ingest → productize → parity → register. Source kinds are closed; public registration is atomic and cannot occur before owner-reviewed integrated parity.
+- Recorded the owner's explicit approval of all ten CH1 source visuals. All ten inspect as deterministic/direct-seek-safe foreign components suitable for lossless normalization; only Component 01 advanced as the required first pilot.
+- Frosted Icon Rail now has one canonical Motion Scene with 14 semantic nodes, 15 meaningful exposures, real C2 keyframes/formulas, C3/C4/C5 projection and seven typed AI-edit intents while preserving the approved CH1 default visual/timing.
+- Added exact deterministic `back-out` scalar expression support because the approved CH1 item scale uses that mathematical easing; replacing it with a convenient generic ease was rejected.
+- Immutable pilot source hash: `428e6e328f366417f3e13fb8dcbca388238e1d196f78ec5243fa97a3e374ce39`. No creator/reference MP4 was copied into the repository.
+- Real Edge parity page compares the immutable approved renderer and integrated Sanverse renderer on one exact playhead. A 31-frame/30-fps canonical comparison plus temporal contact sheet preserves entrance, stagger, hold and exit; full-video SSIM 0.996780 is supporting evidence, not the visual authority.
+- Fresh scoped gate: **469/469 tests**; root all-workspace build PASS. `apps/web` diff 0. A deliberate pre-owner registration attempt correctly refused, so the public catalog remains 89.
+- Next action is owner visual verification of the integrated Frosted Icon Rail. Stop before public registration/bulk CH1 ingestion and before A22/B2/B3/C6.
+
+
 ## 2026-08-11 — Sanverse Creative Engine L1 Creative Library complete locally
 
 - Added a one-registry development Creative Library over all 89 public Plan-A components with typed discovery metadata, search/filter/sort/tabs/collections and future-B2 pure lookup boundaries.
