@@ -1,0 +1,185 @@
+{
+  "schema": "sanverse.visual-component-prototype/v1",
+  "canonicalId": "sanverse.media-cutaway",
+  "workingName": "Media Cutaway Stage",
+  "order": 7,
+  "status": "owner-approved-visual",
+  "ownerApproval": true,
+  "purpose": "Temporarily promote an image, webpage, screenshot, document or b-roll into a clean visual evidence panel.",
+  "typicalUse": [
+    "talking-head",
+    "short-form",
+    "long-form",
+    "documentary",
+    "product",
+    "social"
+  ],
+  "reference": {
+    "source": "../..\\YTDown.com_Shorts_Open-Source-VS-Open-Weight-What-is-the-D_Media_pdlkU3rDxq0_001_1080p.mp4",
+    "startSeconds": 72.3,
+    "endSeconds": 74.77,
+    "occurrences": [
+      "61.27–63.27s",
+      "72.30–74.77s"
+    ]
+  },
+  "extractNotPixels": true,
+  "referencePrinciples": {
+    "reuse": "Screenshots · documents · product captures · b-roll · evidence images",
+    "entrance": "Media plane enters as one deliberate surface.",
+    "hold": "Image gets uncluttered reading time.",
+    "exit": "Panel clears quickly back to the presenter."
+  },
+  "mustNotCopyLiterally": [
+    "creator footage",
+    "source wording",
+    "brand logos",
+    "copyrighted artwork",
+    "distinctive proprietary UI"
+  ],
+  "canonicalFixture": {
+    "caption": "Reference visual",
+    "mediaText": "MEDIA",
+    "mediaUrl": ""
+  },
+  "canonicalRatio": "9:16",
+  "supportedRatios": [
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:5",
+    "custom/arbitrary"
+  ],
+  "footageModes": [
+    "OVERLAY",
+    "FEATURE",
+    "FULL-SCENE"
+  ],
+  "transparentBackgroundByDefault": true,
+  "semanticParts": [
+    "media.root",
+    "media.frame",
+    "media.asset",
+    "media.caption",
+    "component.background"
+  ],
+  "customization": {
+    "creator": [
+      "content.caption",
+      "content.mediaText",
+      "content.mediaUrl",
+      "style.accentColor",
+      "motion.duration"
+    ],
+    "designer": [
+      "style.backgroundColor",
+      "style.backgroundOpacity",
+      "layout.positionPreset",
+      "layout.offsetX",
+      "layout.offsetY",
+      "layout.scale",
+      "layout.rotation",
+      "style.opacity",
+      "typography.fontFamily",
+      "typography.typeScale",
+      "typography.fontWeight",
+      "style.textColor",
+      "style.accentColor",
+      "style.surfaceColor",
+      "style.highlightColor",
+      "surface.borderColor",
+      "surface.borderWidth",
+      "surface.surfaceOpacity",
+      "surface.radius",
+      "surface.padding",
+      "surface.spacing",
+      "surface.shadowStrength",
+      "surface.blur"
+    ],
+    "advanced": [
+      "motion.entranceStyle",
+      "motion.exitStyle",
+      "motion.motionIntensity",
+      "motion.stagger",
+      "motion.duration",
+      "motion.reducedMotion",
+      "node.media.root",
+      "node.media.frame",
+      "node.media.asset",
+      "node.media.caption"
+    ],
+    "compositor": {
+      "status": "local-deep-variant-ready",
+      "semanticNodeSelection": true,
+      "perNodeOverrides": [
+        "text",
+        "visibility",
+        "z-order",
+        "blend-mode",
+        "position",
+        "scale-x",
+        "scale-y",
+        "rotation",
+        "skew",
+        "opacity",
+        "transform-origin",
+        "width",
+        "height",
+        "padding",
+        "gap",
+        "overflow",
+        "font-family",
+        "font-size",
+        "font-weight",
+        "line-height",
+        "letter-spacing",
+        "text-align",
+        "foreground",
+        "background",
+        "border",
+        "radius",
+        "shadow",
+        "filter",
+        "backdrop-filter",
+        "clip-path",
+        "independent-enter-exit-motion",
+        "raw-css",
+        "normalized-keyframes"
+      ],
+      "responsiveScopes": [
+        "all-resolutions",
+        "current-ratio",
+        "current-canvas-shape"
+      ],
+      "variantPersistence": [
+        "local-auto-save",
+        "copy-json",
+        "export-json",
+        "import-json"
+      ],
+      "sanverseGraphProductization": "next engineering projection; approved default must remain visually locked"
+    }
+  },
+  "motion": {
+    "exactTickAuthority": true,
+    "ticksPerSecond": 1440000,
+    "directSeekSafeByConstruction": true,
+    "defaultEntrance": "rise-soft",
+    "defaultExit": "fade-drop",
+    "reducedMotion": true
+  },
+  "source": {
+    "runtime": "../../components.js",
+    "renderer": "renderMediaCutaway",
+    "viewer": "../../index.html?component=media-cutaway"
+  },
+  "review": {
+    "canonicalPosterProgress": 0.58,
+    "compareMode": "reference-left / reusable-component-right",
+    "ownerApprovalRequiredBeforeProductization": false,
+    "visualLock": true,
+    "ownerApprovedAt": "2026-08-14"
+  },
+  "visualLock": true,
+  "approvedAt": "2026-08-14"
+}

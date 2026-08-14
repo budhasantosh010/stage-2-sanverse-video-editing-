@@ -1,0 +1,186 @@
+{
+  "schema": "sanverse.visual-component-prototype/v1",
+  "canonicalId": "sanverse.stat-burst",
+  "workingName": "Stat Burst",
+  "order": 8,
+  "status": "owner-approved-visual",
+  "ownerApproval": true,
+  "purpose": "Reveal one large number, count or metric, then add its unit and supporting label in a second beat.",
+  "typicalUse": [
+    "talking-head",
+    "short-form",
+    "long-form",
+    "documentary",
+    "product",
+    "social"
+  ],
+  "reference": {
+    "source": "../..\\YTDown.com_Shorts_Open-Source-VS-Open-Weight-What-is-the-D_Media_pdlkU3rDxq0_001_1080p.mp4",
+    "startSeconds": 74.77,
+    "endSeconds": 78,
+    "occurrences": [
+      "74.77–78.00s"
+    ]
+  },
+  "extractNotPixels": true,
+  "referencePrinciples": {
+    "reuse": "Users · revenue · growth · speed · percentages · counts",
+    "entrance": "Value lands first and carries the visual weight.",
+    "hold": "Suffix/label completes the meaning.",
+    "exit": "Small scale-down/fade keeps the stat punchy."
+  },
+  "mustNotCopyLiterally": [
+    "creator footage",
+    "source wording",
+    "brand logos",
+    "copyrighted artwork",
+    "distinctive proprietary UI"
+  ],
+  "canonicalFixture": {
+    "startValue": "0",
+    "endValue": "12",
+    "suffix": "M+",
+    "label": "monthly users"
+  },
+  "canonicalRatio": "9:16",
+  "supportedRatios": [
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:5",
+    "custom/arbitrary"
+  ],
+  "footageModes": [
+    "OVERLAY",
+    "FEATURE",
+    "FULL-SCENE"
+  ],
+  "transparentBackgroundByDefault": true,
+  "semanticParts": [
+    "stat.root",
+    "stat.value",
+    "stat.suffix",
+    "stat.label",
+    "component.background"
+  ],
+  "customization": {
+    "creator": [
+      "content.startValue",
+      "content.endValue",
+      "content.suffix",
+      "content.label",
+      "style.accentColor",
+      "motion.duration"
+    ],
+    "designer": [
+      "style.backgroundColor",
+      "style.backgroundOpacity",
+      "layout.positionPreset",
+      "layout.offsetX",
+      "layout.offsetY",
+      "layout.scale",
+      "layout.rotation",
+      "style.opacity",
+      "typography.fontFamily",
+      "typography.typeScale",
+      "typography.fontWeight",
+      "style.textColor",
+      "style.accentColor",
+      "style.surfaceColor",
+      "style.highlightColor",
+      "surface.borderColor",
+      "surface.borderWidth",
+      "surface.surfaceOpacity",
+      "surface.radius",
+      "surface.padding",
+      "surface.spacing",
+      "surface.shadowStrength",
+      "surface.blur"
+    ],
+    "advanced": [
+      "motion.entranceStyle",
+      "motion.exitStyle",
+      "motion.motionIntensity",
+      "motion.stagger",
+      "motion.duration",
+      "motion.reducedMotion",
+      "node.stat.root",
+      "node.stat.value",
+      "node.stat.suffix",
+      "node.stat.label"
+    ],
+    "compositor": {
+      "status": "local-deep-variant-ready",
+      "semanticNodeSelection": true,
+      "perNodeOverrides": [
+        "text",
+        "visibility",
+        "z-order",
+        "blend-mode",
+        "position",
+        "scale-x",
+        "scale-y",
+        "rotation",
+        "skew",
+        "opacity",
+        "transform-origin",
+        "width",
+        "height",
+        "padding",
+        "gap",
+        "overflow",
+        "font-family",
+        "font-size",
+        "font-weight",
+        "line-height",
+        "letter-spacing",
+        "text-align",
+        "foreground",
+        "background",
+        "border",
+        "radius",
+        "shadow",
+        "filter",
+        "backdrop-filter",
+        "clip-path",
+        "independent-enter-exit-motion",
+        "raw-css",
+        "normalized-keyframes"
+      ],
+      "responsiveScopes": [
+        "all-resolutions",
+        "current-ratio",
+        "current-canvas-shape"
+      ],
+      "variantPersistence": [
+        "local-auto-save",
+        "copy-json",
+        "export-json",
+        "import-json"
+      ],
+      "sanverseGraphProductization": "next engineering projection; approved default must remain visually locked"
+    }
+  },
+  "motion": {
+    "exactTickAuthority": true,
+    "ticksPerSecond": 1440000,
+    "directSeekSafeByConstruction": true,
+    "defaultEntrance": "rise-soft",
+    "defaultExit": "fade-drop",
+    "reducedMotion": true
+  },
+  "source": {
+    "runtime": "../../components.js",
+    "renderer": "renderStatBurst",
+    "viewer": "../../index.html?component=stat-burst"
+  },
+  "review": {
+    "canonicalPosterProgress": 0.58,
+    "compareMode": "reference-left / reusable-component-right",
+    "ownerApprovalRequiredBeforeProductization": false,
+    "visualLock": true,
+    "ownerApprovedAt": "2026-08-14"
+  },
+  "visualLock": true,
+  "approvedAt": "2026-08-14"
+}

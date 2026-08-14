@@ -1,0 +1,182 @@
+{
+  "schema": "sanverse.visual-component-prototype/v1",
+  "canonicalId": "sanverse.cta-pill",
+  "workingName": "CTA Pill",
+  "order": 10,
+  "status": "owner-approved-visual",
+  "ownerApproval": true,
+  "purpose": "Land a short call-to-action as a final focal button-like graphic over any footage or background.",
+  "typicalUse": [
+    "talking-head",
+    "short-form",
+    "long-form",
+    "documentary",
+    "product",
+    "social"
+  ],
+  "reference": {
+    "source": "../..\\YTDown.com_Shorts_Open-Source-VS-Open-Weight-What-is-the-D_Media_pdlkU3rDxq0_001_1080p.mp4",
+    "startSeconds": 92.7,
+    "endSeconds": 94.47,
+    "occurrences": [
+      "92.70–94.47s"
+    ]
+  },
+  "extractNotPixels": true,
+  "referencePrinciples": {
+    "reuse": "Follow · Subscribe · Download · Learn more · Watch next",
+    "entrance": "CTA grows from subtle/transparent to confident but not bouncy.",
+    "hold": "Simple readable hero state.",
+    "exit": "Optional; usually a video cut can end it."
+  },
+  "mustNotCopyLiterally": [
+    "creator footage",
+    "source wording",
+    "brand logos",
+    "copyrighted artwork",
+    "distinctive proprietary UI"
+  ],
+  "canonicalFixture": {
+    "label": "Follow",
+    "subtext": "for more"
+  },
+  "canonicalRatio": "9:16",
+  "supportedRatios": [
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:5",
+    "custom/arbitrary"
+  ],
+  "footageModes": [
+    "OVERLAY",
+    "FEATURE",
+    "FULL-SCENE"
+  ],
+  "transparentBackgroundByDefault": true,
+  "semanticParts": [
+    "cta.root",
+    "cta.surface",
+    "cta.label",
+    "cta.subtext",
+    "component.background"
+  ],
+  "customization": {
+    "creator": [
+      "content.label",
+      "content.subtext",
+      "style.accentColor",
+      "motion.duration"
+    ],
+    "designer": [
+      "style.backgroundColor",
+      "style.backgroundOpacity",
+      "layout.positionPreset",
+      "layout.offsetX",
+      "layout.offsetY",
+      "layout.scale",
+      "layout.rotation",
+      "style.opacity",
+      "typography.fontFamily",
+      "typography.typeScale",
+      "typography.fontWeight",
+      "style.textColor",
+      "style.accentColor",
+      "style.surfaceColor",
+      "style.highlightColor",
+      "surface.borderColor",
+      "surface.borderWidth",
+      "surface.surfaceOpacity",
+      "surface.radius",
+      "surface.padding",
+      "surface.spacing",
+      "surface.shadowStrength",
+      "surface.blur"
+    ],
+    "advanced": [
+      "motion.entranceStyle",
+      "motion.exitStyle",
+      "motion.motionIntensity",
+      "motion.stagger",
+      "motion.duration",
+      "motion.reducedMotion",
+      "node.cta.root",
+      "node.cta.surface",
+      "node.cta.label",
+      "node.cta.subtext"
+    ],
+    "compositor": {
+      "status": "local-deep-variant-ready",
+      "semanticNodeSelection": true,
+      "perNodeOverrides": [
+        "text",
+        "visibility",
+        "z-order",
+        "blend-mode",
+        "position",
+        "scale-x",
+        "scale-y",
+        "rotation",
+        "skew",
+        "opacity",
+        "transform-origin",
+        "width",
+        "height",
+        "padding",
+        "gap",
+        "overflow",
+        "font-family",
+        "font-size",
+        "font-weight",
+        "line-height",
+        "letter-spacing",
+        "text-align",
+        "foreground",
+        "background",
+        "border",
+        "radius",
+        "shadow",
+        "filter",
+        "backdrop-filter",
+        "clip-path",
+        "independent-enter-exit-motion",
+        "raw-css",
+        "normalized-keyframes"
+      ],
+      "responsiveScopes": [
+        "all-resolutions",
+        "current-ratio",
+        "current-canvas-shape"
+      ],
+      "variantPersistence": [
+        "local-auto-save",
+        "copy-json",
+        "export-json",
+        "import-json"
+      ],
+      "sanverseGraphProductization": "next engineering projection; approved default must remain visually locked"
+    }
+  },
+  "motion": {
+    "exactTickAuthority": true,
+    "ticksPerSecond": 1440000,
+    "directSeekSafeByConstruction": true,
+    "defaultEntrance": "rise-soft",
+    "defaultExit": "fade-drop",
+    "reducedMotion": true
+  },
+  "source": {
+    "runtime": "../../components.js",
+    "renderer": "renderCta",
+    "viewer": "../../index.html?component=cta-pill"
+  },
+  "review": {
+    "canonicalPosterProgress": 0.58,
+    "compareMode": "reference-left / reusable-component-right",
+    "ownerApprovalRequiredBeforeProductization": false,
+    "visualLock": true,
+    "ownerApprovedAt": "2026-08-14"
+  },
+  "visualLock": true,
+  "approvedAt": "2026-08-14"
+}

@@ -1,0 +1,12 @@
+{
+  "componentId": "sanverse.stat-burst",
+  "componentVersion": 1,
+  "status": "owner-approved",
+  "visualLock": true,
+  "approvedBy": "owner",
+  "approvedAt": "2026-08-14",
+  "notes": [
+    "Owner said the current visuals are good to go and would be used as-is.",
+    "Approved default template must remain unchanged while deep customization is layered on top."
+  ]
+}

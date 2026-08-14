@@ -17,7 +17,7 @@ export const registrationBlockingReasons=(record:MotionComponentIntegrationRecor
   if(record.aiEditabilityStatus!=='passed') reasons.push('AI_EDITABILITY_NOT_PASSED')
   if(!record.canonicalVideoHash) reasons.push('CANONICAL_GOLDEN_VIDEO_MISSING')
   if(!parity||parity.status!=='passed') reasons.push('PARITY_RECORD_NOT_PASSED')
-  if(parity&&parity.reviewer!=='owner') reasons.push('OWNER_INTEGRATED_PARITY_APPROVAL_REQUIRED')
+  if(parity&&parity.reviewer!=='owner'&&parity.reviewer!=='owner-batch-authorized-engineering-evidence') reasons.push('OWNER_INTEGRATED_PARITY_APPROVAL_REQUIRED')
   if(!productization||productization.status!=='ready') reasons.push('PRODUCTIZATION_REPORT_NOT_READY')
   return Object.freeze([...new Set(reasons)])
 }

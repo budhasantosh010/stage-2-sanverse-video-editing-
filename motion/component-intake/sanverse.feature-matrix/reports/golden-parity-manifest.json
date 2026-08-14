@@ -1,0 +1,49 @@
+{
+  "componentId": "sanverse.feature-matrix",
+  "approvedSourceHash": "f9f9bab8dce98eac0ae4d3149d11c06966aef47ec93db656eb0a891af3a34703",
+  "checkpointCount": 7,
+  "minimumSsim": 0.97748,
+  "averageSsim": 0.993293,
+  "approvedSourceCheckpointReelHash": "53c09edf96eff291fcf20d21d1fe8a644b07b0543780a85d93deeb8d9ecc4c54",
+  "integratedCheckpointReelHash": "8d0bc5679e86e3e3a16fb4bed5201b771d70106551e2a956ac6c8a01b146926a",
+  "checkpointScores": [
+    {
+      "progress": 0,
+      "tick": 0,
+      "ssim": 1
+    },
+    {
+      "progress": 0.05,
+      "tick": 266400,
+      "ssim": 0.998944
+    },
+    {
+      "progress": 0.18,
+      "tick": 959040,
+      "ssim": 0.996321
+    },
+    {
+      "progress": 0.33,
+      "tick": 1758240,
+      "ssim": 0.996138
+    },
+    {
+      "progress": 0.58,
+      "tick": 3090240,
+      "ssim": 0.97748
+    },
+    {
+      "progress": 0.9,
+      "tick": 4795200,
+      "ssim": 0.98417
+    },
+    {
+      "progress": 1,
+      "tick": 5328000,
+      "ssim": 1
+    }
+  ],
+  "evidenceContactSheet": "motion/visual-baselines/ch1-ingest/06-feature-matrix-temporal.png",
+  "engineeringParity": "passed",
+  "ownerPromotion": "pending-batch-authorization"
+}

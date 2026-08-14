@@ -1,0 +1,93 @@
+{
+  "componentId": "sanverse.kinetic-phrase",
+  "componentVersion": 1,
+  "moduleFile": "packages/motion-library/src/ingested/ch1-approved-components.tsx",
+  "moduleImportPath": "./ch1-approved-components.tsx",
+  "moduleExportName": "KineticPhraseModule",
+  "definitionExportName": "KINETIC_PHRASE_DEFINITION",
+  "supportedRatios": [
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:5"
+  ],
+  "semanticMapping": [
+    {
+      "sourcePart": "phrase.root",
+      "nodeIds": [
+        "phrase.root"
+      ]
+    },
+    {
+      "sourcePart": "phrase.line:*",
+      "nodeIds": [
+        "phrase.line:0",
+        "phrase.line:1"
+      ]
+    },
+    {
+      "sourcePart": "phrase.emphasis",
+      "nodeIds": [
+        "phrase.emphasis"
+      ]
+    },
+    {
+      "sourcePart": "component.background",
+      "nodeIds": [
+        "component.background"
+      ]
+    }
+  ],
+  "aiEditIntents": [
+    {
+      "command": "Edit Phrase.",
+      "exposureId": "phrase.text",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Emphasis.",
+      "exposureId": "phrase.emphasis-text",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Emphasis style.",
+      "exposureId": "phrase.emphasis-style",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Placement.",
+      "exposureId": "phrase.placement",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Accent.",
+      "exposureId": "phrase.accent",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Opacity.",
+      "exposureId": "phrase.opacity",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position X.",
+      "exposureId": "phrase.position-x",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position Y.",
+      "exposureId": "phrase.position-y",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Scale.",
+      "exposureId": "phrase.scale",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Semantic parts.",
+      "exposureId": "phrase.parts",
+      "operation": "retime-keyframes"
+    }
+  ]
+}

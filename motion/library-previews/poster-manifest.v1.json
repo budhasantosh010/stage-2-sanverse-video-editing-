@@ -1,6 +1,6 @@
 {
   "schemaVersion": "sanverse.library-posters/v1",
-  "generatedAt": "2026-08-11T10:38:12.729Z",
+  "generatedAt": "2026-08-14T20:52:13.207Z",
   "posters": {
     "sanverse.donut-breakdown": {
       "previewHash": "985b7306",
@@ -357,6 +357,46 @@
     "sanverse.terminal-command-story": {
       "previewHash": "f8f39112",
       "file": "posters/sanverse.terminal-command-story.png"
+    },
+    "sanverse.cta-pill": {
+      "previewHash": "cee49c13",
+      "file": "posters/sanverse.cta-pill.png"
+    },
+    "sanverse.explainer-board": {
+      "previewHash": "b9aefa11",
+      "file": "posters/sanverse.explainer-board.png"
+    },
+    "sanverse.feature-matrix": {
+      "previewHash": "aa775fec",
+      "file": "posters/sanverse.feature-matrix.png"
+    },
+    "sanverse.floating-value-cloud": {
+      "previewHash": "48d9a11f",
+      "file": "posters/sanverse.floating-value-cloud.png"
+    },
+    "sanverse.icon-rail": {
+      "previewHash": "6b867c32",
+      "file": "posters/sanverse.icon-rail.png"
+    },
+    "sanverse.kinetic-phrase": {
+      "previewHash": "3e49d1f9",
+      "file": "posters/sanverse.kinetic-phrase.png"
+    },
+    "sanverse.media-cutaway": {
+      "previewHash": "0653a968",
+      "file": "posters/sanverse.media-cutaway.png"
+    },
+    "sanverse.milestone-stage": {
+      "previewHash": "c1a9732a",
+      "file": "posters/sanverse.milestone-stage.png"
+    },
+    "sanverse.progressive-choice-stack": {
+      "previewHash": "3664f657",
+      "file": "posters/sanverse.progressive-choice-stack.png"
+    },
+    "sanverse.stat-burst": {
+      "previewHash": "fd470956",
+      "file": "posters/sanverse.stat-burst.png"
     }
   }
 }

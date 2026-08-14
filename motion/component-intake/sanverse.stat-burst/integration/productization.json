@@ -1,0 +1,98 @@
+{
+  "componentId": "sanverse.stat-burst",
+  "componentVersion": 1,
+  "moduleFile": "packages/motion-library/src/ingested/ch1-approved-components.tsx",
+  "moduleImportPath": "./ch1-approved-components.tsx",
+  "moduleExportName": "StatBurstModule",
+  "definitionExportName": "STAT_BURST_DEFINITION",
+  "supportedRatios": [
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:5"
+  ],
+  "semanticMapping": [
+    {
+      "sourcePart": "stat.root",
+      "nodeIds": [
+        "stat.root"
+      ]
+    },
+    {
+      "sourcePart": "stat.value",
+      "nodeIds": [
+        "stat.value"
+      ]
+    },
+    {
+      "sourcePart": "stat.suffix",
+      "nodeIds": [
+        "stat.suffix"
+      ]
+    },
+    {
+      "sourcePart": "stat.label",
+      "nodeIds": [
+        "stat.label"
+      ]
+    },
+    {
+      "sourcePart": "component.background",
+      "nodeIds": [
+        "component.background"
+      ]
+    }
+  ],
+  "aiEditIntents": [
+    {
+      "command": "Edit Final value.",
+      "exposureId": "stat.end",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Suffix.",
+      "exposureId": "stat.suffix-text",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Label.",
+      "exposureId": "stat.label-text",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Placement.",
+      "exposureId": "stat.placement",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Accent.",
+      "exposureId": "stat.accent",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Opacity.",
+      "exposureId": "stat.opacity",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position X.",
+      "exposureId": "stat.position-x",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position Y.",
+      "exposureId": "stat.position-y",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Scale.",
+      "exposureId": "stat.scale",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Semantic parts.",
+      "exposureId": "stat.parts",
+      "operation": "retime-keyframes"
+    }
+  ]
+}

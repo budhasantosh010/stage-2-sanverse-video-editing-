@@ -1,0 +1,49 @@
+{
+  "componentId": "sanverse.explainer-board",
+  "approvedSourceHash": "a327f01bb1872e4dbcf65e73392d05fd4557f2f6ce466ab1006a366c6cdda4a5",
+  "checkpointCount": 7,
+  "minimumSsim": 0.988172,
+  "averageSsim": 0.994643,
+  "approvedSourceCheckpointReelHash": "616afbf3ccd6f3a48e2dc1f35e494bfa6331b18b31a53457580fc7f21d7d8f0e",
+  "integratedCheckpointReelHash": "8ce0d831e15be0851f9d88ff49385cb95268d88286fb5bd679a5b50644124b85",
+  "checkpointScores": [
+    {
+      "progress": 0,
+      "tick": 0,
+      "ssim": 1
+    },
+    {
+      "progress": 0.05,
+      "tick": 318960,
+      "ssim": 0.999049
+    },
+    {
+      "progress": 0.18,
+      "tick": 1148256,
+      "ssim": 0.994639
+    },
+    {
+      "progress": 0.33,
+      "tick": 2105136,
+      "ssim": 0.990989
+    },
+    {
+      "progress": 0.58,
+      "tick": 3699936,
+      "ssim": 0.989651
+    },
+    {
+      "progress": 0.9,
+      "tick": 5741280,
+      "ssim": 0.988172
+    },
+    {
+      "progress": 1,
+      "tick": 6379200,
+      "ssim": 1
+    }
+  ],
+  "evidenceContactSheet": "motion/visual-baselines/ch1-ingest/04-explainer-board-temporal.png",
+  "engineeringParity": "passed",
+  "ownerPromotion": "pending-batch-authorization"
+}

@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vitest'
-import { createImmutableIntakeSnapshot, inspectApprovedComponentPackage, registerProductizedComponent } from './index.ts'
+import { createImmutableIntakeSnapshot, inspectApprovedComponentPackage, registerProductizedComponent, registrationBlockingReasons } from './index.ts'
 
 const createPackage = (options: Readonly<{ approved?: boolean; random?: boolean }> = {}) => {
   const root = mkdtempSync(join(tmpdir(), 'sanverse-ingest-'))
@@ -62,6 +62,10 @@ describe('Component Ingest V1', () => {
     const record = { schemaVersion:'sanverse.component-ingest/v1', componentId:'sanverse.ingest-proof', componentVersion:1, visualAuthoringSource:'external-agent', sourceEnvironment:'test', approvedAt:'2026-08-14', sourceKind:'foreign', approvedSourceHash:'source', manifestHash:'manifest', approvalHash:'approval', runtimeSourceHash:'runtime', canonicalVideoHash:'video', integrationStrategy:'foreign-adapter', canonicalGraphId:'sanverse.ingest-proof', visualParityStatus:'passed', productizationStatus:'ready', determinismStatus:'passed', directSeekStatus:'passed', semanticMappingStatus:'passed', c3Status:'passed', c4Status:'passed', c5Status:'passed', c6Status:'not-yet-available', aiEditabilityStatus:'passed', libraryStatus:'not-registered', blockingReasons:[] } as const
     const parity = { schemaVersion:'sanverse.component-parity/v1', componentId:'sanverse.ingest-proof', componentVersion:1, approvedSourceHash:'source', canonicalVideoHash:'video', integratedVideoHash:'integrated', checkpointCount:7, temporalEventsVerified:true, status:'passed', reviewer:'owner', notes:[] } as const
     const productization = { componentId:'sanverse.ingest-proof', componentVersion:1, status:'ready', determinism:'passed', directSeek:'passed', semanticMapping:'passed', c3:'passed', c4:'passed', c5:'passed', c6:'not-yet-available', aiEditability:'passed', ratios:{'16:9':'passed','9:16':'passed','1:1':'passed','4:5':'passed'}, semanticNodeCount:3, exposureCount:3, editableCurveTrackCount:1, blockingReasons:[] } as const
+    const engineeringParity = { ...parity, reviewer:'engineering-evidence' as const }
+    expect(registrationBlockingReasons(record, engineeringParity, productization)).toContain('OWNER_INTEGRATED_PARITY_APPROVAL_REQUIRED')
+    const batchAuthorizedParity = { ...parity, reviewer:'owner-batch-authorized-engineering-evidence' as const }
+    expect(registrationBlockingReasons(record, batchAuthorizedParity, productization)).not.toContain('OWNER_INTEGRATED_PARITY_APPROVAL_REQUIRED')
     expect(() => registerProductizedComponent(repo, { ...descriptor, moduleImportPath:'../../escape.tsx' }, record, parity, productization)).toThrow('REGISTRATION_MODULE_IMPORT_INVALID')
     const ledger = registerProductizedComponent(repo, descriptor, record, parity, productization)
     expect(ledger.components).toHaveLength(1)

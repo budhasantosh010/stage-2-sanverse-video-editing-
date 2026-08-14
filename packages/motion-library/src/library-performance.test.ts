@@ -9,9 +9,9 @@ const synthetic = (count: number): readonly MotionLibraryCatalogEntryV1[] => Obj
 }))
 
 describe('L1 Creative Library measured catalog performance', () => {
-  it('measures deterministic filtering and sorting at 89/150/300/500 entries', () => {
-    for (const count of [89, 150, 300, 500]) {
-      const entries = count === 89 ? MOTION_LIBRARY_CATALOG : synthetic(count)
+  it('measures deterministic filtering and sorting at 99/150/300/500 entries', () => {
+    for (const count of [99, 150, 300, 500]) {
+      const entries = count === 99 ? MOTION_LIBRARY_CATALOG : synthetic(count)
       const started = performance.now()
       const result = filterMotionLibraryCatalog(entries, { context: 'youtube-long-form', sort: 'recent' })
       const elapsed = performance.now() - started

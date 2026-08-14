@@ -1,0 +1,49 @@
+{
+  "componentId": "sanverse.media-cutaway",
+  "approvedSourceHash": "8fed16b8aabe33e78db84150e721717b171ddc77ce9560ef6b0d8e142b75bee4",
+  "checkpointCount": 7,
+  "minimumSsim": 0.989602,
+  "averageSsim": 0.995937,
+  "approvedSourceCheckpointReelHash": "f2a49193c1aadb3fa06344246e296fcecefadc3d10a622094ff5760982501619",
+  "integratedCheckpointReelHash": "deb00c5edad675720c583d0ede0fa7416c1dc846a7bb6ab214e821cf7df0ce31",
+  "checkpointScores": [
+    {
+      "progress": 0,
+      "tick": 0,
+      "ssim": 1
+    },
+    {
+      "progress": 0.05,
+      "tick": 177840,
+      "ssim": 0.998795
+    },
+    {
+      "progress": 0.18,
+      "tick": 640224,
+      "ssim": 0.996437
+    },
+    {
+      "progress": 0.33,
+      "tick": 1173744,
+      "ssim": 0.996029
+    },
+    {
+      "progress": 0.58,
+      "tick": 2062944,
+      "ssim": 0.990695
+    },
+    {
+      "progress": 0.9,
+      "tick": 3201120,
+      "ssim": 0.989602
+    },
+    {
+      "progress": 1,
+      "tick": 3556800,
+      "ssim": 1
+    }
+  ],
+  "evidenceContactSheet": "motion/visual-baselines/ch1-ingest/07-media-cutaway-temporal.png",
+  "engineeringParity": "passed",
+  "ownerPromotion": "pending-batch-authorization"
+}

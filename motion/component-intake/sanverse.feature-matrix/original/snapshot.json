@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "sanverse.component-intake-snapshot/v1",
+  "componentId": "sanverse.feature-matrix",
+  "componentVersion": 1,
+  "approvedSourceHash": "f9f9bab8dce98eac0ae4d3149d11c06966aef47ec93db656eb0a891af3a34703",
+  "manifestHash": "22c81e34d478c0a73fc4e5f57c3419452ca1dea7f3fb425e575d7229b8d689ff",
+  "approvalHash": "926584a49aab4c7eea598e1417f068c42128534283b13c009bf7f7f47e968448",
+  "runtimeSourceHash": "cd8c44a60b74401edb01f36b55d139b5663f4151a1fea3cea529e56b2bca5b08",
+  "files": [
+    {
+      "logicalPath": "component/component.json",
+      "sha256": "22c81e34d478c0a73fc4e5f57c3419452ca1dea7f3fb425e575d7229b8d689ff",
+      "bytes": 4872
+    },
+    {
+      "logicalPath": "component/README.md",
+      "sha256": "4a29a431f8a98be2d91a5ae8d6421bfbce76ef9d406b71866c846103efe44fc3",
+      "bytes": 782
+    },
+    {
+      "logicalPath": "component/review/approval.json",
+      "sha256": "926584a49aab4c7eea598e1417f068c42128534283b13c009bf7f7f47e968448",
+      "bytes": 373
+    },
+    {
+      "logicalPath": "shared/components.js",
+      "sha256": "cd8c44a60b74401edb01f36b55d139b5663f4151a1fea3cea529e56b2bca5b08",
+      "bytes": 27844
+    },
+    {
+      "logicalPath": "shared/deep-editor.js",
+      "sha256": "c7ec36a0f534b2ab9da5771dc96357cf9906b79fbcaa86b3664698c0063fec25",
+      "bytes": 23782
+    },
+    {
+      "logicalPath": "shared/index.html",
+      "sha256": "198ac0e2ac539651d99629684f85b30b57717d143e3f49d4fc5487d6bb6cd8f3",
+      "bytes": 21619
+    },
+    {
+      "logicalPath": "shared/review.js",
+      "sha256": "b17816d7220de3043171745a64abccb317f2a4d0a2195c3410758573b404c3ec",
+      "bytes": 18860
+    },
+    {
+      "logicalPath": "shared/styles.css",
+      "sha256": "aae9a2e8296a08d0b459ba3a6baed841f5c6d85b1d91053a0d63ad4397dc7636",
+      "bytes": 24709
+    }
+  ],
+  "excludedFromSnapshot": [
+    "third-party reference video",
+    "reference frame extraction",
+    "temporary browser/render artifacts"
+  ]
+}

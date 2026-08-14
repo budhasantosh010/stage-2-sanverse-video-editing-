@@ -1,0 +1,49 @@
+{
+  "componentId": "sanverse.progressive-choice-stack",
+  "approvedSourceHash": "697b21bba018860150dbd572d6650c2d12339352e719c306dcdd6b18ddada62d",
+  "checkpointCount": 7,
+  "minimumSsim": 0.987923,
+  "averageSsim": 0.995793,
+  "approvedSourceCheckpointReelHash": "ff17297003a3aa19c622dab492d8d8b78ac459c8ef4cd4ccfc99ed152771ea36",
+  "integratedCheckpointReelHash": "8015af2c53838075c7e77901c82844a432a3e0977968f6da6181c018e1fea4fe",
+  "checkpointScores": [
+    {
+      "progress": 0,
+      "tick": 0,
+      "ssim": 1
+    },
+    {
+      "progress": 0.05,
+      "tick": 194400,
+      "ssim": 0.9974
+    },
+    {
+      "progress": 0.18,
+      "tick": 699840,
+      "ssim": 0.997753
+    },
+    {
+      "progress": 0.33,
+      "tick": 1283040,
+      "ssim": 0.994498
+    },
+    {
+      "progress": 0.58,
+      "tick": 2255040,
+      "ssim": 0.992978
+    },
+    {
+      "progress": 0.9,
+      "tick": 3499200,
+      "ssim": 0.987923
+    },
+    {
+      "progress": 1,
+      "tick": 3888000,
+      "ssim": 1
+    }
+  ],
+  "evidenceContactSheet": "motion/visual-baselines/ch1-ingest/02-progressive-choice-stack-temporal.png",
+  "engineeringParity": "passed",
+  "ownerPromotion": "pending-batch-authorization"
+}

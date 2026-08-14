@@ -1,0 +1,101 @@
+{
+  "componentId": "sanverse.feature-matrix",
+  "componentVersion": 1,
+  "moduleFile": "packages/motion-library/src/ingested/ch1-approved-components.tsx",
+  "moduleImportPath": "./ch1-approved-components.tsx",
+  "moduleExportName": "FeatureMatrixModule",
+  "definitionExportName": "FEATURE_MATRIX_DEFINITION",
+  "supportedRatios": [
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:5"
+  ],
+  "semanticMapping": [
+    {
+      "sourcePart": "matrix.root",
+      "nodeIds": [
+        "matrix.root"
+      ]
+    },
+    {
+      "sourcePart": "matrix.metric:*",
+      "nodeIds": [
+        "matrix.metric:0",
+        "matrix.metric:1"
+      ]
+    },
+    {
+      "sourcePart": "matrix.status:*",
+      "nodeIds": [
+        "matrix.status:0",
+        "matrix.status:1",
+        "matrix.status:2"
+      ]
+    },
+    {
+      "sourcePart": "matrix.criteria",
+      "nodeIds": [
+        "matrix.criteria"
+      ]
+    },
+    {
+      "sourcePart": "component.background",
+      "nodeIds": [
+        "component.background"
+      ]
+    }
+  ],
+  "aiEditIntents": [
+    {
+      "command": "Edit Metric A.",
+      "exposureId": "matrix.metric-a",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Metric B.",
+      "exposureId": "matrix.metric-b",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Criterion.",
+      "exposureId": "matrix.criterion-text",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Placement.",
+      "exposureId": "matrix.placement",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Accent.",
+      "exposureId": "matrix.accent",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Opacity.",
+      "exposureId": "matrix.opacity",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position X.",
+      "exposureId": "matrix.position-x",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position Y.",
+      "exposureId": "matrix.position-y",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Scale.",
+      "exposureId": "matrix.scale",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Semantic parts.",
+      "exposureId": "matrix.parts",
+      "operation": "retime-keyframes"
+    }
+  ]
+}

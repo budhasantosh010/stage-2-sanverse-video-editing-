@@ -1,0 +1,80 @@
+{
+  "componentId": "sanverse.floating-value-cloud",
+  "componentVersion": 1,
+  "moduleFile": "packages/motion-library/src/ingested/ch1-approved-components.tsx",
+  "moduleImportPath": "./ch1-approved-components.tsx",
+  "moduleExportName": "FloatingValueCloudModule",
+  "definitionExportName": "FLOATING_VALUE_CLOUD_DEFINITION",
+  "supportedRatios": [
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:5"
+  ],
+  "semanticMapping": [
+    {
+      "sourcePart": "values.root",
+      "nodeIds": [
+        "values.root"
+      ]
+    },
+    {
+      "sourcePart": "values.item:*",
+      "nodeIds": [
+        "values.item:0",
+        "values.item:1",
+        "values.item:2",
+        "values.item:3",
+        "values.item:4"
+      ]
+    },
+    {
+      "sourcePart": "component.background",
+      "nodeIds": [
+        "component.background"
+      ]
+    }
+  ],
+  "aiEditIntents": [
+    {
+      "command": "Edit Values.",
+      "exposureId": "values.content",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Placement.",
+      "exposureId": "values.placement",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Accent.",
+      "exposureId": "values.accent",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Opacity.",
+      "exposureId": "values.opacity",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position X.",
+      "exposureId": "values.position-x",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position Y.",
+      "exposureId": "values.position-y",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Scale.",
+      "exposureId": "values.scale",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Semantic parts.",
+      "exposureId": "values.parts",
+      "operation": "retime-keyframes"
+    }
+  ]
+}

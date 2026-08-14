@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "sanverse.component-ingest/v1",
+  "componentPath": "06-feature-matrix",
+  "visualWorkspaceRoot": "Component CH1",
+  "componentId": "sanverse.feature-matrix",
+  "componentVersion": 1,
+  "componentName": "Feature Matrix",
+  "sourceKind": "foreign",
+  "lane": "foreign",
+  "foreignDecision": "lossless-normalization",
+  "recommendedStrategy": "foreign-adapter",
+  "visualApproval": "passed",
+  "determinism": "passed",
+  "directSeek": "passed",
+  "canonicalTickAuthority": "passed",
+  "manifestPath": "original/component/component.json",
+  "approvalPath": "original/component/review/approval.json",
+  "runtimePath": "original/shared/components.js",
+  "rendererName": "renderFeatureMatrix",
+  "dependencies": [],
+  "semanticParts": [
+    "matrix.root",
+    "matrix.metric:*",
+    "matrix.status:*",
+    "matrix.criteria",
+    "component.background"
+  ],
+  "snapshotSourceFiles": [
+    "C:\\Users\\Lenovo\\Music\\Startups\\YT Automations\\A1 Talking Head Youtube Video\\Sanverse YT Channel\\2nd Stage Motion Graphics & Animations Library\\components building with chatgpt harness\\Component CH1\\components\\06-feature-matrix\\component.json",
+    "C:\\Users\\Lenovo\\Music\\Startups\\YT Automations\\A1 Talking Head Youtube Video\\Sanverse YT Channel\\2nd Stage Motion Graphics & Animations Library\\components building with chatgpt harness\\Component CH1\\components\\06-feature-matrix\\review\\approval.json",
+    "C:\\Users\\Lenovo\\Music\\Startups\\YT Automations\\A1 Talking Head Youtube Video\\Sanverse YT Channel\\2nd Stage Motion Graphics & Animations Library\\components building with chatgpt harness\\Component CH1\\components\\06-feature-matrix\\README.md",
+    "C:\\Users\\Lenovo\\Music\\Startups\\YT Automations\\A1 Talking Head Youtube Video\\Sanverse YT Channel\\2nd Stage Motion Graphics & Animations Library\\components building with chatgpt harness\\Component CH1\\components.js",
+    "C:\\Users\\Lenovo\\Music\\Startups\\YT Automations\\A1 Talking Head Youtube Video\\Sanverse YT Channel\\2nd Stage Motion Graphics & Animations Library\\components building with chatgpt harness\\Component CH1\\styles.css",
+    "C:\\Users\\Lenovo\\Music\\Startups\\YT Automations\\A1 Talking Head Youtube Video\\Sanverse YT Channel\\2nd Stage Motion Graphics & Animations Library\\components building with chatgpt harness\\Component CH1\\review.js",
+    "C:\\Users\\Lenovo\\Music\\Startups\\YT Automations\\A1 Talking Head Youtube Video\\Sanverse YT Channel\\2nd Stage Motion Graphics & Animations Library\\components building with chatgpt harness\\Component CH1\\deep-editor.js",
+    "C:\\Users\\Lenovo\\Music\\Startups\\YT Automations\\A1 Talking Head Youtube Video\\Sanverse YT Channel\\2nd Stage Motion Graphics & Animations Library\\components building with chatgpt harness\\Component CH1\\index.html"
+  ],
+  "issues": [],
+  "readyForIntake": true
+}

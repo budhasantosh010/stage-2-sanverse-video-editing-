@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "sanverse.component-registration-ledger/v1",
+  "components": [
+    {
+      "componentId": "sanverse.cta-pill",
+      "componentVersion": 1,
+      "moduleImportPath": "./ch1-approved-components.tsx",
+      "moduleExportName": "CtaPillModule",
+      "definitionExportName": "CTA_PILL_DEFINITION"
+    },
+    {
+      "componentId": "sanverse.explainer-board",
+      "componentVersion": 1,
+      "moduleImportPath": "./ch1-approved-components.tsx",
+      "moduleExportName": "ExplainerBoardModule",
+      "definitionExportName": "EXPLAINER_BOARD_DEFINITION"
+    },
+    {
+      "componentId": "sanverse.feature-matrix",
+      "componentVersion": 1,
+      "moduleImportPath": "./ch1-approved-components.tsx",
+      "moduleExportName": "FeatureMatrixModule",
+      "definitionExportName": "FEATURE_MATRIX_DEFINITION"
+    },
+    {
+      "componentId": "sanverse.floating-value-cloud",
+      "componentVersion": 1,
+      "moduleImportPath": "./ch1-approved-components.tsx",
+      "moduleExportName": "FloatingValueCloudModule",
+      "definitionExportName": "FLOATING_VALUE_CLOUD_DEFINITION"
+    },
+    {
+      "componentId": "sanverse.icon-rail",
+      "componentVersion": 1,
+      "moduleImportPath": "./frosted-icon-rail.tsx",
+      "moduleExportName": "FrostedIconRailModule",
+      "definitionExportName": "FROSTED_ICON_RAIL_DEFINITION"
+    },
+    {
+      "componentId": "sanverse.kinetic-phrase",
+      "componentVersion": 1,
+      "moduleImportPath": "./ch1-approved-components.tsx",
+      "moduleExportName": "KineticPhraseModule",
+      "definitionExportName": "KINETIC_PHRASE_DEFINITION"
+    },
+    {
+      "componentId": "sanverse.media-cutaway",
+      "componentVersion": 1,
+      "moduleImportPath": "./ch1-approved-components.tsx",
+      "moduleExportName": "MediaCutawayModule",
+      "definitionExportName": "MEDIA_CUTAWAY_DEFINITION"
+    },
+    {
+      "componentId": "sanverse.milestone-stage",
+      "componentVersion": 1,
+      "moduleImportPath": "./ch1-approved-components.tsx",
+      "moduleExportName": "MilestoneStageModule",
+      "definitionExportName": "MILESTONE_STAGE_DEFINITION"
+    },
+    {
+      "componentId": "sanverse.progressive-choice-stack",
+      "componentVersion": 1,
+      "moduleImportPath": "./ch1-approved-components.tsx",
+      "moduleExportName": "ProgressiveChoiceStackModule",
+      "definitionExportName": "PROGRESSIVE_CHOICE_STACK_DEFINITION"
+    },
+    {
+      "componentId": "sanverse.stat-burst",
+      "componentVersion": 1,
+      "moduleImportPath": "./ch1-approved-components.tsx",
+      "moduleExportName": "StatBurstModule",
+      "definitionExportName": "STAT_BURST_DEFINITION"
+    }
+  ]
+}

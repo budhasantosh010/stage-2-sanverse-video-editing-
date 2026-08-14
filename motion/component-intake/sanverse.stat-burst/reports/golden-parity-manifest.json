@@ -1,0 +1,49 @@
+{
+  "componentId": "sanverse.stat-burst",
+  "approvedSourceHash": "12e2c7adf5a74c3340712e2c91fb973b2eb51c26692a6f594696bf18b6335ce0",
+  "checkpointCount": 7,
+  "minimumSsim": 0.961086,
+  "averageSsim": 0.987773,
+  "approvedSourceCheckpointReelHash": "b03d522bfc7cd28033aba72ab94f1e955b8b17d62f246f501985e18f0d7a374a",
+  "integratedCheckpointReelHash": "cda022b973502c33a5f82dc40ab3bca7cc84427b2eb9a180523c48d0e381a1d4",
+  "checkpointScores": [
+    {
+      "progress": 0,
+      "tick": 0,
+      "ssim": 1
+    },
+    {
+      "progress": 0.05,
+      "tick": 232560,
+      "ssim": 0.998542
+    },
+    {
+      "progress": 0.18,
+      "tick": 837216,
+      "ssim": 0.99653
+    },
+    {
+      "progress": 0.33,
+      "tick": 1534896,
+      "ssim": 0.995568
+    },
+    {
+      "progress": 0.58,
+      "tick": 2697696,
+      "ssim": 0.962686
+    },
+    {
+      "progress": 0.9,
+      "tick": 4186080,
+      "ssim": 0.961086
+    },
+    {
+      "progress": 1,
+      "tick": 4651200,
+      "ssim": 1
+    }
+  ],
+  "evidenceContactSheet": "motion/visual-baselines/ch1-ingest/08-stat-burst-temporal.png",
+  "engineeringParity": "passed",
+  "ownerPromotion": "pending-batch-authorization"
+}

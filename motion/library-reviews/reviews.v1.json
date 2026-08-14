@@ -2492,6 +2492,296 @@
       "fullPlaybackVerified": true,
       "playbackSpeed": 1,
       "canonicalDurationTicks": 4320000
+    },
+    {
+      "componentId": "sanverse.cta-pill",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 5,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Owner approved the CH1 source visual for YouTube use. Sanverse integration preserved the approved design through synchronized exact-tick source-vs-integrated parity inspection.",
+        "Real Edge canonical playback completed from tick 0 to end at 1× after registration. Seven exact-tick parity checkpoints also covered entrance, build/stagger, hold and exit without a remaining blocking visual mismatch."
+      ],
+      "reviewedAt": "2026-08-14T20:54:00.354Z",
+      "reviewer": "Sanverse CH1 ingest parity audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 2548800
+    },
+    {
+      "componentId": "sanverse.explainer-board",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 5,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Owner approved the CH1 source visual for YouTube use. Sanverse integration preserved the approved design through synchronized exact-tick source-vs-integrated parity inspection.",
+        "Real Edge canonical playback completed from tick 0 to end at 1× after registration. Seven exact-tick parity checkpoints also covered entrance, build/stagger, hold and exit without a remaining blocking visual mismatch."
+      ],
+      "reviewedAt": "2026-08-14T20:54:00.354Z",
+      "reviewer": "Sanverse CH1 ingest parity audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 6379200
+    },
+    {
+      "componentId": "sanverse.feature-matrix",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 5,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Owner approved the CH1 source visual for YouTube use. Sanverse integration preserved the approved design through synchronized exact-tick source-vs-integrated parity inspection.",
+        "Real Edge canonical playback completed from tick 0 to end at 1× after registration. Seven exact-tick parity checkpoints also covered entrance, build/stagger, hold and exit without a remaining blocking visual mismatch."
+      ],
+      "reviewedAt": "2026-08-14T20:54:00.354Z",
+      "reviewer": "Sanverse CH1 ingest parity audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 5328000
+    },
+    {
+      "componentId": "sanverse.floating-value-cloud",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 5,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Owner approved the CH1 source visual for YouTube use. Sanverse integration preserved the approved design through synchronized exact-tick source-vs-integrated parity inspection.",
+        "Real Edge canonical playback completed from tick 0 to end at 1× after registration. Seven exact-tick parity checkpoints also covered entrance, build/stagger, hold and exit without a remaining blocking visual mismatch."
+      ],
+      "reviewedAt": "2026-08-14T20:54:00.354Z",
+      "reviewer": "Sanverse CH1 ingest parity audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 2160000
+    },
+    {
+      "componentId": "sanverse.icon-rail",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 5,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Owner approved the CH1 source visual for YouTube use. Sanverse integration preserved the approved design through synchronized exact-tick source-vs-integrated parity inspection.",
+        "Real Edge canonical playback completed from tick 0 to end at 1× after registration. Seven exact-tick parity checkpoints also covered entrance, build/stagger, hold and exit without a remaining blocking visual mismatch."
+      ],
+      "reviewedAt": "2026-08-14T20:54:00.354Z",
+      "reviewer": "Sanverse CH1 ingest parity audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 1440000
+    },
+    {
+      "componentId": "sanverse.kinetic-phrase",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 5,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Owner approved the CH1 source visual for YouTube use. Sanverse integration preserved the approved design through synchronized exact-tick source-vs-integrated parity inspection.",
+        "Real Edge canonical playback completed from tick 0 to end at 1× after registration. Seven exact-tick parity checkpoints also covered entrance, build/stagger, hold and exit without a remaining blocking visual mismatch."
+      ],
+      "reviewedAt": "2026-08-14T20:54:00.354Z",
+      "reviewer": "Sanverse CH1 ingest parity audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 2160000
+    },
+    {
+      "componentId": "sanverse.media-cutaway",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 5,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Owner approved the CH1 source visual for YouTube use. Sanverse integration preserved the approved design through synchronized exact-tick source-vs-integrated parity inspection.",
+        "Real Edge canonical playback completed from tick 0 to end at 1× after registration. Seven exact-tick parity checkpoints also covered entrance, build/stagger, hold and exit without a remaining blocking visual mismatch."
+      ],
+      "reviewedAt": "2026-08-14T20:54:00.354Z",
+      "reviewer": "Sanverse CH1 ingest parity audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 3556800
+    },
+    {
+      "componentId": "sanverse.milestone-stage",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 5,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Owner approved the CH1 source visual for YouTube use. Sanverse integration preserved the approved design through synchronized exact-tick source-vs-integrated parity inspection.",
+        "Real Edge canonical playback completed from tick 0 to end at 1× after registration. Seven exact-tick parity checkpoints also covered entrance, build/stagger, hold and exit without a remaining blocking visual mismatch."
+      ],
+      "reviewedAt": "2026-08-14T20:54:00.354Z",
+      "reviewer": "Sanverse CH1 ingest parity audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 4752000
+    },
+    {
+      "componentId": "sanverse.progressive-choice-stack",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 5,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Owner approved the CH1 source visual for YouTube use. Sanverse integration preserved the approved design through synchronized exact-tick source-vs-integrated parity inspection.",
+        "Real Edge canonical playback completed from tick 0 to end at 1× after registration. Seven exact-tick parity checkpoints also covered entrance, build/stagger, hold and exit without a remaining blocking visual mismatch."
+      ],
+      "reviewedAt": "2026-08-14T20:54:00.354Z",
+      "reviewer": "Sanverse CH1 ingest parity audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 3888000
+    },
+    {
+      "componentId": "sanverse.stat-burst",
+      "fixtureId": "default",
+      "status": "passed",
+      "qualityTier": "A",
+      "scores": {
+        "entrance": 4,
+        "pacing": 4,
+        "easing": 4,
+        "rhythm": 4,
+        "readability": 5,
+        "hold": 4,
+        "payoff": 4,
+        "exit": 4,
+        "competingMotion": 4,
+        "footageCompatibility": 5,
+        "professionalFeel": 5,
+        "overall": 5
+      },
+      "notes": [
+        "Owner approved the CH1 source visual for YouTube use. Sanverse integration preserved the approved design through synchronized exact-tick source-vs-integrated parity inspection.",
+        "Real Edge canonical playback completed from tick 0 to end at 1× after registration. Seven exact-tick parity checkpoints also covered entrance, build/stagger, hold and exit without a remaining blocking visual mismatch."
+      ],
+      "reviewedAt": "2026-08-14T20:54:00.354Z",
+      "reviewer": "Sanverse CH1 ingest parity audit",
+      "fullPlaybackVerified": true,
+      "playbackSpeed": 1,
+      "canonicalDurationTicks": 4651200
     }
   ]
 }

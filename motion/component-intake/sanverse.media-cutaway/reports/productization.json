@@ -1,0 +1,23 @@
+{
+  "componentId": "sanverse.media-cutaway",
+  "componentVersion": 1,
+  "status": "ready",
+  "determinism": "passed",
+  "directSeek": "passed",
+  "semanticMapping": "passed",
+  "c3": "passed",
+  "c4": "passed",
+  "c5": "passed",
+  "c6": "not-yet-available",
+  "aiEditability": "passed",
+  "ratios": {
+    "16:9": "passed",
+    "9:16": "passed",
+    "1:1": "passed",
+    "4:5": "passed"
+  },
+  "semanticNodeCount": 7,
+  "exposureCount": 11,
+  "editableCurveTrackCount": 8,
+  "blockingReasons": []
+}

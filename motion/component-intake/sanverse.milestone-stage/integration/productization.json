@@ -1,0 +1,110 @@
+{
+  "componentId": "sanverse.milestone-stage",
+  "componentVersion": 1,
+  "moduleFile": "packages/motion-library/src/ingested/ch1-approved-components.tsx",
+  "moduleImportPath": "./ch1-approved-components.tsx",
+  "moduleExportName": "MilestoneStageModule",
+  "definitionExportName": "MILESTONE_STAGE_DEFINITION",
+  "supportedRatios": [
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:5"
+  ],
+  "semanticMapping": [
+    {
+      "sourcePart": "milestone.root",
+      "nodeIds": [
+        "milestone.root"
+      ]
+    },
+    {
+      "sourcePart": "milestone.year",
+      "nodeIds": [
+        "milestone.year"
+      ]
+    },
+    {
+      "sourcePart": "milestone.mark",
+      "nodeIds": [
+        "milestone.mark"
+      ]
+    },
+    {
+      "sourcePart": "milestone.label",
+      "nodeIds": [
+        "milestone.label"
+      ]
+    },
+    {
+      "sourcePart": "milestone.related:*",
+      "nodeIds": [
+        "milestone.related:0",
+        "milestone.related:1"
+      ]
+    },
+    {
+      "sourcePart": "component.background",
+      "nodeIds": [
+        "component.background"
+      ]
+    }
+  ],
+  "aiEditIntents": [
+    {
+      "command": "Edit Year / version.",
+      "exposureId": "milestone.year-text",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Hero mark.",
+      "exposureId": "milestone.mark-text",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Label.",
+      "exposureId": "milestone.label-text",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Related marks.",
+      "exposureId": "milestone.related-text",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Placement.",
+      "exposureId": "milestone.placement",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Accent.",
+      "exposureId": "milestone.accent",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Opacity.",
+      "exposureId": "milestone.opacity",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position X.",
+      "exposureId": "milestone.position-x",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position Y.",
+      "exposureId": "milestone.position-y",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Scale.",
+      "exposureId": "milestone.scale",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Semantic parts.",
+      "exposureId": "milestone.parts",
+      "operation": "retime-keyframes"
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "componentId": "sanverse.cta-pill",
+  "componentVersion": 1,
+  "moduleFile": "packages/motion-library/src/ingested/ch1-approved-components.tsx",
+  "moduleImportPath": "./ch1-approved-components.tsx",
+  "moduleExportName": "CtaPillModule",
+  "definitionExportName": "CTA_PILL_DEFINITION",
+  "supportedRatios": [
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:5"
+  ],
+  "semanticMapping": [
+    {
+      "sourcePart": "cta.root",
+      "nodeIds": [
+        "cta.root"
+      ]
+    },
+    {
+      "sourcePart": "cta.surface",
+      "nodeIds": [
+        "cta.surface"
+      ]
+    },
+    {
+      "sourcePart": "cta.label",
+      "nodeIds": [
+        "cta.label"
+      ]
+    },
+    {
+      "sourcePart": "cta.subtext",
+      "nodeIds": [
+        "cta.subtext"
+      ]
+    },
+    {
+      "sourcePart": "component.background",
+      "nodeIds": [
+        "component.background"
+      ]
+    }
+  ],
+  "aiEditIntents": [
+    {
+      "command": "Edit CTA label.",
+      "exposureId": "cta.label-text",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Subtext.",
+      "exposureId": "cta.subtext-text",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Placement.",
+      "exposureId": "cta.placement",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Accent.",
+      "exposureId": "cta.accent",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Opacity.",
+      "exposureId": "cta.opacity",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position X.",
+      "exposureId": "cta.position-x",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position Y.",
+      "exposureId": "cta.position-y",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Scale.",
+      "exposureId": "cta.scale",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Surface color.",
+      "exposureId": "cta.surface",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Semantic parts.",
+      "exposureId": "cta.parts",
+      "operation": "retime-keyframes"
+    }
+  ]
+}

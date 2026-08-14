@@ -1,0 +1,104 @@
+{
+  "componentId": "sanverse.progressive-choice-stack",
+  "componentVersion": 1,
+  "moduleFile": "packages/motion-library/src/ingested/ch1-approved-components.tsx",
+  "moduleImportPath": "./ch1-approved-components.tsx",
+  "moduleExportName": "ProgressiveChoiceStackModule",
+  "definitionExportName": "PROGRESSIVE_CHOICE_STACK_DEFINITION",
+  "supportedRatios": [
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:5"
+  ],
+  "semanticMapping": [
+    {
+      "sourcePart": "choices.root",
+      "nodeIds": [
+        "choices.root"
+      ]
+    },
+    {
+      "sourcePart": "choices.item:*",
+      "nodeIds": [
+        "choices.item:0",
+        "choices.item:1",
+        "choices.item:2"
+      ]
+    },
+    {
+      "sourcePart": "choices.label:*",
+      "nodeIds": [
+        "choices.label:0",
+        "choices.label:1",
+        "choices.label:2"
+      ]
+    },
+    {
+      "sourcePart": "choices.icon:*",
+      "nodeIds": [
+        "choices.icon:0",
+        "choices.icon:1",
+        "choices.icon:2"
+      ]
+    },
+    {
+      "sourcePart": "component.background",
+      "nodeIds": [
+        "component.background"
+      ]
+    }
+  ],
+  "aiEditIntents": [
+    {
+      "command": "Edit Items.",
+      "exposureId": "choices.items",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Trailing icons.",
+      "exposureId": "choices.icons",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Layout.",
+      "exposureId": "choices.direction",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Placement.",
+      "exposureId": "choices.placement",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Accent.",
+      "exposureId": "choices.accent",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Opacity.",
+      "exposureId": "choices.opacity",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position X.",
+      "exposureId": "choices.position-x",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position Y.",
+      "exposureId": "choices.position-y",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Scale.",
+      "exposureId": "choices.scale",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Semantic parts.",
+      "exposureId": "choices.parts",
+      "operation": "retime-keyframes"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "componentId": "sanverse.kinetic-phrase",
+  "approvedSourceHash": "264cab44f47019327ce89c7d68e8a31aede6022340568d459db5d69232523c72",
+  "checkpointCount": 7,
+  "minimumSsim": 0.968589,
+  "averageSsim": 0.984298,
+  "approvedSourceCheckpointReelHash": "e0068f735ef76cc8b9534d936042997bf67e65edcb244d5dabc0f49d8742b40c",
+  "integratedCheckpointReelHash": "d924e392f0dfcb8ee48b0a48ee991c352f299662303db4e4f0748b02f09230e3",
+  "checkpointScores": [
+    {
+      "progress": 0,
+      "tick": 0,
+      "ssim": 1
+    },
+    {
+      "progress": 0.05,
+      "tick": 108000,
+      "ssim": 0.991664
+    },
+    {
+      "progress": 0.18,
+      "tick": 388800,
+      "ssim": 0.986606
+    },
+    {
+      "progress": 0.33,
+      "tick": 712800,
+      "ssim": 0.974329
+    },
+    {
+      "progress": 0.58,
+      "tick": 1252800,
+      "ssim": 0.968589
+    },
+    {
+      "progress": 0.9,
+      "tick": 1944000,
+      "ssim": 0.968898
+    },
+    {
+      "progress": 1,
+      "tick": 2160000,
+      "ssim": 1
+    }
+  ],
+  "evidenceContactSheet": "motion/visual-baselines/ch1-ingest/03-kinetic-phrase-temporal.png",
+  "engineeringParity": "passed",
+  "ownerPromotion": "pending-batch-authorization"
+}

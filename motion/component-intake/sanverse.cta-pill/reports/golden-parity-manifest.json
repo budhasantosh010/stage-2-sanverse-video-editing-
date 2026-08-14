@@ -1,0 +1,49 @@
+{
+  "componentId": "sanverse.cta-pill",
+  "approvedSourceHash": "cc209d131f6d71434a0a7aaeb2242748e81f27bfd1f125cfa4594a0f4f93a68e",
+  "checkpointCount": 7,
+  "minimumSsim": 0.988042,
+  "averageSsim": 0.992474,
+  "approvedSourceCheckpointReelHash": "8ab9994444a0d96296338e6d9a8c9b6b01209d226b9c034d51acf8b73c21f081",
+  "integratedCheckpointReelHash": "b20a0c2743883f2aff52efebf4f64099cf8e5989c86e7f45afbc660aa0b4b4f6",
+  "checkpointScores": [
+    {
+      "progress": 0,
+      "tick": 0,
+      "ssim": 1
+    },
+    {
+      "progress": 0.05,
+      "tick": 127440,
+      "ssim": 0.990177
+    },
+    {
+      "progress": 0.18,
+      "tick": 458784,
+      "ssim": 0.988042
+    },
+    {
+      "progress": 0.33,
+      "tick": 841104,
+      "ssim": 0.989754
+    },
+    {
+      "progress": 0.58,
+      "tick": 1478304,
+      "ssim": 0.990092
+    },
+    {
+      "progress": 0.9,
+      "tick": 2293920,
+      "ssim": 0.989252
+    },
+    {
+      "progress": 1,
+      "tick": 2548800,
+      "ssim": 1
+    }
+  ],
+  "evidenceContactSheet": "motion/visual-baselines/ch1-ingest/10-cta-pill-temporal.png",
+  "engineeringParity": "passed",
+  "ownerPromotion": "pending-batch-authorization"
+}

@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CH1 Reusable Motion Components — Visual Review</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">SANVERSE · COMPONENT CH1</p>
+        <h1>Reusable Motion Components</h1>
+        <p class="subhead">Reference principles on the left. Original reusable template on the right. No server required.</p>
+      </div>
+      <div class="status-stack">
+        <span class="status-chip">Local HTML</span>
+        <span class="status-chip">Exact-tick preview</span>
+        <span class="status-chip">Transparent-ready</span>
+      </div>
+    </header>
+
+    <section class="workspace">
+      <aside class="catalog-panel panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">VIDEO ORDER</p>
+            <h2>Component catalog</h2>
+          </div>
+          <span id="componentCount" class="count-badge"></span>
+        </div>
+        <nav id="componentList" class="component-list" aria-label="Reusable component catalog"></nav>
+      </aside>
+
+      <section class="review-panel panel">
+        <div class="review-heading">
+          <div>
+            <p id="componentIndexLabel" class="eyebrow"></p>
+            <h2 id="componentName"></h2>
+            <p id="componentPurpose" class="purpose"></p>
+          </div>
+          <div class="mode-tabs" role="tablist" aria-label="Review mode">
+            <button class="mode-tab is-active" data-view="compare">Compare</button>
+            <button class="mode-tab" data-view="component">Component only</button>
+          </div>
+        </div>
+
+        <div id="compareGrid" class="compare-grid">
+          <article class="stage-card">
+            <div class="stage-head">
+              <div>
+                <span class="stage-kicker">REFERENCE</span>
+                <strong>Original source</strong>
+              </div>
+              <span id="referenceRange" class="timecode"></span>
+            </div>
+            <div class="reference-stage">
+              <video id="referenceVideo" playsinline preload="auto" muted>
+                <source src="YTDown.com_Shorts_Open-Source-VS-Open-Weight-What-is-the-D_Media_pdlkU3rDxq0_001_1080p.mp4" type="video/mp4" />
+              </video>
+              <img id="referenceFrame" class="reference-frame" src="reference_analysis/frames_all/frame_0002.jpg" alt="Reference checkpoint frame" />
+              <div class="stage-note">Used only as visual reference. The right side contains no copied creator footage or branded artwork.</div>
+            </div>
+          </article>
+
+          <article class="stage-card component-stage-card">
+            <div class="stage-head">
+              <div>
+                <span class="stage-kicker">SANVERSE PROTOTYPE</span>
+                <strong>Reusable component</strong>
+              </div>
+              <span id="ratioReadout" class="timecode"></span>
+            </div>
+            <div class="component-viewport-shell">
+              <div id="componentViewport" class="component-viewport checkerboard" data-ratio="9:16">
+                <div id="previewBackdrop" class="preview-backdrop"></div>
+                <div id="componentRoot" class="component-root" aria-live="polite"></div>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="transport">
+          <button id="playButton" class="primary-button" type="button">▶ Play 1×</button>
+          <button id="restartButton" class="secondary-button" type="button">↺ Restart</button>
+          <label class="scrubber-wrap">
+            <span>Exact tick</span>
+            <input id="scrubber" type="range" min="0" max="1000" value="0" step="1" />
+          </label>
+          <div class="transport-readout">
+            <strong id="progressReadout">0.000</strong>
+            <span id="tickReadout">0 ticks</span>
+          </div>
+        </div>
+
+        <section class="inspection-strip">
+          <div><span>Entrance</span><strong id="entranceReadout">—</strong></div>
+          <div><span>Hold / payoff</span><strong id="holdReadout">—</strong></div>
+          <div><span>Exit</span><strong id="exitReadout">—</strong></div>
+          <div><span>Reference reuse</span><strong id="reuseReadout">—</strong></div>
+        </section>
+      </section>
+
+      <aside class="controls-panel panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">CUSTOMIZE</p>
+            <h2>Template controls</h2>
+          </div>
+          <button id="resetButton" class="tiny-button" type="button">Reset</button>
+        </div>
+
+        <div class="editor-mode-switch" role="tablist" aria-label="Customization depth">
+          <button id="templateModeButton" class="editor-mode-button is-active" type="button" data-editor-mode="template">1 · Template</button>
+          <button id="deepModeButton" class="editor-mode-button" type="button" data-editor-mode="deep">2 · Deep edit</button>
+        </div>
+
+        <div id="templateControls">
+        <section class="control-section">
+          <h3>Canvas</h3>
+          <label>Preset ratio
+            <select id="ratioSelect">
+              <option value="9:16">9:16 · Shorts</option>
+              <option value="16:9">16:9 · Horizontal</option>
+              <option value="1:1">1:1 · Square</option>
+              <option value="4:5">4:5 · Social portrait</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <div class="split-fields">
+            <label>Width <input id="canvasWidth" type="number" min="160" max="7680" value="1080" /></label>
+            <label>Height <input id="canvasHeight" type="number" min="160" max="7680" value="1920" /></label>
+          </div>
+          <label>Preview background
+            <select id="backgroundMode">
+              <option value="transparent">Transparent checkerboard</option>
+              <option value="white">White</option>
+              <option value="black">Black</option>
+              <option value="soft">Soft neutral footage test</option>
+            </select>
+          </label>
+          <div class="split-fields">
+            <label>Component BG <input id="componentBackgroundColor" type="color" value="#111111" /></label>
+            <label>BG opacity <input id="componentBackgroundOpacity" type="range" min="0" max="1" step="0.01" value="0" /></label>
+          </div>
+        </section>
+
+        <section class="control-section">
+          <h3>Content</h3>
+          <div id="contentControls" class="dynamic-controls"></div>
+        </section>
+
+        <section class="control-section">
+          <h3>Placement</h3>
+          <label>Position preset
+            <select id="positionPreset">
+              <option value="center">Center</option>
+              <option value="top-safe">Top safe</option>
+              <option value="bottom-safe">Bottom safe</option>
+              <option value="left-safe">Left safe</option>
+              <option value="right-safe">Right safe</option>
+            </select>
+          </label>
+          <div class="split-fields">
+            <label>X offset <input id="offsetX" type="range" min="-360" max="360" step="1" value="0" /></label>
+            <label>Y offset <input id="offsetY" type="range" min="-360" max="360" step="1" value="0" /></label>
+          </div>
+          <label>Overall scale <input id="scale" type="range" min="0.35" max="1.8" step="0.01" value="1" /></label>
+          <label>Rotation <input id="rotation" type="range" min="-45" max="45" step="0.5" value="0" /></label>
+          <label>Overall opacity <input id="opacity" type="range" min="0" max="1" step="0.01" value="1" /></label>
+        </section>
+
+        <section class="control-section">
+          <h3>Typography & surface</h3>
+          <label>Font family <input id="fontFamily" type="text" value="Arial, Helvetica, sans-serif" /></label>
+          <div class="split-fields">
+            <label>Type scale <input id="typeScale" type="range" min="0.55" max="1.6" step="0.01" value="1" /></label>
+            <label>Font weight <input id="fontWeight" type="range" min="300" max="950" step="50" value="900" /></label>
+          </div>
+          <div class="split-fields">
+            <label>Text <input id="textColor" type="color" value="#111111" /></label>
+            <label>Accent <input id="accentColor" type="color" value="#275EFE" /></label>
+          </div>
+          <div class="split-fields">
+            <label>Surface <input id="surfaceColor" type="color" value="#FFFFFF" /></label>
+            <label>Highlight <input id="highlightColor" type="color" value="#F7F7C6" /></label>
+          </div>
+          <div class="split-fields">
+            <label>Border <input id="borderColor" type="color" value="#D8DCE5" /></label>
+            <label>Border width <input id="borderWidth" type="range" min="0" max="12" step="0.5" value="0" /></label>
+          </div>
+          <label>Surface opacity <input id="surfaceOpacity" type="range" min="0" max="1" step="0.01" value="0.94" /></label>
+          <label>Roundness <input id="radius" type="range" min="0" max="96" step="1" value="24" /></label>
+          <label>Padding <input id="padding" type="range" min="4" max="72" step="1" value="20" /></label>
+          <label>Internal spacing <input id="spacing" type="range" min="0" max="56" step="1" value="12" /></label>
+          <label>Shadow strength <input id="shadowStrength" type="range" min="0" max="1.5" step="0.01" value="0.72" /></label>
+          <label>Backdrop blur <input id="blur" type="range" min="0" max="40" step="1" value="14" /></label>
+        </section>
+
+        <section class="control-section">
+          <h3>Motion</h3>
+          <label>Entrance
+            <select id="entranceStyle">
+              <option value="rise-soft">Rise soft</option>
+              <option value="pop">Soft pop</option>
+              <option value="slide">Directional slide</option>
+              <option value="fade">Fade only</option>
+            </select>
+          </label>
+          <label>Exit
+            <select id="exitStyle">
+              <option value="fade-drop">Fade + drift</option>
+              <option value="scale">Scale down</option>
+              <option value="slide">Slide away</option>
+              <option value="none">Cut-safe hold</option>
+            </select>
+          </label>
+          <label>Motion intensity <input id="motionIntensity" type="range" min="0" max="1" step="0.01" value="0.72" /></label>
+          <label>Stagger <input id="stagger" type="range" min="0" max="1" step="0.01" value="0.55" /></label>
+          <label>Duration <input id="duration" type="range" min="1" max="8" step="0.05" value="3" /></label>
+          <label class="checkbox-row"><input id="reducedMotion" type="checkbox" /> Reduced motion</label>
+        </section>
+
+        <section class="control-section contract-note">
+          <h3>Deep editability</h3>
+          <p>The controls above are the fast template layer. The approved default stays intact. Switch to <strong>Deep edit</strong> to change individual semantic nodes without source-code editing.</p>
+        </section>
+        </div>
+
+        <div id="deepEditor" class="deep-editor" hidden>
+          <section class="control-section deep-intro">
+            <h3>Level 4 · Compositor</h3>
+            <p>Select any rendered semantic node, then override that node independently. Deep edits sit on top of the approved template, so resetting a node returns to the approved design.</p>
+            <label>Override scope
+              <select id="deepScope">
+                <option value="global">All resolutions</option>
+                <option value="ratio">Current ratio only</option>
+                <option value="shape">Current canvas shape</option>
+              </select>
+            </label>
+          </section>
+
+          <section class="control-section">
+            <div class="deep-section-head"><h3>Layers / nodes</h3><span id="deepNodeCount" class="mini-badge">0</span></div>
+            <div id="deepNodeList" class="deep-node-list" aria-label="Semantic layers"></div>
+            <div class="selected-node-card"><span>Selected</span><strong id="deepSelectedNode">—</strong></div>
+            <div class="deep-action-row">
+              <button id="resetDeepNode" class="tiny-button" type="button">Reset node</button>
+              <button id="resetAllDeep" class="tiny-button" type="button">Reset all deep edits</button>
+            </div>
+          </section>
+
+          <section class="control-section">
+            <h3>Content / visibility</h3>
+            <label>Text override <textarea id="deepText" placeholder="Leave blank to keep template text"></textarea></label>
+            <div class="split-fields">
+              <label>Visible <select id="deepVisible"><option value="inherit">Template</option><option value="visible">Visible</option><option value="hidden">Hidden</option></select></label>
+              <label>Z order <input id="deepZ" type="number" step="1" placeholder="template" /></label>
+            </div>
+            <label>Blend mode <select id="deepBlend"><option value="">Template</option><option>normal</option><option>multiply</option><option>screen</option><option>overlay</option><option>darken</option><option>lighten</option><option>difference</option><option>color-dodge</option><option>color-burn</option></select></label>
+          </section>
+
+          <section class="control-section">
+            <h3>Transform · normalized</h3>
+            <p class="micro-note">X/Y use canvas-relative units, so the same edit survives resolution changes.</p>
+            <div class="split-fields"><label>X (% canvas) <input id="deepX" type="number" step="0.1" placeholder="0" /></label><label>Y (% canvas) <input id="deepY" type="number" step="0.1" placeholder="0" /></label></div>
+            <div class="split-fields"><label>Scale X <input id="deepScaleX" type="number" step="0.01" placeholder="1" /></label><label>Scale Y <input id="deepScaleY" type="number" step="0.01" placeholder="1" /></label></div>
+            <div class="split-fields"><label>Rotation ° <input id="deepRotation" type="number" step="0.1" placeholder="0" /></label><label>Opacity <input id="deepOpacity" type="number" min="0" max="1" step="0.01" placeholder="1" /></label></div>
+            <div class="split-fields"><label>Skew X ° <input id="deepSkewX" type="number" step="0.1" placeholder="0" /></label><label>Skew Y ° <input id="deepSkewY" type="number" step="0.1" placeholder="0" /></label></div>
+            <label>Transform origin <input id="deepTransformOrigin" type="text" placeholder="center center" /></label>
+          </section>
+
+          <section class="control-section">
+            <h3>Geometry / spacing</h3>
+            <div class="split-fields"><label>Width (% canvas) <input id="deepWidth" type="number" min="0" step="0.1" placeholder="template" /></label><label>Height (% canvas) <input id="deepHeight" type="number" min="0" step="0.1" placeholder="template" /></label></div>
+            <div class="split-fields"><label>Padding <input id="deepPadding" type="text" placeholder="template / 12px 20px" /></label><label>Gap <input id="deepGap" type="text" placeholder="template / 12px" /></label></div>
+            <label>Overflow <select id="deepOverflow"><option value="">Template</option><option>visible</option><option>hidden</option><option>clip</option><option>auto</option></select></label>
+          </section>
+
+          <section class="control-section">
+            <h3>Typography</h3>
+            <label>Font family <input id="deepFontFamily" type="text" placeholder="template" /></label>
+            <div class="split-fields"><label>Font size <input id="deepFontSize" type="text" placeholder="template / 48px" /></label><label>Font weight <input id="deepFontWeight" type="number" min="100" max="1000" step="50" placeholder="template" /></label></div>
+            <div class="split-fields"><label>Line height <input id="deepLineHeight" type="text" placeholder="template / 1.1" /></label><label>Letter spacing <input id="deepLetterSpacing" type="text" placeholder="template / -0.03em" /></label></div>
+            <label>Text align <select id="deepTextAlign"><option value="">Template</option><option>left</option><option>center</option><option>right</option><option>justify</option></select></label>
+          </section>
+
+          <section class="control-section">
+            <h3>Surface / effects</h3>
+            <label>Text / foreground <input id="deepColor" type="text" placeholder="template / #111 / rgba(...)" /></label>
+            <label>Background <input id="deepBackground" type="text" placeholder="template / #fff / linear-gradient(...)" /></label>
+            <div class="split-fields"><label>Border color <input id="deepBorderColor" type="text" placeholder="template" /></label><label>Border width <input id="deepBorderWidth" type="text" placeholder="template / 2px" /></label></div>
+            <label>Border radius <input id="deepBorderRadius" type="text" placeholder="template / 24px / 50%" /></label>
+            <label>Box shadow <input id="deepBoxShadow" type="text" placeholder="template / 0 12px 40px rgba(...)" /></label>
+            <label>Filter <input id="deepFilter" type="text" placeholder="template / blur(4px) saturate(1.2)" /></label>
+            <label>Backdrop filter <input id="deepBackdropFilter" type="text" placeholder="template / blur(18px)" /></label>
+            <label>Clip path / mask shape <input id="deepClipPath" type="text" placeholder="template / circle(45%) / polygon(...)" /></label>
+          </section>
+
+          <section class="control-section">
+            <h3>Independent node motion</h3>
+            <div class="split-fields"><label>Enter start <input id="deepEnterStart" type="number" min="0" max="1" step="0.01" placeholder="0" /></label><label>Enter end <input id="deepEnterEnd" type="number" min="0" max="1" step="0.01" placeholder="0.18" /></label></div>
+            <div class="split-fields"><label>Enter X (% canvas) <input id="deepEnterX" type="number" step="0.1" placeholder="0" /></label><label>Enter Y (% canvas) <input id="deepEnterY" type="number" step="0.1" placeholder="0" /></label></div>
+            <label>Enter scale <input id="deepEnterScale" type="number" step="0.01" placeholder="1" /></label>
+            <div class="split-fields"><label>Exit start <input id="deepExitStart" type="number" min="0" max="1" step="0.01" placeholder="0.84" /></label><label>Exit end <input id="deepExitEnd" type="number" min="0" max="1" step="0.01" placeholder="1" /></label></div>
+            <div class="split-fields"><label>Exit X (% canvas) <input id="deepExitX" type="number" step="0.1" placeholder="0" /></label><label>Exit Y (% canvas) <input id="deepExitY" type="number" step="0.1" placeholder="0" /></label></div>
+            <label>Exit scale <input id="deepExitScale" type="number" step="0.01" placeholder="1" /></label>
+            <label>Easing <select id="deepEase"><option value="">Template</option><option value="linear">Linear</option><option value="ease-out-cubic">Ease out cubic</option><option value="ease-in-cubic">Ease in cubic</option><option value="ease-in-out-cubic">Ease in/out cubic</option><option value="back">Soft back</option></select></label>
+          </section>
+
+          <section class="control-section">
+            <h3>Expert escape hatch</h3>
+            <label>Raw CSS for selected node <textarea id="deepRawCss" class="code-textarea" placeholder="aspect-ratio: 1; border-style: dashed; transform-origin: left center;"></textarea></label>
+            <label>Keyframes JSON <textarea id="deepKeyframes" class="code-textarea tall" placeholder='[{"at":0,"x":-8,"opacity":0},{"at":0.25,"x":0,"opacity":1,"ease":"ease-out-cubic"}]'></textarea></label>
+            <p class="micro-note">Keyframe fields: at, x, y, scaleX, scaleY, rotation, opacity, blur, ease. Times are normalized 0→1 and are direct-seek deterministic.</p>
+          </section>
+
+          <section class="control-section">
+            <h3>Variant file</h3>
+            <div class="deep-action-row wrap">
+              <button id="copyVariant" class="tiny-button" type="button">Copy JSON</button>
+              <button id="exportVariant" class="tiny-button" type="button">Export JSON</button>
+              <button id="importVariantButton" class="tiny-button" type="button">Import JSON</button>
+              <input id="importVariantFile" type="file" accept="application/json,.json" hidden />
+            </div>
+            <p id="variantStatus" class="micro-note">Deep edits auto-save locally in this browser and can also be exported as a portable variant.</p>
+          </section>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="footer-note">
+      <strong>How to view:</strong> double-click <code>index.html</code>. Nothing is hosted and no server is required.
+    </footer>
+  </main>
+
+  <script src="components.js"></script>
+  <script src="review.js"></script>
+  <script src="deep-editor.js"></script>
+</body>
+</html>

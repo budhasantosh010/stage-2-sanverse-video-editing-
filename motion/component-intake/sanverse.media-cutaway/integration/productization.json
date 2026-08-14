@@ -1,0 +1,103 @@
+{
+  "componentId": "sanverse.media-cutaway",
+  "componentVersion": 1,
+  "moduleFile": "packages/motion-library/src/ingested/ch1-approved-components.tsx",
+  "moduleImportPath": "./ch1-approved-components.tsx",
+  "moduleExportName": "MediaCutawayModule",
+  "definitionExportName": "MEDIA_CUTAWAY_DEFINITION",
+  "supportedRatios": [
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:5"
+  ],
+  "semanticMapping": [
+    {
+      "sourcePart": "media.root",
+      "nodeIds": [
+        "media.root"
+      ]
+    },
+    {
+      "sourcePart": "media.frame",
+      "nodeIds": [
+        "media.frame"
+      ]
+    },
+    {
+      "sourcePart": "media.asset",
+      "nodeIds": [
+        "media.asset"
+      ]
+    },
+    {
+      "sourcePart": "media.caption",
+      "nodeIds": [
+        "media.caption"
+      ]
+    },
+    {
+      "sourcePart": "component.background",
+      "nodeIds": [
+        "component.background"
+      ]
+    }
+  ],
+  "aiEditIntents": [
+    {
+      "command": "Edit Caption.",
+      "exposureId": "media.caption-text",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Media URL.",
+      "exposureId": "media.asset-url",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Fallback label.",
+      "exposureId": "media.placeholder",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Placement.",
+      "exposureId": "media.placement",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Accent.",
+      "exposureId": "media.accent",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Opacity.",
+      "exposureId": "media.opacity",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position X.",
+      "exposureId": "media.position-x",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position Y.",
+      "exposureId": "media.position-y",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Scale.",
+      "exposureId": "media.scale",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Surface color.",
+      "exposureId": "media.surface",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Semantic parts.",
+      "exposureId": "media.parts",
+      "operation": "retime-keyframes"
+    }
+  ]
+}

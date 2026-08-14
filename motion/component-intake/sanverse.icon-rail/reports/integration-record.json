@@ -13,7 +13,7 @@
   "canonicalVideoHash": "7a79482b5c3b07299cf2f5f7c755553c55ab2273fb4f30416c2c3017e955b762",
   "integrationStrategy": "foreign-adapter",
   "canonicalGraphId": "sanverse.icon-rail",
-  "visualParityStatus": "pending",
+  "visualParityStatus": "passed",
   "productizationStatus": "ready",
   "determinismStatus": "passed",
   "directSeekStatus": "passed",
@@ -23,8 +23,6 @@
   "c5Status": "passed",
   "c6Status": "not-yet-available",
   "aiEditabilityStatus": "passed",
-  "libraryStatus": "not-registered",
-  "blockingReasons": [
-    "OWNER_INTEGRATED_PARITY_APPROVAL_REQUIRED"
-  ]
+  "libraryStatus": "registered",
+  "blockingReasons": []
 }

@@ -1,0 +1,113 @@
+{
+  "componentId": "sanverse.explainer-board",
+  "componentVersion": 1,
+  "moduleFile": "packages/motion-library/src/ingested/ch1-approved-components.tsx",
+  "moduleImportPath": "./ch1-approved-components.tsx",
+  "moduleExportName": "ExplainerBoardModule",
+  "definitionExportName": "EXPLAINER_BOARD_DEFINITION",
+  "supportedRatios": [
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:5"
+  ],
+  "semanticMapping": [
+    {
+      "sourcePart": "board.root",
+      "nodeIds": [
+        "board.root"
+      ]
+    },
+    {
+      "sourcePart": "board.title",
+      "nodeIds": [
+        "board.title"
+      ]
+    },
+    {
+      "sourcePart": "board.window",
+      "nodeIds": [
+        "board.window"
+      ]
+    },
+    {
+      "sourcePart": "board.content",
+      "nodeIds": [
+        "board.content"
+      ]
+    },
+    {
+      "sourcePart": "board.obscure",
+      "nodeIds": []
+    },
+    {
+      "sourcePart": "board.badge",
+      "nodeIds": [
+        "board.badge"
+      ]
+    },
+    {
+      "sourcePart": "component.background",
+      "nodeIds": [
+        "component.background"
+      ]
+    }
+  ],
+  "aiEditIntents": [
+    {
+      "command": "Edit Title.",
+      "exposureId": "board.title-text",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Content.",
+      "exposureId": "board.code",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Mode.",
+      "exposureId": "board.mode",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Placement.",
+      "exposureId": "board.placement",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Accent.",
+      "exposureId": "board.accent",
+      "operation": "set-component-property"
+    },
+    {
+      "command": "Edit Opacity.",
+      "exposureId": "board.opacity",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position X.",
+      "exposureId": "board.position-x",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Position Y.",
+      "exposureId": "board.position-y",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Scale.",
+      "exposureId": "board.scale",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Surface color.",
+      "exposureId": "board.surface",
+      "operation": "set-node-property"
+    },
+    {
+      "command": "Edit Semantic parts.",
+      "exposureId": "board.parts",
+      "operation": "retime-keyframes"
+    }
+  ]
+}

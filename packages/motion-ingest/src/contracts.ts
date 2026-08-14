@@ -146,7 +146,7 @@ export interface ComponentParityRecordV1 {
   readonly checkpointCount: number
   readonly temporalEventsVerified: boolean
   readonly status: SanverseGateStatusV1
-  readonly reviewer: 'owner' | 'engineering-evidence'
+  readonly reviewer: 'owner' | 'engineering-evidence' | 'owner-batch-authorized-engineering-evidence'
   readonly notes: readonly string[]
 }
 

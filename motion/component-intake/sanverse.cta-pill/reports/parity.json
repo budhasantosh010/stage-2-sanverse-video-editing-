@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "sanverse.component-parity/v1",
+  "componentId": "sanverse.cta-pill",
+  "componentVersion": 1,
+  "approvedSourceHash": "cc209d131f6d71434a0a7aaeb2242748e81f27bfd1f125cfa4594a0f4f93a68e",
+  "canonicalVideoHash": "8ab9994444a0d96296338e6d9a8c9b6b01209d226b9c034d51acf8b73c21f081",
+  "integratedVideoHash": "b20a0c2743883f2aff52efebf4f64099cf8e5989c86e7f45afbc660aa0b4b4f6",
+  "checkpointCount": 7,
+  "temporalEventsVerified": true,
+  "status": "passed",
+  "reviewer": "owner-batch-authorized-engineering-evidence",
+  "notes": [
+    "Seven exact-tick 9:16 checkpoints were compared at progress 0, 0.05, 0.18, 0.33, 0.58, 0.90 and 1.00 using the immutable approved CH1 renderer and the canonical Sanverse integration.",
+    "Valid checkpoint SSIM minimum 0.988042, average 0.992474. SSIM is supporting evidence; manual source-vs-integrated visual inspection remains the engineering authority.",
+    "The temporal contact sheet was manually inspected after rejecting/retrying invalid blank headless captures. No material source-design, composition-order or motion-beat difference remained.",
+    "Approved source checkpoint reel SHA-256 8ab9994444a0d96296338e6d9a8c9b6b01209d226b9c034d51acf8b73c21f081; integrated checkpoint reel SHA-256 b20a0c2743883f2aff52efebf4f64099cf8e5989c86e7f45afbc660aa0b4b4f6.",
+    "Owner approved the CH1 source component set and explicitly instructed the Sanverse coding agent to implement, self-verify and insert the remaining components; batch authorization is recorded separately by the promotion gate.",
+    "Owner explicitly approved the CH1 source component set and authorized the Sanverse coding agent on 2026-08-14 to self-verify source-preserving integrations and insert the remaining CH1 components into the Library."
+  ]
+}

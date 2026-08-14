@@ -1,0 +1,23 @@
+{
+  "componentId": "sanverse.kinetic-phrase",
+  "componentVersion": 1,
+  "status": "ready",
+  "determinism": "passed",
+  "directSeek": "passed",
+  "semanticMapping": "passed",
+  "c3": "passed",
+  "c4": "passed",
+  "c5": "passed",
+  "c6": "not-yet-available",
+  "aiEditability": "passed",
+  "ratios": {
+    "16:9": "passed",
+    "9:16": "passed",
+    "1:1": "passed",
+    "4:5": "passed"
+  },
+  "semanticNodeCount": 6,
+  "exposureCount": 10,
+  "editableCurveTrackCount": 6,
+  "blockingReasons": []
+}

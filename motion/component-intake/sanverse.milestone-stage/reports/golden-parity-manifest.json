@@ -1,0 +1,49 @@
+{
+  "componentId": "sanverse.milestone-stage",
+  "approvedSourceHash": "3f28fcd25d666c550d804502a68be49984c3f9e2b40036c59aec3446b31d7be3",
+  "checkpointCount": 7,
+  "minimumSsim": 0.983422,
+  "averageSsim": 0.996025,
+  "approvedSourceCheckpointReelHash": "d1a18a211a6b4744b9163e173d11b3d1f76b408b9064290b9da4d9996164e653",
+  "integratedCheckpointReelHash": "0665d2822c8a89e1f3e9b672ede43c2c37e1ae7c660e199d1ae1702b187df534",
+  "checkpointScores": [
+    {
+      "progress": 0,
+      "tick": 0,
+      "ssim": 1
+    },
+    {
+      "progress": 0.05,
+      "tick": 237600,
+      "ssim": 0.983422
+    },
+    {
+      "progress": 0.18,
+      "tick": 855360,
+      "ssim": 1
+    },
+    {
+      "progress": 0.33,
+      "tick": 1568160,
+      "ssim": 0.9982
+    },
+    {
+      "progress": 0.58,
+      "tick": 2756160,
+      "ssim": 0.997653
+    },
+    {
+      "progress": 0.9,
+      "tick": 4276800,
+      "ssim": 0.9929
+    },
+    {
+      "progress": 1,
+      "tick": 4752000,
+      "ssim": 1
+    }
+  ],
+  "evidenceContactSheet": "motion/visual-baselines/ch1-ingest/05-milestone-stage-temporal.png",
+  "engineeringParity": "passed",
+  "ownerPromotion": "pending-batch-authorization"
+}

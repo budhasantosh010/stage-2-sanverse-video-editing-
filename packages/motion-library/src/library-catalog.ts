@@ -27,7 +27,7 @@ export type MotionVisualTraitV1 = (typeof MOTION_VISUAL_TRAITS)[number]
 export const MOTION_MOTION_TRAITS = Object.freeze(['fade','slide','scale','stagger','count','draw','wipe','mask-reveal','type-reveal','spring','parallax','glow','depth','sequential','hold'] as const)
 export type MotionMotionTraitV1 = (typeof MOTION_MOTION_TRAITS)[number]
 
-export const MOTION_LIBRARY_MILESTONES = Object.freeze(['A0-A16','A17','A18','A19','A20','A21','unknown'] as const)
+export const MOTION_LIBRARY_MILESTONES = Object.freeze(['A0-A16','A17','A18','A19','A20','A21','CH1','unknown'] as const)
 export type MotionLibraryMilestoneV1 = (typeof MOTION_LIBRARY_MILESTONES)[number]
 export const MOTION_LIBRARY_BACKGROUNDS = Object.freeze(['dark','light','busy','neutral'] as const)
 export type MotionLibraryBackgroundV1 = (typeof MOTION_LIBRARY_BACKGROUNDS)[number]
@@ -88,18 +88,19 @@ const A18 = new Set(['sanverse.keyword-slam','sanverse.three-beat-headline','san
 const A19 = new Set(['sanverse.decision-tree','sanverse.swimlane-process','sanverse.journey-map','sanverse.priority-matrix','sanverse.value-chain','sanverse.layer-stack-explainer','sanverse.ecosystem-regions-map','sanverse.dependency-map'])
 const A20 = new Set(['sanverse.conversation-toast-stack','sanverse.floating-prompt-composer','sanverse.product-ui-story-scene','sanverse.agent-work-log','sanverse.scoped-access-comparison','sanverse.keyword-brand-lockup'])
 const A21 = new Set(['sanverse.trend-line-chart','sanverse.donut-breakdown','sanverse.venn-intersection','sanverse.feature-comparison-table','sanverse.code-diff-spotlight','sanverse.terminal-command-story'])
+const CH1 = new Set(['sanverse.icon-rail','sanverse.progressive-choice-stack','sanverse.kinetic-phrase','sanverse.explainer-board','sanverse.milestone-stage','sanverse.feature-matrix','sanverse.media-cutaway','sanverse.stat-burst','sanverse.floating-value-cloud','sanverse.cta-pill'])
 
-const SOFTWARE = new Set(['sanverse.notification-card','sanverse.progress-status','sanverse.live-status','sanverse.browser-demo','sanverse.chat-thread','sanverse.dashboard-snapshot','sanverse.search-results','sanverse.upload-status','sanverse.cursor-callout','sanverse.keyboard-shortcut-callout','sanverse.app-feature-spotlight', ...A20])
+const SOFTWARE = new Set(['sanverse.notification-card','sanverse.progress-status','sanverse.live-status','sanverse.browser-demo','sanverse.chat-thread','sanverse.dashboard-snapshot','sanverse.search-results','sanverse.upload-status','sanverse.cursor-callout','sanverse.keyboard-shortcut-callout','sanverse.app-feature-spotlight','sanverse.icon-rail','sanverse.media-cutaway', ...A20])
 const SOCIAL = new Set(['sanverse.quote-card','sanverse.testimonial-card','sanverse.review-card','sanverse.proof-stat-card','sanverse.comment-highlight','sanverse.client-proof-strip','sanverse.social-proof-stack'])
-const DATA = new Set(['sanverse.cost-value-card','sanverse.single-metric','sanverse.metric-delta','sanverse.before-after','sanverse.ratio-card','sanverse.score-card','sanverse.stat-stack','sanverse.price-breakdown','sanverse.proof-stat-card','sanverse.poll-vote-result','sanverse.ranking-podium','sanverse.trend-line-chart','sanverse.donut-breakdown','sanverse.feature-comparison-table'])
+const DATA = new Set(['sanverse.cost-value-card','sanverse.single-metric','sanverse.metric-delta','sanverse.before-after','sanverse.ratio-card','sanverse.score-card','sanverse.stat-stack','sanverse.price-breakdown','sanverse.proof-stat-card','sanverse.poll-vote-result','sanverse.ranking-podium','sanverse.trend-line-chart','sanverse.donut-breakdown','sanverse.feature-comparison-table','sanverse.feature-matrix','sanverse.stat-burst'])
 const EDITORIAL = new Set(['sanverse.quote-card','sanverse.source-citation','sanverse.lower-third-title','sanverse.definition-title','sanverse.chapter-title'])
-const EXPLAINERS = new Set(['sanverse.process-flow','sanverse.funnel-diagram','sanverse.hierarchy-diagram','sanverse.flywheel-diagram','sanverse.sequence-diagram','sanverse.myth-fact','sanverse.problem-solution', ...A19])
-const WOW = new Set(['sanverse.kinetic-headline','sanverse.keyword-slam','sanverse.three-beat-headline','sanverse.stacked-hook','sanverse.sentence-deconstruction','sanverse.punch-word-reveal','sanverse.keyword-brand-lockup','sanverse.venn-intersection','sanverse.trend-line-chart'])
-const OVERLAYS = new Set(['sanverse.lower-third-title','sanverse.timer-status-pill','sanverse.urgency-banner','sanverse.notification-card','sanverse.live-status','sanverse.comment-highlight','sanverse.cursor-callout','sanverse.conversation-toast-stack','sanverse.floating-prompt-composer'])
-const SHORT_FORM = new Set([...A18, 'sanverse.kinetic-headline','sanverse.question-title','sanverse.highlight-title','sanverse.comment-highlight','sanverse.subscribe-cta','sanverse.follow-cta'])
+const EXPLAINERS = new Set(['sanverse.process-flow','sanverse.funnel-diagram','sanverse.hierarchy-diagram','sanverse.flywheel-diagram','sanverse.sequence-diagram','sanverse.myth-fact','sanverse.problem-solution','sanverse.progressive-choice-stack','sanverse.explainer-board','sanverse.feature-matrix', ...A19])
+const WOW = new Set(['sanverse.kinetic-headline','sanverse.keyword-slam','sanverse.three-beat-headline','sanverse.stacked-hook','sanverse.sentence-deconstruction','sanverse.punch-word-reveal','sanverse.keyword-brand-lockup','sanverse.venn-intersection','sanverse.trend-line-chart','sanverse.kinetic-phrase','sanverse.milestone-stage'])
+const OVERLAYS = new Set(['sanverse.lower-third-title','sanverse.timer-status-pill','sanverse.urgency-banner','sanverse.notification-card','sanverse.live-status','sanverse.comment-highlight','sanverse.cursor-callout','sanverse.conversation-toast-stack','sanverse.floating-prompt-composer','sanverse.icon-rail','sanverse.floating-value-cloud','sanverse.cta-pill'])
+const SHORT_FORM = new Set([...A18, ...CH1, 'sanverse.kinetic-headline','sanverse.question-title','sanverse.highlight-title','sanverse.comment-highlight','sanverse.subscribe-cta','sanverse.follow-cta'])
 const PRODUCT_STORY_REFERENCE = Object.freeze(['sanverse.conversation-toast-stack','sanverse.floating-prompt-composer','sanverse.product-ui-story-scene','sanverse.agent-work-log','sanverse.scoped-access-comparison','sanverse.keyword-brand-lockup'] as const)
 
-const milestoneFor = (id: string): MotionLibraryMilestoneV1 => A21.has(id) ? 'A21' : A20.has(id) ? 'A20' : A19.has(id) ? 'A19' : A18.has(id) ? 'A18' : A17.has(id) ? 'A17' : 'A0-A16'
+const milestoneFor = (id: string): MotionLibraryMilestoneV1 => CH1.has(id) ? 'CH1' : A21.has(id) ? 'A21' : A20.has(id) ? 'A20' : A19.has(id) ? 'A19' : A18.has(id) ? 'A18' : A17.has(id) ? 'A17' : 'A0-A16'
 const unique = <T extends string>(values: readonly T[]): readonly T[] => Object.freeze([...new Set(values)])
 const contains = (definition: MotionComponentDefinitionV1, fragment: string): boolean => `${definition.id} ${definition.name} ${definition.purpose}`.toLowerCase().includes(fragment)
 
@@ -249,7 +250,7 @@ const aliasesFor = (definition: MotionComponentDefinitionV1): readonly string[] 
   ...(definition.id === 'sanverse.kinetic-headline' ? ['semantic highlight','kinetic title'] : []),
 ])
 
-const referenceLineageFor = (definition: MotionComponentDefinitionV1): readonly string[] => A20.has(definition.id) || definition.id === 'sanverse.kinetic-headline' ? Object.freeze(['product-storytelling-reference-pack']) : Object.freeze([])
+const referenceLineageFor = (definition: MotionComponentDefinitionV1): readonly string[] => CH1.has(definition.id) ? Object.freeze(['owner-approved-ch1-ingest']) : A20.has(definition.id) || definition.id === 'sanverse.kinetic-headline' ? Object.freeze(['product-storytelling-reference-pack']) : Object.freeze([])
 
 const defaultReview: MotionLibraryReviewSummaryV1 = Object.freeze({ status: 'unreviewed', qualityTier: 'Experimental', fullPlaybackVerified: false })
 
@@ -347,7 +348,7 @@ const queryScore = (entry: MotionLibraryCatalogEntryV1, query: string): number =
   return searchableText(entry).includes(q) ? 100 : 0
 }
 
-const milestoneRank = (milestone: MotionLibraryMilestoneV1): number => ({ 'A0-A16': 1, A17: 17, A18: 18, A19: 19, A20: 20, A21: 21, unknown: 0 })[milestone]
+const milestoneRank = (milestone: MotionLibraryMilestoneV1): number => ({ 'A0-A16': 1, A17: 17, A18: 18, A19: 19, A20: 20, A21: 21, CH1: 22, unknown: 0 })[milestone]
 const tierRank = (tier: MotionLibraryQualityTierV1): number => ({ S: 5, A: 4, B: 3, C: 2, Experimental: 1 })[tier]
 
 export const withMotionLibraryReviews = (entries: readonly MotionLibraryCatalogEntryV1[], reviews: Readonly<Record<string, MotionQualityReviewV1>>): readonly MotionLibraryCatalogEntryV1[] => Object.freeze(entries.map((entry) => {
@@ -367,7 +368,7 @@ export const getMotionLibraryCollections = (entries: readonly MotionLibraryCatal
   const has = (predicate: (entry: MotionLibraryCatalogEntryV1) => boolean) => entries.filter(predicate)
   const collections: MotionLibraryCollectionV1[] = [
     collection('all-components','All Components','Every current public Plan-A component.',itemsFrom(entries)),
-    collection('recently-added','Recently Added','Newest verified Plan-A components.',itemsFrom(has((entry) => entry.introducedInMilestone === 'A21'))),
+    collection('recently-added','Recently Added','Newest verified Plan-A components.',itemsFrom(has((entry) => entry.introducedInMilestone === 'CH1'))),
     collection('youtube-essentials','YouTube Essentials','Broadly useful long-form creator graphics.',itemsFrom(has((entry) => entry.recommendedContexts.includes('youtube-long-form') && entry.primaryCategory !== 'transitions'))),
     collection('product-saas','Product / SaaS','Product, software and SaaS storytelling components.',itemsFrom(has((entry) => entry.primaryCategory === 'software-product' || A20.has(entry.componentId)))),
     collection('talking-head','Talking Head','Overlay and support graphics that work around a speaker.',itemsFrom(has((entry) => entry.recommendedContexts.includes('talking-head')))),
@@ -379,9 +380,10 @@ export const getMotionLibraryCollections = (entries: readonly MotionLibraryCatal
       ...PRODUCT_STORY_REFERENCE.map((id) => item(id)),
       item('sanverse.kinetic-headline','semantic-highlight','highlight-box'),
     ])),
+    collection('owner-approved-ch1','Owner Approved CH1','Ten source-approved creator components ingested through the Sanverse parity/productization pipeline.',Object.freeze([...CH1].map((id) => item(id)))),
     collection('sanverse-launch-core','Sanverse Launch Core','Provisional broadly useful launch-ready shortlist; owner may revise visually in the Library.',Object.freeze(LAUNCH_CORE_IDS.filter((id) => entries.some((entry) => entry.componentId === id)).map((id) => item(id))),true),
   ]
-  for (const milestone of ['A0-A16','A17','A18','A19','A20','A21'] as const) collections.push(collection(`milestone-${milestone.toLowerCase()}`, milestone, `Components introduced in ${milestone}.`, itemsFrom(has((entry) => entry.introducedInMilestone === milestone))))
+  for (const milestone of ['A0-A16','A17','A18','A19','A20','A21','CH1'] as const) collections.push(collection(`milestone-${milestone.toLowerCase()}`, milestone, `Components introduced in ${milestone}.`, itemsFrom(has((entry) => entry.introducedInMilestone === milestone))))
   collections.push(collection('needs-motion-review','Needs Motion Review','Unreviewed, in-review or needs-polish canonical motion.',itemsFrom(has((entry) => entry.review.status === 'unreviewed' || entry.review.status === 'in-review' || entry.review.status === 'needs-polish'))))
   collections.push(collection('motion-review-passed','Motion Review Passed','Canonical full-playback reviews marked passed.',itemsFrom(has((entry) => entry.review.status === 'passed'))))
   return Object.freeze(collections)

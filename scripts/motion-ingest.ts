@@ -63,17 +63,23 @@ const productize=async()=>{
 }
 
 const parity=()=>{
-  if(!target) fail('Usage: npm run motion:parity -- <component-id> [--owner-approve]')
+  if(!target) fail('Usage: npm run motion:parity -- <component-id> [--owner-approve|--owner-batch-authorize]')
   let record=readIntegrationRecord(repositoryRoot,target)
   let parityRecord=readParityRecord(repositoryRoot,target)
-  if(process.argv.includes('--owner-approve')){
+  const ownerApprove=process.argv.includes('--owner-approve')
+  const batchAuthorize=process.argv.includes('--owner-batch-authorize')
+  if(ownerApprove&&batchAuthorize) fail('PARITY_PROMOTION_AMBIGUOUS: choose one owner promotion mode.')
+  if(ownerApprove||batchAuthorize){
     if(!parityRecord||parityRecord.status!=='passed'||parityRecord.reviewer!=='engineering-evidence') fail('OWNER_PARITY_PROMOTION_BLOCKED: engineering parity evidence must pass first.')
-    parityRecord=Object.freeze({...parityRecord,reviewer:'owner' as const,notes:Object.freeze([...parityRecord.notes,'Owner explicitly approved the Sanverse-integrated visual parity after reviewing the synchronized comparison.'])})
+    parityRecord=ownerApprove
+      ? Object.freeze({...parityRecord,reviewer:'owner' as const,notes:Object.freeze([...parityRecord.notes,'Owner explicitly approved the Sanverse-integrated visual parity after reviewing the synchronized comparison.'])})
+      : Object.freeze({...parityRecord,reviewer:'owner-batch-authorized-engineering-evidence' as const,notes:Object.freeze([...parityRecord.notes,'Owner explicitly approved the CH1 source component set and authorized the Sanverse coding agent on 2026-08-14 to self-verify source-preserving integrations and insert the remaining CH1 components into the Library.'])})
     writeParityRecord(repositoryRoot,parityRecord)
     record=Object.freeze({...record,visualParityStatus:'passed' as const,blockingReasons:Object.freeze(record.blockingReasons.filter(reason=>reason!=='OWNER_INTEGRATED_PARITY_APPROVAL_REQUIRED'&&reason!=='VISUAL_PARITY_REQUIRED'))})
     writeIntegrationRecord(repositoryRoot,record)
   }
-  console.log(JSON.stringify({componentId:target,approvedSourceHash:record.approvedSourceHash,canonicalVideoHash:record.canonicalVideoHash,visualParityStatus:record.visualParityStatus,parity:parityRecord??{schemaVersion:COMPONENT_PARITY_SCHEMA_VERSION,status:'pending',reason:'No parity record exists yet.'},registrationAllowed:record.visualParityStatus==='passed'&&parityRecord?.status==='passed'&&parityRecord.reviewer==='owner'},null,2))
+  const ownerAuthorized=parityRecord?.reviewer==='owner'||parityRecord?.reviewer==='owner-batch-authorized-engineering-evidence'
+  console.log(JSON.stringify({componentId:target,approvedSourceHash:record.approvedSourceHash,canonicalVideoHash:record.canonicalVideoHash,visualParityStatus:record.visualParityStatus,parity:parityRecord??{schemaVersion:COMPONENT_PARITY_SCHEMA_VERSION,status:'pending',reason:'No parity record exists yet.'},registrationAllowed:record.visualParityStatus==='passed'&&parityRecord?.status==='passed'&&ownerAuthorized},null,2))
 }
 
 const register=()=>{

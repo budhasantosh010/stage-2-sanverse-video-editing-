@@ -16,7 +16,7 @@ if (!rootElement) throw new Error('Motion Lab root element not found.')
 
 const mode = new URLSearchParams(window.location.search).get('mode')
 const libraryRoute = window.location.pathname === '/library' || window.location.pathname.startsWith('/library/')
-const ingestParityRoute = window.location.pathname === '/ingest/parity/sanverse.icon-rail'
+const ingestParityRoute = window.location.pathname.startsWith('/ingest/parity/sanverse.')
 
 createRoot(rootElement).render(
   <StrictMode>

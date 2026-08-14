@@ -42,7 +42,7 @@ describe('L1 Creative Library browser', () => {
   })
   afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlobals() })
 
-  it('derives the visible grid count from the canonical public registry without mounting 89 players', () => {
+  it('derives the visible grid count from the canonical public registry without mounting 99 players', () => {
     expect(container.textContent).toContain(`${MOTION_LIBRARY_CATALOG.length} COMPONENTS`)
     expect(container.querySelectorAll('[data-library-card]')).toHaveLength(MOTION_LIBRARY_CATALOG.length)
     expect(container.querySelectorAll('[data-library-player]')).toHaveLength(0)

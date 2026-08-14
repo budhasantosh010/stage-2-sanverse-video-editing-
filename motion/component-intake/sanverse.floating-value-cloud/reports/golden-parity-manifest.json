@@ -1,0 +1,49 @@
+{
+  "componentId": "sanverse.floating-value-cloud",
+  "approvedSourceHash": "8e929b9ab61a3a1c70558450f1db88a084f74f6d1157d727d4ba9ec4a1dca1d3",
+  "checkpointCount": 7,
+  "minimumSsim": 0.987512,
+  "averageSsim": 0.995232,
+  "approvedSourceCheckpointReelHash": "2f4cdce29f8ac62a5b0568669782725ce8345f9b815aab7daa7d27cbfe707f46",
+  "integratedCheckpointReelHash": "645f129988993044ef74ea3ec88e8827bc420b3c8e54c2eaff5d9257bf351398",
+  "checkpointScores": [
+    {
+      "progress": 0,
+      "tick": 0,
+      "ssim": 1
+    },
+    {
+      "progress": 0.05,
+      "tick": 108000,
+      "ssim": 0.999918
+    },
+    {
+      "progress": 0.18,
+      "tick": 388800,
+      "ssim": 0.996668
+    },
+    {
+      "progress": 0.33,
+      "tick": 712800,
+      "ssim": 0.994257
+    },
+    {
+      "progress": 0.58,
+      "tick": 1252800,
+      "ssim": 0.98827
+    },
+    {
+      "progress": 0.9,
+      "tick": 1944000,
+      "ssim": 0.987512
+    },
+    {
+      "progress": 1,
+      "tick": 2160000,
+      "ssim": 1
+    }
+  ],
+  "evidenceContactSheet": "motion/visual-baselines/ch1-ingest/09-floating-value-cloud-temporal.png",
+  "engineeringParity": "passed",
+  "ownerPromotion": "pending-batch-authorization"
+}
