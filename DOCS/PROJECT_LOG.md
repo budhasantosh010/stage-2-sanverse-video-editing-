@@ -832,3 +832,15 @@ separate questions, and a written refusal of veed-engine-cli on licence grounds
 with four hard rules so nobody has to work it out again.
 
 Tests 1,848 → 2,050. Build exit 0.
+
+## 2026-08-14 — Component Ingest V1 finishes the approved CH1 set
+
+The owner approved the integrated Frosted Icon Rail comparison, then clarified that this Sanverse coding agent—not another agent—owns the complete engineering conversion and Library insertion for the rest of CH1. The remaining nine already-approved source visuals were therefore implemented in this worktree, not left as intake placeholders.
+
+All ten CH1 packages pass the same foreign/lossless-normalization intake contract and keep immutable approved-source hashes without copying any reference video. Components 02–10 now have canonical typed props, stable semantic Motion Graph scenes, Creator/Designer/Advanced exposures, exact CH1 reference durations, reduced motion, four ratios and C2/C3/C4/C5 editability. Component 01 records direct owner parity approval; Components 02–10 record the separate explicit owner batch-authorized engineering-parity state rather than pretending they were individually watched by the owner.
+
+The visual loop found and fixed real issues before registration: full-screen-vs-intrinsic transform authority, invalid graph shape-child hierarchy, a missing CH1 responsive `data-shape` in the parity harness, Feature Matrix entrance motion bypassing its graph tracks, and invalid blank/noisy Edge captures. Seven exact-tick source↔integrated checkpoints were retained per remaining component and manually inspected.
+
+Registration then moved the public catalog **89 → 99**. The Creative Library now has a first-class `Owner Approved CH1` collection with ten fresh posters and ten `A · PASSED` cards. Real Edge completed canonical 1× playback for all ten new entries. The durable review store is 99/99.
+
+Fresh scoped Creative/Motion/B1/Ingest tests are **473/473**, the root all-workspace build passes, `apps/web` remains unchanged, no source/reference media was copied, no external animation runtime was added, and A22/B2/B3/C6 remain unstarted. GitHub is not used; release history remains local.

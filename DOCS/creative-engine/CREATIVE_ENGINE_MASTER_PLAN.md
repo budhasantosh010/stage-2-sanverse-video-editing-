@@ -1,7 +1,7 @@
 # Sanverse Creative Engine — Master Plan
 
 Date: 2026-08-11
-Status: **L1 COMPLETE LOCALLY** — ABC-2 remains preserved; Creative Library + full 89-component 1× motion review verified; local release only; stop before A22/B2/B3/C6
+Status: **L1 + COMPONENT INGEST V1 CH1 COMPLETE LOCALLY** — ABC-2 remains preserved; Creative Library now has 99 public components including 10 owner-approved CH1 ingests with real 1× playback verification; local release only; stop before A22/B2/B3/C6
 
 ## Mission
 
@@ -136,14 +136,14 @@ L1 keeps `apps/web` untouched and adds no second Motion authority. Final local r
 
 ## Plan-A engineering infrastructure — Approved Component Ingest V1
 
-External visual authoring is now allowed to vary without allowing integration semantics to fragment. One fail-closed intake path classifies owner-approved external packages, preserves immutable hashes/source evidence, productizes them into the existing Motion Graph/customization authorities, proves visual parity and permits public registration only after owner-reviewed integrated parity.
+External visual authoring may vary without allowing integration semantics to fragment. One fail-closed intake path classifies owner-approved external packages, preserves immutable hashes/source evidence, productizes them into the existing Motion Graph/customization authorities, proves visual parity and permits public registration only after owner-authorized integrated parity.
 
-This is Plan-A engineering infrastructure, not A22. It adds no new public component by itself. The first pilot is owner-approved CH1 Frosted Icon Rail; engineering productization/parity evidence is ready, but registration is intentionally blocked until the owner approves the integrated rendering. Remaining CH1 components stay source-approved/inspect-clean but are not bulk-registered before that pilot gate.
+This is Plan-A engineering infrastructure, not A22. CH1 is the first completed source set: Frosted Icon Rail received direct owner integrated-parity approval, and the owner then explicitly authorized the Sanverse coding agent to preserve, engineering-verify and insert Components 02–10. All ten now pass canonical productization/parity, are registered in the public catalog and appear in the `Owner Approved CH1` Library collection. Public catalog is 99; all ten new entries have fresh posters, durable Passed reviews and real canonical 1× playback verification.
 
 Architecture: `DOCS/motion/COMPONENT_INGEST_ARCHITECTURE.md`; evidence: `DOCS/motion/evidence/COMPONENT-INGEST-V1.md`.
 
 ## Current stop boundary
 
-Do **not** register/bulk-ingest the remaining CH1 components until the first integrated pilot receives owner parity approval. Do **not** begin A22, B2/B3 or C6 without explicit authorization. Production Studio integration and provider-specific AI remain out of scope.
+CH1 ingestion is complete. Do **not** begin A22, B2/B3 or C6 without explicit authorization. Future external visual sets must pass the same fail-closed Component Ingest sequence and receive their own owner authority; CH1 authorization is not reusable. Production Studio integration and provider-specific AI remain out of scope.
 
 Per owner instruction on 2026-08-11, L1 release history is preserved locally and remote synchronization/parity is deferred until the owner re-authorizes it next month.

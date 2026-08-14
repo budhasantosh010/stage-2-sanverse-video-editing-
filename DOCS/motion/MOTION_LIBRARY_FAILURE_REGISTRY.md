@@ -427,3 +427,108 @@ VERIFIED FIX: all 10 CH1 packages now inspect approval/determinism/direct-seek c
 
 ONE-LINE SOLUTION: compute visual-root confinement structurally with `path.relative`, never by string-prefix assumptions.
 
+## MOTION-FAIL-022 — CH1 normalization initially transformed the full composition instead of the intrinsic component group
+
+- Status: FIXED
+- Severity: high visual-parity failure
+- Milestone: COMPONENT-INGEST-V1
+- Date: 2026-08-14
+
+WHAT: the first Component 02 parity capture placed the right content/motion inside the wrong transform box, producing a visibly different size/alignment from the approved CH1 source.
+
+WHERE: the shared 02–10 renderer in `packages/motion-library/src/ingested/ch1-approved-components.tsx`.
+
+WHY: the first renderer applied Motion Graph transform authority to a full-screen root. The approved CH1 renderer instead uses a full-screen `.sv-layer` only for centering and applies opacity/transform to the intrinsic `.sv-wrap` component group.
+
+IMPACT: mechanical graph/productization tests passed but visual parity did not.
+
+FIX: the outer render root now owns the full-screen grid/centering while the intrinsic component root consumes Motion Graph transform/opacity. The inherited `.sv-wrap` flex alignment defaults were also restored.
+
+VERIFIED FIX: Progressive Choice Stack's 58% parity improved from a visibly offset first pass to SSIM 0.992978 with matching center/clip geometry; the same corrected architecture is shared by Components 02–10.
+
+ONE-LINE SOLUTION: preserve CH1's two-level `full-screen layer → intrinsic transformed component` authority instead of transforming the canvas-sized wrapper.
+
+## MOTION-FAIL-023 — Visual DOM nesting was initially modeled as illegal Motion Graph shape/text hierarchy
+
+- Status: FIXED
+- Severity: medium graph-authoring failure
+- Milestone: COMPONENT-INGEST-V1
+- Date: 2026-08-14
+
+WHAT: early 02–10 C3 readiness failed for Explainer Board, Media Cutaway, Stat Burst and CTA because visual DOM children were represented as children of non-group graph nodes.
+
+WHERE: first productization scenes in `ch1-approved-components.tsx`.
+
+WHY: CSS/DOM visual nesting and canonical Motion Graph editing hierarchy are not always identical. Shape/text nodes cannot own arbitrary structural children.
+
+IMPACT: the visual could render, but C3 could not truthfully expose a valid editable layer hierarchy.
+
+FIX: Explainer Board and Media Cutaway gained explicit group nodes; Stat suffix and CTA label remain visual DOM children where needed but are canonical graph siblings under valid groups.
+
+VERIFIED FIX: all 9 remaining components × 4 ratios pass `validateMotionScene`, compositor readiness, C3 Layers, C4 keyframes and editable C5 curve projection.
+
+ONE-LINE SOLUTION: keep DOM nesting for pixels and use explicit Motion Graph groups/siblings for truthful edit hierarchy.
+
+## MOTION-FAIL-024 — Parity harness initially compared different responsive branches
+
+- Status: FIXED
+- Severity: high evidence-integrity failure
+- Milestone: COMPONENT-INGEST-V1
+- Date: 2026-08-14
+
+WHAT: Feature Matrix initially appeared to diverge badly because the approved-source iframe rendered its desktop two-column branch while the Sanverse side correctly rendered the 9:16 portrait branch.
+
+WHERE: generalized `apps/motion-lab/src/ingest/ComponentParityLab.tsx`.
+
+WHY: CH1 responsive CSS depends on `data-shape=portrait|balanced|landscape`; the first generalized iframe set ratio dimensions but omitted that source attribute.
+
+IMPACT: the comparison could have falsely classified a correct integration as a visual failure.
+
+FIX: approved-source parity now derives the same CH1 shape classification for 9:16, 16:9, 1:1 and 4:5 and applies it inside the sandboxed source viewport.
+
+VERIFIED FIX: Feature Matrix source and integration now compare the same portrait layout; retained parity evidence was regenerated only after this correction.
+
+ONE-LINE SOLUTION: parity evidence must reproduce the approved source renderer's responsive branch, not merely its pixel dimensions.
+
+## MOTION-FAIL-025 — Feature Matrix settled correctly but its graph-active entrance bypassed source motion
+
+- Status: FIXED
+- Severity: high temporal-parity failure
+- Milestone: COMPONENT-INGEST-V1
+- Date: 2026-08-14
+
+WHAT: seven-checkpoint review showed the settled Feature Matrix frame was close but early source rows were still entering while the integrated rows were already visible.
+
+WHERE: Feature Matrix render branch in `ch1-approved-components.tsx`.
+
+WHY: the scene had correct opacity/Y tracks, but the graph-active React renderer hard-coded visible row styles instead of consuming the resolved graph nodes.
+
+IMPACT: static/poster review could pass while real 1× motion was wrong.
+
+FIX: metric and criterion rows now use their resolved Motion Graph styles; graph nodes include the exact CH1 14px/18px entrance translations plus opacity timing.
+
+VERIFIED FIX: the rerun seven-checkpoint sheet shows paired entrance/build/hold/exit motion; final Feature Matrix valid checkpoint SSIM is min 0.950300 / average 0.979155 and manual inspection found no remaining blocking temporal difference.
+
+ONE-LINE SOLUTION: when a graph track is authoritative, the renderer must consume it at every tick rather than reproducing only the settled visual.
+
+## MOTION-FAIL-026 — Headless parity/poster evidence had Windows process/capture noise
+
+- Status: FIXED / invalid evidence rejected
+- Severity: medium evidence and tooling reliability
+- Milestone: COMPONENT-INGEST-V1
+- Date: 2026-08-14
+
+WHAT: Windows Edge emitted non-fatal `LoadEnclaveImageW error 577`; a few early temporal screenshots were blank; and the poster script's attempt to self-spawn `npm.cmd` failed once with `spawn EINVAL`.
+
+WHERE: temporary exact-tick capture harness and existing poster-generation server bootstrap.
+
+WHY: process stderr/startup behavior was being treated as the product signal, and the poster script attempted to own a Windows child process that Harness can manage more reliably.
+
+IMPACT: invalid blank captures could have depressed SSIM or been mistaken for component failures; poster generation stopped before creating new assets.
+
+FIX: parity capture success is judged by actual rendered PNG output and blank captures are rejected/retried. For posters, Motion Lab was started explicitly through Harness on strict port 2010, then the unchanged poster generator ran against the live server.
+
+VERIFIED FIX: all retained temporal sheets contain valid source/integrated frames; fresh posters were generated for all 10 CH1 entries; real Edge 1× Library audit then passed 10/10.
+
+ONE-LINE SOLUTION: treat browser/process startup noise as infrastructure until rendered evidence proves otherwise, and never accept a blank screenshot as parity evidence.
+

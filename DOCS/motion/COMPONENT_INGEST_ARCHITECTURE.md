@@ -1,7 +1,7 @@
 # Sanverse Approved Component Ingest V1
 
 Date: 2026-08-14
-Status: **Infrastructure implemented; first foreign/lossless pilot productized; public registration owner-parity gated.**
+Status: **Infrastructure implemented and CH1 batch completed locally: 10/10 approved components productized, parity verified and registered; public catalog 99.**
 
 ## Mission
 
@@ -24,7 +24,8 @@ canonical props + semantic Motion Graph + exposure map
         ↓
 approved original ↔ integrated parity
         ↓
-OWNER integrated-parity approval
+owner parity authority
+(direct review OR explicit batch-authorized engineering parity)
         ↓
 motion:register
         ↓
@@ -61,11 +62,11 @@ Loads a repository-side productization descriptor and validates one canonical co
 
 ### `npm run motion:parity -- <component-id>`
 
-Shows source hash, golden-video hash, engineering parity evidence and whether registration is allowed. A numeric image metric is supporting evidence only; synchronized visual review remains authority. After the owner explicitly approves the synchronized integrated result, the integration agent records that decision with `npm run motion:parity -- <component-id> --owner-approve`; this promotion refuses unless engineering parity evidence already passed.
+Shows source hash, golden-review hash, engineering parity evidence and whether registration is allowed. A numeric image metric is supporting evidence only; synchronized visual review remains authority. Direct manual owner review is recorded with `npm run motion:parity -- <component-id> --owner-approve`. When the owner has already approved a bounded source set and explicitly authorized the coding agent to preserve, self-verify and insert the remaining integrations, the distinct `--owner-batch-authorize` promotion records `owner-batch-authorized-engineering-evidence`. Both promotions refuse unless engineering parity evidence already passed; ordinary engineering evidence alone cannot register.
 
 ### `npm run motion:register -- <component-id>`
 
-Registration is atomic and refuses unless productization, determinism, direct seek, semantic mapping, C3/C4/C5, AI editability, a canonical golden review and **owner-reviewed integrated visual parity** all pass. Only then does it update the generated ingested registry and registration ledger.
+Registration is atomic and refuses unless productization, determinism, direct seek, semantic mapping, C3/C4/C5, AI editability, a canonical golden review and **owner-authorized integrated visual parity** all pass. Owner authority is either a direct synchronized parity review or the explicit batch-authorized engineering-parity state above. Only then does registration update the generated ingested registry and registration ledger.
 
 ## Immutable evidence
 
@@ -91,29 +92,26 @@ Normal AI edits target stable component/node/exposure identity and typed operati
 public Motion registry == public Creative Library catalog
 ```
 
-## First pilot — Frosted Icon Rail
+## CH1 completion
 
-Source: CH1 Component 01, `sanverse.icon-rail`, owner-approved 2026-08-14.
+CH1 Components 01–10 classify as `foreign → lossless-normalization → foreign-adapter`. They share one approved deterministic HTML/CSS/JS runtime, but each becomes an independent public Sanverse component with its own definition, props, stable semantic graph, exposures, duration and review evidence.
 
-Classification: `foreign → lossless-normalization → foreign-adapter`.
+Component 01 established the first-pilot contract and received direct owner parity approval. Components 02–10 then reused the same fail-closed pipeline under the owner's explicit batch authorization.
 
-The approved HTML/CSS/JS visual is plain exact-tick deterministic browser code. Productization materializes semantic groups, real C2 keyframes and meaningful exposures while preserving the frosted CSS visual where current graph decoration primitives would otherwise change the approved pixels.
+Final CH1 status:
 
-Current pilot status:
+- source approval: 10/10 PASS;
+- immutable snapshot/hash: 10/10 PASS;
+- deterministic/direct seek: 10/10 PASS;
+- four ratios + reduced motion: 10/10 PASS;
+- C3/C4/C5 + AI editability: 10/10 PASS;
+- exact-tick temporal parity: 10/10 PASS;
+- owner authority: Component 01 direct owner review; Components 02–10 batch-authorized engineering parity;
+- public registration: 10/10 REGISTERED;
+- real Creative Library 1× playback: 10/10 PASS;
+- public catalog count: 99.
 
-- source approval: PASS;
-- immutable snapshot/hash: PASS;
-- deterministic/direct seek: PASS;
-- four ratios + reduced motion: PASS;
-- semantic nodes: 14;
-- exposed controls: 15;
-- editable C5 curve tracks: 10;
-- C3/C4/C5: PASS;
-- AI-edit mapping: PASS;
-- engineering visual-parity evidence: PASS;
-- owner integrated-parity approval: **PENDING**;
-- public registration: **BLOCKED by design**;
-- public catalog count: still 89.
+The Creative Library exposes the ten entries through the `CH1` milestone and `owner-approved-ch1` collection with fresh posters and durable passed reviews.
 
 Evidence: `DOCS/motion/evidence/COMPONENT-INGEST-V1.md`.
 
@@ -123,4 +121,4 @@ Evidence: `DOCS/motion/evidence/COMPONENT-INGEST-V1.md`.
 - No GitHub push/actions are used.
 - A22, B2/B3 and C6 are not started.
 - C6 readiness is recorded as `not-yet-available`, never faked.
-- Remaining CH1 components are source-approved and inspect-clean, but do not advance through public registration until the first integrated pilot is owner-verified.
+- CH1 is complete; future external visual sets must still pass the same fail-closed intake/productization/parity/authorization/registration sequence rather than inheriting CH1 approval.

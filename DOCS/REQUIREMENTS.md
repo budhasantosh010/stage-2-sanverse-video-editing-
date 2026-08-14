@@ -111,5 +111,8 @@ Status values: `Approved`, `Proposed`, `Deferred`, `Rejected`, `Superseded`.
 - External visual agents may create reusable motion components in different implementation environments, but every owner-approved visual must enter Sanverse through one fail-closed component-ingestion contract before it becomes public.
 - The approved visual appearance is authority. Engineering may normalize implementation, extract typed properties, semantic nodes, keyframes, expert boundaries and responsive behavior, but may not aesthetically reinterpret or silently approximate the approved result.
 - Public registration requires owner approval, deterministic/direct-seek validation, immutable source evidence, visual parity, canonical Motion Graph/edit controls, review evidence and Library metadata.
-- All ten CH1 source visuals are owner-approved as of 2026-08-14; integrated visual parity remains a separate verification gate.
-- Source: owner-approved Component Ingest V1 contract and owner correction on 2026-08-14.
+- All ten CH1 source visuals are owner-approved as of 2026-08-14. Component 01 (`sanverse.icon-rail`) also received direct owner approval of the synchronized integrated parity view.
+- The Sanverse coding agent in this worktree owns the complete engineering conversion and Library insertion; this work is not delegated to another coding agent.
+- For CH1 Components 02–10, the owner explicitly authorized the coding agent on 2026-08-14 to preserve the approved source visuals, perform the engineering parity/productization review, and insert the verified results into the Library without a separate manual owner viewing round for every component. This batch authorization must be recorded distinctly from direct owner parity review.
+- Completion means the components themselves are public, searchable and playable in the Sanverse Creative Library—not merely staged in an intake folder or represented by placeholders.
+- Source: owner-approved Component Ingest V1 contract and owner corrections on 2026-08-14.

@@ -141,3 +141,14 @@ Only durable, approved decisions belong here. Proposals stay in plans or the bla
 - Public registry mutation happens only after productization and owner-reviewed integrated parity. Staging never creates half-public components.
 - Why: visual diversity is desirable, while separate integration semantics per coding agent would fragment Motion Graph, customization, Library behavior and AI editing.
 - Revisit trigger: a real approved component cannot be preserved through these lanes without either violating visual parity or creating a second animation/editing authority.
+
+## DEC-013 — Direct owner parity and bounded batch authorization are distinct authorities
+
+- Status: Approved by the owner
+- Date: 2026-08-14
+- Decision: a component may reach public registration after either (a) the owner directly reviews and approves the synchronized integrated parity result, or (b) for a specifically bounded source set the owner has already approved, the owner explicitly authorizes the Sanverse coding agent to preserve those visuals, perform engineering parity/productization review, and insert the verified integrations without a separate manual viewing round for every item.
+- The two states are recorded separately. Direct review uses reviewer `owner`; bounded delegation uses `owner-batch-authorized-engineering-evidence`. Plain `engineering-evidence` remains insufficient for registration.
+- CH1 applies this decision once: Component 01 Frosted Icon Rail is direct owner-reviewed; Components 02–10 use the explicit 2026-08-14 CH1 batch authorization. Future visual sets do not inherit this authorization.
+- The Sanverse coding agent owns implementation and Library insertion after source approval; external visual workspaces provide approved source evidence, not a second engineering owner.
+- Why: preserve truthful provenance while allowing the owner to delegate repetitive source-preserving conversion work without pretending nine unseen integrations were individually owner-reviewed.
+- Revisit trigger: a future batch contains a component whose engineering parity is ambiguous or materially diverges from the approved source; that component returns to direct owner review.
