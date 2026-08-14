@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { CreativeDirectionLab } from './CreativeDirectionLab.tsx'
 import { MotionLabApp } from './MotionLabApp.tsx'
 import { CreativeLibraryApp } from './library/CreativeLibraryApp.tsx'
+import { ComponentParityLab } from './ingest/ComponentParityLab.tsx'
 import './styles.css'
 import './library/library.css'
 import './creative-direction.css'
@@ -15,9 +16,10 @@ if (!rootElement) throw new Error('Motion Lab root element not found.')
 
 const mode = new URLSearchParams(window.location.search).get('mode')
 const libraryRoute = window.location.pathname === '/library' || window.location.pathname.startsWith('/library/')
+const ingestParityRoute = window.location.pathname === '/ingest/parity/sanverse.icon-rail'
 
 createRoot(rootElement).render(
   <StrictMode>
-    {libraryRoute ? <CreativeLibraryApp /> : mode === 'creative-direction' ? <CreativeDirectionLab /> : <MotionLabApp />}
+    {ingestParityRoute ? <ComponentParityLab /> : libraryRoute ? <CreativeLibraryApp /> : mode === 'creative-direction' ? <CreativeDirectionLab /> : <MotionLabApp />}
   </StrictMode>,
 )

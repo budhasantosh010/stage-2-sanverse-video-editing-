@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MotionRenderContextV1 } from '@sanverse/motion-contract'
+import { easeOutBack, easeOutCubic, sequenceProgress } from '@sanverse/motion-primitives'
 import {
   applyMotionGraphPatch,
   applyMotionGraphPatches,
@@ -8,6 +9,7 @@ import {
   createDefaultEffect,
   createDefaultMask,
   createMotionScene,
+  evaluateScalarExpression,
   evaluateScene,
   exposuresForLevel,
   deriveLayerTree,
@@ -76,6 +78,18 @@ const baseScene = (): MotionSceneV1 => {
 }
 
 const mutableClone = (scene: MotionSceneV1): Record<string, unknown> => JSON.parse(JSON.stringify(scene)) as Record<string, unknown>
+
+describe('foreign parity easing expressions', () => {
+  it('evaluates exact deterministic back-out expressions independently of seek history', () => {
+    const context = (localTicks: number) => ({ localTicks, durationTicks: 1_440_000, ticksPerSecond: 1_440_000, composition: { width: 1920, height: 1080, fpsNumerator: 30, fpsDenominator: 1 }, reducedMotion: false } as const)
+    const expression = { kind: 'back-out', overshoot: 0.85, input: { kind: 'ease', easing: 'ease-out-cubic', input: { kind: 'sequence', input: { kind: 'progress' }, start: 0.02, end: 0.30 } } } as const
+    const first = evaluateScalarExpression(expression, context(360_000))
+    evaluateScalarExpression(expression, context(1_200_000))
+    evaluateScalarExpression(expression, context(0))
+    expect(evaluateScalarExpression(expression, context(360_000))).toBe(first)
+    expect(first).toBeCloseTo(easeOutBack(easeOutCubic(sequenceProgress(0.25, 0.02, 0.30)), 0.85), 12)
+  })
+})
 
 describe('motion graph scene and evaluator', () => {
   it('validates a normalized scene containing group/text/shape/path/image nodes', () => {

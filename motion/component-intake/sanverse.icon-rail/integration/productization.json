@@ -1,0 +1,25 @@
+{
+  "componentId": "sanverse.icon-rail",
+  "componentVersion": 1,
+  "moduleFile": "packages/motion-library/src/ingested/frosted-icon-rail.tsx",
+  "moduleImportPath": "./frosted-icon-rail.tsx",
+  "moduleExportName": "FrostedIconRailModule",
+  "definitionExportName": "FROSTED_ICON_RAIL_DEFINITION",
+  "supportedRatios": ["16:9", "9:16", "1:1", "4:5"],
+  "semanticMapping": [
+    { "sourcePart": "component.background", "nodeIds": ["component.background"] },
+    { "sourcePart": "rail.root", "nodeIds": ["rail.root"] },
+    { "sourcePart": "rail.surface", "nodeIds": ["rail.surface"] },
+    { "sourcePart": "rail.item:*", "nodeIds": ["rail.item:0", "rail.item:1", "rail.item:2"] },
+    { "sourcePart": "rail.icon:*", "nodeIds": ["rail.icon:0", "rail.icon:1", "rail.icon:2"] }
+  ],
+  "aiEditIntents": [
+    { "command": "Change the icons.", "exposureId": "rail.glyphs", "operation": "set-component-property" },
+    { "command": "Make the rail vertical.", "exposureId": "rail.direction", "operation": "set-component-property" },
+    { "command": "Change the accent to blue.", "exposureId": "rail.accent", "operation": "set-component-property" },
+    { "command": "Move the rail lower.", "exposureId": "rail.position-y", "operation": "set-node-property" },
+    { "command": "Make the rail larger.", "exposureId": "rail.scale-x", "operation": "set-node-property" },
+    { "command": "Make the corners less round.", "exposureId": "rail.radius", "operation": "set-node-property" },
+    { "command": "Slow down the icon reveal.", "exposureId": "rail.parts", "operation": "retime-keyframes" }
+  ]
+}

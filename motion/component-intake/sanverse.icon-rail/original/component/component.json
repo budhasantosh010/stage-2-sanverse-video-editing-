@@ -1,0 +1,185 @@
+{
+  "schema": "sanverse.visual-component-prototype/v1",
+  "canonicalId": "sanverse.icon-rail",
+  "workingName": "Frosted Icon Rail",
+  "order": 1,
+  "status": "owner-approved-visual",
+  "ownerApproval": true,
+  "purpose": "Introduce a small set of tools, brands, platforms, people or categories as a compact floating group.",
+  "typicalUse": [
+    "talking-head",
+    "short-form",
+    "long-form",
+    "documentary",
+    "product",
+    "social"
+  ],
+  "reference": {
+    "source": "../..\\YTDown.com_Shorts_Open-Source-VS-Open-Weight-What-is-the-D_Media_pdlkU3rDxq0_001_1080p.mp4",
+    "startSeconds": 0.067,
+    "endSeconds": 1.067,
+    "occurrences": [
+      "0.07–1.07s",
+      "90.47–92.50s"
+    ]
+  },
+  "extractNotPixels": true,
+  "referencePrinciples": {
+    "reuse": "Tool stacks · platform sets · partner logos · category groups",
+    "entrance": "Tiles arrive one-by-one into a frosted tray.",
+    "hold": "Balanced compact icon group.",
+    "exit": "Soft fade/drift; cut-safe."
+  },
+  "mustNotCopyLiterally": [
+    "creator footage",
+    "source wording",
+    "brand logos",
+    "copyrighted artwork",
+    "distinctive proprietary UI"
+  ],
+  "canonicalFixture": {
+    "labels": "A\nB\nC",
+    "glyphs": "◆\n✦\n∞",
+    "direction": "horizontal"
+  },
+  "canonicalRatio": "9:16",
+  "supportedRatios": [
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:5",
+    "custom/arbitrary"
+  ],
+  "footageModes": [
+    "OVERLAY",
+    "FEATURE",
+    "FULL-SCENE"
+  ],
+  "transparentBackgroundByDefault": true,
+  "semanticParts": [
+    "rail.root",
+    "rail.surface",
+    "rail.item:*",
+    "rail.icon:*",
+    "component.background"
+  ],
+  "customization": {
+    "creator": [
+      "content.labels",
+      "content.glyphs",
+      "content.direction",
+      "style.accentColor",
+      "motion.duration"
+    ],
+    "designer": [
+      "style.backgroundColor",
+      "style.backgroundOpacity",
+      "layout.positionPreset",
+      "layout.offsetX",
+      "layout.offsetY",
+      "layout.scale",
+      "layout.rotation",
+      "style.opacity",
+      "typography.fontFamily",
+      "typography.typeScale",
+      "typography.fontWeight",
+      "style.textColor",
+      "style.accentColor",
+      "style.surfaceColor",
+      "style.highlightColor",
+      "surface.borderColor",
+      "surface.borderWidth",
+      "surface.surfaceOpacity",
+      "surface.radius",
+      "surface.padding",
+      "surface.spacing",
+      "surface.shadowStrength",
+      "surface.blur"
+    ],
+    "advanced": [
+      "motion.entranceStyle",
+      "motion.exitStyle",
+      "motion.motionIntensity",
+      "motion.stagger",
+      "motion.duration",
+      "motion.reducedMotion",
+      "node.rail.root",
+      "node.rail.surface",
+      "node.rail.item:*",
+      "node.rail.icon:*"
+    ],
+    "compositor": {
+      "status": "local-deep-variant-ready",
+      "semanticNodeSelection": true,
+      "perNodeOverrides": [
+        "text",
+        "visibility",
+        "z-order",
+        "blend-mode",
+        "position",
+        "scale-x",
+        "scale-y",
+        "rotation",
+        "skew",
+        "opacity",
+        "transform-origin",
+        "width",
+        "height",
+        "padding",
+        "gap",
+        "overflow",
+        "font-family",
+        "font-size",
+        "font-weight",
+        "line-height",
+        "letter-spacing",
+        "text-align",
+        "foreground",
+        "background",
+        "border",
+        "radius",
+        "shadow",
+        "filter",
+        "backdrop-filter",
+        "clip-path",
+        "independent-enter-exit-motion",
+        "raw-css",
+        "normalized-keyframes"
+      ],
+      "responsiveScopes": [
+        "all-resolutions",
+        "current-ratio",
+        "current-canvas-shape"
+      ],
+      "variantPersistence": [
+        "local-auto-save",
+        "copy-json",
+        "export-json",
+        "import-json"
+      ],
+      "sanverseGraphProductization": "next engineering projection; approved default must remain visually locked"
+    }
+  },
+  "motion": {
+    "exactTickAuthority": true,
+    "ticksPerSecond": 1440000,
+    "directSeekSafeByConstruction": true,
+    "defaultEntrance": "rise-soft",
+    "defaultExit": "fade-drop",
+    "reducedMotion": true
+  },
+  "source": {
+    "runtime": "../../components.js",
+    "renderer": "renderIconRail",
+    "viewer": "../../index.html?component=icon-rail"
+  },
+  "review": {
+    "canonicalPosterProgress": 0.58,
+    "compareMode": "reference-left / reusable-component-right",
+    "ownerApprovalRequiredBeforeProductization": false,
+    "visualLock": true,
+    "ownerApprovedAt": "2026-08-14"
+  },
+  "visualLock": true,
+  "approvedAt": "2026-08-14"
+}

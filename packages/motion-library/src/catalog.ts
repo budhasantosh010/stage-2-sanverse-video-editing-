@@ -5,6 +5,7 @@ import { KINETIC_HEADLINE_DEFINITION, KineticHeadlineModule } from './components
 import { TIMER_STATUS_PILL_DEFINITION, TimerStatusPillModule } from './components/timer-status-pill.tsx'
 import { TEAM_NETWORK_DIAGRAM_DEFINITION, TeamNetworkDiagramModule } from './components/team-network-diagram.tsx'
 import { FAMILY_COMPONENT_DEFINITIONS, FAMILY_COMPONENT_MODULES_BY_ID } from './components/component-families.tsx'
+import { INGESTED_PUBLIC_COMPONENT_DEFINITIONS, INGESTED_PUBLIC_COMPONENT_MODULES_BY_ID } from './ingested/registry.generated.ts'
 
 export const MOTION_COMPONENT_CATALOG = Object.freeze([
   KINETIC_HEADLINE_DEFINITION,
@@ -13,6 +14,7 @@ export const MOTION_COMPONENT_CATALOG = Object.freeze([
   TIMER_STATUS_PILL_DEFINITION,
   TEAM_NETWORK_DIAGRAM_DEFINITION,
   ...FAMILY_COMPONENT_DEFINITIONS,
+  ...INGESTED_PUBLIC_COMPONENT_DEFINITIONS,
 ] satisfies readonly MotionComponentDefinitionV1[])
 
 export const MOTION_COMPONENT_MODULES = Object.freeze({
@@ -22,4 +24,5 @@ export const MOTION_COMPONENT_MODULES = Object.freeze({
   [TimerStatusPillModule.definition.id]: TimerStatusPillModule,
   [TeamNetworkDiagramModule.definition.id]: TeamNetworkDiagramModule,
   ...FAMILY_COMPONENT_MODULES_BY_ID,
+  ...INGESTED_PUBLIC_COMPONENT_MODULES_BY_ID,
 })

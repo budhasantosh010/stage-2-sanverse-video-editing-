@@ -1,5 +1,5 @@
 import type { MotionRenderContextV1 } from '@sanverse/motion-contract'
-import { clamp01, cubicBezier, easeInCubic, easeInOutCubic, easeOutCubic, formatClockSeconds, formatCompactNumber, interpolateNumber, linear, normalizedProgress, sequenceProgress, springProgress, staggerProgress } from '@sanverse/motion-primitives'
+import { clamp01, cubicBezier, easeInCubic, easeInOutCubic, easeOutBack, easeOutCubic, formatClockSeconds, formatCompactNumber, interpolateNumber, linear, normalizedProgress, sequenceProgress, springProgress, staggerProgress } from '@sanverse/motion-primitives'
 import type { Animatable, BoundValueV1, KeyframedValueV1, MotionBezierHandlesV1, MotionDriverV1, MotionEasingIdV1, MotionPropertyPrimitiveV1, MotionScalarExpressionV1 } from './properties.ts'
 
 const easingFor = (id: MotionEasingIdV1) => id === 'linear' ? linear : id === 'ease-in-cubic' ? easeInCubic : id === 'ease-out-cubic' ? easeOutCubic : easeInOutCubic
@@ -27,6 +27,7 @@ export const evaluateScalarExpression = (expression: MotionScalarExpressionV1, c
   if (expression.kind === 'sequence') return sequenceProgress(evaluateScalarExpression(expression.input, context), expression.start, expression.end)
   if (expression.kind === 'ease') return easingFor(expression.easing)(evaluateScalarExpression(expression.input, context))
   if (expression.kind === 'spring') return springProgress({ progress: evaluateScalarExpression(expression.input, context), damping: expression.damping, frequency: expression.frequency })
+  if (expression.kind === 'back-out') return easeOutBack(evaluateScalarExpression(expression.input, context), expression.overshoot)
   if (expression.kind === 'stagger') return staggerProgress({ progress: evaluateScalarExpression(expression.input, context), index: expression.index, count: expression.count, overlap: expression.overlap })
   if (expression.kind === 'sin') return Math.sin(evaluateScalarExpression(expression.input, context) * Math.PI * 2 * expression.cycles)
   if (expression.kind === 'clamp01') return clamp01(evaluateScalarExpression(expression.input, context))

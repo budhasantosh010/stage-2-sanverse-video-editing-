@@ -9,6 +9,11 @@
     "dev": "node scripts/dev.mjs",
     "test": "npm run test --workspaces --if-present --",
     "build": "npm run build --workspaces --if-present",
-    "motion-library:posters": "vite-node scripts/generate-library-posters.ts"
+    "motion-library:posters": "vite-node scripts/generate-library-posters.ts",
+    "motion:inspect": "vite-node scripts/motion-ingest.ts inspect",
+    "motion:ingest": "vite-node scripts/motion-ingest.ts ingest",
+    "motion:parity": "vite-node scripts/motion-ingest.ts parity",
+    "motion:productize": "vite-node scripts/motion-ingest.ts productize",
+    "motion:register": "vite-node scripts/motion-ingest.ts register"
   }
 }

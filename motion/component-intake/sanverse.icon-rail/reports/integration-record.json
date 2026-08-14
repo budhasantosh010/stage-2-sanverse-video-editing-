@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "sanverse.component-ingest/v1",
+  "componentId": "sanverse.icon-rail",
+  "componentVersion": 1,
+  "visualAuthoringSource": "external-agent",
+  "sourceEnvironment": "ChatGPT Harness visual-agent handoff",
+  "approvedAt": "2026-08-14",
+  "sourceKind": "foreign",
+  "approvedSourceHash": "428e6e328f366417f3e13fb8dcbca388238e1d196f78ec5243fa97a3e374ce39",
+  "manifestHash": "23a58bf7fce9b06124225fb649832df246ee4038810bc35a9ea892426f1aea73",
+  "approvalHash": "dbf009c8a5d9defd6025fe05b7253638f5e0ee9228b0901b9934e7919bc5ae91",
+  "runtimeSourceHash": "cd8c44a60b74401edb01f36b55d139b5663f4151a1fea3cea529e56b2bca5b08",
+  "canonicalVideoHash": "7a79482b5c3b07299cf2f5f7c755553c55ab2273fb4f30416c2c3017e955b762",
+  "integrationStrategy": "foreign-adapter",
+  "canonicalGraphId": "sanverse.icon-rail",
+  "visualParityStatus": "pending",
+  "productizationStatus": "ready",
+  "determinismStatus": "passed",
+  "directSeekStatus": "passed",
+  "semanticMappingStatus": "passed",
+  "c3Status": "passed",
+  "c4Status": "passed",
+  "c5Status": "passed",
+  "c6Status": "not-yet-available",
+  "aiEditabilityStatus": "passed",
+  "libraryStatus": "not-registered",
+  "blockingReasons": [
+    "OWNER_INTEGRATED_PARITY_APPROVAL_REQUIRED"
+  ]
+}

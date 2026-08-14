@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "sanverse.component-golden-parity/v1",
+  "componentId": "sanverse.icon-rail",
+  "componentVersion": 1,
+  "approvedSourceHash": "428e6e328f366417f3e13fb8dcbca388238e1d196f78ec5243fa97a3e374ce39",
+  "canonicalRatio": "9:16",
+  "dimensions": { "width": 360, "height": 640 },
+  "frames": 31,
+  "fps": 30,
+  "durationSeconds": 1,
+  "canonicalSourceVideo": {
+    "localGeneratedPath": "tmp/component-ingest/sanverse.icon-rail/full/approved-source-1x.mp4",
+    "sha256": "7a79482b5c3b07299cf2f5f7c755553c55ab2273fb4f30416c2c3017e955b762",
+    "committed": false,
+    "reason": "Generated review video remains a reproducible local artifact; repository policy does not commit generated exports."
+  },
+  "integratedVideo": {
+    "localGeneratedPath": "tmp/component-ingest/sanverse.icon-rail/full/sanverse-integrated-1x.mp4",
+    "sha256": "dafd3f47903c90b02f05908371e7d3f93a00b85d38d45b48a037e0034a5aa951",
+    "committed": false
+  },
+  "fullVideoSsim": 0.99678,
+  "checkpointProgress": [0, 0.05, 0.18, 0.33, 0.58, 0.9, 1],
+  "visualEvidence": [
+    "motion/visual-baselines/ingest-v1-icon-rail-parity.png",
+    "motion/visual-baselines/ingest-v1-icon-rail-temporal-parity.png"
+  ],
+  "authority": "Visual judgment + exact source-motion math; SSIM is supporting evidence only."
+}

@@ -13,6 +13,7 @@ export type MotionScalarExpressionV1 =
   | Readonly<{ kind: 'sequence'; input: MotionScalarExpressionV1; start: number; end: number }>
   | Readonly<{ kind: 'ease'; easing: MotionEasingIdV1; input: MotionScalarExpressionV1 }>
   | Readonly<{ kind: 'spring'; input: MotionScalarExpressionV1; damping: number; frequency: number }>
+  | Readonly<{ kind: 'back-out'; input: MotionScalarExpressionV1; overshoot: number }>
   | Readonly<{ kind: 'stagger'; input: MotionScalarExpressionV1; index: number; count: number; overlap: number }>
   | Readonly<{ kind: 'sin'; input: MotionScalarExpressionV1; cycles: number }>
   | Readonly<{ kind: 'clamp01'; input: MotionScalarExpressionV1 }>

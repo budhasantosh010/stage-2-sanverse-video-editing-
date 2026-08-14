@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "sanverse.external-visual-approval-index/v1",
+  "visualWorkspace": "Component CH1",
+  "approvedBy": "owner",
+  "approvedAt": "2026-08-14",
+  "ownerStatement": "All CH1 components are approved and suitable for use in the owner's YouTube videos.",
+  "components": [
+    { "componentId": "sanverse.icon-rail", "name": "Frosted Icon Rail", "sourceKind": "foreign", "foreignDecision": "lossless-normalization", "approval": "passed", "determinism": "passed", "directSeek": "passed", "status": "pilot-productized-awaiting-owner-integrated-parity" },
+    { "componentId": "sanverse.progressive-choice-stack", "name": "Progressive Choice Stack", "sourceKind": "foreign", "foreignDecision": "lossless-normalization", "approval": "passed", "determinism": "passed", "directSeek": "passed", "status": "approved-source-inspected-not-ingested" },
+    { "componentId": "sanverse.kinetic-phrase", "name": "Kinetic Phrase", "sourceKind": "foreign", "foreignDecision": "lossless-normalization", "approval": "passed", "determinism": "passed", "directSeek": "passed", "status": "approved-source-inspected-not-ingested" },
+    { "componentId": "sanverse.explainer-board", "name": "Explainer Board", "sourceKind": "foreign", "foreignDecision": "lossless-normalization", "approval": "passed", "determinism": "passed", "directSeek": "passed", "status": "approved-source-inspected-not-ingested" },
+    { "componentId": "sanverse.milestone-stage", "name": "Milestone Brand Stage", "sourceKind": "foreign", "foreignDecision": "lossless-normalization", "approval": "passed", "determinism": "passed", "directSeek": "passed", "status": "approved-source-inspected-not-ingested" },
+    { "componentId": "sanverse.feature-matrix", "name": "Feature Matrix", "sourceKind": "foreign", "foreignDecision": "lossless-normalization", "approval": "passed", "determinism": "passed", "directSeek": "passed", "status": "approved-source-inspected-not-ingested" },
+    { "componentId": "sanverse.media-cutaway", "name": "Media Cutaway Stage", "sourceKind": "foreign", "foreignDecision": "lossless-normalization", "approval": "passed", "determinism": "passed", "directSeek": "passed", "status": "approved-source-inspected-not-ingested" },
+    { "componentId": "sanverse.stat-burst", "name": "Stat Burst", "sourceKind": "foreign", "foreignDecision": "lossless-normalization", "approval": "passed", "determinism": "passed", "directSeek": "passed", "status": "approved-source-inspected-not-ingested" },
+    { "componentId": "sanverse.floating-value-cloud", "name": "Floating Value Cloud", "sourceKind": "foreign", "foreignDecision": "lossless-normalization", "approval": "passed", "determinism": "passed", "directSeek": "passed", "status": "approved-source-inspected-not-ingested" },
+    { "componentId": "sanverse.cta-pill", "name": "CTA Pill", "sourceKind": "foreign", "foreignDecision": "lossless-normalization", "approval": "passed", "determinism": "passed", "directSeek": "passed", "status": "approved-source-inspected-not-ingested" }
+  ]
+}
