@@ -2,6 +2,7 @@ import type { MotionValidationIssueV1, MotionValidationResultV1 } from '@sanvers
 import { motionValidationError, motionValidationOk } from '@sanverse/motion-contract'
 import { MOTION_BLEND_MODES, MOTION_EFFECT_REGISTRY, MOTION_EFFECT_TYPES } from './effects.ts'
 import { MOTION_MASK_TYPES } from './masks.ts'
+import { validateMotionMatteRelationshipV1 } from './compositing.ts'
 import { motionBezierHandleIssue } from './animation.ts'
 import type { Animatable, MotionKeyframeInterpolationV1, MotionNodePropertyNameV1, MotionNodePropertyPathV1, MotionPropertyPathV1, MotionScalarExpressionV1 } from './properties.ts'
 import type { MotionNodeV1 } from './nodes.ts'
@@ -238,6 +239,17 @@ export const validateMotionScene = (input: unknown): MotionValidationResultV1<Mo
     if (!targetExists(scene, exposure.target)) issues.push(issue(`$.exposures[${index}].target`, 'Exposure target does not exist.'))
   })
   for (const node of Object.values(scene.nodes)) for (const [property, value] of nodeAnimatables(node)) if (value.kind === 'binding' && !scene.nodes[value.binding.source.nodeId]) issues.push(issue(`$.nodes.${node.id}.${property}`, 'Binding source node does not exist.'))
+  if (scene.compositing !== undefined) {
+    if (scene.compositing.schemaVersion !== 'sanverse.motion-compositing/v1' || !Array.isArray(scene.compositing.mattes)) issues.push(issue('$.compositing', 'Compositing metadata must use sanverse.motion-compositing/v1 with matte relationships.'))
+    else {
+      const matteIds = new Set<string>()
+      scene.compositing.mattes.forEach((matte, index) => {
+        if (matteIds.has(matte.id)) issues.push(issue(`$.compositing.mattes[${index}].id`, 'Matte id must be unique.')); else matteIds.add(matte.id)
+        const matteIssue = validateMotionMatteRelationshipV1(scene, matte)
+        if (matteIssue) issues.push(issue(`$.compositing.mattes[${index}]`, matteIssue))
+      })
+    }
+  }
   for (const ownership of scene.layout.ownership) if (!scene.nodes[ownership.target.nodeId]) issues.push(issue('$.layout.ownership', 'Layout ownership references a missing node.'))
   for (const override of scene.layout.formatOverrides) if (!scene.nodes[override.target.nodeId]) issues.push(issue('$.layout.formatOverrides', 'Format override references a missing node.'))
   return issues.length > 0 ? motionValidationError(...issues) : motionValidationOk(scene)

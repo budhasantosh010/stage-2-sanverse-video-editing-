@@ -28,6 +28,7 @@ const persistedReviewDocument = JSON.stringify({
 })
 const settle = async () => { await act(async () => { await Promise.resolve(); await Promise.resolve() }) }
 const setInput = (input: HTMLInputElement, value: string) => { const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set; setter?.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })) }
+const setSelect = (select: HTMLSelectElement, value: string) => { const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set; setter?.call(select, value); select.dispatchEvent(new Event('change', { bubbles: true })) }
 
 describe('L1 Creative Library browser', () => {
   let container: HTMLDivElement
@@ -46,6 +47,16 @@ describe('L1 Creative Library browser', () => {
     expect(container.textContent).toContain(`${MOTION_LIBRARY_CATALOG.length} COMPONENTS`)
     expect(container.querySelectorAll('[data-library-card]')).toHaveLength(MOTION_LIBRARY_CATALOG.length)
     expect(container.querySelectorAll('[data-library-player]')).toHaveLength(0)
+  })
+
+  it('exposes explicit shared Library scopes and fails closed to an empty external scope before external catalog entries exist', async () => {
+    const scope = container.querySelector<HTMLSelectElement>('[aria-label="Library scope"]')!
+    expect(scope).not.toBeNull()
+    expect([...scope.options].map((option) => option.value)).toEqual(['', 'sanverse', 'external', 'generated', 'project'])
+    await act(async () => { setSelect(scope, 'external'); await Promise.resolve() }); await settle()
+    expect(window.location.search).toContain('scope=external')
+    expect(container.querySelectorAll('[data-library-card]')).toHaveLength(0)
+    expect(container.textContent).toContain('No components match.')
   })
 
   it('keeps exactly one inline real preview active when a second card starts', async () => {
@@ -72,8 +83,17 @@ describe('L1 Creative Library browser', () => {
     await act(async () => { window.history.pushState({}, '', '/library/component/sanverse.donut-breakdown'); window.dispatchEvent(new PopStateEvent('popstate')); await Promise.resolve() }); await settle()
     expect(container.textContent).toContain('Donut Breakdown')
     expect(container.querySelector('[data-library-player="sanverse.donut-breakdown"]')).not.toBeNull()
+    expect(container.querySelector<HTMLAnchorElement>('a[href="/review-videos/sanverse.donut-breakdown.mp4"]')?.textContent).toContain('Open canonical 1× review')
     await act(async () => { window.history.pushState({}, '', '/library/component/sanverse.nope'); window.dispatchEvent(new PopStateEvent('popstate')); await Promise.resolve() }); await settle()
     expect(container.textContent).toContain('Component not found')
+  })
+
+  it('renders one canonical component at the exact requested tick for portable review capture', async () => {
+    await act(async () => { window.history.pushState({}, '', '/library/record/sanverse.donut-breakdown?tick=720000'); window.dispatchEvent(new PopStateEvent('popstate')); await Promise.resolve() }); await settle()
+    const capture = container.querySelector<HTMLElement>('[data-library-record="sanverse.donut-breakdown"]')
+    expect(capture).not.toBeNull()
+    expect(capture?.getAttribute('data-library-record-tick')).toBe('720000')
+    expect(capture?.querySelectorAll('[data-library-stage="sanverse.donut-breakdown"]')).toHaveLength(1)
   })
 
   it('keeps Pass disabled before a complete canonical 1x playback', async () => {

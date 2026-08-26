@@ -1,6 +1,16 @@
 # Current State
 
-Last updated: 2026-08-11
+Last updated: 2026-08-26
+
+## Parallel Creative Engine worktree — Closed-Loop V1 + MCP V1 complete locally
+
+The isolated Motion/Creative worktree has completed the owner-authorized Creative Engine Closed-Loop V1 and then exposed that accepted loop through MCP V1 without changing the production editor. The loop is UI-independent and reuses one canonical `MotionSceneV1`/`MotionGraphOperationV1` authority from source/capability context through isolated Storyboard KVS, exact-tick Animatic, MotionPlan/Motion Forge, structural + visual QA, bounded repair, explicit revision-bound owner approvals, one atomic accepted-project merge and one inverse Undo.
+
+C6 is a projection over the same semantic node IDs; C8 adds bounded matte/compositing metadata and existing exact-tick masks to the same graph. External SVG/Lottie support is deliberately bounded and fail-closed; alpha video remains an external exact-time asset. No second graph, renderer, keyframe engine, timeline, Library registry or Undo system was introduced.
+
+`@sanverse/motion-agent-tools` publishes 17 T0/T1/T2 internal workflow tools. `@sanverse/motion-mcp` is only a protocol adapter over that registry: it propagates sandbox context and cannot forge owner approval. Host-resolved opaque proof is required before the MCP path can supply an `OwnerApprovalV1` to the internal tool.
+
+Real Edge completed the development `/closed-loop-review` route at exactly 1× from tick 0 to **7,200,000 / 7,200,000**, captured **194** browser frames and retained graph-backed stable semantic node `cost-card.value`; entrance/payoff/exit frames were manually inspected. Final affected matrix: **525/525 PASS**; root all-workspace build: **PASS**; `apps/web/**` diff: **0**. Durable details: `DOCS/motion/creative-engine-closed-loop-v1/STATUS.md`. Local Git only; the nested `sites/creative-library-site` repository remains separate and excluded.
 
 ## Active goal
 

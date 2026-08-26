@@ -1,5 +1,17 @@
 # Project Log
 
+## 2026-08-26 — Creative Engine Closed-Loop V1 + MCP V1 complete locally
+
+- Reconciled the complete verified CH1 foundation into the requested Motion worktree before new architecture work and preserved the pre-existing portable-Library changes plus the separately versioned nested `sites/creative-library-site` repository.
+- Extended shared contracts with the closed presentation/source/background/scope/lock/editability/result vocabulary; added C6 node projection and bounded C8 matte/compositing to the existing Motion Graph rather than creating parallel authorities.
+- Added narrow Storyboard/Animatic sandbox, external-source bridge and UI-independent agent-tool packages. Storyboard writes are revision-fenced and atomic; approvals target exact revisions; reopening invalidates old approval; external SVG/Lottie support is explicitly bounded and unsupported features fail closed; alpha video remains an external exact-time asset.
+- Motion Forge produces inspectable `MotionPlanV1` beats/intents and compiles the locked 27-operation semantic vocabulary into existing Motion Graph keyframe/mask operations. Structural QA covers graph/semantic IDs/assets/capabilities/provenance/locks/unsupported operations/exact ticks/direct-seek parity; repairs are localized and reversible.
+- The registry-driven acceptance test executes Storyboard → QA → owner approval → Animatic → QA → owner approval → MotionPlan/Motion Draft → QA → canonical review → owner approval → one atomic accepted-project merge → one inverse Undo. A forged revision approval is refused, and the same `hero` semantic identity remains visible through C3 Layers, C4 Dope Sheet, C5 Curves and C6 Node Graph.
+- Added the development-only `/closed-loop-review` Motion Lab route and real Edge/CDP audit. One canonical 1× playback completed at exactly **7,200,000 / 7,200,000 ticks**, captured **194** browser frames, remained graph-backed and exposed stable semantic node `cost-card.value`. Entrance/payoff/exit frames were visually inspected and retained under `motion/visual-baselines/closed-loop-v1/`.
+- Added `@sanverse/motion-mcp` as a thin adapter over the same internal registry. MCP exposes the actual 17 Closed-Loop tools, carries explicit sandbox context, serves a real localhost `/mcp` request, and cannot create owner approval from client JSON, elicitation response, guessed request state or fake proof; only host-resolved opaque approval proof is accepted.
+- Final release gate: **525 affected tests PASS** plus root all-workspace build PASS. `apps/web/**` diff is **0**. The existing Motion Lab/web large-chunk warnings and runtime-resolved nameplate-font warning remain non-blocking pre-existing build warnings. Local Git only; nested `sites/` repository is excluded from this release.
+- Durable closeout: `DOCS/motion/creative-engine-closed-loop-v1/STATUS.md`, `REQ-016`, `DEC-014`, Build Tracker row `CREATIVE-CLOSED-LOOP-V1`.
+
 ## 2026-08-14 — Plan-A Approved Component Ingest V1 + Frosted Icon Rail pilot ready for owner parity
 
 - Added one fail-closed `@sanverse/motion-ingest` pipeline and internal CLI for inspect → immutable ingest → productize → parity → register. Source kinds are closed; public registration is atomic and cannot occur before owner-reviewed integrated parity.

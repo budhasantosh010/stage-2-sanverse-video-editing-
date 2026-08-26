@@ -2,6 +2,8 @@ import { MOTION_BLEND_MODES, MOTION_EFFECT_REGISTRY, MOTION_EFFECT_TYPES } from 
 import type { MotionBlendModeV1, MotionEffectInstanceV1, MotionEffectParameterDefinitionV1 } from './effects.ts'
 import { MOTION_MASK_TYPES } from './masks.ts'
 import type { MotionMaskInstanceV1 } from './masks.ts'
+import { removeMotionMatteRelationshipV1, setMotionMatteRelationshipV1, validateMotionMatteRelationshipV1 } from './compositing.ts'
+import type { MotionMatteRelationshipV1 } from './compositing.ts'
 import { nodeBase } from './nodes.ts'
 import type { MotionGroupNodeV1, MotionNodeV1 } from './nodes.ts'
 import { evaluateKeyframedValue, motionBezierHandleIssue } from './animation.ts'
@@ -50,6 +52,8 @@ export type MotionGraphOperationV1 =
   | (MotionOperationBaseV1 & Readonly<{ type: 'remove-mask'; nodeId: string; maskId: string }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'reorder-mask'; nodeId: string; maskId: string; index: number }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'set-mask-property'; nodeId: string; maskId: string; property: MotionMaskPropertyNameV1; value: boolean | Animatable<number> }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'set-matte'; relationship: MotionMatteRelationshipV1 }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'remove-matte'; matteId: string }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'set-blend-mode'; nodeId: string; blendMode: MotionBlendModeV1 }>)
 
 export const MOTION_GRAPH_OPERATION_TYPES = Object.freeze([
@@ -58,7 +62,7 @@ export const MOTION_GRAPH_OPERATION_TYPES = Object.freeze([
   'add-node', 'remove-node', 'duplicate-node', 'rename-node', 'reparent-node', 'reorder-node', 'group-nodes', 'ungroup-nodes',
   'add-effect', 'remove-effect', 'duplicate-effect', 'reorder-effect', 'set-effect-property', 'set-effect-enabled',
   'add-mask', 'remove-mask', 'reorder-mask', 'set-mask-property',
-  'set-blend-mode',
+  'set-matte', 'remove-matte', 'set-blend-mode',
 ] as const satisfies readonly MotionGraphOperationV1['type'][])
 
 export type MotionOperationErrorCodeV1 =
@@ -80,6 +84,7 @@ export type MotionOperationErrorCodeV1 =
   | 'EFFECT_INVALID'
   | 'EFFECT_PARAMETER_INVALID'
   | 'MASK_INVALID'
+  | 'MATTE_INVALID'
   | 'BLEND_MODE_INVALID'
   | 'RESULT_INVALID'
   | 'BATCH_FAILED'
@@ -192,6 +197,8 @@ export const validateMotionGraphOperation = (input: unknown): MotionOperationErr
   if (input.type === 'add-mask' && !isRecord(input.mask)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.mask', message: 'add-mask needs a mask definition.' })
   if (['remove-mask', 'reorder-mask', 'set-mask-property'].includes(input.type) && !boundedId(input.maskId)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.maskId', message: 'Mask operation needs maskId.' })
   if (input.type === 'set-mask-property' && typeof input.property !== 'string') return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.property', message: 'Mask operation needs property.' })
+  if (input.type === 'set-matte' && (!isRecord(input.relationship) || !boundedId(input.relationship.id) || !boundedId(input.relationship.sourceNodeId) || !boundedId(input.relationship.targetNodeId) || typeof input.relationship.mode !== 'string' || typeof input.relationship.order !== 'string')) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.relationship', message: 'set-matte needs a typed matte relationship.' })
+  if (input.type === 'remove-matte' && !boundedId(input.matteId)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.matteId', message: 'remove-matte needs matteId.' })
   if (input.type === 'set-blend-mode' && typeof input.blendMode !== 'string') return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.blendMode', message: 'Blend mode must be a string.' })
   if ('index' in input && input.index !== undefined && !validIndex(input.index)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.index', message: 'Insertion index must be a non-negative safe integer.' })
   return null
@@ -794,6 +801,24 @@ export const applyMotionOperation = (
       const oldValue = property === 'enabled' || property === 'invert' ? mask[property] : mask[property]
       const candidate = applyMotionGraphPatch(scene, { op: 'set-mask-property', nodeId: node.id, maskId: mask.id, property, value: operation.value })
       return success(candidate, [node.id], [Object.freeze({ operationId: operationInverseId(operationId), type: 'set-mask-property', nodeId: node.id, maskId: mask.id, property, value: oldValue }) as MotionGraphOperationV1])
+    }
+
+    if (operation.type === 'set-matte') {
+      const issue = validateMotionMatteRelationshipV1(scene, operation.relationship)
+      if (issue) return fail(operationId, 'MATTE_INVALID', issue)
+      const previous = scene.compositing?.mattes.find((item) => item.id === operation.relationship.id) ?? null
+      const candidate = setMotionMatteRelationshipV1(scene, operation.relationship)
+      const inverse: MotionGraphOperationV1 = previous
+        ? Object.freeze({ operationId: operationInverseId(operationId), type: 'set-matte', relationship: previous })
+        : Object.freeze({ operationId: operationInverseId(operationId), type: 'remove-matte', matteId: operation.relationship.id })
+      return success(candidate, [operation.relationship.sourceNodeId, operation.relationship.targetNodeId], [inverse])
+    }
+
+    if (operation.type === 'remove-matte') {
+      const previous = scene.compositing?.mattes.find((item) => item.id === operation.matteId)
+      if (!previous) return fail(operationId, 'MATTE_INVALID', `Unknown matte: ${operation.matteId}`)
+      const candidate = removeMotionMatteRelationshipV1(scene, operation.matteId)
+      return success(candidate, [previous.sourceNodeId, previous.targetNodeId], [Object.freeze({ operationId: operationInverseId(operationId), type: 'set-matte', relationship: previous })])
     }
 
     const node = findNode(scene, operation.nodeId)

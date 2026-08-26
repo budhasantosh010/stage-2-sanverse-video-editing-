@@ -4,6 +4,7 @@ import {
   MOTION_LIBRARY_CATALOG,
   filterMotionLibraryCatalog,
   getMotionDiscoveryCatalog,
+  getMotionLibraryCapabilityRecordsV1,
   getMotionLibraryCollections,
   validateMotionLibraryCatalog,
   validateMotionLibraryCollections,
@@ -70,9 +71,14 @@ describe('L1 Creative Library catalog authority', () => {
     expect(productStory.items.find((entry) => entry.componentId === 'sanverse.kinetic-headline')?.fixtureId).toBe('semantic-highlight')
   })
 
-  it('exposes a pure future-B2 discovery boundary without scraping React UI', () => {
+  it('exposes pure B2 discovery/capability boundaries without scraping React UI', () => {
     const discovery = getMotionDiscoveryCatalog()
+    const capabilities = getMotionLibraryCapabilityRecordsV1()
     expect(discovery).toHaveLength(MOTION_COMPONENT_CATALOG.length)
-    expect(discovery.every((entry) => entry.communicationIntents.length > 0 && entry.recommendedContexts.length > 0)).toBe(true)
+    expect(capabilities).toHaveLength(MOTION_COMPONENT_CATALOG.length)
+    expect(discovery.every((entry) => entry.communicationIntents.length > 0 && entry.recommendedContexts.length > 0 && entry.libraryScope === 'sanverse')).toBe(true)
+    expect(capabilities.every((entry) => entry.kind === 'sanverse-component' && entry.libraryScope === 'sanverse' && entry.supportedPresentationModes.length > 0)).toBe(true)
+    expect(filterMotionLibraryCatalog(MOTION_LIBRARY_CATALOG, { libraryScope: 'sanverse' })).toHaveLength(MOTION_COMPONENT_CATALOG.length)
+    expect(filterMotionLibraryCatalog(MOTION_LIBRARY_CATALOG, { libraryScope: 'external' })).toHaveLength(0)
   })
 })

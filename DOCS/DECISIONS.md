@@ -152,3 +152,14 @@ Only durable, approved decisions belong here. Proposals stay in plans or the bla
 - The Sanverse coding agent owns implementation and Library insertion after source approval; external visual workspaces provide approved source evidence, not a second engineering owner.
 - Why: preserve truthful provenance while allowing the owner to delegate repetitive source-preserving conversion work without pretending nine unseen integrations were individually owner-reviewed.
 - Revisit trigger: a future batch contains a component whose engineering parity is ambiguous or materially diverges from the approved source; that component returns to direct owner review.
+
+## DEC-014 — One Creative Engine authority; MCP is only a protocol adapter
+
+- Status: Approved by the owner
+- Date: 2026-08-26
+- Decision: Closed-Loop V1 extends the existing Motion/Creative authorities instead of creating parallel state. `MotionSceneV1` remains the canonical visual scene; `MotionGraphOperationV1` remains the canonical deterministic mutation/inverse path; Storyboard/Animatic live in an isolated revisioned sandbox until explicit approvals and one atomic accepted-project merge; C3/C4/C5/C6 are projections over the same semantic node IDs; C8 adds only bounded mask/matte/compositing metadata to that same graph.
+- New packages are narrow responsibility boundaries only: `@sanverse/motion-storyboard` owns Storyboard/Animatic sandbox lifecycle, `@sanverse/motion-external-bridge` owns foreign-source inspection/materialization/provenance/rights, and `@sanverse/motion-agent-tools` owns the UI-independent T0/T1/T2 workflow registry/orchestration.
+- MCP V1 (`@sanverse/motion-mcp`) delegates `tools/list` and `tools/call` to that internal registry. It does not directly call graph helpers or own project/approval/Undo state. Sandbox identity is explicit. Owner approval requires host-resolved opaque proof; client arguments, elicitation responses, or guessed request state cannot create approval authority.
+- Why: a second graph/tool-state/approval/Undo system would make browser UI, automation and future agents disagree about what the project actually is. One authority makes every surface a different controller over the same deterministic state.
+- Trade-off: MCP cannot independently recover or mutate state if the internal engine is unavailable; that dependence is intentional because protocol availability must never outrank project correctness.
+- Revisit trigger: a future external client needs a capability the internal registry cannot express without breaking the one-authority rule; extend/version the internal contract first, then expose it through MCP.

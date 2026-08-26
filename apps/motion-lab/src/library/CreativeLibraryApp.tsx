@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { MotionAspectRatio } from '@sanverse/motion-contract'
+import { LIBRARY_SCOPES_V1, type MotionAspectRatio } from '@sanverse/motion-contract'
 import {
   INITIAL_MOTION_STYLE_PACKS,
   MOTION_LIBRARY_CATALOG,
@@ -22,7 +22,7 @@ import type {
   MotionLibraryReviewStatusV1,
   MotionQualityReviewV1,
 } from '@sanverse/motion-library'
-import { LibraryPlayer, LibraryPosterStage } from './LibraryPlayer.tsx'
+import { LibraryMotionStage, LibraryPlayer, LibraryPosterStage } from './LibraryPlayer.tsx'
 import { libraryComponentLabUrl, libraryCompositorUrl } from './preview-model.ts'
 import { useLibraryReviewStore } from './review-store.ts'
 import type { PlaybackSpeed } from '../transport.ts'
@@ -112,6 +112,7 @@ function LibraryHome({ search, navigate, reviewByComponent, reviewLoading }: Rea
     qualityTier: selectValue(params.get('quality') ?? '', MOTION_LIBRARY_QUALITY_TIERS),
     performanceClass: selectValue(params.get('performance') ?? '', ['light','medium','heavy'] as const),
     format: selectValue(params.get('format') ?? '', MOTION_FORMAT_USES),
+    libraryScope: selectValue(params.get('scope') ?? '', LIBRARY_SCOPES_V1),
     sort: selectValue(params.get('sort') ?? '', ['recommended','recent','a-z','milestone','quality'] as const) ?? 'recommended',
   }), [params])
   const entries = useMemo(() => filterMotionLibraryCatalog(reviewedCatalog, options), [reviewedCatalog, options])
@@ -123,6 +124,7 @@ function LibraryHome({ search, navigate, reviewByComponent, reviewLoading }: Rea
     <section className="creative-library__toolbar"><label className="creative-library__search-label">Search components<input aria-label="Search components" value={params.get('q') ?? ''} placeholder="toast, agent, percentage, glass…" onChange={(event) => update('q', event.target.value)} /></label><div className="creative-library__toolbar-links"><label className="creative-library__auto-preview"><input type="checkbox" checked={autoPreview} onChange={(event) => setAutoPreview(event.target.checked)} /> Auto-preview on hover</label><button onClick={() => navigate(`/library/showreel${search}`)}>▶ Showreel</button><button onClick={() => navigate('/library/review')}>Review Queue</button></div></section>
     <div className="creative-library__tabs" role="tablist" aria-label="Library categories">{MOTION_LIBRARY_TAB_DEFINITIONS.map((tab) => <button role="tab" aria-selected={currentTab === tab.id} className={currentTab === tab.id ? 'is-active' : ''} key={tab.id} onClick={() => selectTab(tab.id)}>{tab.label}</button>)}</div>
     <section className="creative-library__filters" aria-label="Library filters">
+      <select aria-label="Library scope" value={options.libraryScope ?? ''} onChange={(event) => update('scope', event.target.value)}><option value="">All scopes</option>{LIBRARY_SCOPES_V1.map((value) => <option key={value} value={value}>{labelize(value)}</option>)}</select>
       <select aria-label="Collection" value={options.collectionId ?? ''} onChange={(event) => update('collection', event.target.value)}><option value="">All collections</option>{collections.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.displayName}</option>)}</select>
       <select aria-label="Context" value={options.context ?? ''} onChange={(event) => update('context', event.target.value)}><option value="">All contexts</option>{MOTION_USE_CONTEXTS.map((value) => <option key={value} value={value}>{labelize(value)}</option>)}</select>
       <select aria-label="Milestone" value={options.milestone ?? ''} onChange={(event) => update('milestone', event.target.value)}><option value="">All milestones</option>{MOTION_LIBRARY_MILESTONES.map((value) => <option key={value} value={value}>{value}</option>)}</select>
@@ -186,7 +188,7 @@ function ComponentDetail({ id, navigate, reviewByComponent, saveReview }: Readon
   const effectiveReview = reviewByComponent[entry.componentId]
   const visibleEntry = effectiveReview ? Object.freeze({ ...entry, review: Object.freeze({ status: effectiveReview.status, qualityTier: effectiveReview.qualityTier, fullPlaybackVerified: effectiveReview.fullPlaybackVerified }) }) : entry
   const labState = { ratio, stylePackId, background, reducedMotion, fixtureId }
-  return <main className="creative-library creative-library--detail"><LibraryHeader count={MOTION_LIBRARY_CATALOG.length} navigate={navigate} /><section className="creative-library__detail-head"><button onClick={() => navigate('/library')}>← Library</button><div><span>{labelize(entry.primaryCategory)} · Added {entry.introducedInMilestone}</span><h2>{entry.displayName}</h2><p>{entry.shortDescription}</p></div><QualityBadge entry={visibleEntry} /></section><section className="creative-library__detail-player"><LibraryPlayer entry={entry} fixtureId={fixtureId} ratio={ratio} stylePackId={stylePackId} background={background} reducedMotion={reducedMotion} speed={speed} controls onFullPlaybackVerified={() => setFullPlaybackVerified(true)} /></section><PlayerOptions ratio={ratio} setRatio={setRatio} stylePackId={stylePackId} setStylePackId={setStylePackId} background={background} setBackground={setBackground} reducedMotion={reducedMotion} setReducedMotion={setReducedMotion} speed={speed} setSpeed={setSpeed} />{entry.componentId === 'sanverse.kinetic-headline' ? <section className="creative-library__examples"><strong>Examples</strong><button className={fixtureId === 'default' ? 'is-active' : ''} onClick={() => setFixtureId('default')}>Default</button><button className={fixtureId === 'semantic-highlight' ? 'is-active' : ''} onClick={() => setFixtureId('semantic-highlight')}>Semantic Highlight</button></section> : null}<section className="creative-library__detail-meta"><div><span>ABOUT</span><p>{entry.shortDescription}</p><dl><dt>Component ID</dt><dd>{entry.componentId}</dd><dt>Milestone</dt><dd>{entry.introducedInMilestone}</dd><dt>Performance</dt><dd>{entry.performanceClass}</dd>{entry.referenceLineage.length ? <><dt>Reference lineage</dt><dd>{entry.referenceLineage.map(labelize).join(', ')}</dd></> : null}</dl></div><div><span>DISCOVERY</span><strong>Communication intents</strong><div className="creative-library__tag-row">{entry.communicationIntents.map((value) => <small key={value}>{labelize(value)}</small>)}</div><strong>Recommended contexts</strong><div className="creative-library__tag-row">{entry.recommendedContexts.map((value) => <small key={value}>{labelize(value)}</small>)}</div></div><div><span>CONTROLS</span><p>Creator, Designer and Advanced controls are schema-driven in Component Lab. Deep editing uses the same C3 Layers, C4 Timeline and C5 Curves.</p><div className="creative-library__open-actions"><a href={libraryComponentLabUrl(entry, labState)}>Open in Component Lab ↗</a><a href={libraryCompositorUrl(entry, labState)}>Open in Compositor ↗</a></div></div></section><ReviewEditor entry={entry} existing={effectiveReview} fullPlaybackVerified={fullPlaybackVerified} onSave={saveReview} /></main>
+  return <main className="creative-library creative-library--detail"><LibraryHeader count={MOTION_LIBRARY_CATALOG.length} navigate={navigate} /><section className="creative-library__detail-head"><button onClick={() => navigate('/library')}>← Library</button><div><span>{labelize(entry.primaryCategory)} · Added {entry.introducedInMilestone}</span><h2>{entry.displayName}</h2><p>{entry.shortDescription}</p></div><QualityBadge entry={visibleEntry} /></section><section className="creative-library__detail-player"><LibraryPlayer entry={entry} fixtureId={fixtureId} ratio={ratio} stylePackId={stylePackId} background={background} reducedMotion={reducedMotion} speed={speed} controls onFullPlaybackVerified={() => setFullPlaybackVerified(true)} /></section><PlayerOptions ratio={ratio} setRatio={setRatio} stylePackId={stylePackId} setStylePackId={setStylePackId} background={background} setBackground={setBackground} reducedMotion={reducedMotion} setReducedMotion={setReducedMotion} speed={speed} setSpeed={setSpeed} />{entry.componentId === 'sanverse.kinetic-headline' ? <section className="creative-library__examples"><strong>Examples</strong><button className={fixtureId === 'default' ? 'is-active' : ''} onClick={() => setFixtureId('default')}>Default</button><button className={fixtureId === 'semantic-highlight' ? 'is-active' : ''} onClick={() => setFixtureId('semantic-highlight')}>Semantic Highlight</button></section> : null}<section className="creative-library__detail-meta"><div><span>ABOUT</span><p>{entry.shortDescription}</p><dl><dt>Component ID</dt><dd>{entry.componentId}</dd><dt>Milestone</dt><dd>{entry.introducedInMilestone}</dd><dt>Performance</dt><dd>{entry.performanceClass}</dd><dt>Library scope</dt><dd>{labelize(entry.libraryScope)}</dd>{entry.referenceLineage.length ? <><dt>Reference lineage</dt><dd>{entry.referenceLineage.map(labelize).join(', ')}</dd></> : null}</dl></div><div><span>DISCOVERY</span><strong>Communication intents</strong><div className="creative-library__tag-row">{entry.communicationIntents.map((value) => <small key={value}>{labelize(value)}</small>)}</div><strong>Recommended contexts</strong><div className="creative-library__tag-row">{entry.recommendedContexts.map((value) => <small key={value}>{labelize(value)}</small>)}</div></div><div><span>CONTROLS</span><p>Creator, Designer and Advanced controls are schema-driven in Component Lab. Deep editing uses the same C3 Layers, C4 Timeline and C5 Curves.</p><div className="creative-library__open-actions"><a href={libraryComponentLabUrl(entry, labState)}>Open in Component Lab ↗</a><a href={libraryCompositorUrl(entry, labState)}>Open in Compositor ↗</a></div></div></section><ReviewEditor entry={entry} existing={effectiveReview} fullPlaybackVerified={fullPlaybackVerified} onSave={saveReview} /></main>
 }
 
 function Showreel({ search, navigate, reviewByComponent, saveReview }: Readonly<{ search: string; navigate: (href: string) => void; reviewByComponent: Readonly<Record<string, MotionQualityReviewV1>>; saveReview: (review: MotionQualityReviewV1) => Promise<boolean> }>) {
@@ -227,6 +229,16 @@ function ReviewQueue({ navigate, reviewByComponent }: Readonly<{ navigate: (href
 
 function PosterCapture({ id }: Readonly<{ id: string }>) { const entry = entryById(id); if (!entry) return <div className="creative-library__poster-error">Unknown component</div>; return <div className="creative-library__poster-capture" data-poster-component={entry.componentId} data-poster-hash={entry.preview.previewHash}><LibraryPosterStage entry={entry} /></div> }
 
+function ReviewVideoCapture({ id, search }: Readonly<{ id: string; search: string }>) {
+  const entry = entryById(id)
+  const requestedTick = Number(new URLSearchParams(search).get('tick'))
+  if (!entry) return <div className="creative-library__poster-error">Unknown component</div>
+  if (!Number.isSafeInteger(requestedTick) || requestedTick < 0 || requestedTick > entry.preview.durationTicks) return <div className="creative-library__poster-error">Invalid canonical tick</div>
+  return <div style={{ width: 960, height: 540, overflow: 'hidden' }} data-library-record={entry.componentId} data-library-record-tick={requestedTick}>
+    <LibraryMotionStage entry={entry} ratio="16:9" stylePackId={entry.preview.stylePackId} background={entry.preview.backgroundPreset} reducedMotion={false} localTicks={requestedTick} fixedScale={1} />
+  </div>
+}
+
 function AuditPlayback({ id }: Readonly<{ id: string }>) {
   const entry = entryById(id)
   if (!entry) return <div className="creative-library__poster-error">Unknown component</div>
@@ -238,6 +250,7 @@ export function CreativeLibraryApp() {
   const reviews = useLibraryReviewStore()
   if (pathname.startsWith('/library/audit/')) return <AuditPlayback id={decodeURIComponent(pathname.slice('/library/audit/'.length))} />
   if (pathname.startsWith('/library/poster/')) return <PosterCapture id={decodeURIComponent(pathname.slice('/library/poster/'.length))} />
+  if (pathname.startsWith('/library/record/')) return <ReviewVideoCapture id={decodeURIComponent(pathname.slice('/library/record/'.length))} search={search} />
   if (pathname.startsWith('/library/component/')) return <ComponentDetail id={decodeURIComponent(pathname.slice('/library/component/'.length))} navigate={navigate} reviewByComponent={reviews.byComponent} saveReview={reviews.saveReview} />
   if (pathname === '/library/showreel') return <Showreel search={search} navigate={navigate} reviewByComponent={reviews.byComponent} saveReview={reviews.saveReview} />
   if (pathname === '/library/review') return <ReviewQueue navigate={navigate} reviewByComponent={reviews.byComponent} />

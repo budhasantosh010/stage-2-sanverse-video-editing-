@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "sanverse.closed-loop-browser-evidence/v1",
+  "recordedAt": "2026-08-26T08:26:18.590Z",
+  "route": "/closed-loop-review",
+  "speed": 1,
+  "elapsedMs": 4723,
+  "capturedFrames": 194,
+  "samples": [
+    "closed-loop-1x-00.jpg",
+    "closed-loop-1x-01.jpg",
+    "closed-loop-1x-02.jpg",
+    "closed-loop-1x-03.jpg",
+    "closed-loop-1x-04.jpg",
+    "closed-loop-1x-05.jpg",
+    "closed-loop-1x-06.jpg"
+  ],
+  "fullPlaybackVerified": true,
+  "finalTick": 7200000,
+  "durationTicks": 7200000,
+  "semanticNodeId": "cost-card.value",
+  "semanticNodeVisible": true,
+  "graphBacked": "true",
+  "productionWebTouched": false
+}

@@ -3,6 +3,7 @@ import type { MotionNodeId, MotionLayoutMetadataV1 } from './properties.ts'
 import type { MotionNodeV1 } from './nodes.ts'
 import type { MotionSemanticPartV1 } from './parts.ts'
 import type { MotionExposureV1 } from './exposures.ts'
+import type { MotionCompositingV1 } from './compositing.ts'
 
 export interface MotionSceneV1 {
   readonly schemaVersion: 'sanverse.motion-scene/v1'
@@ -14,6 +15,7 @@ export interface MotionSceneV1 {
   readonly exposures: readonly MotionExposureV1[]
   readonly layout: MotionLayoutMetadataV1
   readonly supportedAspectRatios: readonly MotionAspectRatio[]
+  readonly compositing?: MotionCompositingV1
 }
 export const createMotionScene = (input: Omit<MotionSceneV1, 'schemaVersion'>): MotionSceneV1 => Object.freeze({ schemaVersion: 'sanverse.motion-scene/v1', ...input })
 

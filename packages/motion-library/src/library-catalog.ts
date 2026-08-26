@@ -1,4 +1,4 @@
-import type { MotionAspectRatio, MotionComponentDefinitionV1, MotionPerformanceClass } from '@sanverse/motion-contract'
+import type { LibraryScopeV1, MotionAspectRatio, MotionComponentDefinitionV1, MotionPerformanceClass, MotionPresentationModeV1 } from '@sanverse/motion-contract'
 import { MOTION_COMPONENT_CATALOG, MOTION_COMPONENT_MODULES } from './catalog.ts'
 import { INITIAL_MOTION_STYLE_PACKS, SANVERSE_CLEAN_STYLE, CREATOR_ENERGETIC_STYLE, EDITORIAL_STYLE, TECH_UI_STYLE } from './style-packs.ts'
 import type { MotionLibraryQualityTierV1, MotionLibraryReviewStatusV1, MotionQualityReviewV1 } from './library-review.ts'
@@ -63,6 +63,7 @@ export interface MotionLibraryCatalogEntryV1 {
   readonly introducedInMilestone: MotionLibraryMilestoneV1
   readonly aliases: readonly string[]
   readonly performanceClass: MotionPerformanceClass
+  readonly libraryScope: LibraryScopeV1
   readonly preview: MotionLibraryPreviewDefinitionV1
   readonly review: MotionLibraryReviewSummaryV1
   readonly referenceLineage: readonly string[]
@@ -272,6 +273,7 @@ const createEntry = (definition: MotionComponentDefinitionV1): MotionLibraryCata
     introducedInMilestone: milestoneFor(definition.id),
     aliases: aliasesFor(definition),
     performanceClass: definition.performanceClass,
+    libraryScope: 'sanverse',
     preview: Object.freeze({ ...previewSeed, previewHash: fnv1a(JSON.stringify(previewSeed)) }),
     review: defaultReview,
     referenceLineage: referenceLineageFor(definition),
@@ -301,6 +303,7 @@ export const validateMotionLibraryCatalog = (entries: readonly MotionLibraryCata
     if (entry.formats.length === 0 || entry.formats.some((value) => !MOTION_FORMAT_USES.includes(value))) issues.push({ path: `${path}.formats`, message: 'at least one valid editorial format is required.' })
     if (entry.visualTraits.length === 0 || entry.visualTraits.some((value) => !MOTION_VISUAL_TRAITS.includes(value))) issues.push({ path: `${path}.visualTraits`, message: 'at least one valid visual trait is required.' })
     if (entry.motionTraits.length === 0 || entry.motionTraits.some((value) => !MOTION_MOTION_TRAITS.includes(value))) issues.push({ path: `${path}.motionTraits`, message: 'at least one valid motion trait is required.' })
+    if (!['sanverse','external','generated','project'].includes(entry.libraryScope)) issues.push({ path: `${path}.libraryScope`, message: 'libraryScope must use the shared closed Creative Engine scope vocabulary.' })
     if (!MOTION_LIBRARY_MILESTONES.includes(entry.introducedInMilestone)) issues.push({ path: `${path}.introducedInMilestone`, message: 'milestone must be verified range or unknown.' })
     const definition = MOTION_COMPONENT_CATALOG.find((candidate) => candidate.id === entry.componentId)
     if (!definition) continue
@@ -326,6 +329,7 @@ export interface MotionLibrarySearchOptionsV1 {
   readonly qualityTier?: MotionLibraryQualityTierV1
   readonly performanceClass?: MotionPerformanceClass
   readonly format?: MotionFormatUseV1
+  readonly libraryScope?: LibraryScopeV1
   readonly sort?: 'recommended' | 'recent' | 'a-z' | 'milestone' | 'quality'
 }
 
@@ -418,7 +422,8 @@ export const filterMotionLibraryCatalog = (entries: readonly MotionLibraryCatalo
     && (!options.reviewStatus || entry.review.status === options.reviewStatus)
     && (!options.qualityTier || entry.review.qualityTier === options.qualityTier)
     && (!options.performanceClass || entry.performanceClass === options.performanceClass)
-    && (!options.format || entry.formats.includes(options.format)))
+    && (!options.format || entry.formats.includes(options.format))
+    && (!options.libraryScope || entry.libraryScope === options.libraryScope))
   const sort = options.sort ?? 'recommended'
   scored.sort((a, b) => {
     if (sort === 'a-z') return a.entry.displayName.localeCompare(b.entry.displayName)
@@ -441,9 +446,58 @@ export const getMotionDiscoveryCatalog = (reviews: Readonly<Record<string, Motio
   visualTraits: entry.visualTraits,
   motionTraits: entry.motionTraits,
   performanceClass: entry.performanceClass,
+  libraryScope: entry.libraryScope,
   qualityTier: entry.review.qualityTier,
   reviewStatus: entry.review.status,
 })))
+
+export interface MotionLibraryCapabilityRecordV1 {
+  readonly id: string
+  readonly kind: 'sanverse-component'
+  readonly title: string
+  readonly description: string
+  readonly semanticTags: readonly string[]
+  readonly communicationGoals: readonly string[]
+  readonly supportedPresentationModes: readonly MotionPresentationModeV1[]
+  readonly supportedRatios: readonly MotionAspectRatio[]
+  readonly styleTraits: readonly string[]
+  readonly motionTraits: readonly string[]
+  readonly editability: 'full'
+  readonly libraryScope: 'sanverse'
+  readonly requiredCapabilities: readonly string[]
+  readonly qualityStatus: 'unreviewed' | 'passed' | 'needs-polish'
+  readonly ownerApprovalStatus: 'batch-authorized' | 'not-required'
+  readonly performanceClass: MotionPerformanceClass
+}
+
+const presentationModesForLibraryEntry = (entry: MotionLibraryCatalogEntryV1): readonly MotionPresentationModeV1[] => {
+  const modes: MotionPresentationModeV1[] = []
+  if (entry.formats.includes('overlay')) modes.push('overlay')
+  if (entry.formats.includes('picture-in-picture')) modes.push('picture-in-picture')
+  if (entry.formats.some((format) => format === 'full-screen' || format === 'hero' || format === 'screen-demo')) modes.push('full-screen-motion')
+  return Object.freeze(modes.length > 0 ? [...new Set(modes)] : ['full-screen-motion'])
+}
+
+export const getMotionLibraryCapabilityRecordsV1 = (reviews: Readonly<Record<string, MotionQualityReviewV1>> = Object.freeze({})): readonly MotionLibraryCapabilityRecordV1[] => Object.freeze(
+  withMotionLibraryReviews(MOTION_LIBRARY_CATALOG, reviews).map((entry): MotionLibraryCapabilityRecordV1 => Object.freeze({
+    id: entry.componentId,
+    kind: 'sanverse-component',
+    title: entry.displayName,
+    description: entry.shortDescription,
+    semanticTags: Object.freeze([...entry.communicationIntents, entry.primaryCategory, ...entry.secondaryCategories]),
+    communicationGoals: entry.communicationIntents,
+    supportedPresentationModes: presentationModesForLibraryEntry(entry),
+    supportedRatios: Object.freeze<MotionAspectRatio[]>(['16:9', '9:16', '1:1', '4:5']),
+    styleTraits: entry.visualTraits,
+    motionTraits: entry.motionTraits,
+    editability: 'full',
+    libraryScope: 'sanverse',
+    requiredCapabilities: Object.freeze([]),
+    qualityStatus: entry.review.status === 'passed' ? 'passed' : entry.review.status === 'needs-polish' ? 'needs-polish' : 'unreviewed',
+    ownerApprovalStatus: entry.introducedInMilestone === 'CH1' ? 'batch-authorized' : 'not-required',
+    performanceClass: entry.performanceClass,
+  })),
+)
 
 export const MOTION_LIBRARY_TAB_DEFINITIONS = Object.freeze([
   { id: 'all', label: 'ALL' },

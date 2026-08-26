@@ -1,0 +1,8 @@
+import { describe,expect,it } from 'vitest'
+import { planMotionForgeV1,SEMANTIC_MOTION_OPERATIONS_V1,validateMotionPlanV1 } from './motion-plan.ts'
+
+describe('Batch 5 MotionPlanV1 planning',()=>{
+  const input=()=>({motionPlanId:'motion-plan:1',storyboardId:'storyboard:1',storyboardApprovedRevision:3,storyboardStatus:'owner-approved' as const,animaticId:'animatic:1',animaticApprovedRevision:2,animaticStatus:'owner-approved' as const,stateTimings:Object.freeze([{stateId:'a',startTick:0,endTick:720000,nodeIds:Object.freeze(['hero'])},{stateId:'b',startTick:720000,endTick:1440000,nodeIds:Object.freeze(['hero'])}]),storyboardDiffs:Object.freeze([{fromStateId:'a',toStateId:'b',addedNodeIds:Object.freeze([]),removedNodeIds:Object.freeze([]),changedNodes:Object.freeze([{nodeId:'hero',changedProperties:Object.freeze(['transform'])}])}]),styleLockId:'style:locked'})
+  it('requires exact approved storyboard + animatic revisions and emits inspectable beats/intents',()=>{const result=planMotionForgeV1(input());expect(result.ok).toBe(true);if(!result.ok)return;expect(result.value.storyboardApprovedRevision).toBe(3);expect(result.value.animaticApprovedRevision).toBe(2);expect(result.value.beats).toHaveLength(2);expect(result.value.beats[1]?.operationIntents[0]?.type).toBe('motion.move');expect(validateMotionPlanV1(result.value)).toMatchObject({ok:true})})
+  it('publishes the complete closed semantic vocabulary and refuses unapproved inputs',()=>{expect(SEMANTIC_MOTION_OPERATIONS_V1).toHaveLength(27);expect(SEMANTIC_MOTION_OPERATIONS_V1).toContain('motion.controlled-overshoot');expect(planMotionForgeV1({...input(),animaticStatus:'draft' as never})).toMatchObject({ok:false,refusal:{code:'MOTION_FORGE_REQUIRES_APPROVAL'}})})
+})

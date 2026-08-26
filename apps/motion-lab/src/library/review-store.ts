@@ -8,7 +8,7 @@ import {
 } from '@sanverse/motion-library'
 import type { MotionLibraryReviewDocumentV1, MotionQualityReviewV1 } from '@sanverse/motion-library'
 
-const REVIEW_ENDPOINT = '/__sanverse/library-reviews'
+const REVIEW_ENDPOINT = '/library-reviews/reviews.v1.json'
 const DRAFT_KEY = 'sanverse.motion-library-reviews.draft.v1'
 
 export interface LibraryReviewStoreV1 {

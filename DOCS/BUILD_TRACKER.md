@@ -1,6 +1,6 @@
 # Build Tracker
 
-Last updated: 2026-08-09
+Last updated: 2026-08-26
 
 | ID | Goal | Deliverable | Status | Evidence |
 |---|---|---|---|---|
@@ -69,6 +69,7 @@ Last updated: 2026-08-09
 | CREATIVE-ABC2 | Sanverse Creative Engine | End-to-end B1 evidence → B0 directive/proposal → Plan-A Motion Scene → C3 → C4 → C5 with exact source/local time mapping and identity-preserving curve edits | Complete | Real 68% statistic → A21 Donut + real security moment → Scoped Access; sourceObservationIds/provenance survive; C5 preset edits preserve component/node/keyframe IDs; exact placement/local midpoint round-trip; real Edge paired source/statistic/scoped C5 proof; 439/439 tests; 9/9 builds; final tag `sanverse-creative-engine-abc2`; `DOCS/creative-engine/evidence/ABC-2.md` |
 | CREATIVE-L1 | Sanverse Creative Engine | Development Creative Library browser, one-registry discovery catalog, deterministic posters, single-live-preview detail/showreel, durable motion review and complete 1× catalog audit | Complete — local release | 89/89 real Edge full canonical 1× playbacks; 89 Passed with 13 S / 35 A / 41 B tiers; 89 fresh posters; 459/459 affected Creative/Motion/B1 tests; root all-workspace build PASS; Edge accessibility/performance gates; `apps/web` unchanged; local tag `sanverse-creative-library-l1`; remote sync deferred by owner; `DOCS/creative-engine/evidence/L1-CREATIVE-LIBRARY.md` |
 | MOTION-INGEST-V1 | Plan A engineering infrastructure | One fail-closed external-component inspect→ingest→productize→parity→register pipeline plus full owner-approved CH1 ingestion | Complete — local release | 10/10 CH1 source packages approval/determinism/direct-seek inspect PASS; 10 immutable source snapshots; all 10 canonical C2/C3/C4/C5 + 4-ratio + AI-editability productizations PASS; Component 01 direct owner parity approval + Components 02–10 explicit owner batch-authorized engineering parity; 7 exact visual checkpoints per 02–10; 10 fresh posters; 10/10 real Edge canonical 1× Library playbacks; public catalog 89→99; 99/99 durable Library reviews; 473/473 scoped tests + root all-workspace build PASS; `apps/web` unchanged; local Git only; `DOCS/motion/evidence/COMPONENT-INGEST-V1.md` |
+| CREATIVE-CLOSED-LOOP-V1 | Sanverse Creative Engine | Full Storyboard→Animatic→Motion Forge→QA/repair→owner approval→atomic merge/Undo loop over one canonical Motion authority, then thin MCP V1 exposure of the same internal tool registry | Complete — local release | End-to-end registry proof rejects forged revision approval, preserves C3/C4/C5/C6 semantic identity, merges once and undoes once; safe SVG + bounded Lottie materialization, alpha-video external asset semantics, fail-closed rights/provenance; C8 matte/mask operations; 17 internal workflow tools; MCP real-registry exposure + sandbox propagation + host-resolved owner-approval proof + real localhost `/mcp`; real Edge canonical 1× Closed-Loop review reaches exact 7,200,000/7,200,000 ticks with 194 captured frames; final affected matrix 525 tests + root all-workspace build PASS; `apps/web` diff 0; `DOCS/motion/creative-engine-closed-loop-v1/STATUS.md` |
 
 ## Status rules
 

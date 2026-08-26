@@ -116,3 +116,14 @@ Status values: `Approved`, `Proposed`, `Deferred`, `Rejected`, `Superseded`.
 - For CH1 Components 02–10, the owner explicitly authorized the coding agent on 2026-08-14 to preserve the approved source visuals, perform the engineering parity/productization review, and insert the verified results into the Library without a separate manual owner viewing round for every component. This batch authorization must be recorded distinctly from direct owner parity review.
 - Completion means the components themselves are public, searchable and playable in the Sanverse Creative Library—not merely staged in an intake folder or represented by placeholders.
 - Source: owner-approved Component Ingest V1 contract and owner corrections on 2026-08-14.
+
+### REQ-016 — Creative Engine Closed-Loop V1, then MCP V1
+
+- Status: Approved
+- The existing Creative Engine must reach a complete UI-independent closed loop before MCP is allowed to expose it: source/capability context → isolated Storyboard KVS → explicit Storyboard approval → exact-tick Animatic → explicit Animatic approval → MotionPlan/Motion Forge → structural and visual QA → bounded repair → explicit Motion approval → one atomic accepted-project merge → one inverse Undo.
+- The loop must reuse the existing canonical Motion Scene/Graph, C2 keyframes, C3 Layers, C4 Dope Sheet, C5 Curves, C6 node projection, C8 masks/mattes, exact-tick clock, Library registry and graph inverse operations. It must not create a second graph, renderer, keyframe engine, timeline, Library or Undo authority.
+- External assets must be inspected with explicit provenance/rights/editability and fail closed when lossless support is unavailable. Unsupported SVG/Lottie features must refuse rather than silently approximate; alpha video remains an external exact-time asset rather than pretending to be an editable graph node.
+- Storyboard/Animatic/Motion owner approvals are explicit and revision-bound. A model/tool caller cannot manufacture approval authority.
+- MCP V1 is a thin adapter over the accepted internal tool registry. MCP may list/call the same tools but may not own project, Storyboard, Motion Graph, approval, merge or Undo state, and it may not bypass the internal registry validation/sandbox gates.
+- Production `apps/web/**` remains outside this development-only implementation cycle.
+- Source: owner implementation instruction on 2026-08-26: take the existing Creative Engine to 100% of Closed-Loop V1, then expose that stable closed loop through MCP V1.

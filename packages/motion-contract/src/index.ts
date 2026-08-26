@@ -1,5 +1,7 @@
 import type { ComponentType } from 'react'
 
+export * from './creative-engine.ts'
+
 export const MOTION_ASPECT_RATIOS = ['16:9', '9:16', '1:1', '4:5'] as const
 export type MotionAspectRatio = (typeof MOTION_ASPECT_RATIOS)[number]
 

@@ -1,0 +1,20 @@
+import { describe,expect,it } from 'vitest'
+import { createDefaultMask } from './masks.ts'
+import { evaluateScene } from './evaluator.ts'
+import { applyMotionOperations } from './operations.ts'
+import { constant,keyframed } from './properties.ts'
+import { createMotionScene } from './scene.ts'
+import { nodeBase } from './nodes.ts'
+import { validateMotionScene } from './validation.ts'
+
+const scene=()=>{
+  const animatedMask=Object.freeze({...createDefaultMask('mask:reveal','rounded-rectangle'),invert:true,opacity:keyframed([{id:'mask:k0',tick:0,value:0,interpolation:'linear'},{id:'mask:k1',tick:1_440_000,value:1,interpolation:'linear'}]),feather:constant(0.08)})
+  return createMotionScene({componentId:'sanverse.c8-proof',componentVersion:1,rootNodeId:'root',nodes:Object.freeze({root:Object.freeze({...nodeBase('root','Root',null),type:'group' as const,childIds:Object.freeze(['matte','target'])}),matte:Object.freeze({...nodeBase('matte','Matte','root'),type:'group' as const,childIds:Object.freeze([])}),target:Object.freeze({...nodeBase('target','Target','root'),type:'group' as const,childIds:Object.freeze([]),masks:Object.freeze([animatedMask])})}),semanticParts:Object.freeze([{id:'target-part',label:'Target',role:'content-group' as const,nodeIds:Object.freeze(['target'])}]),exposures:Object.freeze([]),layout:Object.freeze({mode:'responsive' as const,ownership:Object.freeze([]),formatOverrides:Object.freeze([])}),supportedAspectRatios:Object.freeze(['16:9'])})
+}
+const ctx=(localTicks:number)=>({localTicks,durationTicks:1_440_000,ticksPerSecond:1_440_000,composition:{width:1920,height:1080,fpsNumerator:30,fpsDenominator:1},reducedMotion:false} as const)
+
+describe('C8 masks / mattes / compositing foundation',()=>{
+  it('sets/removes a serialized matte through canonical atomic MotionGraphOperationV1 with an inverse',()=>{const base=scene();const set=applyMotionOperations(base,[{operationId:'op:matte',type:'set-matte',relationship:{id:'matte:1',sourceNodeId:'matte',targetNodeId:'target',mode:'alpha',order:'source-before-target'}}]);expect(set.ok, !set.ok ? JSON.stringify(set.error) : '').toBe(true);if(!set.ok)return;expect(set.scene.compositing?.mattes[0]).toMatchObject({id:'matte:1',sourceNodeId:'matte',targetNodeId:'target'});expect(validateMotionScene(set.scene)).toMatchObject({ok:true});expect(JSON.parse(JSON.stringify(set.scene)).compositing.mattes).toHaveLength(1);expect(set.inverseOperations).toHaveLength(1);const undone=applyMotionOperations(set.scene,set.inverseOperations!);expect(undone.ok).toBe(true);if(!undone.ok)return;expect(undone.scene.compositing?.mattes).toEqual([])})
+  it('refuses missing/self/duplicate-target matte relationships instead of approximating',()=>{const base=scene();expect(applyMotionOperations(base,[{operationId:'op:self',type:'set-matte',relationship:{id:'m1',sourceNodeId:'target',targetNodeId:'target',mode:'alpha',order:'source-before-target'}}])).toMatchObject({ok:false,error:{causeCode:'MATTE_INVALID'}});const first=applyMotionOperations(base,[{operationId:'op:first',type:'set-matte',relationship:{id:'m1',sourceNodeId:'matte',targetNodeId:'target',mode:'alpha',order:'source-before-target'}}]);expect(first.ok).toBe(true);if(!first.ok)return;expect(applyMotionOperations(first.scene,[{operationId:'op:second',type:'set-matte',relationship:{id:'m2',sourceNodeId:'root',targetNodeId:'target',mode:'alpha-inverted',order:'source-after-target'}}])).toMatchObject({ok:false,error:{causeCode:'MATTE_INVALID'}})})
+  it('keeps animated mask inversion/opacity/feather deterministic under direct, backward and repeated seeks',()=>{const base=scene();const direct=evaluateScene(base,ctx(720_000)).nodes.target!.masks[0];evaluateScene(base,ctx(1_440_000));const backward=evaluateScene(base,ctx(720_000)).nodes.target!.masks[0];evaluateScene(base,ctx(0));const repeated=evaluateScene(base,ctx(720_000)).nodes.target!.masks[0];expect(direct).toEqual(backward);expect(backward).toEqual(repeated);expect(direct).toMatchObject({id:'mask:reveal',invert:true,opacity:0.5,feather:0.08})})
+})

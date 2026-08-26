@@ -157,13 +157,13 @@ export function LibraryPlayer({
   return (
     <section className="creative-library__player" data-library-player={entry.componentId} data-library-current-tick={tick} data-library-duration-ticks={durationTicks} data-library-playing={playing ? 'true' : 'false'} data-library-full-playback={verified ? 'true' : 'false'}>
       <LibraryMotionStage entry={entry} fixtureId={fixtureId} ratio={ratio} stylePackId={stylePackId} background={background} reducedMotion={reducedMotion} localTicks={tick} />
-      {controls ? <div className="creative-library__player-controls">
+      {controls ? <><div className="creative-library__player-controls">
         <button type="button" onClick={restart} aria-label="Restart animation">↻</button>
         <button type="button" onClick={playing ? pause : play} aria-label={playing ? 'Pause animation' : 'Play animation'}>{playing ? '❚❚' : '▶'}</button>
         <input aria-label="Scrub animation" type="range" min={0} max={durationTicks} step={1} value={tick} onChange={(event) => seek(Number(event.target.value))} />
         <span className="creative-library__timecode">{seconds.toFixed(2)} / {totalSeconds.toFixed(2)}s</span>
         <span className="creative-library__progress-label">{Math.round(progress * 100)}%</span>
-      </div> : null}
+      </div><a className="creative-library__canonical-review" href={`/review-videos/${entry.componentId}.mp4`} target="_blank" rel="noreferrer">Open canonical 1× review ↗</a></> : null}
     </section>
   )
 }
