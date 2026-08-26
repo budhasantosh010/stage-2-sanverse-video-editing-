@@ -1,4 +1,4 @@
-import type { CreativeEditabilityV1, LibraryScopeV1, MotionAspectRatio, MotionPerformanceClass, MotionPresentationModeV1 } from '@sanverse/motion-contract'
+import type { CapabilityOriginV1, CapabilityReuseStatusV1, CreativeEditabilityV1, LibraryScopeV1, MotionAspectRatio, MotionPerformanceClass, MotionPresentationModeV1 } from '@sanverse/motion-contract'
 
 export type CapabilityKindV1 = 'sanverse-component' | 'external-component' | 'generated-scene' | 'motion-recipe' | 'effect'
 
@@ -15,6 +15,9 @@ export interface CapabilityCatalogItemV1 {
   readonly motionTraits: readonly string[]
   readonly editability: CreativeEditabilityV1
   readonly libraryScope: LibraryScopeV1
+  readonly origin?: CapabilityOriginV1
+  readonly reuseStatus?: CapabilityReuseStatusV1
+  readonly lineage?: unknown
   readonly requiredCapabilities: readonly string[]
   readonly qualityStatus: 'unreviewed' | 'preview-ready' | 'passed' | 'needs-polish'
   readonly ownerApprovalStatus: 'owner-approved' | 'batch-authorized' | 'not-required' | 'unapproved'
@@ -71,6 +74,7 @@ const editabilityRank: Readonly<Record<CreativeEditabilityV1, number>> = Object.
 
 export const rankCapabilitiesV1 = (catalog: readonly CapabilityCatalogItemV1[], query: CapabilityRetrievalQueryV1): readonly RankedCapabilityV1[] => Object.freeze(catalog
   .filter((item) => query.allowedLibraryScopes.includes(item.libraryScope)
+    && item.reuseStatus !== 'deprecated'
     && item.supportedRatios.includes(query.ratio)
     && item.supportedPresentationModes.includes(query.presentationMode)
     && (!query.requiredEditability || editabilityRank[item.editability] >= editabilityRank[query.requiredEditability]))
@@ -89,7 +93,18 @@ export const rankCapabilitiesV1 = (catalog: readonly CapabilityCatalogItemV1[], 
       reasons.push(`${styleMatches} requested style trait(s) match.`)
     }
     const missing = (query.requiredCapabilities ?? []).filter((capability) => !item.requiredCapabilities.includes(capability))
-    if (missing.length > 0) warnings.push(`Candidate does not declare required capability metadata: ${missing.join(', ')}.`)
+    if (missing.length > 0) {
+      score -= missing.length * 25
+      warnings.push(`Candidate does not declare required capability metadata: ${missing.join(', ')}.`)
+    }
+    if (item.reuseStatus === 'promoted-reusable') {
+      score += 4
+      reasons.push('Approved promoted capability is reusable across projects; promotion alone does not outrank a better contextual match.')
+    }
+    if (item.ownerApprovalStatus === 'owner-approved') {
+      score += 3
+      reasons.push('Owner-approved reusable capability.')
+    }
     if (item.qualityStatus === 'passed') {
       score += 10
       reasons.push('Existing quality review passed.')

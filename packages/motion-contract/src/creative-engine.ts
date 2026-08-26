@@ -12,6 +12,12 @@ export type BackgroundTreatmentV1 = (typeof BACKGROUND_TREATMENTS_V1)[number]
 export const LIBRARY_SCOPES_V1 = Object.freeze(['sanverse','external','generated','project'] as const)
 export type LibraryScopeV1 = (typeof LIBRARY_SCOPES_V1)[number]
 
+export const CAPABILITY_ORIGINS_V1 = Object.freeze(['curated','external','generated'] as const)
+export type CapabilityOriginV1 = (typeof CAPABILITY_ORIGINS_V1)[number]
+
+export const CAPABILITY_REUSE_STATUSES_V1 = Object.freeze(['project-only','promotion-candidate','promoted-reusable','deprecated'] as const)
+export type CapabilityReuseStatusV1 = (typeof CAPABILITY_REUSE_STATUSES_V1)[number]
+
 export const CREATIVE_LOCK_SCOPES_V1 = Object.freeze(['content','style','storyboard','animatic','motion'] as const)
 export type CreativeLockScopeV1 = (typeof CREATIVE_LOCK_SCOPES_V1)[number]
 

@@ -2,6 +2,16 @@
 
 Last updated: 2026-08-26
 
+## Parallel Creative Engine worktree — Promotion / Parameterization / Reuse V1.1 complete locally
+
+The isolated Motion/Creative worktree now closes the owner-authorized V1.1 reuse flywheel on top of Closed-Loop V1 + MCP V1. An exact motion-approved Project-A scene can be promoted non-destructively into a versioned reusable capability with conservative semantic parameterization, frozen design properties, role-based Motion Recipe extraction, immutable lineage, most-restrictive rights aggregation, QA and atomic Library registration. Generated source remains truthfully `origin = generated`; registration independently sets `reuseStatus = promoted-reusable`.
+
+B2 consumes promoted entries through the existing capability catalog/ranking authority. The mandatory registry-driven Project A → Project B proof retrieves the promoted capability, instantiates it in an isolated reuse sandbox, changes headline/value/supporting text/style, applies the extracted Motion Recipe, preserves the same semantic identity through C3/C4/C5/C6, passes direct/backward/repeated-seek equality, accepts one exact reuse approval, performs one accepted-project merge and one inverse Undo back to the original Project-B scene. Stale sandbox writes and forged/stale reuse approvals refuse before mutation.
+
+The internal registry is extended from 17 Closed-Loop tools to **37 total tools**; MCP V1.1 still exposes that registry generically and owns no promotion/project/approval/Undo state. Host-resolved opaque proof remains required for approval-bearing MCP calls. Development `/promotion-review` shows Project A source, promoted-default parity and adapted Project B plus parameter/frozen-property/lineage/QA/deep-editability truth.
+
+Real Edge completed Project-B playback at exactly **1×**, **7,200,000 / 7,200,000 ticks**, with **80 captured frames**. Source and promoted-default remained preserved; Project B visibly rendered `Retention compounds faster`, `82%` and the adapted orange semantic accent; stable node `cost-card.value` remained graph-backed and deep-editable. The first Edge run exposed and rejected `MOTION-FAIL-027` (graph text changed but the Cost/Value renderer still displayed stale prop-driven title/label text); resolved graph text is now authoritative and reuses the existing responsive-fit algorithm. Fresh final affected matrix: **551/551 PASS** and the root all-workspace build is **PASS**. Durable closeout is `DOCS/motion/creative-engine-promotion-v1/STATUS.md`; the local release tag is `sanverse-creative-engine-promotion-reuse-v1.1`. `apps/web/**` remains outside this release and the separate `sites/` repository remains excluded.
+
 ## Parallel Creative Engine worktree — Closed-Loop V1 + MCP V1 complete locally
 
 The isolated Motion/Creative worktree has completed the owner-authorized Creative Engine Closed-Loop V1 and then exposed that accepted loop through MCP V1 without changing the production editor. The loop is UI-independent and reuses one canonical `MotionSceneV1`/`MotionGraphOperationV1` authority from source/capability context through isolated Storyboard KVS, exact-tick Animatic, MotionPlan/Motion Forge, structural + visual QA, bounded repair, explicit revision-bound owner approvals, one atomic accepted-project merge and one inverse Undo.

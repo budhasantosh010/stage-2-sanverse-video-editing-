@@ -532,3 +532,24 @@ VERIFIED FIX: all retained temporal sheets contain valid source/integrated frame
 
 ONE-LINE SOLUTION: treat browser/process startup noise as infrastructure until rendered evidence proves otherwise, and never accept a blank screenshot as parity evidence.
 
+## MOTION-FAIL-027 — Project-B graph text changed but Cost/Value pixels still showed Project-A props
+
+- Status: FIXED / first browser evidence rejected
+- Severity: high reuse/parity failure
+- Milestone: Creative Engine V1.1 Promotion / Reuse
+- Date: 2026-08-26
+
+WHAT: Project-B reuse correctly mutated canonical `MotionSceneV1` text nodes (for example `cost-card.title = "Retention compounds faster"`), but the `CostValueCard` renderer still displayed title and metric-label strings from original component props. Other graph-driven edits such as the payoff value, accent and footer rendered correctly, so automated graph/QA tests passed while the visible title remained stale.
+
+WHERE: `packages/motion-library/src/components/cost-value-card.tsx`, specifically title/metric-label render paths versus resolved Motion Graph presentation.
+
+WHY: the component had become graph-editable incrementally. Numeric/footer/style paths already consumed the resolved graph, while title and metric-label layout still reused prop-derived `TextPlan` values. That left two competing display authorities inside one component.
+
+IMPACT: a promoted capability could pass graph validity, semantic identity, direct-seek QA and reuse approval while visibly showing the wrong Project-A copy in Project B. This would make cross-project reuse untrustworthy.
+
+FIX: resolved Motion Graph text is now the display authority for title, metric labels, notes, eyebrow and footer. Graph-edited title/label strings are run through the existing responsive text-fitting algorithm before rendering; impossible text fails closed rather than silently reverting to stale props. A focused `MotionComponentHost` regression test edits title + value-label through normal `MotionGraphOperationV1` and requires the new text in rendered markup.
+
+VERIFIED FIX: focused Cost/Value suite is 16/16 PASS + Motion Library build PASS. Real Edge `/promotion-review` then completed 1× to 7,200,000/7,200,000 ticks with `adapted=true`; retained middle frame visibly shows `Retention compounds faster`, `82%` and the adapted orange accent while source/default remain preserved. Final affected matrix is 551/551 PASS.
+
+ONE-LINE SOLUTION: once a component is graph-editable, every rendered editable field must read the resolved graph—not stale props—and reuse the component's existing layout/fit constraints.
+

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { SANVERSE_TICKS_PER_SECOND } from '@sanverse/motion-primitives'
+import { constant } from '@sanverse/motion-graph'
+import { MotionComponentHost } from '@sanverse/motion-native-runtime'
 import { RATIO_COMPOSITIONS, evaluateDeterminism, evaluateMarkupDeterminism, renderComponentMarkup, validateDefinition, validateFixture } from '@sanverse/motion-testing'
 import {
   COST_VALUE_CARD_DEFINITION,
@@ -101,6 +104,25 @@ describe('Cost / Value Card exact-time motion', () => {
     expect(markup).toContain('data-motion-metric="value"')
     expect(markup).toContain('data-motion-number="cost"')
     expect(markup).toContain('data-motion-arrow="true"')
+  })
+
+  it('renders graph-edited reusable title and metric label text instead of stale component props', () => {
+    const markup = renderToStaticMarkup(
+      <MotionComponentHost
+        module={CostValueCardModule}
+        props={DEFAULT_COST_VALUE_CARD_PROPS}
+        style={DEFAULT_COST_VALUE_CARD_STYLE}
+        context={context(Math.round(durationTicks * 0.70))}
+        graphOperations={[
+          { operationId:'reuse:title', type:'set-property', target:{ nodeId:'cost-card.title', property:'text.text' }, value:constant('Retention compounds faster') },
+          { operationId:'reuse:value-label', type:'set-property', target:{ nodeId:'cost-card.value.label', property:'text.text' }, value:constant('Retention after 90 days') },
+        ]}
+      />,
+    )
+    expect(markup).toContain('Retention compounds faster')
+    expect(markup).toContain('Retention after 90 days')
+    expect(markup).not.toContain('What one month buys you')
+    expect(markup).not.toContain('Workflow value created')
   })
 
   it('uses shared style tokens without changing the component implementation', () => {

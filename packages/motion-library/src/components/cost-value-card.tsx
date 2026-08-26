@@ -389,6 +389,21 @@ const renderTextPlan = (plan: TextPlan) => {
   ))
 }
 
+const resolveGraphTextPlan = (
+  text: string | undefined,
+  fallback: TextPlan,
+  width: number,
+  maxLines: number,
+  preferred: number,
+  minimum: number,
+  path: string,
+): TextPlan => {
+  if (text === undefined || text === fallback.text) return fallback
+  const fit = fitText(text, width, maxLines, preferred, minimum)
+  if (!fit.ok) throw new RangeError(`${path} cannot fit the graph-edited text within the component's responsive bounds.`)
+  return fit.value
+}
+
 const metricPanel = (
   kind: 'cost' | 'value',
   metric: CostValueMetric,
@@ -418,6 +433,9 @@ const metricPanel = (
   const note = noteNode?.type === 'text' ? noteNode : null
   const groupNode = scene?.nodes[groupId]
   const group = groupNode?.type === 'group' ? groupNode : null
+  const resolvedLabelPlan = resolveGraphTextPlan(label?.text, labelPlan, layout.metricInnerWidth, 2, layout.kind === 'horizontal' ? 30 : 28, 22, labelId)
+  const resolvedLabelFontSize = Math.min(label?.fontSize ?? resolvedLabelPlan.fontSize, resolvedLabelPlan.fontSize)
+  const noteText = note?.text ?? metric.note
   const resolvedTranslateX = group?.transform.positionX ?? (layout.kind === 'horizontal' ? (kind === 'cost' ? -translate : translate) : 0)
   const resolvedTranslateY = group?.transform.positionY ?? (layout.kind === 'stacked' ? translate : 0)
   const basePanelStyle: CSSProperties = {
@@ -436,13 +454,13 @@ const metricPanel = (
   const panelStyle = mergeMotionGraphNodeDecorationStyle(surfaceStyle, group, false)
   return (
     <div data-motion-node-id={groupId} data-motion-surface-node-id={surfaceId} data-motion-metric={kind} style={panelStyle}>
-      <div data-motion-node-id={labelId} data-motion-text={`${kind}-label`} style={graphStyle(labelId, { color: label?.fillColor ?? style.mutedColor, fontSize: label?.fontSize ?? labelPlan.fontSize, lineHeight: `${labelPlan.lineHeight}px`, fontWeight: label?.fontWeight ?? 650 })}>
-        {renderTextPlan(labelPlan)}
+      <div data-motion-node-id={labelId} data-motion-text={`${kind}-label`} style={graphStyle(labelId, { color: label?.fillColor ?? style.mutedColor, fontSize: resolvedLabelFontSize, lineHeight: `${resolvedLabelPlan.lineHeight}px`, fontWeight: label?.fontWeight ?? 650 })}>
+        {renderTextPlan(resolvedLabelPlan)}
       </div>
       <div data-motion-node-id={numberId} data-motion-number={kind} style={graphStyle(numberId, { marginTop: 10, color: number?.fillColor ?? color, fontSize: number?.fontSize ?? numberPlan.fontSize, lineHeight: `${numberPlan.lineHeight}px`, fontWeight: number?.fontWeight ?? style.numberWeight, letterSpacing: '-.045em', whiteSpace: 'nowrap' })}>
         {number?.text ?? metricDisplayText(metric, displayedValue)}
       </div>
-      {metric.note.trim() ? <div data-motion-node-id={noteId} style={graphStyle(noteId, { marginTop: 10, color: note?.fillColor ?? style.mutedColor, fontSize: note?.fontSize ?? layout.noteFontSize, lineHeight: 1.25 })}>{note?.text ?? metric.note}</div> : null}
+      {noteText.trim() ? <div data-motion-node-id={noteId} style={graphStyle(noteId, { marginTop: 10, color: note?.fillColor ?? style.mutedColor, fontSize: note?.fontSize ?? layout.noteFontSize, lineHeight: 1.25 })}>{noteText}</div> : null}
     </div>
   )
 }
@@ -469,14 +487,18 @@ export function CostValueCard({ props, style, context }: MotionComponentRenderPr
   const cardStyle = mergeMotionGraphNodeDecorationStyle({ width: state.layout.cardWidth, minHeight: state.layout.cardHeight, boxSizing: 'border-box', padding: state.layout.padding, borderRadius: surface?.radius ?? Math.round(Math.min(width, height) * 0.034), borderStyle: 'solid', borderWidth: surface?.strokeWidth ?? 2, borderColor: surface?.strokeColor ?? `${style.accentColor}22`, background: surface?.fillColor ?? style.surfaceColor, boxShadow: `0 ${Math.round(height * 0.018)}px ${Math.round(height * 0.06)}px rgba(0,0,0,.36)`, opacity: surface?.opacity ?? state.panelOpacity, color: style.textColor }, surface, graph.selectedNodeId === 'cost-card.surface')
   const titleGroupNode = graph.scene?.nodes['cost-card.title-group']
   const titleGroup = titleGroupNode?.type === 'group' ? titleGroupNode : null
+  const eyebrowText = eyebrow?.text ?? props.eyebrow
+  const titlePlan = resolveGraphTextPlan(title?.text, state.layout.title, state.layout.contentWidth, 2, state.layout.kind === 'horizontal' ? 64 : 56, state.layout.kind === 'horizontal' ? 40 : 36, 'cost-card.title')
+  const titleFontSize = Math.min(title?.fontSize ?? titlePlan.fontSize, titlePlan.fontSize)
+  const footerText = footer?.text ?? props.footer
 
   return (
     <div data-motion-root="cost-value-card" data-motion-node-id="cost-card.root" data-motion-layout={state.layout.kind} style={rootStyle}>
       <section data-motion-node-id="cost-card.surface" style={cardStyle}>
         <header data-motion-node-id="cost-card.title-group" style={mergeMotionGraphNodeDecorationStyle({ opacity: titleGroup?.opacity ?? state.titleOpacity, transform: `translate3d(0,${titleGroup?.transform.positionY ?? state.titleTranslateY}px,0)` }, titleGroup, graph.selectedNodeId === 'cost-card.title-group')}>
-          {props.eyebrow.trim() ? <div data-motion-node-id="cost-card.eyebrow" style={graphStyle('cost-card.eyebrow', { color: eyebrow?.fillColor ?? style.accentColor, fontSize: eyebrow?.fontSize ?? state.layout.eyebrowFontSize, fontWeight: eyebrow?.fontWeight ?? 800, letterSpacing: '.11em', marginBottom: 12 })}>{eyebrow?.text ?? props.eyebrow}</div> : null}
-          <div data-motion-node-id="cost-card.title" data-motion-text="cost-value-title" style={graphStyle('cost-card.title', { fontSize: title?.fontSize ?? state.layout.title.fontSize, lineHeight: `${state.layout.title.lineHeight}px`, fontWeight: title?.fontWeight ?? style.titleWeight, color: title?.fillColor, letterSpacing: '-.035em' })}>
-            {renderTextPlan(state.layout.title)}
+          {eyebrowText.trim() ? <div data-motion-node-id="cost-card.eyebrow" style={graphStyle('cost-card.eyebrow', { color: eyebrow?.fillColor ?? style.accentColor, fontSize: eyebrow?.fontSize ?? state.layout.eyebrowFontSize, fontWeight: eyebrow?.fontWeight ?? 800, letterSpacing: '.11em', marginBottom: 12 })}>{eyebrowText}</div> : null}
+          <div data-motion-node-id="cost-card.title" data-motion-text="cost-value-title" style={graphStyle('cost-card.title', { fontSize: titleFontSize, lineHeight: `${titlePlan.lineHeight}px`, fontWeight: title?.fontWeight ?? style.titleWeight, color: title?.fillColor, letterSpacing: '-.035em' })}>
+            {renderTextPlan(titlePlan)}
           </div>
         </header>
 
@@ -488,7 +510,7 @@ export function CostValueCard({ props, style, context }: MotionComponentRenderPr
           {metricPanel('value', props.value, state.layout.valueLabel, state.layout.valueNumber, state.displayedValueValue, state.valueOpacity, state.valueTranslate, style.accentColor, style, state.layout, graph.scene, graphStyle)}
         </div>
 
-        {props.footer.trim() ? <footer data-motion-node-id="cost-card.footer" style={mergeMotionGraphNodeDecorationStyle({ marginTop: 28, paddingTop: 20, borderTop: `1px solid ${style.textColor}16`, color: footer?.fillColor ?? style.mutedColor, fontSize: footer?.fontSize ?? state.layout.footerFontSize, fontWeight: footer?.fontWeight ?? 650, opacity: footer?.opacity ?? state.valueOpacity }, footer, graph.selectedNodeId === 'cost-card.footer')}>{footer?.text ?? props.footer}</footer> : null}
+        {footerText.trim() ? <footer data-motion-node-id="cost-card.footer" style={mergeMotionGraphNodeDecorationStyle({ marginTop: 28, paddingTop: 20, borderTop: `1px solid ${style.textColor}16`, color: footer?.fillColor ?? style.mutedColor, fontSize: footer?.fontSize ?? state.layout.footerFontSize, fontWeight: footer?.fontWeight ?? 650, opacity: footer?.opacity ?? state.valueOpacity }, footer, graph.selectedNodeId === 'cost-card.footer')}>{footerText}</footer> : null}
       </section>
     </div>
   )

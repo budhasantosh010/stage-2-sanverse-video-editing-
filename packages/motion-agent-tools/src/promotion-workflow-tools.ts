@@ -1,0 +1,45 @@
+import { creativeOperationRefusal,creativeValidationOk,type CreativeOperationResultV1,type CreativeValidationResultV1 } from '@sanverse/motion-contract'
+import type { OwnerApprovalV1 } from '@sanverse/motion-storyboard'
+import type { PromotionRegistrationConfirmationV1,PromotionReviewArtifactsV1,PromotionTargetKindV1,StyleLockV1 } from '@sanverse/motion-promotion'
+import { createSanverseToolRegistryV1,type SanverseToolDefinitionV1,type SanverseToolRegistryV1,type ToolExecutionContextV1 } from './registry.ts'
+import type { ClosedLoopEngineV1 } from './closed-loop-engine.ts'
+import { createClosedLoopToolRegistryV1 } from './workflow-tools.ts'
+import type { PromotionReuseEngineV1 } from './promotion-reuse-engine.ts'
+
+const objectSchema=Object.freeze({type:'object',additionalProperties:true})
+const outputSchema=Object.freeze({type:'object',required:['ok'],additionalProperties:true})
+const record=(input:unknown):CreativeValidationResultV1<Record<string,unknown>>=>input!==null&&typeof input==='object'&&!Array.isArray(input)?creativeValidationOk(input as Record<string,unknown>):({ok:false,refusal:Object.freeze({code:'INVALID_TOOL_INPUT',message:'Tool input must be an object.'})})
+const noInput=(input:unknown):CreativeValidationResultV1<Record<string,never>>=>input===undefined||input===null||(typeof input==='object'&&!Array.isArray(input)&&Object.keys(input as object).length===0)?creativeValidationOk(Object.freeze({})):({ok:false,refusal:Object.freeze({code:'INVALID_TOOL_INPUT',message:'This tool does not accept input fields.'})})
+const register=<I,O>(registry:SanverseToolRegistryV1,definition:SanverseToolDefinitionV1<I,O>)=>{const result=registry.register(definition as SanverseToolDefinitionV1);if(!result.ok)throw new RangeError(`${result.refusal.code}: ${result.refusal.message}`)}
+const reuseMismatch=(engine:PromotionReuseEngineV1,context:ToolExecutionContextV1):CreativeOperationResultV1<never>|null=>{const active=engine.getState().reuseSandbox?.id;if(!active)return creativeOperationRefusal('CAPABILITY_REUSE_SANDBOX_REQUIRED','No active promoted-capability reuse sandbox exists.');return context.sandboxId===active?null:creativeOperationRefusal('SANDBOX_CONTEXT_MISMATCH',`Tool context sandbox ${context.sandboxId??'<missing>'} does not match active reuse sandbox ${active}.`)}
+
+export const PROMOTION_REUSE_TOOL_IDS_V1=Object.freeze([
+  'promotion.create_candidate','promotion.inspect_candidate','promotion.propose_parameters','promotion.accept_parameter','promotion.reject_parameter','promotion.set_target_kind','promotion.productize','promotion.validate','promotion.register','promotion.retrieve',
+  'capability.instantiate','capability.set_parameter','capability.apply_style_lock','recipe.apply','capability.validate','capability.render_review','capability.record_owner_approval','capability.apply_reuse','capability.undo_reuse','capability.discard_reuse',
+] as const)
+
+export const createCreativeEngineV11ToolRegistryV1=(closedLoop:ClosedLoopEngineV1,promotion:PromotionReuseEngineV1):SanverseToolRegistryV1=>{
+  const registry=createSanverseToolRegistryV1(),base=createClosedLoopToolRegistryV1(closedLoop)
+  for(const summary of base.list()){const definition=base.get(summary.id);if(definition)register(registry,definition)}
+  register(registry,{id:'promotion.create_candidate',version:1,level:'T1',inputSchema:objectSchema,outputSchema,requiresSandbox:false,validateInput:record,execute:(input)=>promotion.createCandidate({candidateId:String(input.candidateId??''),workspaceId:String(input.workspaceId??''),targetKinds:(Array.isArray(input.targetKinds)?input.targetKinds:[]) as PromotionTargetKindV1[]})})
+  register(registry,{id:'promotion.inspect_candidate',version:1,level:'T0',inputSchema:Object.freeze({type:'object',additionalProperties:false}),outputSchema,requiresSandbox:false,validateInput:noInput,execute:()=>promotion.inspectCandidate()})
+  register(registry,{id:'promotion.propose_parameters',version:1,level:'T1',inputSchema:objectSchema,outputSchema,requiresSandbox:false,validateInput:record,execute:(input)=>promotion.proposeParameters(String(input.planId??''))})
+  register(registry,{id:'promotion.accept_parameter',version:1,level:'T1',inputSchema:objectSchema,outputSchema,requiresSandbox:false,validateInput:record,execute:(input)=>promotion.reviewParameter(String(input.parameterId??''),Object.freeze({status:'accepted'}))})
+  register(registry,{id:'promotion.reject_parameter',version:1,level:'T1',inputSchema:objectSchema,outputSchema,requiresSandbox:false,validateInput:record,execute:(input)=>promotion.reviewParameter(String(input.parameterId??''),Object.freeze({status:'rejected'}))})
+  register(registry,{id:'promotion.set_target_kind',version:1,level:'T1',inputSchema:objectSchema,outputSchema,requiresSandbox:false,validateInput:record,execute:(input)=>promotion.setTargetKind(String(input.targetKind??'') as PromotionTargetKindV1,String(input.idempotencyKey??''))})
+  register(registry,{id:'promotion.productize',version:1,level:'T2',inputSchema:objectSchema,outputSchema,requiresSandbox:false,validateInput:record,execute:(input)=>promotion.productize({id:String(input.id??''),title:String(input.title??''),description:String(input.description??''),registrationVersion:Number(input.registrationVersion??0)})})
+  register(registry,{id:'promotion.validate',version:1,level:'T0',inputSchema:objectSchema,outputSchema,requiresSandbox:false,validateInput:record,execute:(input)=>promotion.validatePromotion(input as never)})
+  register(registry,{id:'promotion.register',version:1,level:'T2',inputSchema:objectSchema,outputSchema,requiresSandbox:false,validateInput:record,execute:(input)=>promotion.registerPromotion(input.confirmation as PromotionRegistrationConfirmationV1,input.artifacts as PromotionReviewArtifactsV1)})
+  register(registry,{id:'promotion.retrieve',version:1,level:'T0',inputSchema:objectSchema,outputSchema,requiresSandbox:false,validateInput:record,execute:(input)=>promotion.retrievePromoted(input as never)})
+  register(registry,{id:'capability.instantiate',version:1,level:'T1',inputSchema:objectSchema,outputSchema,requiresSandbox:false,validateInput:record,execute:(input)=>promotion.instantiateCapability({capabilityId:String(input.capabilityId??''),sandboxId:String(input.sandboxId??''),instanceId:String(input.instanceId??''),...(input.values&&typeof input.values==='object'&&!Array.isArray(input.values)?{values:input.values as Readonly<Record<string,unknown>>}:{})})})
+  register(registry,{id:'capability.set_parameter',version:1,level:'T1',inputSchema:objectSchema,outputSchema,requiresSandbox:true,validateInput:record,execute:(input,context)=>reuseMismatch(promotion,context)??promotion.setCapabilityParameter(String(input.publicPath??''),input.value,Number(input.expectedSandboxRevision??0))})
+  register(registry,{id:'capability.apply_style_lock',version:1,level:'T1',inputSchema:objectSchema,outputSchema,requiresSandbox:true,validateInput:record,execute:(input,context)=>reuseMismatch(promotion,context)??promotion.applyCapabilityStyleLock(input.lock as StyleLockV1,Number(input.expectedSandboxRevision??0))})
+  register(registry,{id:'recipe.apply',version:1,level:'T1',inputSchema:objectSchema,outputSchema,requiresSandbox:true,validateInput:record,execute:(input,context)=>reuseMismatch(promotion,context)??promotion.applyRecipe(input as never)})
+  register(registry,{id:'capability.validate',version:1,level:'T0',inputSchema:objectSchema,outputSchema,requiresSandbox:true,validateInput:record,execute:(input,context)=>reuseMismatch(promotion,context)??promotion.validateReuse(input as never)})
+  register(registry,{id:'capability.render_review',version:1,level:'T0',inputSchema:Object.freeze({type:'object',additionalProperties:false}),outputSchema,requiresSandbox:true,validateInput:noInput,execute:(_input,context)=>reuseMismatch(promotion,context)??promotion.renderReuseReview()})
+  register(registry,{id:'capability.record_owner_approval',version:1,level:'T2',inputSchema:objectSchema,outputSchema,requiresSandbox:true,requiresOwnerApproval:true,validateInput:record,execute:(input,context)=>reuseMismatch(promotion,context)??promotion.recordReuseApproval(input.approval as OwnerApprovalV1)})
+  register(registry,{id:'capability.apply_reuse',version:1,level:'T2',inputSchema:Object.freeze({type:'object',additionalProperties:false}),outputSchema,requiresSandbox:true,validateInput:noInput,execute:(_input,context)=>reuseMismatch(promotion,context)??promotion.applyReuse()})
+  register(registry,{id:'capability.undo_reuse',version:1,level:'T2',inputSchema:Object.freeze({type:'object',additionalProperties:false}),outputSchema,requiresSandbox:false,validateInput:noInput,execute:()=>promotion.undoReuse()})
+  register(registry,{id:'capability.discard_reuse',version:1,level:'T2',inputSchema:Object.freeze({type:'object',additionalProperties:false}),outputSchema,requiresSandbox:true,validateInput:noInput,execute:(_input,context)=>reuseMismatch(promotion,context)??promotion.discardReuse()})
+  return registry
+}

@@ -163,3 +163,16 @@ Only durable, approved decisions belong here. Proposals stay in plans or the bla
 - Why: a second graph/tool-state/approval/Undo system would make browser UI, automation and future agents disagree about what the project actually is. One authority makes every surface a different controller over the same deterministic state.
 - Trade-off: MCP cannot independently recover or mutate state if the internal engine is unavailable; that dependence is intentional because protocol availability must never outrank project correctness.
 - Revisit trigger: a future external client needs a capability the internal registry cannot express without breaking the one-authority rule; extend/version the internal contract first, then expose it through MCP.
+
+## DEC-015 — Promotion is productization over existing Creative authorities, not a second engine
+
+- Status: Approved by the owner
+- Date: 2026-08-26
+- Decision: V1.1 adds one narrow `@sanverse/motion-promotion` domain for promotion-specific candidate/workspace/parameterization/classification/template/recipe/lineage/QA/registration logic. `MotionSceneV1`, `MotionGraphOperationV1`, existing exposures, B2 catalog/ranking, Creative Library, accepted-project transaction/Undo, internal tool registry and MCP remain the authorities they already are.
+- Capability origin and reuse status are orthogonal shared vocabulary: a generated item stays `origin = generated` after productization while moving from project-only/candidate state to `reuseStatus = promoted-reusable`. Promotion never rewrites provenance to make generated work appear curated.
+- Parameterization is conservative: stable semantic-node bindings expose meaningful content/media/style/layout/motion/behavior controls; non-exposed approved composition/choreography remains explicitly frozen. Default productized fixture must preserve the approved source appearance unless a material visual change triggers reapproval.
+- Promoted runtime assets must be self-sufficient or explicitly constrained; rights are aggregated fail-closed from all dependencies. Public registration is staged/atomic and cannot leave half-public catalog state.
+- Reused capability instances and recipes compile back into ordinary canonical graph/semantic motion operations so C3/C4/C5/C6, direct seek and Undo continue to operate normally.
+- Why: the reuse flywheel compounds approved design knowledge only if it remains truthful, editable and governed by the same deterministic authorities; parallel promotion graphs/renderers/catalogs would destroy that guarantee.
+- Trade-off: V1.1 deliberately supports bounded, typed productization rather than automatically exposing every literal or solving universal responsive/brand adaptation. Broader style intelligence and advanced runtimes stay deferred.
+- Revisit trigger: a real approved scene cannot be productized/reused without either breaking default visual parity, losing semantic editability, or requiring a runtime the canonical Motion Graph cannot express.

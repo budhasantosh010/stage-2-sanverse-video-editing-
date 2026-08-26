@@ -54,7 +54,7 @@ export const createSanverseMcpServerV1=(registry:SanverseToolRegistryV1,options:
       const requestedVersion=protocolVersion(params)
       if(requestedVersion!==MCP_PROTOCOL_VERSION_V1)return rpcError(id,-32001,`Unsupported MCP protocol version. Expected ${MCP_PROTOCOL_VERSION_V1}.`)
     }
-    if(request.method==='server/discover')return rpcResult(id,withServerMeta({resultType:'complete',supportedVersions:Object.freeze([MCP_PROTOCOL_VERSION_V1]),capabilities:Object.freeze({tools:Object.freeze({})}),instructions:'Sanverse Creative Engine Closed-Loop V1. Owner approvals are explicit, exact-revision, and cannot be inferred or forged by a tool caller.',ttlMs:0,cacheScope:'private'},name,version))
+    if(request.method==='server/discover')return rpcResult(id,withServerMeta({resultType:'complete',supportedVersions:Object.freeze([MCP_PROTOCOL_VERSION_V1]),capabilities:Object.freeze({tools:Object.freeze({})}),instructions:'Sanverse Creative Engine. Closed-Loop and promotion/reuse tools share one internal registry. Owner approvals are explicit, exact-revision, and cannot be inferred or forged by a tool caller.',ttlMs:0,cacheScope:'private'},name,version))
     if(request.method==='tools/list'){
       const tools=Object.freeze(registry.list().map(tool=>Object.freeze({name:tool.id,title:title(tool.id),description:`Sanverse ${tool.level} Closed-Loop V1 tool.`,inputSchema:tool.inputSchema,outputSchema:tool.outputSchema,_meta:Object.freeze({'io.sanverse/toolLevel':tool.level,'io.sanverse/requiresSandbox':tool.requiresSandbox,'io.sanverse/requiresOwnerApproval':tool.requiresOwnerApproval})})))
       return rpcResult(id,withServerMeta({resultType:'complete',tools,ttlMs:0,cacheScope:'private'},name,version))

@@ -127,3 +127,14 @@ Status values: `Approved`, `Proposed`, `Deferred`, `Rejected`, `Superseded`.
 - MCP V1 is a thin adapter over the accepted internal tool registry. MCP may list/call the same tools but may not own project, Storyboard, Motion Graph, approval, merge or Undo state, and it may not bypass the internal registry validation/sandbox gates.
 - Production `apps/web/**` remains outside this development-only implementation cycle.
 - Source: owner implementation instruction on 2026-08-26: take the existing Creative Engine to 100% of Closed-Loop V1, then expose that stable closed loop through MCP V1.
+
+### REQ-017 — Creative Engine V1.1 promotion, parameterization and reuse flywheel
+
+- Status: Approved
+- An exact owner-approved Motion revision may be copied into an isolated promotion workspace and productized into reusable Sanverse capability without mutating the approved source. Unapproved, stale-approved, QA-failed, graph-invalid or insufficiently evidenced source must fail closed.
+- Promotion must conservatively separate project content from frozen design constants, bind reusable parameters only to stable semantic graph identities, preserve generated origin and immutable lineage, aggregate dependency rights using the most restrictive relevant source, and require successful promotion QA before atomic Library registration.
+- V1.1 must prove reusable scene/component productization plus role-based Motion Recipe extraction. Reuse must instantiate as ordinary canonical Motion Graph content, not an opaque runtime, and must remain editable through C3/C4/C5/C6 with deterministic direct-seek behavior and existing one-action/Undo semantics.
+- The decisive release proof is cross-project: Project A approved generated scene → promote/register → normal B2 retrieval → Project B instantiate in sandbox → change content/value/accent/style → apply recipe → review → approved apply → Undo restores Project B.
+- Promotion/reuse tools are implemented in the existing internal registry first. The existing MCP remains a thin adapter and may expose the new safe internal tools only after the internal cross-project reuse loop passes; neither AI nor MCP may manufacture owner approval or rewrite lineage.
+- Production `apps/web/**`, the separately versioned `sites/` repository, B6/B7/B8, C9+, tracking/3D/particles, advanced external conversion and production-editor integration are outside this V1.1 milestone.
+- Source: owner-provided SANVERSE CREATIVE ENGINE V1.1 Promotion + Parameterization + Reuse Flywheel implementation plan on 2026-08-26.
