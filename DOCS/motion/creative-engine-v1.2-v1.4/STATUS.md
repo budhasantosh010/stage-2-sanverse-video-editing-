@@ -1,6 +1,6 @@
 # SANVERSE Creative Engine V1.2 → V1.3 → V1.4 Continuous Program
 
-Status: **IN PROGRESS — V1.2.1 CORRECTIVE RELEASE CANDIDATE GREEN; LOCAL COMMIT/TAG NEXT**
+Status: **IN PROGRESS — V1.2.1 CORRECTIVE RELEASE GREEN; V1.3 NEXT**
 Date: **2026-08-27**
 
 ## START SHA
@@ -195,21 +195,23 @@ Release hygiene before commit:
 
 ## Acceptance
 
-Status: **GREEN — READY FOR CORRECTIVE LOCAL COMMIT/TAG**
+Status: **GREEN — CORRECTIVE LOCAL RELEASE COMPLETE**
 
-The historical V1.2 release tag remains immutable at `e246697155826d9f91789e89b18bafe94e62ca8f`. V1.3 remains blocked until the corrective V1.2.1 commit and immutable tag are created and verified.
+The historical V1.2 release tag remains immutable at `e246697155826d9f91789e89b18bafe94e62ca8f`. Corrective V1.2.1 closes the semantic-pack gap without rewriting that history. V1.3 is unlocked only from this corrected release baseline.
 
 ## Commit
 
 Historical V1.2 implementation/evidence commit: `327c4e8`; historical closeout/tag commit: `e246697155826d9f91789e89b18bafe94e62ca8f`.
 
-Corrective V1.2.1 commit: pending.
+Corrective V1.2.1 implementation commit: `7cfe929` (`fix(motion): complete v1.2 semantic tool packs`).
+
+Corrective V1.2.1 closeout commit: this document's release commit.
 
 ## Tag
 
 Historical immutable tag: `sanverse-creative-engine-v1.2`.
 
-Corrective pending tag: `sanverse-creative-engine-v1.2.1`.
+Corrective immutable tag: `sanverse-creative-engine-v1.2.1`.
 
 # V1.3 — CAMERA / DEPTH + PREFERENCE INTELLIGENCE
 

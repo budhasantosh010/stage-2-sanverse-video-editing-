@@ -2,9 +2,9 @@
 
 Last updated: 2026-08-27
 
-## Parallel Creative Engine worktree — corrective V1.2.1 Source-Aware + Cohesive Motion release candidate green
+## Parallel Creative Engine worktree — corrective V1.2.1 Source-Aware + Cohesive Motion complete locally
 
-The owner-approved continuous V1.2→V1.4 program is active in the isolated Motion worktree. The historical immutable V1.2 tag (`sanverse-creative-engine-v1.2` at `e246697…`) is preserved, but a post-tag contract audit found missing exact semantic M5/M6/M7, easing, stagger and source-aware layout tool packs. Those packs are now implemented over the existing C5/C8/C9/Motion Graph authorities and corrective V1.2.1 is the required gate before V1.3. V1.3 remains blocked until the corrective local commit/tag is verified.
+The owner-approved continuous V1.2→V1.4 program is active in the isolated Motion worktree. The historical immutable V1.2 tag (`sanverse-creative-engine-v1.2` at `e246697…`) is preserved, but a post-tag contract audit found missing exact semantic M5/M6/M7, easing, stagger and source-aware layout tool packs. Those packs are now implemented over the existing C5/C8/C9/Motion Graph authorities and corrective V1.2.1 is complete locally at implementation commit `7cfe929` plus immutable local tag `sanverse-creative-engine-v1.2.1`. V1.3 is now unlocked from that corrected baseline.
 
 V1.2 adds one Sanverse-owned source-aware domain rather than a TrackingGraph: versioned exact-tick point/object/subject/surface tracks, explicit track bindings, a real deterministic RGBA color-marker provider, tracking QA/repair, M5 tracked attachment, M6 four-corner homography materialized into the existing Motion Graph perspective property, and M7 canonical subject matte materialized into existing C8 masks. B6 Style Intelligence and B7 Video Creative Language/cohesion are structured recommendation/evidence layers only. Bounded React/SVG and Remotion subsets extend the existing rights/provenance bridge and materialize to ordinary graph/keyframe data or fail closed.
 
