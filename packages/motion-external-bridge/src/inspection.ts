@@ -1,6 +1,7 @@
 import { creativeRefusal, creativeValidationOk, type CreativeEditabilityV1, type CreativeValidationResultV1 } from '@sanverse/motion-contract'
 import { constant, createMotionScene, nodeBase, validateMotionScene, type MotionNodeV1, type MotionSceneV1 } from '@sanverse/motion-graph'
 import { evaluateExternalRights, type ExternalMotionProvenanceV1, type ExternalMotionSourceKindV1, type ExternalRightsDecisionV1 } from './provenance.ts'
+import { materializeRemotionSubsetV1, normalizeReactSvgV1, parseRemotionSubsetV1 } from './v12-bridges.ts'
 
 export type ExternalMaterializationKindV1 = 'canonical-scene' | 'external-runtime-asset'
 export interface ExternalAssetMetadataV1 { readonly width?: number; readonly height?: number; readonly durationTicks?: number; readonly hasAlpha?: boolean; readonly codec?: string }
@@ -101,6 +102,19 @@ export const inspectExternalMotionAssetV1=(input:ExternalAssetInspectionInputV1)
     const durationTicks=Math.round(((Number(parsed.value.op)-Number(parsed.value.ip))/Number(parsed.value.fr))*1_440_000)
     return creativeValidationOk(Object.freeze({schemaVersion:'sanverse.external-asset-inspection/v1',assetId:input.assetId,sourceKind:'lottie',rightsDecision:rights.decision,editability:'high',materialization:'canonical-scene',deterministic:true,directSeekSafe:true,contentHash:fnv1a(input.bytes),metadata:Object.freeze({width:parsed.value.w,height:parsed.value.h,durationTicks,...input.metadata}),warnings:Object.freeze(['Lottie V1 accepts only deterministic static shape layers; unsupported features fail closed.'])}))
   }
+  if(input.sourceKind==='react-svg'){
+    if(typeof input.bytes!=='string')return creativeRefusal('EXTERNAL_ASSET_INVALID','React/SVG V1 inspection requires source text.')
+    const normalized=normalizeReactSvgV1(input.bytes);if(!normalized.ok)return normalized as CreativeValidationResultV1<ExternalAssetInspectionV1>
+    const unsupported=svgUnsupported(normalized.value)
+    if(unsupported)return creativeRefusal('EXTERNAL_ASSET_UNSUPPORTED_FEATURE',`React/SVG V1 normalized to unsupported SVG ${unsupported}; no approximation is rendered.`)
+    return creativeValidationOk(Object.freeze({schemaVersion:'sanverse.external-asset-inspection/v1',assetId:input.assetId,sourceKind:'react-svg',rightsDecision:rights.decision,editability:'high',materialization:'canonical-scene',deterministic:true,directSeekSafe:true,contentHash:fnv1a(input.bytes),metadata:Object.freeze({...input.metadata}),warnings:Object.freeze(['React/SVG V1 accepts only a static deterministic SVG JSX tree and materializes it to native Motion Graph nodes.'])}))
+  }
+  if(input.sourceKind==='remotion'){
+    if(typeof input.bytes!=='string')return creativeRefusal('EXTERNAL_ASSET_INVALID','Remotion V1 inspection requires sanverse.remotion-subset/v1 JSON source text.')
+    const parsed=parseRemotionSubsetV1(input.bytes);if(!parsed.ok)return parsed as CreativeValidationResultV1<ExternalAssetInspectionV1>
+    const durationTicks=Math.round(parsed.value.durationInFrames/parsed.value.fps*1_440_000)
+    return creativeValidationOk(Object.freeze({schemaVersion:'sanverse.external-asset-inspection/v1',assetId:input.assetId,sourceKind:'remotion',rightsDecision:rights.decision,editability:'high',materialization:'canonical-scene',deterministic:true,directSeekSafe:true,contentHash:fnv1a(input.bytes),metadata:Object.freeze({width:parsed.value.width,height:parsed.value.height,durationTicks,...input.metadata}),warnings:Object.freeze(['Remotion V1 accepts only the declared deterministic frame/Sequence/interpolate/spring subset and materializes it to native exact-tick graph values.'])}))
+  }
   if(input.sourceKind==='alpha-video'){
     const metadata=input.metadata??{}
     if(!finitePositive(metadata.width)||!finitePositive(metadata.height)||!safeDuration(metadata.durationTicks)||metadata.hasAlpha!==true||typeof metadata.codec!=='string'||!metadata.codec.trim()) return creativeRefusal('EXTERNAL_ASSET_INVALID','Alpha-video V1 requires width, height, positive durationTicks, hasAlpha=true and codec metadata.')
@@ -173,6 +187,8 @@ export const materializeExternalMotionAssetV1=(inspection:ExternalAssetInspectio
     if(typeof bytes!=='string')return creativeRefusal('EXTERNAL_MATERIALIZATION_INVALID','Canonical V1 materialization requires inspected source text.')
     if(inspection.sourceKind==='svg')return svgScene(inspection,bytes)
     if(inspection.sourceKind==='lottie')return lottieScene(inspection,bytes)
+    if(inspection.sourceKind==='react-svg'){const normalized=normalizeReactSvgV1(bytes);return normalized.ok?svgScene(inspection,normalized.value):normalized as CreativeValidationResultV1<ExternalMaterializationV1>}
+    if(inspection.sourceKind==='remotion'){const parsed=parseRemotionSubsetV1(bytes);if(!parsed.ok)return parsed as CreativeValidationResultV1<ExternalMaterializationV1>;const scene=materializeRemotionSubsetV1(inspection.assetId,parsed.value);return scene.ok?creativeValidationOk(Object.freeze({kind:'canonical-scene' as const,scene:scene.value})):scene as CreativeValidationResultV1<ExternalMaterializationV1>}
     return creativeRefusal('EXTERNAL_MATERIALIZATION_INVALID',`Canonical V1 materialization does not support ${inspection.sourceKind}.`)
   }
   const meta=inspection.metadata

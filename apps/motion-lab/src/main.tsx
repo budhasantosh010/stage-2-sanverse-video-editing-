@@ -6,6 +6,7 @@ import { CreativeLibraryApp } from './library/CreativeLibraryApp.tsx'
 import { ComponentParityLab } from './ingest/ComponentParityLab.tsx'
 import { ClosedLoopReviewLab } from './ClosedLoopReviewLab.tsx'
 import { PromotionReviewLab } from './PromotionReviewLab.tsx'
+import { SourceAwareReviewLab } from './SourceAwareReviewLab.tsx'
 import './styles.css'
 import './library/library.css'
 import './creative-direction.css'
@@ -21,9 +22,10 @@ const libraryRoute = window.location.pathname === '/library' || window.location.
 const ingestParityRoute = window.location.pathname.startsWith('/ingest/parity/sanverse.')
 const closedLoopReviewRoute = window.location.pathname === '/closed-loop-review' || mode === 'closed-loop-review'
 const promotionReviewRoute = window.location.pathname === '/promotion-review' || mode === 'promotion-review'
+const sourceAwareReviewRoute = window.location.pathname === '/source-aware-review' || mode === 'source-aware-review'
 
 createRoot(rootElement).render(
   <StrictMode>
-    {ingestParityRoute ? <ComponentParityLab /> : promotionReviewRoute ? <PromotionReviewLab /> : closedLoopReviewRoute ? <ClosedLoopReviewLab /> : libraryRoute ? <CreativeLibraryApp /> : mode === 'creative-direction' ? <CreativeDirectionLab /> : <MotionLabApp />}
+    {ingestParityRoute ? <ComponentParityLab /> : sourceAwareReviewRoute ? <SourceAwareReviewLab /> : promotionReviewRoute ? <PromotionReviewLab /> : closedLoopReviewRoute ? <ClosedLoopReviewLab /> : libraryRoute ? <CreativeLibraryApp /> : mode === 'creative-direction' ? <CreativeDirectionLab /> : <MotionLabApp />}
   </StrictMode>,
 )

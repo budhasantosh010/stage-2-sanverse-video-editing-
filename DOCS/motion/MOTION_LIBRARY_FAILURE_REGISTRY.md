@@ -553,3 +553,87 @@ VERIFIED FIX: focused Cost/Value suite is 16/16 PASS + Motion Library build PASS
 
 ONE-LINE SOLUTION: once a component is graph-editable, every rendered editable field must read the resolved graph—not stale props—and reuse the component's existing layout/fit constraints.
 
+## MOTION-FAIL-028 — Perspective-only graph transform was silently skipped by native runtime
+
+- Status: FIXED / first M6 browser evidence rejected
+- Severity: high source-aware rendering failure
+- Milestone: Creative Engine V1.2
+- Date: 2026-08-27
+
+WHAT: M6 produced a valid canonical `transform.perspectiveMatrix3d` operation and the resolved graph contained the matrix, but the real browser node had no `matrix3d(...)` transform when perspective was the only non-identity transform.
+
+WHERE: `packages/motion-native-runtime/src/index.tsx`, `mergeMotionGraphNodeStyle(...)` graph-presentation predicate.
+
+WHY: `hasGraphTransform` checked position/rotation/scale but did not count non-identity perspective. The function returned the base style before its transform builder could append the matrix.
+
+IMPACT: graph/direct-seek tests could pass while a surface-embedded visual did not actually render its perspective in pixels.
+
+FIX: non-identity `perspectiveMatrix3d` now participates in graph transform/presentation detection. A native-runtime regression test requires a perspective-only node to emit `matrix3d(...)`.
+
+VERIFIED FIX: native runtime **6/6 PASS + build PASS**; real Edge subsequently reported M6 `matrix3d=true` through full 1× playback.
+
+ONE-LINE SOLUTION: every canonical transform field that can change pixels must participate in the runtime's “does this node have graph presentation?” decision.
+
+## MOTION-FAIL-029 — Surface homography rendered from the wrong transform origin
+
+- Status: FIXED / mechanically-green browser frame rejected visually
+- Severity: high source-relationship/parity failure
+- Milestone: Creative Engine V1.2 M6
+- Date: 2026-08-27
+
+WHAT: the M6 homography matrix was mathematically valid and present in the DOM, but the cyan proof content appeared in the lower-right of the source panel instead of inside the tracked blue screen.
+
+WHERE: `packages/motion-source-aware/src/workflows.ts` M6 surface operation materialization plus native transform origin semantics.
+
+WHY: `projectSurfaceQuadV1(...)` solves the mapping from a source rectangle whose origin is top-left `(0,0)`. Graph nodes default to a center anchor `(0.5,0.5)`, so CSS applied the correct matrix around the wrong origin.
+
+IMPACT: an automated assertion for “matrix exists” would have accepted visibly wrong attachment to the source surface.
+
+FIX: M6 materialization explicitly emits `transform.anchorX = 0` and `transform.anchorY = 0` alongside the perspective operation. The source-aware workflow test now requires all three operations and the top-left anchor in the resolved transform.
+
+VERIFIED FIX: source-aware suite **13/13 PASS + build PASS**. The retained real Edge middle frame shows cyan `SURFACE CONTENT` actually warped over the tracked blue quadrilateral.
+
+ONE-LINE SOLUTION: a homography and its transform-origin convention are one contract; materialize both or the correct matrix can still produce wrong pixels.
+
+## MOTION-FAIL-030 — C8 SVG masks were entity-escaped and browser mask polarity was implicit
+
+- Status: FIXED / invisible M7 browser evidence rejected
+- Severity: high compositing failure
+- Milestone: Creative Engine V1.2 M7 / existing C8 runtime
+- Date: 2026-08-27
+
+WHAT: M7 correctly added an inverted C8 mask to the graph, but the purple environment layer was effectively invisible/incorrect in the real browser. The generated data URL decoded to entity text such as `&lt;svg ...&gt;` instead of executable SVG markup.
+
+WHERE: `packages/motion-native-runtime/src/index.tsx`, `maskImageFor(...)`.
+
+WHY: the runtime HTML-escaped the complete SVG before URI encoding it. CSS masks also relied on black/white luminance semantics without explicitly selecting luminance mask mode, while browser image masks otherwise use alpha semantics.
+
+IMPACT: graph mask metadata and deterministic evaluation could be correct while browser compositing pixels were wrong, directly breaking M7 “graphics around the subject.”
+
+FIX: the runtime URI-encodes the real SVG markup directly and sets both standard and WebKit mask mode to luminance. A regression test decodes the generated URL and requires real `<svg ...>` markup plus luminance mode.
+
+VERIFIED FIX: native runtime **6/6 PASS + build PASS**. Final Edge frame visibly shows the purple environment/foreground around a moving black subject cutout while source footage remains visible through the matte.
+
+ONE-LINE SOLUTION: encode SVG as SVG, not escaped HTML text, and make mask interpretation mode explicit so graph masks mean the same thing in the browser.
+
+## MOTION-FAIL-031 — New perspective property crashed the existing C2 numeric keyframe editor
+
+- Status: FIXED / full-release regression initially rejected
+- Severity: high backward-compatibility regression
+- Milestone: Creative Engine V1.2
+- Date: 2026-08-27
+
+WHAT: the first full repository regression failed all three `KeyframeTimeline` tests because target enumeration included `transform.perspectiveMatrix3d`, then `readMotionAnimatableTarget(...)` threw `Property transform.perspectiveMatrix3d is not supported by shape node shape.`
+
+WHERE: `packages/motion-graph/src/animatable-targets.ts`.
+
+WHY: V1.2 added perspective to the list of graph animatable target names and property reading, but omitted its capability declaration. C2 enumerates generic targets before filtering to numeric ones, so the missing capability caused an exception instead of a normal nonnumeric record.
+
+IMPACT: adding V1.2 perspective would have broken pre-existing C2 Motion Lab editing even though `apps/web` and older Motion scenes were unchanged.
+
+FIX: perspective is now a valid string/text semantic capability with hold-only interpolation. Existing C2 numeric UI sees the record and filters it normally; other graph/tool surfaces can inspect it truthfully.
+
+VERIFIED FIX: focused Motion Lab **60/60 PASS**, Motion Graph **136/136 PASS**, then the complete deterministic all-workspace matrix **2,846/2,846 PASS** and root build PASS.
+
+ONE-LINE SOLUTION: extending the property vocabulary requires extending the shared capability registry in the same release so old generic editors can safely classify the new property.
+

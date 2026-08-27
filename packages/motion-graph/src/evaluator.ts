@@ -68,6 +68,7 @@ export const evaluateScene = (sceneInput: MotionSceneV1, context: MotionRenderCo
     rotationDeg: resolveNumber(node.transform.rotationDeg, `${node.id}.transform.rotationDeg`),
     anchorX: resolveNumber(node.transform.anchorX, `${node.id}.transform.anchorX`),
     anchorY: resolveNumber(node.transform.anchorY, `${node.id}.transform.anchorY`),
+    perspectiveMatrix3d: node.transform.perspectiveMatrix3d ? resolveString(node.transform.perspectiveMatrix3d, `${node.id}.transform.perspectiveMatrix3d`) : 'none',
   })
   const resolveEffects = (node: MotionNodeV1): readonly ResolvedMotionEffectV1[] => Object.freeze(node.effects.map((effect) => Object.freeze({
     id: effect.id,

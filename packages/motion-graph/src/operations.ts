@@ -215,7 +215,8 @@ const nodeSupportsProperty = (node: MotionNodeV1, property: MotionNodePropertyNa
 const nodeProperty = (node: MotionNodeV1, property: MotionNodePropertyNameV1): Animatable<MotionPropertyPrimitiveV1> => {
   if (property === 'visible') return node.visible
   if (property === 'opacity') return node.opacity
-  if (property.startsWith('transform.')) return node.transform[property.slice('transform.'.length) as keyof MotionNodeV1['transform']]
+  if (property === 'transform.perspectiveMatrix3d') return node.transform.perspectiveMatrix3d ?? constant('none')
+  if (property.startsWith('transform.')) return node.transform[property.slice('transform.'.length) as Exclude<keyof MotionNodeV1['transform'],'perspectiveMatrix3d'>] as Animatable<MotionPropertyPrimitiveV1>
   if (node.type === 'text') {
     if (property === 'text.text') return node.text
     if (property === 'text.fillColor') return node.fillColor

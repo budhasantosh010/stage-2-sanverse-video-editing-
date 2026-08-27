@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { MotionGraphBackedComponentModuleV1, MotionShapeNodeV1 } from '@sanverse/motion-graph'
-import { applyMotionOperation, constant, createMotionScene, evaluateScene, nodeBase } from '@sanverse/motion-graph'
+import { applyMotionOperation, constant, createDefaultMask, createMotionScene, evaluateScene, nodeBase } from '@sanverse/motion-graph'
 import { mergeMotionGraphNodeStyle, MotionComponentHost, MotionCompositionFrame, MotionSafeArea, useResolvedMotionNode } from './index.tsx'
 
 const composition = { width: 1920, height: 1080, fpsNumerator: 30, fpsDenominator: 1 } as const
@@ -84,6 +84,29 @@ describe('native runtime', () => {
     )
     expect(markup).toContain('data-motion-graph-backed="true"')
     expect(markup).toContain('data-probe-opacity="0.25"')
+  })
+
+  it('renders graph-native perspective even when it is the only transform', () => {
+    const matrix = 'matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,32,18,0,1)'
+    const scene = probeModule.createScene({}, {}, context)
+    const changed = applyMotionOperation(scene, { operationId:'perspective-only', type:'set-property', target:{ nodeId:'probe-shape', property:'transform.perspectiveMatrix3d' }, value:constant(matrix) })
+    expect(changed.ok).toBe(true)
+    if (!changed.ok) return
+    const resolved = evaluateScene(changed.scene, context)
+    expect(mergeMotionGraphNodeStyle({}, resolved.nodes['probe-shape']!).transform).toContain(matrix)
+  })
+
+  it('emits a valid luminance SVG mask for browser compositing', () => {
+    const scene = probeModule.createScene({}, {}, context)
+    const changed = applyMotionOperation(scene, { operationId:'mask-hole', type:'add-mask', nodeId:'probe-shape', mask:{...createDefaultMask('mask-hole','rounded-rectangle'),invert:true} })
+    expect(changed.ok).toBe(true)
+    if (!changed.ok) return
+    const resolved = evaluateScene(changed.scene, context)
+    const style = mergeMotionGraphNodeStyle({ background:'#fff' }, resolved.nodes['probe-shape']!)
+    expect(style.maskMode).toBe('luminance')
+    const decoded = decodeURIComponent(String(style.maskImage))
+    expect(decoded).toContain('<svg xmlns="http://www.w3.org/2000/svg"')
+    expect(decoded).not.toContain('&lt;svg')
   })
 
   it('maps graph sibling order to rendered stacking for positioned visual nodes', () => {

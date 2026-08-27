@@ -11,8 +11,10 @@ export interface MotionTransformV1 {
   readonly rotationDeg: Animatable<number>
   readonly anchorX: Animatable<number>
   readonly anchorY: Animatable<number>
+  /** V1.2 generic exact-tick perspective. Missing on pre-V1.2 scenes means identity. */
+  readonly perspectiveMatrix3d?: Animatable<string>
 }
-export const identityTransform = (): MotionTransformV1 => Object.freeze({ positionX: constant(0), positionY: constant(0), scaleX: constant(1), scaleY: constant(1), rotationDeg: constant(0), anchorX: constant(0.5), anchorY: constant(0.5) })
+export const identityTransform = (): MotionTransformV1 => Object.freeze({ positionX: constant(0), positionY: constant(0), scaleX: constant(1), scaleY: constant(1), rotationDeg: constant(0), anchorX: constant(0.5), anchorY: constant(0.5), perspectiveMatrix3d: constant('none') })
 
 export interface MotionNodeBaseV1 {
   readonly id: MotionNodeId
@@ -34,7 +36,7 @@ export interface MotionPathNodeV1 extends MotionNodeBaseV1 { readonly type: 'pat
 export interface MotionImageNodeV1 extends MotionNodeBaseV1 { readonly type: 'image'; readonly source: string; readonly width: Animatable<number>; readonly height: Animatable<number>; readonly fit: 'contain' | 'cover' | 'fill'; readonly imageOpacity: Animatable<number> }
 export type MotionNodeV1 = MotionGroupNodeV1 | MotionTextNodeV1 | MotionShapeNodeV1 | MotionPathNodeV1 | MotionImageNodeV1
 
-export interface ResolvedMotionTransformV1 { readonly positionX: number; readonly positionY: number; readonly scaleX: number; readonly scaleY: number; readonly rotationDeg: number; readonly anchorX: number; readonly anchorY: number }
+export interface ResolvedMotionTransformV1 { readonly positionX: number; readonly positionY: number; readonly scaleX: number; readonly scaleY: number; readonly rotationDeg: number; readonly anchorX: number; readonly anchorY: number; readonly perspectiveMatrix3d: string }
 export interface ResolvedMotionNodeBaseV1 { readonly id: MotionNodeId; readonly name: string; readonly parentId: MotionNodeId | null; readonly enabled: boolean; readonly effectiveEnabled: boolean; readonly stackingIndex: number; readonly visible: boolean; readonly opacity: number; readonly transform: ResolvedMotionTransformV1; readonly blendMode: MotionBlendModeV1; readonly effects: readonly ResolvedMotionEffectV1[]; readonly masks: readonly ResolvedMotionMaskV1[] }
 export interface ResolvedMotionGroupNodeV1 extends ResolvedMotionNodeBaseV1 { readonly type: 'group'; readonly childIds: readonly MotionNodeId[] }
 export interface ResolvedMotionTextNodeV1 extends ResolvedMotionNodeBaseV1 { readonly type: 'text'; readonly text: string; readonly fillColor: string; readonly fontFamily: string; readonly fontSize: number; readonly fontWeight: number; readonly textAlign: 'left' | 'center' | 'right' }

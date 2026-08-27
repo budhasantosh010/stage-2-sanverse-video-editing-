@@ -44,6 +44,7 @@ export const motionNodePropertyCapability = (node: MotionNodeV1, property: Motio
   if (property === 'transform.positionX' || property === 'transform.positionY' || property === 'transform.rotationDeg') return numeric()
   if (property === 'transform.scaleX' || property === 'transform.scaleY') return numeric()
   if (property === 'transform.anchorX' || property === 'transform.anchorY') return numeric(0, 1)
+  if (property === 'transform.perspectiveMatrix3d') return text()
   if (node.type === 'text') {
     if (property === 'text.text') return text()
     if (property === 'text.fillColor') return color()
@@ -70,7 +71,8 @@ export const motionNodePropertyCapability = (node: MotionNodeV1, property: Motio
 export const motionNodeAnimatable = (node: MotionNodeV1, property: MotionNodePropertyNameV1): Animatable<MotionPropertyPrimitiveV1> => {
   if (property === 'visible') return node.visible
   if (property === 'opacity') return node.opacity
-  if (property.startsWith('transform.')) return node.transform[property.slice('transform.'.length) as keyof typeof node.transform]
+  if (property === 'transform.perspectiveMatrix3d') return node.transform.perspectiveMatrix3d ?? Object.freeze({ kind:'constant' as const, value:'none' })
+  if (property.startsWith('transform.')) return node.transform[property.slice('transform.'.length) as Exclude<keyof typeof node.transform,'perspectiveMatrix3d'>] as Animatable<MotionPropertyPrimitiveV1>
   if (node.type === 'text') {
     if (property === 'text.text') return node.text
     if (property === 'text.fillColor') return node.fillColor
@@ -158,7 +160,7 @@ export const listMotionAnimatableTargetsForNode = (scene: MotionSceneV1, nodeId:
   if (!node) return Object.freeze([])
   const nodeProperties: MotionNodePropertyNameV1[] = [
     'visible', 'opacity',
-    'transform.positionX', 'transform.positionY', 'transform.scaleX', 'transform.scaleY', 'transform.rotationDeg', 'transform.anchorX', 'transform.anchorY',
+    'transform.positionX', 'transform.positionY', 'transform.scaleX', 'transform.scaleY', 'transform.rotationDeg', 'transform.anchorX', 'transform.anchorY', 'transform.perspectiveMatrix3d',
   ]
   if (node.type === 'text') nodeProperties.push('text.text', 'text.fillColor', 'text.fontSize', 'text.fontWeight')
   if (node.type === 'shape') nodeProperties.push('shape.width', 'shape.height', 'shape.fillColor', 'shape.strokeColor', 'shape.strokeWidth', 'shape.radius')

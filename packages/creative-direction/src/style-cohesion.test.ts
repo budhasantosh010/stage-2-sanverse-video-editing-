@@ -1,0 +1,13 @@
+import { describe,expect,it } from 'vitest'
+import { recommendStyleLockV1,scoreSceneCohesionV1,type VideoCreativeLanguageV1 } from './style-cohesion.ts'
+
+describe('B6 Style Intelligence V1',()=>{
+  const input={brand:{palette:['#090909','#ff6a00'],typeFamily:'Inter',traits:['clean','restrained editorial']},existingStyle:{motionIntensity:.4,overshootAllowance:.1,density:'medium' as const},approvedAssetSignals:[{motionIntensity:.3,overshoot:.08,density:'low' as const}],promotedAssetSignals:[{motionIntensity:.35,overshoot:.1,density:'low' as const}],videoContext:{talkingHead:true,informationDensity:'high' as const,negativeSpace:'high' as const,subjectPriority:'high' as const},locked:false}
+  it('returns structured visual/motion/composition locks with inspectable reasons',()=>{const result=recommendStyleLockV1(input);expect(result.ok).toBe(true);if(!result.ok)return;expect(result.value.motion.baseTiming).toBe('calm');expect(result.value.composition.density).toBe('low');expect(result.value.reasons.join(' ')).toMatch(/Talking-head|restrained/iu)})
+  it('refuses silent changes to a locked style',()=>{expect(recommendStyleLockV1({...input,locked:true})).toMatchObject({ok:false,refusal:{code:'STYLE_LOCKED'}})})
+})
+describe('B7 video creative language',()=>{
+  const language:VideoCreativeLanguageV1={schemaVersion:'sanverse.video-creative-language/v1',id:'language:demo',version:1,styleLockId:'style:demo',preferredPresentationModes:['overlay','tracked-attached'],typographyLanguage:'editorial',surfaceLanguage:'soft-depth',motionRhythm:'calm',transitionVocabulary:['cut','fade'],densityPolicy:'low',cameraPolicy:'restrained',paletteRoles:['background','text','accent'],easingFamily:['soft'],overshootMax:.12,allowedExceptions:[{sceneId:'hero',reason:'Payoff intentionally increases density.',dimensions:['density']}]}
+  it('scores normal cohesion explicitly',()=>{const score=scoreSceneCohesionV1(language,{sceneId:'normal',paletteRoles:['background','accent'],typographyLanguage:'editorial',surfaceLanguage:'soft-depth',motionRhythm:'calm',easing:'soft',overshoot:.08,density:'low',presentationMode:'overlay',transition:'fade'});expect(score.level).toBe('HIGH');expect(score.score).toBe(1)})
+  it('allows a declared hero exception without forcing monotony',()=>{const score=scoreSceneCohesionV1(language,{sceneId:'hero',paletteRoles:['background','accent'],typographyLanguage:'editorial',surfaceLanguage:'soft-depth',motionRhythm:'calm',easing:'soft',overshoot:.08,density:'high',presentationMode:'overlay',transition:'fade'});expect(score.level).toBe('HIGH');expect(score.exceptionApplied).toBe(true);expect(score.reasons[0]).toMatch(/intentionally/iu)})
+})

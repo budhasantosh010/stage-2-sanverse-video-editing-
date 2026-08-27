@@ -73,6 +73,7 @@ export type MotionNodePropertyNameV1 =
   | 'transform.rotationDeg'
   | 'transform.anchorX'
   | 'transform.anchorY'
+  | 'transform.perspectiveMatrix3d'
   | 'text.text'
   | 'text.fillColor'
   | 'text.fontSize'

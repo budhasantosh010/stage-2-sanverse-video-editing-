@@ -76,7 +76,7 @@ const setProperty = (node: MotionNodeV1, property: MotionNodePropertyPathV1['pro
   if (property === 'opacity') return Object.freeze({ ...node, opacity: value as Animatable<number> })
   if (property.startsWith('transform.')) {
     const key = property.slice('transform.'.length) as keyof MotionNodeV1['transform']
-    return Object.freeze({ ...node, transform: Object.freeze({ ...node.transform, [key]: value as Animatable<number> }) })
+    return Object.freeze({ ...node, transform: Object.freeze({ ...node.transform, [key]: value as Animatable<number | string> }) })
   }
   if (node.type === 'text') {
     if (property === 'text.text') return Object.freeze({ ...node, text: value as Animatable<string> })

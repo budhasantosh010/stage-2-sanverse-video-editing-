@@ -1,6 +1,16 @@
 # Current State
 
-Last updated: 2026-08-26
+Last updated: 2026-08-27
+
+## Parallel Creative Engine worktree — V1.2 Source-Aware + Cohesive Motion release candidate green
+
+The owner-approved continuous V1.2→V1.4 program is active in the isolated Motion worktree. V1.2 is implementation/QA/browser/regression/build complete and is at local commit/tag closeout; V1.3 has not started yet by gate law.
+
+V1.2 adds one Sanverse-owned source-aware domain rather than a TrackingGraph: versioned exact-tick point/object/subject/surface tracks, explicit track bindings, a real deterministic RGBA color-marker provider, tracking QA/repair, M5 tracked attachment, M6 four-corner homography materialized into the existing Motion Graph perspective property, and M7 canonical subject matte materialized into existing C8 masks. B6 Style Intelligence and B7 Video Creative Language/cohesion are structured recommendation/evidence layers only. Bounded React/SVG and Remotion subsets extend the existing rights/provenance bridge and materialize to ordinary graph/keyframe data or fail closed.
+
+The existing internal registry exposes the proven source-aware T0/T1 operations; MCP remains a generic adapter with no tracking/project/approval/Undo state. All new time-varying paths prove direct/backward/repeated/random seek equality. Real Edge `/source-aware-review` used a temporary encoded VP9/WebM 1280×720 30fps 5.000s source, ran true 1× for 5003 ms, captured 149 browser frames, reached exactly 7,200,000/7,200,000 ticks, and visibly proved M5 tracking, M6 content warped onto the tracked surface, and M7 environment graphics around the subject matte. The temporary source was removed afterward.
+
+Four blocking defects were found and fixed rather than carried forward: perspective-only transforms skipped by native runtime (`MOTION-FAIL-028`), M6 matrix rendered around the wrong transform origin (`MOTION-FAIL-029`), invalid/implicit C8 browser SVG mask semantics (`MOTION-FAIL-030`), and the new perspective target missing from the generic keyframe capability registry (`MOTION-FAIL-031`). The complete deterministic all-workspace matrix is **2,846/2,846 PASS** (including protected `apps/web` **1,231/1,231**) and root `npm run build` is **PASS**. `apps/web/**` diff is 0, raw source media is absent, `sites/` remains excluded, and no GitHub remote/Actions work occurred. Durable program status: `DOCS/motion/creative-engine-v1.2-v1.4/STATUS.md`.
 
 ## Parallel Creative Engine worktree — Promotion / Parameterization / Reuse V1.1 complete locally
 

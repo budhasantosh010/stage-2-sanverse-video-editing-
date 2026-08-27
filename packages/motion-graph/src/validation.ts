@@ -137,7 +137,7 @@ const maskAnimatableConstraint = (property: 'opacity' | 'feather' | 'expansion' 
 const nodeAnimatableConstraint = (property: MotionNodePropertyNameV1): AnimatableConstraintV1 => {
   if (property === 'visible') return { valueType: 'boolean', interpolation: ['hold'] }
   if (property === 'opacity' || property === 'image.opacity' || property === 'path.trimProgress' || property === 'transform.anchorX' || property === 'transform.anchorY') return numericConstraint(0, 1)
-  if (property === 'text.text' || property.endsWith('fillColor') || property.endsWith('strokeColor')) return holdStringConstraint()
+  if (property === 'transform.perspectiveMatrix3d' || property === 'text.text' || property.endsWith('fillColor') || property.endsWith('strokeColor')) return holdStringConstraint()
   if (property === 'text.fontSize') return numericConstraint(1, 4096)
   if (property === 'text.fontWeight') return numericConstraint(1, 1000)
   if (property === 'shape.width' || property === 'shape.height' || property === 'shape.strokeWidth' || property === 'shape.radius' || property === 'path.strokeWidth' || property === 'image.width' || property === 'image.height') return numericConstraint(0)
@@ -149,6 +149,7 @@ const nodeAnimatables = (node: MotionNodeV1): readonly [MotionNodePropertyNameV1
     ['visible', node.visible], ['opacity', node.opacity],
     ['transform.positionX', node.transform.positionX], ['transform.positionY', node.transform.positionY], ['transform.scaleX', node.transform.scaleX], ['transform.scaleY', node.transform.scaleY], ['transform.rotationDeg', node.transform.rotationDeg], ['transform.anchorX', node.transform.anchorX], ['transform.anchorY', node.transform.anchorY],
   ]
+  if (node.transform.perspectiveMatrix3d) base.push(['transform.perspectiveMatrix3d', node.transform.perspectiveMatrix3d])
   if (node.type === 'text') base.push(['text.text', node.text], ['text.fillColor', node.fillColor], ['text.fontSize', node.fontSize], ['text.fontWeight', node.fontWeight])
   if (node.type === 'shape') base.push(['shape.width', node.width], ['shape.height', node.height], ['shape.fillColor', node.fillColor], ['shape.strokeColor', node.strokeColor], ['shape.strokeWidth', node.strokeWidth], ['shape.radius', node.radius])
   if (node.type === 'path') base.push(['path.fillColor', node.fillColor], ['path.strokeColor', node.strokeColor], ['path.strokeWidth', node.strokeWidth], ['path.trimProgress', node.trimProgress])

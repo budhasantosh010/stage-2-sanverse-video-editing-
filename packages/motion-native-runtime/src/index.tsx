@@ -112,18 +112,19 @@ const maskImageFor = (node: ResolvedMotionNodeV1): string | null => {
     return `${filter}<rect x="${x}" y="${y}" width="${Math.max(0, width)}" height="${Math.max(0, height)}" rx="${radius}" ry="${radius}" ${common}/>`
   }).join('')
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><rect width="100" height="100" fill="${background}"/>${shapes}</svg>`
-  return `url("data:image/svg+xml,${encodeURIComponent(escapeSvg(svg))}")`
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
 }
 
 export const mergeMotionGraphNodeStyle = (base: CSSProperties, node: ResolvedMotionNodeV1 | null, _selected = false): CSSProperties => {
   if (!node) return base
-  const hasGraphTransform = node.transform.positionX !== 0 || node.transform.positionY !== 0 || node.transform.rotationDeg !== 0 || node.transform.scaleX !== 1 || node.transform.scaleY !== 1
+  const hasGraphTransform = node.transform.perspectiveMatrix3d !== 'none' || node.transform.positionX !== 0 || node.transform.positionY !== 0 || node.transform.rotationDeg !== 0 || node.transform.scaleX !== 1 || node.transform.scaleY !== 1
   const hasEnabledEffects = node.effects.some((effect) => effect.enabled)
   const hasEnabledMasks = node.masks.some((mask) => mask.enabled)
   const hasGraphPresentation = !node.effectiveEnabled || !node.visible || node.opacity !== 1 || hasGraphTransform || node.blendMode !== 'normal' || hasEnabledEffects || hasEnabledMasks || (base.position !== undefined && node.stackingIndex !== 0)
   if (!hasGraphPresentation) return base
   const baseOpacity = typeof base.opacity === 'number' ? base.opacity : 1
   const transformParts: string[] = []
+  if (node.transform.perspectiveMatrix3d !== 'none') transformParts.push(node.transform.perspectiveMatrix3d)
   if (node.transform.positionX !== 0 || node.transform.positionY !== 0) transformParts.push(`translate3d(${node.transform.positionX}px, ${node.transform.positionY}px, 0)`)
   if (node.transform.rotationDeg !== 0) transformParts.push(`rotate(${node.transform.rotationDeg}deg)`)
   if (node.transform.scaleX !== 1 || node.transform.scaleY !== 1) transformParts.push(node.transform.scaleX === node.transform.scaleY ? `scale(${node.transform.scaleX})` : `scale(${node.transform.scaleX}, ${node.transform.scaleY})`)
@@ -146,6 +147,7 @@ export const mergeMotionGraphNodeStyle = (base: CSSProperties, node: ResolvedMot
     maskImage: maskImage ?? undefined,
     WebkitMaskSize: maskImage ? '100% 100%' : undefined,
     maskSize: maskImage ? '100% 100%' : undefined,
+    maskMode: maskImage ? 'luminance' : undefined,
   }
 }
 
@@ -165,6 +167,7 @@ export const mergeMotionGraphNodeDecorationStyle = (base: CSSProperties, node: R
     maskImage: maskImage ?? undefined,
     WebkitMaskSize: maskImage ? '100% 100%' : undefined,
     maskSize: maskImage ? '100% 100%' : undefined,
+    maskMode: maskImage ? 'luminance' : undefined,
   }
 }
 

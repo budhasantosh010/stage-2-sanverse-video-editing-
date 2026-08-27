@@ -1,0 +1,3 @@
+const hashString=(value:string):number=>{let hash=2166136261>>>0;for(let index=0;index<value.length;index+=1){hash^=value.charCodeAt(index);hash=Math.imul(hash,16777619)}return hash>>>0}
+export const deterministicSeedV1=(seed:string|number,index=0):number=>{let state=(typeof seed==='number'?(seed>>>0):hashString(seed))^(Math.imul(index+1,0x9e3779b1)>>>0);state^=state>>>16;state=Math.imul(state,0x7feb352d);state^=state>>>15;state=Math.imul(state,0x846ca68b);state^=state>>>16;return state>>>0}
+export const deterministicRandom01V1=(seed:string|number,index=0):number=>deterministicSeedV1(seed,index)/0x1_0000_0000

@@ -176,3 +176,15 @@ Only durable, approved decisions belong here. Proposals stay in plans or the bla
 - Why: the reuse flywheel compounds approved design knowledge only if it remains truthful, editable and governed by the same deterministic authorities; parallel promotion graphs/renderers/catalogs would destroy that guarantee.
 - Trade-off: V1.1 deliberately supports bounded, typed productization rather than automatically exposing every literal or solving universal responsive/brand adaptation. Broader style intelligence and advanced runtimes stay deferred.
 - Revisit trigger: a real approved scene cannot be productized/reused without either breaking default visual parity, losing semantic editability, or requiring a runtime the canonical Motion Graph cannot express.
+
+## DEC-016 — Source-aware, camera/depth and Expert Motion are extensions of one Motion Graph
+
+- Status: Approved by the owner
+- Date: 2026-08-26
+- Decision: V1.2–V1.4 add new narrow domain responsibilities, but none may become a parallel animation authority. C9 tracking materializes provider output into Sanverse-owned exact-tick tracks and composes tracked base transform + user offset + normal motion offset. C10 camera/depth is graph-native deterministic 2.5D state evaluated at exact ticks. C11/C12 Expert Motion uses bounded serialized expert nodes whose procedural/particle/shader outputs are pure functions of exact tick, typed parameters/assets and explicit deterministic seed.
+- Surface and subject workflows reuse C8 masks/mattes/compositing; external React/SVG/Remotion/Rive/procedural/shader paths extend the existing external-source provenance/rights authority and must truthfully choose native materialization, bounded expert wrapping/flattening, partial support or rejection.
+- Style/cohesion/preferences/failure intelligence are structured recommendation/evidence layers only. They may influence B2-B5 ranking/planning but may not override rights, locks, capability support, factual content, owner approvals or canonical state.
+- Internal typed operations land and pass before tool-registry exposure; MCP remains a thin generic adapter over that internal registry and owns no tracking/camera/expert/project/approval/Undo state.
+- Why: direct seek, Undo, semantic-ID parity and truthful reuse are only reliable if all new capabilities converge on the same exact-tick Motion authority. Provider/runtime-specific graphs or clocks would make UI, agents, MCP and review evidence disagree about what the project is.
+- Trade-off: supported subsets are deliberately bounded. Features that cannot satisfy deterministic materialization/expert-sandbox/rights requirements must remain partial or rejected rather than gaining broad compatibility claims.
+- Revisit trigger: a required production use case cannot be represented by native graph state or a bounded deterministic expert node without violating direct-seek or security guarantees.

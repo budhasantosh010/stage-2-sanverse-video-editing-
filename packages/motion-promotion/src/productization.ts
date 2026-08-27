@@ -68,7 +68,7 @@ const scaleAnimatable=(source:Animatable<unknown>,factor:number,property:string)
   throw new RangeError(`Motion intensity cannot scale non-numeric ${property}.`)
 }
 const nodeAnimatable=(node:MotionNodeV1,property:MotionNodePropertyNameV1):Animatable<unknown>=>{
-  if(property==='visible')return node.visible;if(property==='opacity')return node.opacity;if(property.startsWith('transform.'))return node.transform[property.slice('transform.'.length) as keyof MotionNodeV1['transform']]
+  if(property==='visible')return node.visible;if(property==='opacity')return node.opacity;if(property==='transform.perspectiveMatrix3d')return node.transform.perspectiveMatrix3d??constant('none');if(property.startsWith('transform.'))return node.transform[property.slice('transform.'.length) as Exclude<keyof MotionNodeV1['transform'],'perspectiveMatrix3d'>]
   if(node.type==='text'){if(property==='text.text')return node.text;if(property==='text.fillColor')return node.fillColor;if(property==='text.fontSize')return node.fontSize;if(property==='text.fontWeight')return node.fontWeight}
   if(node.type==='shape'){if(property==='shape.width')return node.width;if(property==='shape.height')return node.height;if(property==='shape.fillColor')return node.fillColor;if(property==='shape.strokeColor')return node.strokeColor;if(property==='shape.strokeWidth')return node.strokeWidth;if(property==='shape.radius')return node.radius}
   if(node.type==='path'){if(property==='path.fillColor')return node.fillColor;if(property==='path.strokeColor')return node.strokeColor;if(property==='path.strokeWidth')return node.strokeWidth;if(property==='path.trimProgress')return node.trimProgress}

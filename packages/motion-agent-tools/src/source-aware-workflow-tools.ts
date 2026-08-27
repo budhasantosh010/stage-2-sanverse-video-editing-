@@ -1,0 +1,38 @@
+import { recommendStyleLockV1,scoreSceneCohesionV1,type SceneCreativeSignatureV1,type StyleIntelligenceInputV1,type VideoCreativeLanguageV1 } from '@sanverse/creative-direction'
+import { creativeOperationOk,creativeOperationRefusal,creativeValidationOk,type CreativeValidationResultV1 } from '@sanverse/motion-contract'
+import { inspectExternalMotionAssetV1,materializeExternalMotionAssetV1,type ExternalMotionProvenanceV1 } from '@sanverse/motion-external-bridge'
+import { applyTrackRepairV1,renderSubjectEnvironmentAtTickV1,renderSurfaceEmbeddedAtTickV1,renderTrackedAttachmentAtTickV1,runTrackQaV1,validateMotionTrackV1,type CanonicalSubjectMatteV1,type MotionTrackV1,type SubjectEnvironmentReviewInputV1,type SurfaceEmbeddedReviewInputV1,type TrackBindingV1,type TrackRepairOperationV1,type TrackedAttachmentReviewInputV1 } from '@sanverse/motion-source-aware'
+import type { MotionCompositionV1 } from '@sanverse/motion-contract'
+import type { MotionSceneV1 } from '@sanverse/motion-graph'
+import { createCreativeEngineV11ToolRegistryV1 } from './promotion-workflow-tools.ts'
+import type { ClosedLoopEngineV1 } from './closed-loop-engine.ts'
+import type { PromotionReuseEngineV1 } from './promotion-reuse-engine.ts'
+import type { SanverseToolDefinitionV1,SanverseToolRegistryV1 } from './registry.ts'
+
+const outputSchema=Object.freeze({type:'object',required:['ok'],additionalProperties:true})
+const schema=(required:readonly string[])=>Object.freeze({type:'object',required:Object.freeze([...required]),additionalProperties:true})
+const record=(input:unknown):input is Record<string,unknown>=>Boolean(input)&&typeof input==='object'&&!Array.isArray(input)
+const requiredRecord=(keys:readonly string[])=>(input:unknown):CreativeValidationResultV1<Record<string,unknown>>=>record(input)&&keys.every(key=>key in input)?creativeValidationOk(input):({ok:false,refusal:Object.freeze({code:'INVALID_TOOL_INPUT',message:`Tool input requires: ${keys.join(', ')}.`})})
+const register=<I,O>(registry:SanverseToolRegistryV1,definition:SanverseToolDefinitionV1<I,O>)=>{const result=registry.register(definition as SanverseToolDefinitionV1);if(!result.ok)throw new RangeError(`${result.refusal.code}: ${result.refusal.message}`)}
+
+export const SOURCE_AWARE_TOOL_IDS_V12=Object.freeze([
+  'source.track_qa','source.track_repair','source.render_tracked_attachment','source.render_surface_embedded','source.render_subject_environment',
+  'style.recommend_lock','cohesion.score_scene','external.inspect_supported','external.materialize_supported',
+] as const)
+
+export const registerCreativeEngineV12ToolsV1=(registry:SanverseToolRegistryV1):SanverseToolRegistryV1=>{
+  register(registry,{id:'source.track_qa',version:1,level:'T0',inputSchema:schema(['track']),outputSchema,requiresSandbox:false,validateInput:requiredRecord(['track']),execute:(input)=>{const valid=validateMotionTrackV1(input.track);if(!valid.ok)return creativeOperationRefusal(valid.refusal.code,valid.refusal.message,valid.refusal.details);return creativeOperationOk(runTrackQaV1(valid.value),1)}})
+  register(registry,{id:'source.track_repair',version:1,level:'T1',inputSchema:schema(['track','repair']),outputSchema,requiresSandbox:false,validateInput:requiredRecord(['track','repair']),execute:(input)=>{const valid=validateMotionTrackV1(input.track);if(!valid.ok)return creativeOperationRefusal(valid.refusal.code,valid.refusal.message,valid.refusal.details);return applyTrackRepairV1(valid.value,input.repair as TrackRepairOperationV1)}})
+  register(registry,{id:'source.render_tracked_attachment',version:1,level:'T1',inputSchema:schema(['scene','track','binding','tick','composition']),outputSchema,requiresSandbox:false,validateInput:requiredRecord(['scene','track','binding','tick','composition']),execute:(input)=>renderTrackedAttachmentAtTickV1(input as unknown as TrackedAttachmentReviewInputV1)})
+  register(registry,{id:'source.render_surface_embedded',version:1,level:'T1',inputSchema:schema(['scene','track','binding','nodeSize','tick','composition']),outputSchema,requiresSandbox:false,validateInput:requiredRecord(['scene','track','binding','nodeSize','tick','composition']),execute:(input)=>renderSurfaceEmbeddedAtTickV1(input as unknown as SurfaceEmbeddedReviewInputV1)})
+  register(registry,{id:'source.render_subject_environment',version:1,level:'T1',inputSchema:schema(['scene','matte','nodeId','maskId','tick','composition']),outputSchema,requiresSandbox:false,validateInput:requiredRecord(['scene','matte','nodeId','maskId','tick','composition']),execute:(input)=>renderSubjectEnvironmentAtTickV1(input as unknown as SubjectEnvironmentReviewInputV1)})
+  register(registry,{id:'style.recommend_lock',version:1,level:'T0',inputSchema:schema(['brand','existingStyle','approvedAssetSignals','promotedAssetSignals','videoContext','locked']),outputSchema,requiresSandbox:false,validateInput:requiredRecord(['brand','existingStyle','approvedAssetSignals','promotedAssetSignals','videoContext','locked']),execute:(input)=>recommendStyleLockV1(input as unknown as StyleIntelligenceInputV1)})
+  register(registry,{id:'cohesion.score_scene',version:1,level:'T0',inputSchema:schema(['language','scene']),outputSchema,requiresSandbox:false,validateInput:requiredRecord(['language','scene']),execute:(input)=>creativeOperationOk(scoreSceneCohesionV1(input.language as VideoCreativeLanguageV1,input.scene as SceneCreativeSignatureV1),1)})
+  register(registry,{id:'external.inspect_supported',version:1,level:'T0',inputSchema:schema(['assetId','sourceKind','source','provenance']),outputSchema,requiresSandbox:false,validateInput:requiredRecord(['assetId','sourceKind','source','provenance']),execute:(input)=>{const sourceKind=String(input.sourceKind);if(sourceKind!=='react-svg'&&sourceKind!=='remotion')return creativeOperationRefusal('EXTERNAL_V12_TOOL_SCOPE','V1.2 tool exposure supports React/SVG and Remotion only.');const result=inspectExternalMotionAssetV1({assetId:String(input.assetId),sourceKind,bytes:String(input.source),provenance:input.provenance as ExternalMotionProvenanceV1});return result.ok?creativeOperationOk(result.value,1):creativeOperationRefusal(result.refusal.code,result.refusal.message,result.refusal.details)}})
+  register(registry,{id:'external.materialize_supported',version:1,level:'T1',inputSchema:schema(['assetId','sourceKind','source','provenance']),outputSchema,requiresSandbox:false,validateInput:requiredRecord(['assetId','sourceKind','source','provenance']),execute:(input)=>{const sourceKind=String(input.sourceKind);if(sourceKind!=='react-svg'&&sourceKind!=='remotion')return creativeOperationRefusal('EXTERNAL_V12_TOOL_SCOPE','V1.2 tool exposure supports React/SVG and Remotion only.');const source=String(input.source),inspection=inspectExternalMotionAssetV1({assetId:String(input.assetId),sourceKind,bytes:source,provenance:input.provenance as ExternalMotionProvenanceV1});if(!inspection.ok)return creativeOperationRefusal(inspection.refusal.code,inspection.refusal.message,inspection.refusal.details);const materialized=materializeExternalMotionAssetV1(inspection.value,source);return materialized.ok?creativeOperationOk(materialized.value,1):creativeOperationRefusal(materialized.refusal.code,materialized.refusal.message,materialized.refusal.details)}})
+  return registry
+}
+
+export const createCreativeEngineV12ToolRegistryV1=(closedLoop:ClosedLoopEngineV1,promotion:PromotionReuseEngineV1):SanverseToolRegistryV1=>registerCreativeEngineV12ToolsV1(createCreativeEngineV11ToolRegistryV1(closedLoop,promotion))
+
+export type SourceAwareToolFixtureV1=Readonly<{scene:MotionSceneV1;track:MotionTrackV1;binding:TrackBindingV1;matte:CanonicalSubjectMatteV1;composition:MotionCompositionV1}>

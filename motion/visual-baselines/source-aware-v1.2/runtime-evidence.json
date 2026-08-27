@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "sanverse.source-aware-browser-evidence/v1",
+  "recordedAt": "2026-08-27T05:50:53.411Z",
+  "route": "/source-aware-review",
+  "sourceFixture": "temporary VP9/WebM 1280x720 30fps 5s encoded by ffmpeg; not committed",
+  "speed": 1,
+  "elapsedMs": 5003,
+  "capturedFrames": 149,
+  "samples": [
+    "source-aware-1x-00.jpg",
+    "source-aware-1x-01.jpg",
+    "source-aware-1x-02.jpg",
+    "source-aware-1x-03.jpg",
+    "source-aware-1x-04.jpg",
+    "source-aware-1x-05.jpg",
+    "source-aware-1x-06.jpg"
+  ],
+  "fullPlaybackVerified": true,
+  "finalTick": 7200000,
+  "durationTicks": 7200000,
+  "sourceVideoCurrentTimes": [
+    5,
+    5,
+    5
+  ],
+  "graphBacked": true,
+  "semanticNodeId": "source-proof.root",
+  "semanticNodeCount": 3,
+  "m5TrackedAttached": true,
+  "m6SurfaceEmbedded": true,
+  "m7SubjectEnvironment": true,
+  "consoleErrors": [],
+  "networkFailures": [],
+  "badResponses": [],
+  "ignoredBrowserNoise": [
+    "404 http://127.0.0.1:2152/favicon.ico"
+  ],
+  "productionWebTouched": false
+}
