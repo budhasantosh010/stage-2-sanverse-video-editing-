@@ -2,9 +2,9 @@
 
 Last updated: 2026-08-27
 
-## Parallel Creative Engine worktree — V1.3 Camera / Depth + Preference Intelligence release candidate green
+## Parallel Creative Engine worktree — V1.3 complete locally; V1.4 Expert Motion unlocked
 
-The owner-approved continuous V1.2→V1.4 program remains active in the isolated Motion worktree. Corrective V1.2.1 is preserved at immutable local tag `sanverse-creative-engine-v1.2.1`; V1.3 has now completed its implementation, deterministic QA, real 1× browser proof, full repository regression and root production build. The only remaining V1.3 work is local Git sealing (implementation/evidence commit, closeout commit and immutable `sanverse-creative-engine-v1.3` tag). V1.4 remains blocked until that seal exists.
+The owner-approved continuous V1.2→V1.4 program remains active in the isolated Motion worktree. Corrective V1.2.1 is preserved at immutable local tag `sanverse-creative-engine-v1.2.1`. V1.3 is now fully released locally: implementation/evidence commit `6821ff0930beff8e260f172ab4b24011334f4d49` plus immutable local tag `sanverse-creative-engine-v1.3`, verified to resolve to that exact same SHA. V1.4 Expert Motion is therefore unlocked from this sealed V1.3 baseline.
 
 V1.3 adds one narrow `@sanverse/motion-camera-depth` domain over the existing Motion Graph rather than a CameraGraph. C9 source-aware tracking resolves first into ordinary graph transform operations; C10 then evaluates one exact-tick camera rig plus explicit per-node depth bindings and emits ordinary graph transform operations at the same canonical 1,440,000-tick clock. The review fixture proves four distinct depth responses while the tracked callout continues along its C9 path. B8 owner-preference/failure intelligence is evidence-only: 3 positive owner signals across 2 projects promote `camera-policy = restrained`, while two recurring `CAMERA_TOO_AGGRESSIVE` failures produce a repair lesson; automatic mutation remains off.
 

@@ -282,50 +282,50 @@ Manual retained-frame inspection confirms the tracked callout continues along it
 
 ## Release hygiene
 
-Status: **GREEN BEFORE COMMIT**
+Status: **COMPLETE**
 
-- structured Git diff confirms only the intended V1.3 tracked integration files have real content changes; the large surrounding `git status` list is timestamp/line-ending index noise with no content diff;
+- structured Git diff confirmed only the intended V1.3 tracked integration files had real content changes; the large surrounding `git status` list was timestamp/line-ending index noise with no content diff;
 - `apps/web/**` actual content diff: **0 files**;
 - raw source video/audio for release: **0**;
-- separately versioned `sites/` is now explicitly root-ignored so structured stage-all cannot accidentally absorb the nested repository;
-- `git diff --check`: **PASS** from the verified candidate;
+- separately versioned `sites/` is explicitly root-ignored so structured stage-all cannot accidentally absorb the nested repository;
+- `git diff --check`: **PASS** on the verified candidate;
 - GitHub remote/fetch/push/PR/Actions operations: **0**.
 
 ## Acceptance
 
-Status: **GREEN — READY TO SEAL LOCAL RELEASE**
+Status: **GREEN — LOCAL RELEASE COMPLETE**
 
-Every V1.3 contract, deterministic/direct-seek, real 1× Edge, full-regression, root-build and isolation gate is green. V1.4 remains blocked until the V1.3 implementation/evidence commit plus immutable local `sanverse-creative-engine-v1.3` tag are created.
+Every V1.3 contract, deterministic/direct-seek, real 1× Edge, full-regression, root-build and isolation gate is green. The required local implementation/evidence commit and immutable local tag now exist and resolve to the same SHA, so V1.4 is unlocked.
 
 ## Commit
 
-Pending local implementation/evidence release commit.
+Implementation/evidence release commit: `6821ff0930beff8e260f172ab4b24011334f4d49` (`feat(motion): complete creative engine v1.3 camera depth`).
 
 ## Tag
 
-Pending immutable local tag: `sanverse-creative-engine-v1.3`.
+Immutable local tag: `sanverse-creative-engine-v1.3` → `6821ff0930beff8e260f172ab4b24011334f4d49`.
 
 # V1.4 — EXPERT MOTION
 
 ## Contracts
 
-Status: **BLOCKED ON V1.3 RELEASE**
+Status: **READY — NOT STARTED**
 
 ## Implementation
 
-Status: **BLOCKED ON V1.3 RELEASE**
+Status: **READY — NOT STARTED**
 
 ## Tests
 
-Status: **BLOCKED ON V1.3 RELEASE**
+Status: **READY — NOT STARTED**
 
 ## Visual proof
 
-Status: **BLOCKED ON V1.3 RELEASE**
+Status: **READY — NOT STARTED**
 
 ## Acceptance
 
-Status: **BLOCKED ON V1.3 RELEASE**
+Status: **READY — NOT STARTED**
 
 ## Commit
 
