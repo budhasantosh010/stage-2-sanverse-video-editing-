@@ -1,6 +1,6 @@
 # SANVERSE Creative Engine V1.2 → V1.3 → V1.4 Continuous Program
 
-Status: **IN PROGRESS — V1.2 RELEASE CANDIDATE GREEN; LOCAL COMMIT/TAG NEXT**
+Status: **IN PROGRESS — V1.2.1 CORRECTIVE RELEASE CANDIDATE GREEN; LOCAL COMMIT/TAG NEXT**
 Date: **2026-08-27**
 
 ## START SHA
@@ -89,7 +89,7 @@ Status: **COMPLETE**
 
 Status: **COMPLETE**
 
-Source-aware focused package: **13/13 PASS + TypeScript build PASS**.
+Source-aware focused package: **17/17 PASS + TypeScript build PASS** after the corrective semantic-operation audit.
 
 Required mode proofs are covered:
 
@@ -104,7 +104,7 @@ Typed boundaries also pass:
 
 - Creative Direction B6/B7: **38/38**;
 - external bridge: **11/11**;
-- Motion Agent Tools: **14/14**;
+- Motion Agent Tools: **18/18**;
 - MCP: **10/10**;
 - Motion Graph: **136/136**;
 - Native Runtime: **6/6**;
@@ -121,7 +121,7 @@ Evidence: `motion/visual-baselines/source-aware-v1.2/`.
 - route `/source-aware-review`;
 - temporary VP9/WebM source, **1280×720, 30fps, 5.000s**, generated only for the audit and removed afterward;
 - playback speed **1×**;
-- wall-clock elapsed **5003 ms**;
+- wall-clock elapsed **4994 ms**;
 - **149** captured browser frames;
 - final tick **7,200,000 / 7,200,000**;
 - all three source video elements at **5.000s**;
@@ -149,8 +149,9 @@ Manual visual inspection rejected earlier mechanically-green frames until the so
 - `MOTION-FAIL-030`: C8 browser mask data URL encoded entity-escaped SVG and lacked explicit luminance mask semantics; real SVG + luminance mode now render the subject cutout correctly.
 - `MOTION-FAIL-031`: C2 generic target enumeration discovered perspective but its capability registry did not, crashing Motion Lab numeric keyframe UI; perspective is now a valid string/hold-only graph capability and numeric C2 safely filters it.
 - Two unrelated protected-web tests exceeded their 5-second default during a heavily loaded first root run. No `apps/web` code changed. The exact two files passed **10/10** in the repository-documented Windows single-fork mode, and the complete deterministic root matrix then passed.
+- `MOTION-FAIL-032`: the immutable `sanverse-creative-engine-v1.2` tag had been created before a contract-level audit caught that the exact semantic M5/M6/M7, easing, stagger and source-aware layout command packs required by the owner brief were not all exposed. The tag was not rewritten. The missing packs were implemented over the existing C5/C8/C9/Motion Graph authorities and are being sealed as corrective V1.2.1 before V1.3 begins.
 
-## Full V1.2 release matrix
+## Full V1.2 / corrective V1.2.1 release matrix
 
 Status: **PASS**
 
@@ -158,7 +159,7 @@ Command:
 
 `npm run test -- --run --pool=forks --poolOptions.forks.singleFork=true`
 
-Result: **2,846 / 2,846 tests PASS; exit 0** across 21 test-bearing workspaces, including:
+Historical V1.2 result: **2,846 / 2,846 PASS**. Corrective V1.2.1 result on the final code tree: **2,854 / 2,854 tests PASS; exit 0** across 21 test-bearing workspaces, including:
 
 - API 403;
 - Motion Lab 60;
@@ -166,7 +167,7 @@ Result: **2,846 / 2,846 tests PASS; exit 0** across 21 test-bearing workspaces, 
 - Creative Direction 38;
 - Edit Domain 488;
 - Intent Domain 27;
-- Motion Agent Tools 14;
+- Motion Agent Tools 18;
 - Motion Contract 5;
 - Motion External Bridge 11;
 - Motion Graph 136;
@@ -176,7 +177,7 @@ Result: **2,846 / 2,846 tests PASS; exit 0** across 21 test-bearing workspaces, 
 - Motion Native Runtime 6;
 - Motion Primitives 29;
 - Motion Promotion 17;
-- Motion Source Aware 13;
+- Motion Source Aware 17;
 - Motion Storyboard 14;
 - Motion Testing 5;
 - Render Contract 119;
@@ -194,17 +195,21 @@ Release hygiene before commit:
 
 ## Acceptance
 
-Status: **GREEN — READY FOR LOCAL COMMIT/TAG**
+Status: **GREEN — READY FOR CORRECTIVE LOCAL COMMIT/TAG**
 
-V1.3 remains blocked until the V1.2 local commit and immutable tag are created and verified.
+The historical V1.2 release tag remains immutable at `e246697155826d9f91789e89b18bafe94e62ca8f`. V1.3 remains blocked until the corrective V1.2.1 commit and immutable tag are created and verified.
 
 ## Commit
 
-Pending release commit.
+Historical V1.2 implementation/evidence commit: `327c4e8`; historical closeout/tag commit: `e246697155826d9f91789e89b18bafe94e62ca8f`.
+
+Corrective V1.2.1 commit: pending.
 
 ## Tag
 
-Pending: `sanverse-creative-engine-v1.2`
+Historical immutable tag: `sanverse-creative-engine-v1.2`.
+
+Corrective pending tag: `sanverse-creative-engine-v1.2.1`.
 
 # V1.3 — CAMERA / DEPTH + PREFERENCE INTELLIGENCE
 

@@ -1,10 +1,10 @@
 {
   "schemaVersion": "sanverse.source-aware-browser-evidence/v1",
-  "recordedAt": "2026-08-27T05:50:53.411Z",
+  "recordedAt": "2026-08-27T07:19:07.443Z",
   "route": "/source-aware-review",
   "sourceFixture": "temporary VP9/WebM 1280x720 30fps 5s encoded by ffmpeg; not committed",
   "speed": 1,
-  "elapsedMs": 5003,
+  "elapsedMs": 4994,
   "capturedFrames": 149,
   "samples": [
     "source-aware-1x-00.jpg",
@@ -33,7 +33,7 @@
   "networkFailures": [],
   "badResponses": [],
   "ignoredBrowserNoise": [
-    "404 http://127.0.0.1:2152/favicon.ico"
+    "404 http://127.0.0.1:2228/favicon.ico"
   ],
   "productionWebTouched": false
 }

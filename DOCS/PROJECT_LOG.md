@@ -1,5 +1,13 @@
 # Project Log
 
+## 2026-08-27 — Creative Engine corrective V1.2.1 closes semantic-pack release gap
+
+- A post-tag contract audit found that the immutable `sanverse-creative-engine-v1.2` release marker existed before every exact semantic operation family named by the owner brief had been exposed. The tag is preserved; it is not rewritten or moved.
+- Added the missing exact semantic M5/M6/M7 setup/control contracts, all required easing commands, all eight stagger modes including seeded deterministic-random, and source-aware placement commands for negative space, face/subject avoidance, split balance, PIP, tracked callouts, readable labels and subject wrapping. These compile into existing C5/C8/C9/Motion Graph authorities; there is no new runtime/graph/timeline.
+- Focused gates: source-aware **17/17**, agent tools **18/18**, MCP **10/10**, all builds PASS. The complete corrective repository matrix is **2,854/2,854 PASS**, including protected `apps/web` **1,231/1,231**; root all-workspace production build PASS.
+- Fresh real Edge proof on the corrective tree ran the temporary 1280×720 30fps 5.000s VP9/WebM at true **1×** for **4994ms**, captured **149** frames, reached **7,200,000/7,200,000** ticks, and mechanically plus visually re-proved M5 tracked attachment, M6 surface perspective and M7 C8 matte compositing. Release console/network failures are zero after excluding automatic favicon noise.
+- V1.3 remains blocked until the corrective local commit and immutable `sanverse-creative-engine-v1.2.1` tag are created and verified. `apps/web/**` remains untouched; `sites/` remains a separate excluded repository; no GitHub remote/Actions work is used.
+
 ## 2026-08-27 — Creative Engine V1.2 Source-Aware + Cohesive Motion release candidate green
 
 - Executed V1.2 as the first independently gated release of the owner-approved V1.2→V1.4 continuous program. V1.3 remained blocked throughout V1.2 implementation and verification.

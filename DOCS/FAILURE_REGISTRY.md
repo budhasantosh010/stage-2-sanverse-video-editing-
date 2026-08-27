@@ -50,6 +50,15 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | FAIL-038 | P0 | Layout authority | AI toggle state could say collapsed while Reset left the panel physically expanded | RESOLVED | P1-F.0.2.1 |
 | [x] | FAIL-039 | P0 | Responsive layout | Nested Preview and Timeline panels inherited zero-height ancestors at tablet/mobile breakpoints | RESOLVED | P1-F.0.2.1 |
 
+## Creative Engine corrective V1.2.1 issue details
+
+### MOTION-FAIL-032 — V1.2 release marker preceded exact semantic-tool contract audit
+
+- **What failed:** the source-aware engine, browser proof and low-level registry surface were green, but the owner brief also required exact semantic control families for M5/M6/M7, easing, stagger and source-aware layout. The immutable `sanverse-creative-engine-v1.2` tag had already been created when that vocabulary gap was discovered.
+- **Why it mattered:** beginning V1.3 would have carried known unfinished V1.2 contract work forward, violating the program's gated-release rule even though the lower-level engine behavior itself was valid.
+- **Resolution:** preserve the historical tag, remove premature V1.3 work from the candidate, add the missing semantic packs as adapters over C5/C8/C9/Motion Graph, re-run focused tool/MCP tests, the full 2,854-test repository matrix, root build and fresh true-1× Edge proof, then seal a corrective immutable V1.2.1 tag before V1.3.
+- **Status:** RESOLVED in the corrective V1.2.1 release candidate; local commit/tag verification is the final mechanical closeout.
+
 ## P1-F.0.1 validation-found issue details
 
 ### FAIL-036 — AI panel re-parenting cleared the unsent draft
