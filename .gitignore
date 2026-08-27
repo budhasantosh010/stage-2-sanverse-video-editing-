@@ -39,5 +39,8 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Separately versioned repositories
+sites/
+
 # Private continuity data
 DOCS/_raw/user_messages.txt

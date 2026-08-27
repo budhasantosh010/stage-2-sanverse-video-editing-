@@ -51,6 +51,6 @@ describe('external inspection/materialization V1', () => {
   it('fails closed when rights are not usable or source kinds are outside the supported V1 adapters', () => {
     const blocked = { ...rights('svg'), rightsClass: 'unknown' as const, reusableLibraryAllowed: false, projectUseAllowed: false }
     expect(inspectExternalMotionAssetV1({ assetId: 'asset:blocked', sourceKind: 'svg', bytes: '<svg/>', provenance: blocked })).toMatchObject({ ok: false, refusal: { code: 'EXTERNAL_RIGHTS_BLOCKED' } })
-    expect(inspectExternalMotionAssetV1({ assetId: 'asset:rive', sourceKind: 'rive', bytes: new Uint8Array([1]), provenance: rights('rive') })).toMatchObject({ ok: false, refusal: { code: 'EXTERNAL_ADAPTER_NOT_AVAILABLE' } })
+    expect(inspectExternalMotionAssetV1({ assetId: 'asset:rive', sourceKind: 'rive', bytes: new Uint8Array([1]), provenance: rights('rive') })).toMatchObject({ ok: false, refusal: { code: 'RIVE_RUNTIME_REQUIRED' } })
   })
 })

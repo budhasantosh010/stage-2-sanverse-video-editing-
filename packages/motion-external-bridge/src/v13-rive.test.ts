@@ -1,0 +1,13 @@
+import { describe,expect,it } from 'vitest'
+import { evaluateScene } from '@sanverse/motion-graph'
+import { inspectRiveBridgeV1,materializeRiveSubsetV1 } from './v13-rive.ts'
+
+const source=JSON.stringify({schemaVersion:'sanverse.rive-subset/v1',artboardId:'hero',width:1000,height:500,durationTicks:1_440_000,stateMachines:[],shapes:[{id:'card',name:'Card',type:'rect',x:250,y:250,width:220,height:120,fill:'#19d3ff',radius:20,opacity:1,xKeyframes:[{id:'x0',tick:0,value:250,interpolation:'linear'},{id:'x1',tick:1_440_000,value:750,interpolation:'linear'}],opacityKeyframes:[{id:'o0',tick:0,value:.4,interpolation:'linear'},{id:'o1',tick:1_440_000,value:1,interpolation:'linear'}]}]})
+const context=(tick:number)=>({localTicks:tick,durationTicks:1_440_000,ticksPerSecond:1_440_000,composition:{width:1000,height:500,fpsNumerator:30,fpsDenominator:1},reducedMotion:false}) as const
+
+describe('V1.3 truthful bounded Rive bridge',()=>{
+  it('classifies raw .riv bytes as runtime-required instead of claiming native editability',()=>{const result=inspectRiveBridgeV1(new Uint8Array([82,73,86,69]));expect(result).toMatchObject({ok:true,value:{decision:'reject-runtime-required',deterministic:false,directSeekSafe:false,editability:'none'}})})
+  it('accepts only the deterministic subset with no state machines',()=>{expect(inspectRiveBridgeV1(source)).toMatchObject({ok:true,value:{decision:'native-materialize',deterministic:true,directSeekSafe:true,editability:'high'}});expect(inspectRiveBridgeV1(JSON.stringify({...JSON.parse(source),stateMachines:['hover']}))).toMatchObject({ok:false,refusal:{code:'RIVE_STATE_MACHINE_UNSUPPORTED'}})})
+  it('materializes exact-tick Rive vector properties into normal graph nodes',()=>{const result=materializeRiveSubsetV1('rive-card',source);expect(result.ok).toBe(true);if(!result.ok)return;const start=evaluateScene(result.value,context(0)),middle=evaluateScene(result.value,context(720_000)),end=evaluateScene(result.value,context(1_440_000));expect(start.nodes['rive-card::card']?.transform.positionX).toBe(-.25);expect(middle.nodes['rive-card::card']?.transform.positionX).toBe(0);expect(end.nodes['rive-card::card']?.transform.positionX).toBe(.25);expect(middle.nodes['rive-card::card']?.opacity).toBeCloseTo(.7,5)})
+  it('is direct-seek/history independent because output is canonical graph data',()=>{const result=materializeRiveSubsetV1('rive-card',source);expect(result.ok).toBe(true);if(!result.ok)return;const direct=evaluateScene(result.value,context(360_000));evaluateScene(result.value,context(1_200_000));const backward=evaluateScene(result.value,context(360_000));const random=evaluateScene(result.value,context(360_000));expect(backward).toEqual(direct);expect(random).toEqual(direct)})
+})

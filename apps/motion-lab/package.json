@@ -12,6 +12,8 @@
     "@sanverse/creative-direction": "0.0.0",
     "@sanverse/motion-contract": "0.0.0",
     "@sanverse/motion-agent-tools": "0.0.0",
+    "@sanverse/motion-camera-depth": "0.0.0",
+    "@sanverse/motion-external-bridge": "0.0.0",
     "@sanverse/motion-graph": "0.0.0",
     "@sanverse/motion-library": "0.0.0",
     "@sanverse/motion-native-runtime": "0.0.0",

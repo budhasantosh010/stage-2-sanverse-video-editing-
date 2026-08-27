@@ -2,6 +2,7 @@ import { creativeRefusal, creativeValidationOk, type CreativeEditabilityV1, type
 import { constant, createMotionScene, nodeBase, validateMotionScene, type MotionNodeV1, type MotionSceneV1 } from '@sanverse/motion-graph'
 import { evaluateExternalRights, type ExternalMotionProvenanceV1, type ExternalMotionSourceKindV1, type ExternalRightsDecisionV1 } from './provenance.ts'
 import { materializeRemotionSubsetV1, normalizeReactSvgV1, parseRemotionSubsetV1 } from './v12-bridges.ts'
+import { inspectRiveBridgeV1,materializeRiveSubsetV1 } from './v13-rive.ts'
 
 export type ExternalMaterializationKindV1 = 'canonical-scene' | 'external-runtime-asset'
 export interface ExternalAssetMetadataV1 { readonly width?: number; readonly height?: number; readonly durationTicks?: number; readonly hasAlpha?: boolean; readonly codec?: string }
@@ -115,6 +116,12 @@ export const inspectExternalMotionAssetV1=(input:ExternalAssetInspectionInputV1)
     const durationTicks=Math.round(parsed.value.durationInFrames/parsed.value.fps*1_440_000)
     return creativeValidationOk(Object.freeze({schemaVersion:'sanverse.external-asset-inspection/v1',assetId:input.assetId,sourceKind:'remotion',rightsDecision:rights.decision,editability:'high',materialization:'canonical-scene',deterministic:true,directSeekSafe:true,contentHash:fnv1a(input.bytes),metadata:Object.freeze({width:parsed.value.width,height:parsed.value.height,durationTicks,...input.metadata}),warnings:Object.freeze(['Remotion V1 accepts only the declared deterministic frame/Sequence/interpolate/spring subset and materializes it to native exact-tick graph values.'])}))
   }
+  if(input.sourceKind==='rive'){
+    const bridge=inspectRiveBridgeV1(input.bytes);if(!bridge.ok)return bridge as CreativeValidationResultV1<ExternalAssetInspectionV1>
+    if(bridge.value.decision!=='native-materialize')return creativeRefusal('RIVE_RUNTIME_REQUIRED',bridge.value.reasons.join(' '))
+    const document=bridge.value.document!
+    return creativeValidationOk(Object.freeze({schemaVersion:'sanverse.external-asset-inspection/v1',assetId:input.assetId,sourceKind:'rive',rightsDecision:rights.decision,editability:'high',materialization:'canonical-scene',deterministic:true,directSeekSafe:true,contentHash:fnv1a(input.bytes),metadata:Object.freeze({width:document.width,height:document.height,durationTicks:document.durationTicks,...input.metadata}),warnings:Object.freeze(['Rive V1 accepts only sanverse.rive-subset/v1 deterministic exports. Raw .riv binaries and state machines remain unsupported rather than becoming a second render authority.'])}))
+  }
   if(input.sourceKind==='alpha-video'){
     const metadata=input.metadata??{}
     if(!finitePositive(metadata.width)||!finitePositive(metadata.height)||!safeDuration(metadata.durationTicks)||metadata.hasAlpha!==true||typeof metadata.codec!=='string'||!metadata.codec.trim()) return creativeRefusal('EXTERNAL_ASSET_INVALID','Alpha-video V1 requires width, height, positive durationTicks, hasAlpha=true and codec metadata.')
@@ -189,6 +196,7 @@ export const materializeExternalMotionAssetV1=(inspection:ExternalAssetInspectio
     if(inspection.sourceKind==='lottie')return lottieScene(inspection,bytes)
     if(inspection.sourceKind==='react-svg'){const normalized=normalizeReactSvgV1(bytes);return normalized.ok?svgScene(inspection,normalized.value):normalized as CreativeValidationResultV1<ExternalMaterializationV1>}
     if(inspection.sourceKind==='remotion'){const parsed=parseRemotionSubsetV1(bytes);if(!parsed.ok)return parsed as CreativeValidationResultV1<ExternalMaterializationV1>;const scene=materializeRemotionSubsetV1(inspection.assetId,parsed.value);return scene.ok?creativeValidationOk(Object.freeze({kind:'canonical-scene' as const,scene:scene.value})):scene as CreativeValidationResultV1<ExternalMaterializationV1>}
+    if(inspection.sourceKind==='rive'){const scene=materializeRiveSubsetV1(inspection.assetId,bytes);return scene.ok?creativeValidationOk(Object.freeze({kind:'canonical-scene' as const,scene:scene.value})):scene as CreativeValidationResultV1<ExternalMaterializationV1>}
     return creativeRefusal('EXTERNAL_MATERIALIZATION_INVALID',`Canonical V1 materialization does not support ${inspection.sourceKind}.`)
   }
   const meta=inspection.metadata

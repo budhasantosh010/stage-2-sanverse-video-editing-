@@ -1,6 +1,6 @@
 # SANVERSE Creative Engine V1.2 → V1.3 → V1.4 Continuous Program
 
-Status: **IN PROGRESS — V1.2.1 CORRECTIVE RELEASE GREEN; V1.3 NEXT**
+Status: **IN PROGRESS — V1.3 CAMERA / DEPTH + PREFERENCE INTELLIGENCE GREEN; V1.4 NEXT**
 Date: **2026-08-27**
 
 ## START SHA
@@ -217,31 +217,93 @@ Corrective immutable tag: `sanverse-creative-engine-v1.2.1`.
 
 ## Contracts
 
-Status: **READY — NOT STARTED**
+Status: **COMPLETE**
+
+- Added narrow `@sanverse/motion-camera-depth` contracts for one exact-tick `CameraRigV1` plus per-node `DepthBindingV1`; camera/depth never becomes a second scene graph, clock, timeline or renderer.
+- C10 composes after C9: source-aware tracking first materializes ordinary graph transform operations; C10 then evaluates the camera at the same canonical tick and emits ordinary graph transform operations for depth-bound nodes.
+- Camera response is deterministic 2.5D only: position X/Y + zoom with explicit depth coefficients. No free-running camera runtime, physics loop or hidden state is introduced.
+- B8 owner-preference/failure intelligence is structured evidence only. Repeated explicit owner-positive/repair evidence can promote a conservative recommendation with reasons; it cannot mutate canonical state or bypass locks, rights, approvals, facts or Undo.
+- Rive support extends the existing external-source bridge truthfully: only declared `sanverse.rive-subset/v1` deterministic exports can materialize to native graph state. Raw `.riv` binaries and state machines refuse as `RIVE_RUNTIME_REQUIRED` rather than becoming an alternate render authority.
+- Internal camera/depth/Rive/preference operations land in `@sanverse/motion-agent-tools` first; MCP remains the existing thin generic adapter and owns no camera, preference, project, approval or Undo state.
 
 ## Implementation
 
-Status: **READY — NOT STARTED**
+Status: **COMPLETE**
 
-## Tests
+- Camera/depth evaluation validates finite rigs/bindings, clamps exact ticks, samples the canonical Animatable evaluator, computes one deterministic depth response per bound node and returns graph transform operations plus resolved camera state.
+- The review fixture proves the required C9→C10 ordering with a tracked callout plus background/middle/foreground depth planes. The exact operation count is 18: 2 C9 tracked-position operations + 4 C10 transform operations × 4 depth-bound nodes.
+- B8 fixture promotes `camera-policy = restrained` from 3 explicit positive signals across 2 projects and emits a recurring `CAMERA_TOO_AGGRESSIVE` lesson from 2 failure signals; automatic mutation remains OFF.
+- Rive V1.3 parses/validates one bounded deterministic JSON subset, materializes supported shapes/keyframes to ordinary `MotionSceneV1`, and fails closed for raw runtime/state-machine cases.
+- Development `/camera-depth-review` shows the graph-native C9→C10 stack, B8 evidence/recommendation truth, Rive-native materialization proof and exact current camera values without touching production `apps/web`.
+- `scripts/audit-camera-depth-v13.ts` drives real Microsoft Edge at true 1×, captures retained frames and rejects incomplete playback, missing C9/C10 markers, missing depth separation, B8/Rive mismatch, console exceptions, failed loads or bad HTTP responses.
 
-Status: **READY — NOT STARTED**
+## Determinism / tests
 
-## Visual proof
+Status: **COMPLETE**
 
-Status: **READY — NOT STARTED**
+Focused V1.3 gates on the final release candidate:
+
+- `@sanverse/motion-camera-depth`: **10/10 PASS**;
+- `@sanverse/creative-direction`: **43/43 PASS**;
+- `@sanverse/motion-external-bridge`: **15/15 PASS**;
+- `@sanverse/motion-agent-tools`: **22/22 PASS**;
+- `@sanverse/motion-mcp`: **13/13 PASS**;
+- `@sanverse/motion-lab`: **63/63 PASS**;
+- Motion Lab production build: **PASS**.
+
+Time-varying C9→C10 and Rive subset paths prove direct/backward/repeated/random-seek equality from pure exact-tick evaluation. B8 contains no time-varying runtime state.
+
+Complete repository matrix on the final V1.3 candidate: **2,883 / 2,883 PASS; exit 0**, including protected production Web **1,231 / 1,231**. The first heavily loaded root run produced one 5-second timeout in the unchanged protected `StudioPreviewReliability` ten-cycle stress; the exact file immediately passed **6/6** alone with the stress at **815 ms**, then the complete final root rerun passed with that stress at **1.46 s**. No assertion or production Web source changed.
+
+Root `npm run build`: **PASS / exit 0** across all workspaces, including protected production Web.
+
+## Real 1× browser proof
+
+Status: **COMPLETE**
+
+Evidence: `motion/visual-baselines/camera-depth-v1.3/`.
+
+`runtime-evidence.json` records:
+
+- route `/camera-depth-review`;
+- true playback speed **1×**;
+- wall-clock elapsed **5021 ms** for the 5.000-second canonical review;
+- **155** captured browser frames;
+- final tick **7,200,000 / 7,200,000**;
+- C9 composed = `true`;
+- graph-backed C10 = `true`;
+- depth layers = **4**, distinct depth transforms = **4**;
+- B8 promoted preference = `restrained`;
+- Rive decision = `native-materialize`;
+- release console errors = **0**;
+- network failures = **0**.
+
+Manual retained-frame inspection confirms the tracked callout continues along its C9 path while C10 separately changes background/middle/callout/foreground transforms according to depth; the foreground visibly responds most strongly. The Rive chip progresses across its bounded native-graph path. B8 visibly exposes both the promoted restrained policy and the recurring aggressive-camera repair lesson with automatic mutation explicitly off.
+
+## Release hygiene
+
+Status: **GREEN BEFORE COMMIT**
+
+- structured Git diff confirms only the intended V1.3 tracked integration files have real content changes; the large surrounding `git status` list is timestamp/line-ending index noise with no content diff;
+- `apps/web/**` actual content diff: **0 files**;
+- raw source video/audio for release: **0**;
+- separately versioned `sites/` is now explicitly root-ignored so structured stage-all cannot accidentally absorb the nested repository;
+- `git diff --check`: **PASS** from the verified candidate;
+- GitHub remote/fetch/push/PR/Actions operations: **0**.
 
 ## Acceptance
 
-Status: **READY — NOT STARTED**
+Status: **GREEN — READY TO SEAL LOCAL RELEASE**
+
+Every V1.3 contract, deterministic/direct-seek, real 1× Edge, full-regression, root-build and isolation gate is green. V1.4 remains blocked until the V1.3 implementation/evidence commit plus immutable local `sanverse-creative-engine-v1.3` tag are created.
 
 ## Commit
 
-Pending.
+Pending local implementation/evidence release commit.
 
 ## Tag
 
-Pending: `sanverse-creative-engine-v1.3`
+Pending immutable local tag: `sanverse-creative-engine-v1.3`.
 
 # V1.4 — EXPERT MOTION
 

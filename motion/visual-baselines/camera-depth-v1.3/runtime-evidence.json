@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "sanverse.camera-depth-browser-evidence/v1",
+  "recordedAt": "2026-08-27T08:12:37.033Z",
+  "route": "/camera-depth-review",
+  "speed": 1,
+  "elapsedMs": 5021,
+  "startTick": 0,
+  "capturedFrames": 155,
+  "samples": [
+    "camera-depth-1x-00.jpg",
+    "camera-depth-1x-01.jpg",
+    "camera-depth-1x-02.jpg",
+    "camera-depth-1x-03.jpg",
+    "camera-depth-1x-04.jpg",
+    "camera-depth-1x-05.jpg",
+    "camera-depth-1x-06.jpg"
+  ],
+  "fullPlaybackVerified": true,
+  "finalTick": 7200000,
+  "durationTicks": 7200000,
+  "c9Composed": true,
+  "graphBacked": true,
+  "depthLayerCount": 4,
+  "distinctDepthTransforms": 4,
+  "depthTransforms": {
+    "background": "translate3d(-174px, -29px, 0px) scale(1.012)",
+    "middle": "translate3d(-44.4px, 7.1px, 0px) scale(1.0372)",
+    "tracked-callout": "translate3d(46.4px, -181.8px, 0px) scale(1.06)",
+    "foreground": "translate3d(68px, 64.25px, 0px) scale(1.081)"
+  },
+  "b8PromotedPreference": "restrained",
+  "riveDecision": "native-materialize",
+  "consoleErrors": [],
+  "networkFailures": [],
+  "badResponses": [],
+  "ignoredBrowserNoise": [
+    "404 http://127.0.0.1:2484/favicon.ico"
+  ],
+  "productionWebTouched": false
+}

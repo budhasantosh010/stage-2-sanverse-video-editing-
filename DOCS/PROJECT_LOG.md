@@ -1,5 +1,15 @@
 # Project Log
 
+## 2026-08-27 — Creative Engine V1.3 camera/depth + preference intelligence release candidate green
+
+- Implemented `@sanverse/motion-camera-depth` as a narrow exact-tick C10 layer over the existing Motion Graph. C9 tracking resolves first into ordinary graph transforms; C10 then evaluates one camera rig plus per-node depth bindings at the same canonical tick and emits ordinary graph transform operations. No CameraGraph, second clock, renderer or timeline was introduced.
+- Added B8 owner-preference/failure intelligence as evidence-only recommendation state. The review fixture promotes `camera-policy = restrained` from 3 explicit positive owner signals across 2 projects and surfaces a recurring `CAMERA_TOO_AGGRESSIVE` lesson from 2 failure signals; automatic mutation remains off and all rights/locks/approval/canonical-state authorities remain unchanged.
+- Extended the existing external bridge with truthful Rive support: deterministic `sanverse.rive-subset/v1` exports can materialize to native Motion Graph state, while raw `.riv` binaries/state machines refuse as `RIVE_RUNTIME_REQUIRED`. Internal V1.3 operations land in the existing agent-tool registry first; MCP remains a thin generic adapter.
+- Added development-only `/camera-depth-review` and a real Edge audit. Final browser proof ran true 1× for **5021 ms**, captured **155** frames, reached **7,200,000/7,200,000** ticks, proved C9 composed + graph-backed C10, four depth layers with four distinct transforms, B8 `restrained`, Rive `native-materialize`, and zero release console/network failures. Retained frames were manually inspected and visibly show the foreground responding most strongly while the C9-tracked callout continues its independent path.
+- Focused gates are camera/depth **10/10**, Creative Direction **43/43**, external bridge **15/15**, agent tools **22/22**, MCP **13/13**, Motion Lab **63/63**. Complete final repository matrix: **2,883/2,883 PASS**, including protected Web **1,231/1,231**; root all-workspace build **PASS / exit 0**.
+- The first heavily loaded root run produced one 5-second timeout in unchanged protected `StudioPreviewReliability`; the exact file then passed **6/6** alone with the ten-cycle stress at **815 ms**, and the complete final root rerun passed with that stress at **1.46 s**. No protected-web source or assertion changed.
+- Release hygiene is green before local sealing: actual `apps/web/**` content diff 0, no raw source media, no GitHub remote/Actions work, and the separately versioned `sites/` repository is now explicitly root-ignored so stage-all cannot accidentally absorb it. The V1.3 implementation/evidence commit and immutable `sanverse-creative-engine-v1.3` tag are the remaining V1.3 actions; V1.4 remains blocked until then.
+
 ## 2026-08-27 — Creative Engine corrective V1.2.1 closes semantic-pack release gap
 
 - A post-tag contract audit found that the immutable `sanverse-creative-engine-v1.2` release marker existed before every exact semantic operation family named by the owner brief had been exposed. The tag is preserved; it is not rewritten or moved.

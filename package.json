@@ -15,6 +15,7 @@
     "motion:parity": "vite-node scripts/motion-ingest.ts parity",
     "motion:productize": "vite-node scripts/motion-ingest.ts productize",
     "motion:register": "vite-node scripts/motion-ingest.ts register",
-    "motion:audit-source-aware-v12": "vite-node scripts/audit-source-aware-v12.ts"
+    "motion:audit-source-aware-v12": "vite-node scripts/audit-source-aware-v12.ts",
+    "motion:audit-camera-depth-v13": "vite-node scripts/audit-camera-depth-v13.ts"
   }
 }
