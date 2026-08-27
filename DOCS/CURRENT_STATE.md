@@ -4,7 +4,7 @@ Last updated: 2026-08-27
 
 ## Parallel Creative Engine worktree — V1.2 Source-Aware + Cohesive Motion release candidate green
 
-The owner-approved continuous V1.2→V1.4 program is active in the isolated Motion worktree. V1.2 is implementation/QA/browser/regression/build complete and is at local commit/tag closeout; V1.3 has not started yet by gate law.
+The owner-approved continuous V1.2→V1.4 program is active in the isolated Motion worktree. V1.2 is fully released locally: implementation/evidence commit `327c4e8` plus immutable tag `sanverse-creative-engine-v1.2`. V1.3 is now unlocked but has not started yet.
 
 V1.2 adds one Sanverse-owned source-aware domain rather than a TrackingGraph: versioned exact-tick point/object/subject/surface tracks, explicit track bindings, a real deterministic RGBA color-marker provider, tracking QA/repair, M5 tracked attachment, M6 four-corner homography materialized into the existing Motion Graph perspective property, and M7 canonical subject matte materialized into existing C8 masks. B6 Style Intelligence and B7 Video Creative Language/cohesion are structured recommendation/evidence layers only. Bounded React/SVG and Remotion subsets extend the existing rights/provenance bridge and materialize to ordinary graph/keyframe data or fail closed.
 

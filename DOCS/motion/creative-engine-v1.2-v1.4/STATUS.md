@@ -210,23 +210,23 @@ Pending: `sanverse-creative-engine-v1.2`
 
 ## Contracts
 
-Status: **BLOCKED UNTIL V1.2 COMMIT/TAG**
+Status: **READY — NOT STARTED**
 
 ## Implementation
 
-Status: **BLOCKED UNTIL V1.2 COMMIT/TAG**
+Status: **READY — NOT STARTED**
 
 ## Tests
 
-Status: **BLOCKED UNTIL V1.2 COMMIT/TAG**
+Status: **READY — NOT STARTED**
 
 ## Visual proof
 
-Status: **BLOCKED UNTIL V1.2 COMMIT/TAG**
+Status: **READY — NOT STARTED**
 
 ## Acceptance
 
-Status: **BLOCKED UNTIL V1.2 COMMIT/TAG**
+Status: **READY — NOT STARTED**
 
 ## Commit
 
