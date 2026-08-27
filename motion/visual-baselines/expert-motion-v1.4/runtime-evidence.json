@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "sanverse.expert-motion-browser-evidence/v1",
+  "recordedAt": "2026-08-27T09:32:31.230Z",
+  "route": "/expert-motion-review",
+  "speed": 1,
+  "elapsedMs": 5075,
+  "startTick": 0,
+  "capturedFrames": 141,
+  "samples": [
+    "expert-motion-1x-00.jpg",
+    "expert-motion-1x-01.jpg",
+    "expert-motion-1x-02.jpg",
+    "expert-motion-1x-03.jpg",
+    "expert-motion-1x-04.jpg",
+    "expert-motion-1x-05.jpg",
+    "expert-motion-1x-06.jpg"
+  ],
+  "fullPlaybackVerified": true,
+  "finalTick": 7200000,
+  "durationTicks": 7200000,
+  "graphBacked": true,
+  "directSeekSafe": true,
+  "qaStatus": "PASS",
+  "c3ExpertNodeCount": 3,
+  "c6ExpertNodeCount": 3,
+  "expertSurfaceCount": 3,
+  "programs": [
+    "orbital-rings",
+    "radial-burst",
+    "plasma-field"
+  ],
+  "proceduralRingCount": 8,
+  "particleCount": 72,
+  "shaderUniformTick": 7200000,
+  "shaderSeed": 303,
+  "consoleErrors": [],
+  "networkFailures": [],
+  "badResponses": [],
+  "ignoredBrowserNoise": [
+    "404 http://127.0.0.1:2640/favicon.ico"
+  ],
+  "productionWebTouched": false
+}

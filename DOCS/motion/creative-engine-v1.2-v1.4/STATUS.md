@@ -309,39 +309,87 @@ Immutable local tag: `sanverse-creative-engine-v1.3` → `6821ff0930beff8e260f17
 
 ## Contracts
 
-Status: **READY — NOT STARTED**
+Status: **GREEN**
+
+- Added one bounded canonical `expert` leaf to the existing `MotionSceneV1` / Motion Graph authority rather than adding an ExpertGraph, ParticleGraph, ShaderTimeline or second clock.
+- Supported fixed program vocabulary is deliberately closed: procedural `orbital-rings`, analytically reconstructable particles `radial-burst`, and bounded shader plan `plasma-field`.
+- Expert state is serialized data only: exact canonical tick + typed bounded parameters/assets + explicit seed. Arbitrary JavaScript, GLSL/WGSL, filesystem/network access, callbacks, URLs and autonomous timing are refused.
+- Resource ceilings are validated fail-closed before evaluation/materialization; over-budget and unknown programs do not enter the graph.
 
 ## Implementation
 
-Status: **READY — NOT STARTED**
+Status: **GREEN**
+
+- New `@sanverse/motion-expert-runtime` evaluates the three approved programs as pure deterministic functions. Particle state is reconstructed directly from `(tick, seed, parameters)`; no retained simulation state exists.
+- `MotionExpertNodeSurface` in the existing native runtime renders only the deterministic expert frame supplied for the caller's canonical tick and owns no animation loop.
+- External procedural/shader JSON subsets materialize through the existing rights/provenance-gated `motion-external-bridge`; arbitrary shader/source runtime remains refused.
+- Three vetted expert recipes plus internal `expert.*` / external inspect/materialize operations were added to the existing agent-tool registry first. MCP remains the same thin generic registry adapter and owns no expert/project/approval/Undo state.
+- Development-only `/expert-motion-review` projects the same three semantic expert IDs through Motion Scene, C3 Layers and C6 Node Graph and renders all three programs from the same exact-tick data.
 
 ## Tests
 
-Status: **READY — NOT STARTED**
+Status: **GREEN**
+
+Focused V1.4 gates on the final browser-proved tree:
+
+- Motion Graph: **139/139 PASS**;
+- Expert Runtime: **9/9 PASS**;
+- External Bridge: **18/18 PASS**;
+- Agent Tools: **25/25 PASS**;
+- MCP: **16/16 PASS**;
+- Native Runtime: **8/8 PASS**;
+- Motion Lab: **66/66 PASS**.
+
+The first complete repository run produced exactly two 5-second timeouts inside unchanged protected Web under heavy root load, with no assertion failures. The exact App nameplate lifecycle test then passed alone in **2.152 s** and the exact Studio dock-resize test passed alone in **1.551 s**. The final unloaded complete repository rerun passed **2,909/2,909**, including protected `apps/web` **1,231/1,231**, exit 0.
+
+Root `npm run build` on the same candidate tree: **PASS / exit 0** across all workspaces, including protected Web. Only the pre-existing Motion Lab/Web large-chunk advisory and runtime nameplate-font URL warning remain.
 
 ## Visual proof
 
-Status: **READY — NOT STARTED**
+Status: **GREEN — REAL EDGE 1× + MANUAL FRAME REVIEW**
+
+Fresh Edge `/expert-motion-review`:
+
+- playback: true **1×**;
+- elapsed wall time: **5075 ms**;
+- captured screencast frames: **141**;
+- final tick: **7,200,000 / 7,200,000**;
+- graph-backed expert authority: true;
+- direct/backward/random seek equality: PASS;
+- resource QA: PASS;
+- C3 expert IDs: **3**;
+- C6 expert IDs: **3**;
+- rendered expert surfaces: **3**;
+- procedural rings: **8**;
+- analytic particles: **72**;
+- shader final canonical tick: **7,200,000**;
+- shader seed: **303**;
+- release console errors: **0**;
+- network failures: **0**.
+
+Retained entrance/middle/final frames were manually inspected. Orbital rings visibly evolve within the fixed primitive budget; the analytic particle burst expands/reconstructs and fades without clipping; the bounded shader visibly changes with canonical tick; C3/C6/QA identity markers remain stable; no broken layout or overflow was observed. Evidence: `motion/visual-baselines/expert-motion-v1.4/`.
 
 ## Acceptance
 
-Status: **READY — NOT STARTED**
+Status: **VERIFIED RELEASE CANDIDATE — COMMIT/TAG PENDING**
+
+`git diff --check`: PASS. `apps/web/**` actual content diff: **0**. No raw user/source media was added. The separately versioned `sites/` repository remains excluded. No GitHub push/fetch/PR/Actions operation was used.
 
 ## Commit
 
-Pending.
+Pending local V1.4 implementation/evidence commit.
 
 ## Tag
 
-Pending: `sanverse-creative-engine-v1.4`
+Pending immutable local tag: `sanverse-creative-engine-v1.4`.
 
 # FINAL REGRESSION
 
-Pending V1.0 → V1.4 repository-authoritative matrix and root build after V1.4 release candidate.
+Pending the required post-tag V1.0 → V1.4 repository-authoritative matrix, root build and authority/isolation audit.
 
 # APPS/WEB DIFF
 
-Required at each release and final: **0 intentional files**. V1.2 candidate currently: **0 files**.
+Required at each release and final: **0 intentional files**. V1.4 verified candidate: **0 files**.
 
 # SITES STATUS
 

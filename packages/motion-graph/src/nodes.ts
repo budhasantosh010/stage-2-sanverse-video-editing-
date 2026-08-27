@@ -34,7 +34,40 @@ export interface MotionTextNodeV1 extends MotionNodeBaseV1 { readonly type: 'tex
 export interface MotionShapeNodeV1 extends MotionNodeBaseV1 { readonly type: 'shape'; readonly shape: 'rectangle' | 'rounded-rectangle' | 'ellipse'; readonly width: Animatable<number>; readonly height: Animatable<number>; readonly fillColor: Animatable<string>; readonly strokeColor: Animatable<string>; readonly strokeWidth: Animatable<number>; readonly radius: Animatable<number> }
 export interface MotionPathNodeV1 extends MotionNodeBaseV1 { readonly type: 'path'; readonly pathData: string; readonly fillColor: Animatable<string>; readonly strokeColor: Animatable<string>; readonly strokeWidth: Animatable<number>; readonly trimProgress: Animatable<number> }
 export interface MotionImageNodeV1 extends MotionNodeBaseV1 { readonly type: 'image'; readonly source: string; readonly width: Animatable<number>; readonly height: Animatable<number>; readonly fit: 'contain' | 'cover' | 'fill'; readonly imageOpacity: Animatable<number> }
-export type MotionNodeV1 = MotionGroupNodeV1 | MotionTextNodeV1 | MotionShapeNodeV1 | MotionPathNodeV1 | MotionImageNodeV1
+
+export type MotionExpertAssetRoleV1 = 'texture' | 'mask' | 'data'
+export interface MotionExpertAssetRefV1 {
+  readonly id: string
+  readonly role: MotionExpertAssetRoleV1
+  /** Opaque content identity only. Never a path, URL, filesystem handle or executable source. */
+  readonly contentHash: string
+}
+interface MotionExpertSpecBaseV1 {
+  readonly schemaVersion: 'sanverse.motion-expert-node/v1'
+  readonly seed: number
+  readonly width: number
+  readonly height: number
+  readonly maxPrimitives: number
+  readonly assets?: readonly MotionExpertAssetRefV1[]
+}
+export interface MotionProceduralExpertSpecV1 extends MotionExpertSpecBaseV1 {
+  readonly kind: 'procedural'
+  readonly program: 'orbital-rings'
+  readonly parameters: Readonly<{ ringCount: number; radius: number; thickness: number; wobble: number; speed: number }>
+}
+export interface MotionParticleExpertSpecV1 extends MotionExpertSpecBaseV1 {
+  readonly kind: 'particles'
+  readonly program: 'radial-burst'
+  readonly parameters: Readonly<{ count: number; lifetimeTicks: number; radius: number; size: number; speed: number }>
+}
+export interface MotionShaderExpertSpecV1 extends MotionExpertSpecBaseV1 {
+  readonly kind: 'shader'
+  readonly program: 'plasma-field'
+  readonly parameters: Readonly<{ frequency: number; amplitude: number; hueShift: number; scale: number }>
+}
+export type MotionExpertSpecV1 = MotionProceduralExpertSpecV1 | MotionParticleExpertSpecV1 | MotionShaderExpertSpecV1
+export interface MotionExpertNodeV1 extends MotionNodeBaseV1 { readonly type: 'expert'; readonly expert: MotionExpertSpecV1 }
+export type MotionNodeV1 = MotionGroupNodeV1 | MotionTextNodeV1 | MotionShapeNodeV1 | MotionPathNodeV1 | MotionImageNodeV1 | MotionExpertNodeV1
 
 export interface ResolvedMotionTransformV1 { readonly positionX: number; readonly positionY: number; readonly scaleX: number; readonly scaleY: number; readonly rotationDeg: number; readonly anchorX: number; readonly anchorY: number; readonly perspectiveMatrix3d: string }
 export interface ResolvedMotionNodeBaseV1 { readonly id: MotionNodeId; readonly name: string; readonly parentId: MotionNodeId | null; readonly enabled: boolean; readonly effectiveEnabled: boolean; readonly stackingIndex: number; readonly visible: boolean; readonly opacity: number; readonly transform: ResolvedMotionTransformV1; readonly blendMode: MotionBlendModeV1; readonly effects: readonly ResolvedMotionEffectV1[]; readonly masks: readonly ResolvedMotionMaskV1[] }
@@ -43,6 +76,7 @@ export interface ResolvedMotionTextNodeV1 extends ResolvedMotionNodeBaseV1 { rea
 export interface ResolvedMotionShapeNodeV1 extends ResolvedMotionNodeBaseV1 { readonly type: 'shape'; readonly shape: MotionShapeNodeV1['shape']; readonly width: number; readonly height: number; readonly fillColor: string; readonly strokeColor: string; readonly strokeWidth: number; readonly radius: number }
 export interface ResolvedMotionPathNodeV1 extends ResolvedMotionNodeBaseV1 { readonly type: 'path'; readonly pathData: string; readonly fillColor: string; readonly strokeColor: string; readonly strokeWidth: number; readonly trimProgress: number }
 export interface ResolvedMotionImageNodeV1 extends ResolvedMotionNodeBaseV1 { readonly type: 'image'; readonly source: string; readonly width: number; readonly height: number; readonly fit: MotionImageNodeV1['fit']; readonly imageOpacity: number }
-export type ResolvedMotionNodeV1 = ResolvedMotionGroupNodeV1 | ResolvedMotionTextNodeV1 | ResolvedMotionShapeNodeV1 | ResolvedMotionPathNodeV1 | ResolvedMotionImageNodeV1
+export interface ResolvedMotionExpertNodeV1 extends ResolvedMotionNodeBaseV1 { readonly type: 'expert'; readonly expert: MotionExpertSpecV1 }
+export type ResolvedMotionNodeV1 = ResolvedMotionGroupNodeV1 | ResolvedMotionTextNodeV1 | ResolvedMotionShapeNodeV1 | ResolvedMotionPathNodeV1 | ResolvedMotionImageNodeV1 | ResolvedMotionExpertNodeV1
 
 export const nodeBase = (id: string, name: string, parentId: string | null): Pick<MotionNodeBaseV1, 'id' | 'name' | 'parentId' | 'enabled' | 'visible' | 'opacity' | 'transform' | 'blendMode' | 'effects' | 'masks'> => ({ id, name, parentId, enabled: true, visible: constant(true), opacity: constant(1), transform: identityTransform(), blendMode: 'normal', effects: Object.freeze([]), masks: Object.freeze([]) })

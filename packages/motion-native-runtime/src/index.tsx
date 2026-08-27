@@ -257,3 +257,4 @@ export function MotionGridOverlay({ visible = true, size = 80 }: Readonly<{ visi
 
 export const SafeAreaOverlay = MotionSafeArea
 export const DebugBounds = MotionDebugBounds
+export * from './expert-surface.tsx'

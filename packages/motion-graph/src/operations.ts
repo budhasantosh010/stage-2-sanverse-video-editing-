@@ -265,6 +265,7 @@ const validateEffectParameterValue = (definition: MotionEffectParameterDefinitio
 }
 
 const validateEffectForNode = (node: MotionNodeV1, effect: MotionEffectInstanceV1): string | null => {
+  if (node.type === 'expert') return 'Expert nodes do not support ordinary Motion effects in V1.4; expert programs must remain inside their bounded serialized contract.'
   if (!boundedId(effect.id)) return 'Effect id must be a bounded non-empty string.'
   if (!MOTION_EFFECT_TYPES.includes(effect.effectType)) return `Unsupported effect type: ${String(effect.effectType)}`
   const definition = MOTION_EFFECT_REGISTRY[effect.effectType]

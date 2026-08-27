@@ -1,0 +1,10 @@
+{
+  "name": "@sanverse/motion-expert-runtime",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "vitest run", "build": "tsc -p tsconfig.json" },
+  "dependencies": { "@sanverse/motion-contract": "0.0.0", "@sanverse/motion-graph": "0.0.0" },
+  "devDependencies": { "typescript": "~5.8.3", "vitest": "^3.2.4" }
+}

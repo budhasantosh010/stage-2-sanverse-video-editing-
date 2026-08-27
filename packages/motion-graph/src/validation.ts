@@ -5,7 +5,7 @@ import { MOTION_MASK_TYPES } from './masks.ts'
 import { validateMotionMatteRelationshipV1 } from './compositing.ts'
 import { motionBezierHandleIssue } from './animation.ts'
 import type { Animatable, MotionKeyframeInterpolationV1, MotionNodePropertyNameV1, MotionNodePropertyPathV1, MotionPropertyPathV1, MotionScalarExpressionV1 } from './properties.ts'
-import type { MotionNodeV1 } from './nodes.ts'
+import type { MotionExpertSpecV1, MotionNodeV1 } from './nodes.ts'
 import type { MotionSceneV1 } from './scene.ts'
 
 const issue = (path: string, message: string): MotionValidationIssueV1 => ({ path, code: 'VALUE_INVALID', message })
@@ -157,6 +157,47 @@ const nodeAnimatables = (node: MotionNodeV1): readonly [MotionNodePropertyNameV1
   return base
 }
 
+const validateExpertSpec = (spec: MotionExpertSpecV1, path: string, issues: MotionValidationIssueV1[]): void => {
+  if (!isRecord(spec) || spec.schemaVersion !== 'sanverse.motion-expert-node/v1') { issues.push(issue(path, 'Expert node must use sanverse.motion-expert-node/v1.')); return }
+  if (!Number.isSafeInteger(spec.seed) || spec.seed < 0 || spec.seed > 2_147_483_647) issues.push(issue(`${path}.seed`, 'Expert seed must be a safe integer inside [0,2147483647].'))
+  if (!finite(spec.width) || spec.width < 1 || spec.width > 4096 || !finite(spec.height) || spec.height < 1 || spec.height > 4096) issues.push(issue(path, 'Expert dimensions must be finite inside [1,4096].'))
+  if (!Number.isSafeInteger(spec.maxPrimitives) || spec.maxPrimitives < 1 || spec.maxPrimitives > 512) issues.push(issue(`${path}.maxPrimitives`, 'Expert maxPrimitives must be a safe integer inside [1,512].'))
+  if (spec.assets !== undefined) {
+    if (!Array.isArray(spec.assets) || spec.assets.length > 8) issues.push(issue(`${path}.assets`, 'Expert nodes may reference at most eight opaque assets.'))
+    else spec.assets.forEach((asset, index) => {
+      if (!asset || typeof asset.id !== 'string' || !asset.id.trim() || asset.id.length > 240 || !['texture','mask','data'].includes(asset.role) || typeof asset.contentHash !== 'string' || !/^[a-z0-9][a-z0-9:_-]{2,127}$/iu.test(asset.contentHash)) issues.push(issue(`${path}.assets[${index}]`, 'Expert asset references require bounded id, role and opaque contentHash only.'))
+    })
+  }
+  if (!isRecord(spec.parameters)) { issues.push(issue(`${path}.parameters`, 'Expert parameters must be a closed typed object.')); return }
+  const p = spec.parameters as unknown as Record<string, unknown>
+  const finiteKeys = (keys: readonly string[]) => keys.every((key) => finite(p[key]))
+  if (spec.kind === 'procedural') {
+    if (spec.program !== 'orbital-rings') issues.push(issue(`${path}.program`, 'Unsupported procedural expert program.'))
+    const keys = ['ringCount','radius','thickness','wobble','speed'] as const
+    if (!finiteKeys(keys) || !Number.isSafeInteger(p.ringCount) || Number(p.ringCount) < 1 || Number(p.ringCount) > 64 || Number(p.ringCount) > spec.maxPrimitives || Number(p.radius) < 0 || Number(p.radius) > 4096 || Number(p.thickness) <= 0 || Number(p.thickness) > 256 || Math.abs(Number(p.wobble)) > 2048 || Math.abs(Number(p.speed)) > 64 || Object.keys(p).some((key) => !keys.includes(key as typeof keys[number]))) issues.push(issue(`${path}.parameters`, 'orbital-rings parameters are outside the bounded contract.'))
+    return
+  }
+  if (spec.kind === 'particles') {
+    if (spec.program !== 'radial-burst') issues.push(issue(`${path}.program`, 'Unsupported particle expert program.'))
+    const keys = ['count','lifetimeTicks','radius','size','speed'] as const
+    if (!finiteKeys(keys) || !Number.isSafeInteger(p.count) || Number(p.count) < 1 || Number(p.count) > 256 || Number(p.count) > spec.maxPrimitives || !Number.isSafeInteger(p.lifetimeTicks) || Number(p.lifetimeTicks) < 1 || Number(p.lifetimeTicks) > 86_400_000 || Number(p.radius) < 0 || Number(p.radius) > 4096 || Number(p.size) <= 0 || Number(p.size) > 256 || Math.abs(Number(p.speed)) > 64 || Object.keys(p).some((key) => !keys.includes(key as typeof keys[number]))) issues.push(issue(`${path}.parameters`, 'radial-burst parameters are outside the bounded contract.'))
+    return
+  }
+  if (spec.kind === 'shader') {
+    if (spec.program !== 'plasma-field') issues.push(issue(`${path}.program`, 'Unsupported shader expert program.'))
+    const keys = ['frequency','amplitude','hueShift','scale'] as const
+    if (!finiteKeys(keys) || Number(p.frequency) < 0 || Number(p.frequency) > 64 || Number(p.amplitude) < 0 || Number(p.amplitude) > 4 || Math.abs(Number(p.hueShift)) > 3600 || Number(p.scale) <= 0 || Number(p.scale) > 32 || spec.maxPrimitives !== 1 || Object.keys(p).some((key) => !keys.includes(key as typeof keys[number]))) issues.push(issue(`${path}.parameters`, 'plasma-field parameters are outside the bounded contract.'))
+    return
+  }
+  issues.push(issue(`${path}.kind`, 'Unsupported expert kind.'))
+}
+
+export const validateMotionExpertSpecV1 = (input: unknown): MotionValidationResultV1<MotionExpertSpecV1> => {
+  const issues: MotionValidationIssueV1[] = []
+  validateExpertSpec(input as MotionExpertSpecV1, '$', issues)
+  return issues.length > 0 ? motionValidationError(...issues) : motionValidationOk(input as MotionExpertSpecV1)
+}
+
 const targetExists = (scene: MotionSceneV1, target: MotionPropertyPathV1): boolean => {
   if (target.kind === 'component') return Boolean(target.propertyId)
   if (target.kind === 'part') return scene.semanticParts.some((part) => part.id === target.semanticPartId)
@@ -193,6 +234,7 @@ export const validateMotionScene = (input: unknown): MotionValidationResultV1<Mo
     if (node.enabled !== undefined && typeof node.enabled !== 'boolean') issues.push(issue(`$.nodes.${key}.enabled`, 'Node enabled switch must be boolean when present.'))
     if (!MOTION_BLEND_MODES.includes(node.blendMode)) issues.push(issue(`$.nodes.${key}.blendMode`, 'Unsupported blend mode.'))
     nodeAnimatables(node).forEach(([property, value]) => validateAnimatable(value, `$.nodes.${key}.${property}`, issues, nodeAnimatableConstraint(property)))
+    if (node.type === 'expert') validateExpertSpec(node.expert, `$.nodes.${key}.expert`, issues)
     if (node.type === 'group') {
       const childIds = new Set<string>()
       node.childIds.forEach((childId, index) => {
@@ -211,7 +253,7 @@ export const validateMotionScene = (input: unknown): MotionValidationResultV1<Mo
         return
       }
       const definition = MOTION_EFFECT_REGISTRY[effect.effectType]
-      if (!definition.supportedNodeTypes.includes(node.type)) issues.push(issue(effectPath, 'Effect does not support this node type.'))
+      if (node.type !== 'expert' && !definition.supportedNodeTypes.includes(node.type)) issues.push(issue(effectPath, 'Effect does not support this node type.'))
       const parameterIds = new Set(definition.parameters.map((parameter) => parameter.id))
       for (const parameter of Object.keys(effect.parameters)) if (!parameterIds.has(parameter)) issues.push(issue(`${effectPath}.parameters.${parameter}`, 'Unknown effect parameter.'))
       for (const parameter of definition.parameters) {
