@@ -389,7 +389,7 @@ Pending the required post-tag V1.0 → V1.4 repository-authoritative matrix, roo
 
 # APPS/WEB DIFF
 
-Required at each release and final: **0 intentional files**. V1.4 verified candidate: **0 files**.
+Required at each release and final: **0 intentional files**. Final V1.4 release and V1.0→V1.4 audit: **0 files**.
 
 # SITES STATUS
 
