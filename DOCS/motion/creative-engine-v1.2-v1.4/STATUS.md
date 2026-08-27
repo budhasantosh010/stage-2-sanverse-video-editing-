@@ -1,6 +1,6 @@
 # SANVERSE Creative Engine V1.2 → V1.3 → V1.4 Continuous Program
 
-Status: **IN PROGRESS — V1.3 CAMERA / DEPTH + PREFERENCE INTELLIGENCE GREEN; V1.4 NEXT**
+Status: **COMPLETE — V1.2.1, V1.3 AND V1.4 SEALED LOCALLY; FINAL V1.0→V1.4 VERIFICATION GREEN**
 Date: **2026-08-27**
 
 ## START SHA
@@ -371,21 +371,25 @@ Retained entrance/middle/final frames were manually inspected. Orbital rings vis
 
 ## Acceptance
 
-Status: **VERIFIED RELEASE CANDIDATE — COMMIT/TAG PENDING**
+Status: **COMPLETE — LOCAL RELEASE SEALED**
 
 `git diff --check`: PASS. `apps/web/**` actual content diff: **0**. No raw user/source media was added. The separately versioned `sites/` repository remains excluded. No GitHub push/fetch/PR/Actions operation was used.
 
 ## Commit
 
-Pending local V1.4 implementation/evidence commit.
+Implementation/evidence release commit: `b6a833f3f8254c0a2cf5c1b4b54ebc9cb12ffaf7` (`feat(motion): complete creative engine v1.4 expert motion`).
 
 ## Tag
 
-Pending immutable local tag: `sanverse-creative-engine-v1.4`.
+Immutable local tag: `sanverse-creative-engine-v1.4` → `b6a833f3f8254c0a2cf5c1b4b54ebc9cb12ffaf7`.
 
-# FINAL REGRESSION
+## FINAL REGRESSION
 
-Pending the required post-tag V1.0 → V1.4 repository-authoritative matrix, root build and authority/isolation audit.
+Status: **COMPLETE — POST-TAG V1.0 → V1.4 MATRIX + ROOT BUILD + ISOLATION GREEN**
+
+The first post-tag default parallel Windows run produced three unchanged protected-Web 5-second timeouts and no assertion failures. The exact three cases then passed individually: App nameplate lifecycle **2.324 s**, Media Bin image/Undo/Redo **2.209 s**, and responsive Media continuity **4.615 s**. Per the repository-documented Windows heavy-suite policy in `DOCS/HANDOVER_RUNBOOK.md`, the authoritative full post-tag command was then run with `--pool=forks --poolOptions.forks.singleFork=true`; it passed **2,909/2,909**, including protected Web **1,231/1,231**, exit 0.
+
+Post-tag root `npm run build`: **PASS / exit 0** across all workspaces. Final working tree after docs closeout is clean; `apps/web/**` diff is **0**; V1.4 tag still resolves exactly to `b6a833f3f8254c0a2cf5c1b4b54ebc9cb12ffaf7`; V1.3 and corrective V1.2.1 immutable tags remain intact; raw user/source media and secret-like additions are absent; `sites/` remains excluded; no GitHub remote/Actions operation occurred; C13, universal Three/WebGL, AEP/MOGRT and production-editor integration were not started.
 
 # APPS/WEB DIFF
 
