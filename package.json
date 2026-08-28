@@ -17,6 +17,7 @@
     "motion:register": "vite-node scripts/motion-ingest.ts register",
     "motion:audit-source-aware-v12": "vite-node scripts/audit-source-aware-v12.ts",
     "motion:audit-camera-depth-v13": "vite-node scripts/audit-camera-depth-v13.ts",
-    "motion:audit-expert-v14": "vite-node scripts/audit-expert-motion-v14.ts"
+    "motion:audit-expert-v14": "vite-node scripts/audit-expert-motion-v14.ts",
+    "motion:audit-performance-v15": "vite-node scripts/audit-performance-v15.ts"
   }
 }

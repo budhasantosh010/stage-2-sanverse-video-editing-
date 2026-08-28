@@ -4,6 +4,8 @@ import { evaluateExternalRights, type ExternalMotionProvenanceV1, type ExternalM
 import { materializeRemotionSubsetV1, normalizeReactSvgV1, parseRemotionSubsetV1 } from './v12-bridges.ts'
 import { inspectRiveBridgeV1,materializeRiveSubsetV1 } from './v13-rive.ts'
 import { inspectExternalExpertBridgeV14, materializeExternalExpertBridgeV14 } from './v14-expert-bridge.ts'
+import { inspectThreeWebglV15, materializeThreeWebglSubsetV15 } from './v15-three-webgl.ts'
+import { inspectAdobeAssistedBridgeV15, materializeAdobeAssistedBridgeV15 } from './v15-adobe.ts'
 
 export type ExternalMaterializationKindV1 = 'canonical-scene' | 'external-runtime-asset'
 export interface ExternalAssetMetadataV1 { readonly width?: number; readonly height?: number; readonly durationTicks?: number; readonly hasAlpha?: boolean; readonly codec?: string }
@@ -128,6 +130,17 @@ export const inspectExternalMotionAssetV1=(input:ExternalAssetInspectionInputV1)
     const spec=bridge.value.spec
     return creativeValidationOk(Object.freeze({schemaVersion:'sanverse.external-asset-inspection/v1',assetId:input.assetId,sourceKind:input.sourceKind,rightsDecision:rights.decision,editability:'partial',materialization:'canonical-scene',deterministic:true,directSeekSafe:true,contentHash:fnv1a(input.bytes),metadata:Object.freeze({width:spec.width,height:spec.height,...input.metadata}),warnings:Object.freeze(['V1.4 accepts only the fixed declarative Expert Motion subset and materializes it to one bounded canonical expert node. Arbitrary procedural code, GLSL/WGSL, runtime callbacks and external time authority are refused.'])}))
   }
+  if(input.sourceKind==='three-webgl'){
+    const bridge=inspectThreeWebglV15(input.bytes)
+    if(bridge.strategy!=='NATIVE_MATERIALIZE')return creativeRefusal(bridge.strategy==='REJECT'?'THREE_WEBGL_REJECTED':'THREE_WEBGL_FLATTEN_REQUIRED',bridge.reasons.join(' '),bridge)
+    return creativeValidationOk(Object.freeze({schemaVersion:'sanverse.external-asset-inspection/v1',assetId:input.assetId,sourceKind:'three-webgl',rightsDecision:rights.decision,editability:'partial',materialization:'canonical-scene',deterministic:true,directSeekSafe:true,contentHash:fnv1a(input.bytes),metadata:Object.freeze({...input.metadata}),warnings:Object.freeze(['V1.5 materializes only the bounded deterministic plane/circle Three subset. Depth, textures, cameras/lights, arbitrary runtime code and custom shaders remain flatten/reject paths.'])}))
+  }
+  if(input.sourceKind==='aep'||input.sourceKind==='mogrt'){
+    const bridge=inspectAdobeAssistedBridgeV15(input.sourceKind,input.bytes)
+    if(bridge.extractionRequired)return creativeRefusal('ADOBE_EXTRACTION_REQUIRED',bridge.features.map(feature=>feature.reason).join(' '),bridge)
+    if(!bridge.nativeMaterializationAvailable)return creativeRefusal('ADOBE_NATIVE_MATERIALIZATION_UNAVAILABLE','Adobe assisted import contains truthful flatten/unsupported classifications and cannot be silently materialized.',bridge)
+    return creativeValidationOk(Object.freeze({schemaVersion:'sanverse.external-asset-inspection/v1',assetId:input.assetId,sourceKind:input.sourceKind,rightsDecision:rights.decision,editability:'partial',materialization:'canonical-scene',deterministic:true,directSeekSafe:true,contentHash:fnv1a(input.bytes),metadata:Object.freeze({...input.metadata}),warnings:bridge.warnings}))
+  }
   if(input.sourceKind==='alpha-video'){
     const metadata=input.metadata??{}
     if(!finitePositive(metadata.width)||!finitePositive(metadata.height)||!safeDuration(metadata.durationTicks)||metadata.hasAlpha!==true||typeof metadata.codec!=='string'||!metadata.codec.trim()) return creativeRefusal('EXTERNAL_ASSET_INVALID','Alpha-video V1 requires width, height, positive durationTicks, hasAlpha=true and codec metadata.')
@@ -204,6 +217,8 @@ export const materializeExternalMotionAssetV1=(inspection:ExternalAssetInspectio
     if(inspection.sourceKind==='remotion'){const parsed=parseRemotionSubsetV1(bytes);if(!parsed.ok)return parsed as CreativeValidationResultV1<ExternalMaterializationV1>;const scene=materializeRemotionSubsetV1(inspection.assetId,parsed.value);return scene.ok?creativeValidationOk(Object.freeze({kind:'canonical-scene' as const,scene:scene.value})):scene as CreativeValidationResultV1<ExternalMaterializationV1>}
     if(inspection.sourceKind==='rive'){const scene=materializeRiveSubsetV1(inspection.assetId,bytes);return scene.ok?creativeValidationOk(Object.freeze({kind:'canonical-scene' as const,scene:scene.value})):scene as CreativeValidationResultV1<ExternalMaterializationV1>}
     if(inspection.sourceKind==='procedural'||inspection.sourceKind==='shader'){const scene=materializeExternalExpertBridgeV14(inspection.assetId,inspection.sourceKind,bytes);return scene.ok?creativeValidationOk(Object.freeze({kind:'canonical-scene' as const,scene:scene.value})):scene as CreativeValidationResultV1<ExternalMaterializationV1>}
+    if(inspection.sourceKind==='three-webgl'){const scene=materializeThreeWebglSubsetV15(inspection.assetId,bytes);return scene.ok?creativeValidationOk(Object.freeze({kind:'canonical-scene' as const,scene:scene.value})):scene as CreativeValidationResultV1<ExternalMaterializationV1>}
+    if(inspection.sourceKind==='aep'||inspection.sourceKind==='mogrt'){const scene=materializeAdobeAssistedBridgeV15(inspection.assetId,inspection.sourceKind,bytes);return scene.ok?creativeValidationOk(Object.freeze({kind:'canonical-scene' as const,scene:scene.value})):scene as CreativeValidationResultV1<ExternalMaterializationV1>}
     return creativeRefusal('EXTERNAL_MATERIALIZATION_INVALID',`Canonical V1 materialization does not support ${inspection.sourceKind}.`)
   }
   const meta=inspection.metadata

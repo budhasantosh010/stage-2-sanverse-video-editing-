@@ -1,6 +1,14 @@
 # Current State
 
-Last updated: 2026-08-27
+Last updated: 2026-08-28
+
+## Parallel Creative Engine worktree — V1.5 performance maturity complete locally
+
+Creative Engine V1.5 is complete as the first independently gated release of the owner-approved V1.5→V1.6 program. The release keeps one canonical `MotionSceneV1`, one exact 1,440,000-tick clock, one semantic-ID system, one Library authority and one accepted-project/Undo authority. V1.5 adds evidence-only C13 performance recording, a validate-once prepared graph evaluator for immutable hot preview loops, deterministic production-scale stress/reliability probes, explicit Expert Runtime host budgets, one-batch semantic MotionPlan application, a 5,000-entry Library scale index projection, exact preview/export graph + browser text-pixel parity, and truthful bounded Three/WebGL plus extraction-assisted AEP/MOGRT bridges. No second Motion/Tracking/Camera/Particle/Expert/Shader/Three/Adobe graph or runtime authority was introduced.
+
+Fresh real Edge `/performance-review` ran true **1×** for **10,179 ms**, reached exactly **14,400,000 / 14,400,000** ticks, evaluated a **524-node / 2,524-animated-property / 24-mask** canonical stress scene, passed direct/back/random seek, ten-track source-aware seek, camera/depth seek, graph preview/export parity, browser text pixel parity, long-project resource cleanup with **0 leaks**, Expert host budgeting, and had **0 console/network failures**. Current prepared evaluation evidence is p95 **10.0 ms**, max **24.8 ms** on the release machine.
+
+Final V1.5 Windows single-fork repository matrix is **2,930 / 2,930 PASS**, including protected `apps/web` **1,231 / 1,231**; root all-workspace build passes. Final isolation/hygiene is green: V1.5 `apps/web/**` diff **0**, `sites/**` diff **0**, raw user/source media additions **0**, secret-like additions **0**, and forbidden parallel-authority scan **0**. The coherent local release is sealed by immutable tag `sanverse-creative-engine-v1.5`. V1.6 production-editor integration is permitted only from that exact release commit in its dedicated local integration worktree. Durable status: `DOCS/motion/creative-engine-v1.5-v1.6/STATUS.md`.
 
 ## Parallel Creative Engine worktree — V1.2→V1.4 continuous program complete locally
 

@@ -20,8 +20,7 @@ export interface ResolvedMotionSceneV1 {
   readonly layout: MotionSceneV1['layout']
 }
 
-export const evaluateScene = (sceneInput: MotionSceneV1, context: MotionRenderContextV1): ResolvedMotionSceneV1 => {
-  const scene = assertValidMotionScene(sceneInput)
+const evaluateValidatedScene = (scene: MotionSceneV1, context: MotionRenderContextV1): ResolvedMotionSceneV1 => {
   const cache = new Map<string, MotionPropertyPrimitiveV1>()
   const active = new Set<string>()
   const resolveAnimatable = (value: Animatable<MotionPropertyPrimitiveV1>, key: string): MotionPropertyPrimitiveV1 => evaluateAnimatable(value, context, key, (bound, bindingKey) => {
@@ -118,3 +117,30 @@ export const evaluateScene = (sceneInput: MotionSceneV1, context: MotionRenderCo
   }
   return Object.freeze({ schemaVersion: 'sanverse.resolved-motion-scene/v1', componentId: scene.componentId, componentVersion: scene.componentVersion, rootNodeId: scene.rootNodeId, nodes: Object.freeze(nodes), semanticParts: scene.semanticParts, exposures: scene.exposures, layout: scene.layout, ...(scene.compositing ? { compositing: scene.compositing } : {}) })
 }
+
+/**
+ * V1.5 prepared evaluator for hot preview/export loops.
+ *
+ * A MotionScene is immutable canonical data after it crosses the graph
+ * validator. Re-validating the same exact scene object for every scrub/playback
+ * tick was measurable work with no additional safety value. A prepared
+ * evaluator validates once, then evaluates arbitrary ticks directly from the
+ * same canonical scene. Any edit creates a new scene object and therefore a
+ * new prepared evaluator; there is no stale cache to invalidate.
+ */
+export interface PreparedMotionSceneEvaluatorV15 {
+  readonly scene: MotionSceneV1
+  readonly evaluate: (context: MotionRenderContextV1) => ResolvedMotionSceneV1
+}
+
+export const prepareMotionSceneEvaluatorV15 = (sceneInput: MotionSceneV1): PreparedMotionSceneEvaluatorV15 => {
+  const scene = assertValidMotionScene(sceneInput)
+  return Object.freeze({
+    scene,
+    evaluate: (context: MotionRenderContextV1) => evaluateValidatedScene(scene, context),
+  })
+}
+
+/** One-shot evaluation keeps the original safety contract. */
+export const evaluateScene = (sceneInput: MotionSceneV1, context: MotionRenderContextV1): ResolvedMotionSceneV1 =>
+  evaluateValidatedScene(assertValidMotionScene(sceneInput), context)

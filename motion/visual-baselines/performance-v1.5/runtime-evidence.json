@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "sanverse.performance-browser-evidence/v1",
+  "recordedAt": "2026-08-28T09:21:53.424Z",
+  "route": "/performance-review",
+  "speed": 1,
+  "elapsedMs": 10179,
+  "startTick": 0,
+  "capturedFrames": 102,
+  "renderedFrameCount": 190,
+  "samples": [
+    "performance-1x-00.jpg",
+    "performance-1x-01.jpg",
+    "performance-1x-02.jpg",
+    "performance-1x-03.jpg",
+    "performance-1x-04.jpg",
+    "performance-1x-05.jpg",
+    "performance-1x-06.jpg"
+  ],
+  "fullPlaybackVerified": true,
+  "finalTick": 14400000,
+  "durationTicks": 14400000,
+  "nodeCount": 524,
+  "animatedProperties": 2524,
+  "maskCount": 24,
+  "directSeekSafe": true,
+  "trackingDirectSeekSafe": true,
+  "cameraDirectSeekSafe": true,
+  "graphPreviewExportParity": true,
+  "textPixelParity": true,
+  "longProjectReliability": true,
+  "resourceLeaks": 0,
+  "expertBudgetPassed": true,
+  "preparedFrameEvaluationP95Ms": 10,
+  "preparedFrameEvaluationMaxMs": 24.8,
+  "performanceBudgetOk": true,
+  "consoleErrors": [],
+  "networkFailures": [],
+  "badResponses": [],
+  "ignoredBrowserNoise": [
+    "404 http://127.0.0.1:2828/favicon.ico"
+  ],
+  "productionWebTouched": false
+}

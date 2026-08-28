@@ -9,6 +9,7 @@ import { PromotionReviewLab } from './PromotionReviewLab.tsx'
 import { SourceAwareReviewLab } from './SourceAwareReviewLab.tsx'
 import { CameraDepthReviewLab } from './CameraDepthReviewLab.tsx'
 import { ExpertMotionReviewLab } from './ExpertMotionReviewLab.tsx'
+import { PerformanceReviewLab } from './PerformanceReviewLab.tsx'
 import './styles.css'
 import './library/library.css'
 import './creative-direction.css'
@@ -27,9 +28,10 @@ const promotionReviewRoute = window.location.pathname === '/promotion-review' ||
 const sourceAwareReviewRoute = window.location.pathname === '/source-aware-review' || mode === 'source-aware-review'
 const cameraDepthReviewRoute = window.location.pathname === '/camera-depth-review' || mode === 'camera-depth-review'
 const expertMotionReviewRoute = window.location.pathname === '/expert-motion-review' || mode === 'expert-motion-review'
+const performanceReviewRoute = window.location.pathname === '/performance-review' || mode === 'performance-review'
 
 createRoot(rootElement).render(
   <StrictMode>
-    {ingestParityRoute ? <ComponentParityLab /> : expertMotionReviewRoute ? <ExpertMotionReviewLab /> : cameraDepthReviewRoute ? <CameraDepthReviewLab /> : sourceAwareReviewRoute ? <SourceAwareReviewLab /> : promotionReviewRoute ? <PromotionReviewLab /> : closedLoopReviewRoute ? <ClosedLoopReviewLab /> : libraryRoute ? <CreativeLibraryApp /> : mode === 'creative-direction' ? <CreativeDirectionLab /> : <MotionLabApp />}
+    {ingestParityRoute ? <ComponentParityLab /> : performanceReviewRoute ? <PerformanceReviewLab /> : expertMotionReviewRoute ? <ExpertMotionReviewLab /> : cameraDepthReviewRoute ? <CameraDepthReviewLab /> : sourceAwareReviewRoute ? <SourceAwareReviewLab /> : promotionReviewRoute ? <PromotionReviewLab /> : closedLoopReviewRoute ? <ClosedLoopReviewLab /> : libraryRoute ? <CreativeLibraryApp /> : mode === 'creative-direction' ? <CreativeDirectionLab /> : <MotionLabApp />}
   </StrictMode>,
 )

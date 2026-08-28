@@ -18,6 +18,7 @@
     "@sanverse/motion-graph": "0.0.0",
     "@sanverse/motion-library": "0.0.0",
     "@sanverse/motion-native-runtime": "0.0.0",
+    "@sanverse/motion-performance": "0.0.0",
     "@sanverse/motion-primitives": "0.0.0",
     "@sanverse/motion-promotion": "0.0.0",
     "@sanverse/motion-source-aware": "0.0.0",
