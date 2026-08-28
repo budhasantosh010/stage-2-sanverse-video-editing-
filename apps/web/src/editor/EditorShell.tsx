@@ -22,6 +22,8 @@ export type EditorShellProps = {
   redoDisabledReason: string | null
   exportDisabledReason: string | null
   isExporting: boolean
+  exportStatusMessage?: string | null
+  exportReadyUrl?: string | null
   onWorkspaceChange(workspace: EditorWorkspace): void
   onStudioWorkspaceChange(workspace: StudioWorkspace): void
   onBack(): void
@@ -59,6 +61,8 @@ export function EditorShell({
   redoDisabledReason,
   exportDisabledReason,
   isExporting,
+  exportStatusMessage = null,
+  exportReadyUrl = null,
   onWorkspaceChange,
   onStudioWorkspaceChange,
   onBack,
@@ -127,6 +131,16 @@ export function EditorShell({
               {isExporting ? 'Exporting' : 'Export'}
             </Button>
           </DisabledAction>
+          {exportStatusMessage ? (
+            <span className="editor-shell__export-status" role="status" aria-label="Global export status">
+              {exportStatusMessage}
+            </span>
+          ) : null}
+          {exportReadyUrl ? (
+            <a className="editor-shell__export-download" href={exportReadyUrl} download="sanverse-edited.mp4" aria-label="Download exported MP4">
+              Download
+            </a>
+          ) : null}
         </div>
       </header>
 

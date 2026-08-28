@@ -90,7 +90,7 @@ describe('EditorShell', () => {
     await user.type(editorInput, 'one editor')
 
     await user.click(screen.getByRole('button', { name: /studio workspace/i }))
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Edit', 'Effects', 'Color', 'Audio'])
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Edit', 'Creative', 'Effects', 'Color', 'Audio'])
     await user.click(screen.getByRole('tab', { name: 'Effects' }))
     expect(screen.getByRole('tab', { name: 'Effects' })).toHaveAttribute('aria-selected', 'true')
 

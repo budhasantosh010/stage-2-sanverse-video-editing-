@@ -1,4 +1,4 @@
-export type StudioWorkspace = 'edit' | 'effects' | 'color' | 'audio'
+export type StudioWorkspace = 'edit' | 'creative' | 'effects' | 'color' | 'audio'
 
 export type WorkspaceRightTab = 'tool' | 'ai'
 
@@ -34,6 +34,7 @@ export const WORKSPACE_STORAGE_KEY = 'sanverse.workspace-layout/v1'
 
 export const STUDIO_WORKSPACES: readonly StudioWorkspace[] = Object.freeze([
   'edit',
+  'creative',
   'effects',
   'color',
   'audio',

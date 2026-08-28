@@ -32,7 +32,7 @@ import {
   type IntentContextInput,
 } from '../features/conversation/conversation-client'
 import { uploadProject } from '../features/project-intake/project-intake'
-import { exportProject, ProjectExportTimeout, type ProjectExportState } from '../features/project-export/project-export'
+import { exportProject, formatExportElapsed, ProjectExportTimeout, type ProjectExportState } from '../features/project-export/project-export'
 import {
   acceptChangeSet,
   addCaptionsFromTranscript,
@@ -486,6 +486,14 @@ export function App() {
       : appState.editProject.changeSets.length === 0
         ? 'Accept at least one edit before exporting.'
         : null
+  const exportStatusMessage = exportState.status === 'ready'
+    ? `Export ready · ${exportState.result.width} × ${exportState.result.height}`
+    : exportState.status === 'error'
+      ? exportState.message
+      : exportState.status === 'timed-out'
+        ? `Export is still running after ${formatExportElapsed(exportState.elapsedMs)}.`
+        : null
+  const exportReadyUrl = exportState.status === 'ready' ? exportState.result.mediaUrl : null
 
   return (
     <EditorShell
@@ -501,6 +509,8 @@ export function App() {
       redoDisabledReason={redoDisabledReason}
       exportDisabledReason={exportDisabledReason}
       isExporting={exportState.status === 'rendering'}
+      exportStatusMessage={exportStatusMessage}
+      exportReadyUrl={exportReadyUrl}
       onWorkspaceChange={setWorkspace}
       onStudioWorkspaceChange={setStudioWorkspace}
       onBack={() => {
@@ -626,16 +636,21 @@ export function App() {
           return error instanceof Error && error.message ? error.message : 'That could not be added.'
         }
       }}
-      onApplyOperations={async (operations, changeSetId) => {
+      onApplyOperations={async (operations, changeSetId, metadata) => {
         if (appState.screen !== 'studio' || appState.proposal) return 'Finish the pending edit first.'
         const currentProject = latestEditProjectRef.current
         if (!currentProject) return 'Open a project first.'
         if (operations.length === 0) return null
+        if (metadata?.expectedBaseRevision !== undefined && currentProject.revision !== metadata.expectedBaseRevision) {
+          return `Project changed from revision ${metadata.expectedBaseRevision} to ${currentProject.revision}. Rebuild this Creative draft against the current project before applying it.`
+        }
         resetExport()
         try {
           // ONE change set holding every operation the gesture produced. The
           // server accepts all of them or none, so an Insert that pushes four
-          // clips along can never leave three moved and one behind.
+          // clips along can never leave three moved and one behind. Creative
+          // Engine acceptance uses this exact same authority with an explicit
+          // revision fence and non-render lineage metadata.
           const next = await acceptChangeSet(
             appState.project.id,
             {
@@ -643,8 +658,8 @@ export function App() {
               changeSetId,
               baseRevision: currentProject.revision,
               operations: [...operations],
-              provenance: { source: 'direct' as const, requestId: null },
-              extensions: {},
+              provenance: metadata?.provenance ?? { source: 'direct' as const, requestId: null },
+              extensions: metadata?.extensions ?? {},
             },
             fetch,
           )

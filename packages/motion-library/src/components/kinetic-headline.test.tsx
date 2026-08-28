@@ -72,6 +72,15 @@ describe('Kinetic Headline deterministic text fit', () => {
     expect(fit.value.lines.every((line) => line.estimatedWidth <= fit.value.maxWidth)).toBe(true)
   })
 
+  it('scales the readability floor down on a valid low-resolution production canvas', () => {
+    const lowResolution = { ...context(0), composition: { width: 640, height: 360, fpsNumerator: 30, fpsDenominator: 1 } }
+    const fit = validateKineticHeadlineFit(DEFAULT_KINETIC_HEADLINE_PROPS, lowResolution)
+    expect(fit.ok).toBe(true)
+    if (!fit.ok) return
+    expect(fit.value.minimumFontSize).toBeGreaterThan(0)
+    expect(fit.value.fontSize).toBeGreaterThanOrEqual(fit.value.minimumFontSize)
+  })
+
   it('uses explicit portrait and square line plans rather than browser text wrapping', () => {
     const portrait = validateKineticHeadlineFit(DEFAULT_KINETIC_HEADLINE_PROPS, context(1_296_000, '9:16'))
     const square = validateKineticHeadlineFit(DEFAULT_KINETIC_HEADLINE_PROPS, context(1_296_000, '1:1'))

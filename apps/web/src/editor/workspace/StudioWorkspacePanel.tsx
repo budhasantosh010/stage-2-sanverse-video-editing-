@@ -36,7 +36,7 @@ export function StudioWorkspacePanel({
   selection: InspectorSelection
   visualDraftController: SharedVisualDraftController
 }>) {
-  if (workspace === 'edit') return null
+  if (workspace === 'edit' || workspace === 'creative') return null
 
   if (workspace === 'audio') {
     const supported = selection.kind === 'video' || selection.kind === 'dialogue' || selection.kind === 'music'

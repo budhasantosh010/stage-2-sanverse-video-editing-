@@ -9,7 +9,7 @@ afterEach(cleanup)
 describe('Studio workspace tabs', () => {
   it('renders the required order and announces Edit as active', () => {
     render(<StudioWorkspaceTabs value="edit" onChange={vi.fn()} />)
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Edit', 'Effects', 'Color', 'Audio'])
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Edit', 'Creative', 'Effects', 'Color', 'Audio'])
     expect(screen.getByRole('tab', { name: 'Edit' })).toHaveAttribute('aria-selected', 'true')
   })
 
@@ -20,7 +20,7 @@ describe('Studio workspace tabs', () => {
     const edit = screen.getByRole('tab', { name: 'Edit' })
     edit.focus()
     await user.keyboard('{ArrowRight}{Enter}')
-    expect(onChange).toHaveBeenLastCalledWith('effects')
+    expect(onChange).toHaveBeenLastCalledWith('creative')
     await user.keyboard('{End} ')
     expect(onChange).toHaveBeenLastCalledWith('audio')
     await user.keyboard('{Home}{Enter}')

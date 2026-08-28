@@ -4,6 +4,7 @@ import type { StudioWorkspace, WorkspaceRightTab } from './workspace-contract'
 
 const toolLabel: Readonly<Record<StudioWorkspace, string>> = Object.freeze({
   edit: 'Inspector',
+  creative: 'Creative context',
   effects: 'Effect controls',
   color: 'Color controls',
   audio: 'Audio controls',

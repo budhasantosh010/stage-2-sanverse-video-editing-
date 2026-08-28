@@ -157,6 +157,92 @@ Final release-candidate verification:
 
 # V1.6 — PRODUCTION EDITOR INTEGRATION
 
-Status: **UNLOCKED ONLY FROM THE EXACT `sanverse-creative-engine-v1.5` RELEASE COMMIT; IMPLEMENTATION MUST OCCUR IN ITS DEDICATED LOCAL INTEGRATION WORKTREE.**
+Status: **COMPLETE — PRODUCTION INTEGRATION, REAL EDGE WORKFLOW, FULL MATRIX, ROOT BUILD AND HYGIENE GREEN; SEALED LOCALLY BY `sanverse-production-editor-creative-engine-v1.6`.**
 
-When unlocked, V1.6 must integrate the already-built Creative Engine into `apps/web` through explicit production project/time/adaptation seams. Required surfaces include source-aware context, Library/opportunities, Storyboard/KVS/Animatic/Motion Forge/Motion Review, C3–C6 projections with one semantic-ID selection, contextual properties, existing internal tools through the AI rail/MCP, one atomic production apply compatible with existing Undo/Redo and persistence/reopen, responsive resizable panes, failure recovery and production export parity. The decisive proof is a real Edge end-to-end production workflow followed by the full V1.0→V1.6 matrix/root build and immutable local tag `sanverse-production-editor-creative-engine-v1.6`.
+V1.6 starts exactly from V1.5 commit/tag `7325be5a6bac0cfd755dcf15db7852639a67f11e` / `sanverse-creative-engine-v1.5` and integrates existing Creative Engine authorities into production `apps/web`. It does not create another accepted-project model, history/Undo stack, animation clock, Motion Graph, preview renderer, export renderer, approval store or MCP project authority.
+
+## Production adaptation seam
+
+- New package `@sanverse/creative-production-adapter` depends on existing `@sanverse/edit-domain`, `@sanverse/motion-agent-tools`, `@sanverse/motion-contract`, `@sanverse/motion-graph` and `@sanverse/motion-library` authorities.
+- Production source resolution is revision-bound and uses the canonical 1,440,000-tick timebase. V1.6 currently accepts the bounded forward-1× primary-source timing shape and refuses unsupported source transforms rather than guessing.
+- The Library surface reports all **99** canonical entries. **Kinetic Headline** is the one lossless native production adapter in V1.6; the remaining **98** are explicitly `creative-preview-only` because the current production edit/render schema cannot losslessly serialize an arbitrary Motion Graph scene.
+- A supported approved candidate becomes exactly one ordinary production change set containing `add-title` + `set-visual-properties`, with AI provenance plus `sanverse.creative/lineage` metadata. The existing server-authoritative change-set endpoint remains the only production apply authority.
+
+## Closed-loop production workflow
+
+- Storyboard/KVS, exact-tick Animatic, Motion Forge and Motion Review reuse the existing closed-loop engine and revision-bound approval truth.
+- C3 Layers, C4 dope sheet, C5 curves and C6 node graph are projected from the same canonical candidate scene; one semantic node ID is shared across all four views.
+- A manual C5 preset edit uses canonical Motion Graph operations. Any graph change creates a new candidate/workflow state and invalidates old Storyboard/Animatic/Motion approvals before production apply can become available again.
+- The production UI keeps Program Canvas as the one read-only source preview, reuses the existing production Timeline, and keeps the Creative controller mounted across Studio workspace switches.
+- One accepted Creative result is one history action. Focused App/server integration proves one Undo removes both generated production operations and one Redo restores both; the accepted result survives reopen.
+
+## AI rail and MCP safety
+
+- The production Creative AI surface exposes the existing internal tool registry; it does not implement a second tool authority.
+- The production-fenced MCP registry wraps the same Creative workflow engine used by UI, supplies production project/revision context, and requires the live production revision for mutating tools.
+- A stale production revision returns `STALE_PRODUCTION_REVISION` before sandbox mutation.
+- The production MCP surface deliberately omits isolated `apply_approved_sandbox` and `undo_last_creative_merge`; accepted-project apply/Undo remains the production editor/server authority.
+
+## Preview/export, ratios and recovery
+
+- Production preview/export parity is proved through the existing canonical render-plan compiler at exact checkpoints; Creative production output does not bypass that authority.
+- 16:9, 9:16, 1:1 and 4:5 projects all build the same exact-tick Creative scene, preserve C3–C6 semantic selection and compile to the correct production export dimensions.
+- Explicit recovery gates cover no active source, unsupported source timing, stale production revision, stale MCP revision and failed production apply. All fail closed without corrupting the Creative sandbox or production project.
+- Real browser verification found and fixed a low-resolution Kinetic Headline font-bound defect at 640×360. The canonical component now scales its minimum safely without changing higher-resolution behavior.
+- Real browser inspection also found and fixed two production UX issues: Creative text was using a nonexistent light-theme token, and export completion/download could be hidden inside a collapsed AI panel. Creative now uses the production ink token, and global EditorShell export status/download remains reachable independently of AI-panel collapse.
+
+## Real Microsoft Edge production proof
+
+Retained evidence: `DOCS/evidence/2026-08-28-creative-engine-v16-production/`.
+
+The decisive native Edge/CDP workflow uses a temporary synthetic-real MP4 (**640×360**, **6.000 s**) and proves:
+
+- source loaded into the real production app;
+- Creative workspace active over the same production editor;
+- manual C5 `snappy` edit;
+- stale approvals discarded;
+- Storyboard, Animatic and Motion explicitly reapproved;
+- one atomic production change set with `add-title` + `set-visual-properties` and Creative lineage;
+- revision after apply **1**, after Undo **2**, after Redo **3**;
+- accepted Creative result persisted after reload/reopen;
+- desktop **1440×900**, tablet **1024×768** and mobile **390×844** all have no horizontal overflow, exactly one video and reachable Creative controls;
+- real production export succeeds and the completion/download is visible globally;
+- exported MP4: H.264 High + AAC LC stereo, **640×360**, **30 fps**, **6.000 s**, **858,823 bytes**, SHA-256 `653afd857d0fc4d3441c9486dfac564af9d18e4503c80f45c6f1b96287ce12ef`;
+- console errors **0**;
+- network failures **0**;
+- bad HTTP responses **0**.
+
+Retained screenshots:
+
+1. `01-creative-c5-edited.png`
+2. `02-creative-applied.png`
+3. `03-desktop-1440x900.png`
+4. `03-tablet-1024x768.png`
+5. `03-mobile-390x844.png`
+6. `04-export-ready.png`
+
+## V1.6 final seal gate
+
+Status: **GREEN — LOCAL RELEASE SEALED**
+
+Final release-candidate verification:
+
+- authoritative full repository Windows single-fork regression: **2,950 / 2,950 PASS across 25 workspaces**;
+- production `apps/web`: **1,238 / 1,238 PASS**;
+- `@sanverse/creative-production-adapter`: **12 / 12 PASS**;
+- API: **403 / 403 PASS**;
+- edit-domain: **488 / 488 PASS**;
+- Motion Graph: **139 / 139 PASS**;
+- Motion Library: **202 / 202 PASS**;
+- Motion MCP: **18 / 18 PASS**;
+- render-contract: **119 / 119 PASS**;
+- root all-workspace production build: **PASS / exit 0**;
+- `git diff --check`: **PASS**;
+- `sites/**` diff: **0**; separate repository preserved;
+- raw user/source media or generated export additions: **0**;
+- secret-like additions: **0**;
+- forbidden parallel-authority scan: **0 real matches**; one lexical scan hit is the canonical `1_440_000`-timescale test fixture itself;
+- no GitHub remote/PR/Actions operation;
+- immutable local release pointer: `sanverse-production-editor-creative-engine-v1.6` on the coherent V1.6 release commit.
+
+V1.6 is the stop point for this task. Do not start any later Creative Engine milestone from this release task.

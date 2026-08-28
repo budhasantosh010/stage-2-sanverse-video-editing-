@@ -91,6 +91,19 @@
   color: var(--color-danger);
 }
 
+.editor-shell__export-status {
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.editor-shell__export-download {
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .editor-shell__workspace {
   display: flex;
   min-width: 0;

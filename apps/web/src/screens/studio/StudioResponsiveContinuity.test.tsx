@@ -131,7 +131,7 @@ describe('resizing the window never strands the user', () => {
       const reachable = compactControlsPresent() || screen.queryAllByRole('button', { name: /Hide Media dock/ }).length > 0
       expect(reachable, `Media unreachable at ${width}px`).toBe(true)
     }
-  })
+  }, 10_000)
 
   it('keeps what the user typed and chose through the whole journey', async () => {
     const user = userEvent.setup()

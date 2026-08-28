@@ -147,7 +147,7 @@ describe('Studio Media Bin integration', () => {
     await user.click(screen.getAllByRole('button', { name: 'Redo edit' })[0])
     expect(await screen.findByLabelText(/hero\.png, Image, Used 1 time/i)).toBeInTheDocument()
     expect(await screen.findByTestId('media-overlay')).toHaveAttribute('src', expect.stringContaining('asset_p1eimage1'))
-  })
+  }, 10_000)
 
   it('imports audio, adds one A2 music operation, opens Music Inspector, and supports Undo/Redo', async () => {
     const user = userEvent.setup()

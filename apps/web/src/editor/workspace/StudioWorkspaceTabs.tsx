@@ -5,6 +5,7 @@ import './StudioWorkspaceShell.css'
 
 const labels: Readonly<Record<StudioWorkspace, string>> = Object.freeze({
   edit: 'Edit',
+  creative: 'Creative',
   effects: 'Effects',
   color: 'Color',
   audio: 'Audio',

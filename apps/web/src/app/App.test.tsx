@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   acceptChangeSet as applyChangeSet,
+  activeOverlayOperations,
+  activeVisualProperties,
   addAsset,
   redoChangeSet,
   undoChangeSet,
@@ -213,6 +215,102 @@ describe('App', () => {
     // The browser adopts the server's answer rather than deciding for itself.
     await waitFor(() => expect(screen.queryByText('Saved nameplate')).not.toBeInTheDocument())
   })
+
+  it('reopens an accepted project and reaches Export ready through the real queued-to-succeeded polling path', async () => {
+    const user = userEvent.setup()
+    const api = fakeApi()
+    const base = api.current()
+    const accepted = applyChangeSet(base, {
+      schemaVersion: 'sanverse.change-set/v1',
+      changeSetId: 'changeset_savedexport001',
+      baseRevision: base.revision,
+      operations: [{
+        schemaVersion: 'sanverse.operation/v3',
+        operationId: 'operation_savedexport001',
+        kind: 'add-nameplate',
+        capabilityId: 'sanverse.nameplate.component/v1',
+        assetId: base.composition.tracks[0].clips[0].assetId,
+        sourceInterval: { start: { ticks: 0, timescale: 1_440_000 }, duration: { ticks: 1_440_000, timescale: 1_440_000 } },
+        target: { coordinateSpace: 'composition-normalized', point: { x: 0.5, y: 0.5 }, anchor: 'center' },
+        primaryText: 'Saved export',
+        secondaryText: '',
+        extensions: {},
+      }],
+      provenance: { source: 'direct', requestId: null },
+      extensions: {},
+    })
+    if (!accepted.ok) throw new Error('fixture failed')
+    api.setProject(accepted.value)
+    const jobId = 'job_1234567890abcdef'
+    const exportId = 'export_1234567890abcdef'
+    let polls = 0
+    fetchMock.mockImplementation((url: string, options?: RequestInit) => {
+      if (url === `/api/projects/${api.manifest.id}/exports` && options?.method === 'POST') {
+        return new Response(JSON.stringify({ jobId, projectId: api.manifest.id, status: 'queued', phase: 'queued', progress: 0 }), { status: 202, headers: { 'content-type': 'application/json' } })
+      }
+      if (url === `/api/projects/${api.manifest.id}/export-jobs/${jobId}`) {
+        polls += 1
+        return new Response(JSON.stringify({
+          jobId,
+          projectId: api.manifest.id,
+          status: 'succeeded',
+          phase: 'done',
+          progress: 1,
+          result: { id: exportId, mediaUrl: `/api/projects/${api.manifest.id}/exports/${exportId}/media`, sha256: 'b'.repeat(64), width: 1920, height: 1080, durationMs: 30_000, hasAudio: true },
+        }), { status: 200, headers: { 'content-type': 'application/json' } })
+      }
+      return api.handle(url, options) ?? new Response('{}', { status: 404 })
+    })
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /open cleaned\.mp4/i }))
+    const exportButton = await screen.findByRole('button', { name: /export video/i })
+    expect(exportButton).toBeEnabled()
+    await user.click(exportButton)
+    expect(await screen.findByRole('link', { name: /download mp4/i }, { timeout: 5_000 })).toHaveAttribute('href', `/api/projects/${api.manifest.id}/exports/${exportId}/media`)
+    expect(polls).toBeGreaterThanOrEqual(1)
+  }, 10_000)
+
+  it('applies one approved Creative result through the server as one change set with one Undo and Redo', async () => {
+    const user = userEvent.setup()
+    const api = fakeApi()
+    fetchMock.mockImplementation((url: string, options?: RequestInit) =>
+      api.handle(url, options) ?? new Response('{}', { status: 404 }))
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /open cleaned\.mp4/i }))
+    await user.click(screen.getByRole('button', { name: /studio workspace/i }))
+    await user.click(screen.getByRole('tab', { name: 'Creative' }))
+    await user.click(screen.getByRole('button', { name: 'Create Creative draft' }))
+    await user.click(screen.getByRole('button', { name: 'Approve Storyboard' }))
+    await user.click(screen.getByRole('button', { name: 'Build Animatic' }))
+    await user.click(screen.getByRole('button', { name: 'Approve Animatic' }))
+    await user.click(screen.getByRole('button', { name: 'Build Motion' }))
+    await user.click(screen.getByRole('button', { name: 'Prepare Review' }))
+    await waitFor(() => expect(screen.getByText('review ready')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: 'Approve Motion' }))
+    await user.click(screen.getByRole('button', { name: 'Apply to production' }))
+
+    await waitFor(() => expect(api.current().revision).toBe(1))
+    expect(api.current().changeSets).toHaveLength(1)
+    expect(api.current().changeSets[0]?.changeSet.operations.map((operation) => operation.kind)).toEqual(['add-title', 'set-visual-properties'])
+    expect(api.current().changeSets[0]?.changeSet.provenance).toMatchObject({ source: 'ai' })
+    expect(api.current().changeSets[0]?.changeSet.provenance.requestId).toMatch(/^creative:/)
+    expect(api.current().changeSets[0]?.changeSet.extensions).toHaveProperty('sanverse.creative/lineage')
+    expect(activeOverlayOperations(api.current())).toHaveLength(1)
+    expect(activeVisualProperties(api.current())).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: /^undo edit$/i }))
+    await waitFor(() => expect(api.current().revision).toBe(2))
+    expect(activeOverlayOperations(api.current())).toHaveLength(0)
+    expect(activeVisualProperties(api.current())).toHaveLength(0)
+    expect(api.current().redoStack).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: /^redo edit$/i }))
+    await waitFor(() => expect(api.current().revision).toBe(3))
+    expect(activeOverlayOperations(api.current())).toHaveLength(1)
+    expect(activeVisualProperties(api.current())).toHaveLength(1)
+  }, 20_000)
 
   it('sends one Inspector edit through the server-authoritative change-set path and undoes it', async () => {
     const user = userEvent.setup()

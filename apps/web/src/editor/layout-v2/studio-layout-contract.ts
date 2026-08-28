@@ -19,7 +19,7 @@ const KEYS = Object.freeze([
   'schemaVersion', 'rootLayout', 'mainVerticalLayout', 'upperLayout', 'aiMode',
   'mediaCollapsed', 'toolCollapsed', 'activeWorkspace', 'preset',
 ])
-const WORKSPACES = new Set(['edit', 'effects', 'color', 'audio'])
+const WORKSPACES = new Set(['edit', 'creative', 'effects', 'color', 'audio'])
 const PRESETS = new Set(['custom', 'edit', 'motion', 'timeline', 'review', 'ai', 'audio'])
 const AI_MODES = new Set(['collapsed', 'expanded', 'overlay'])
 

@@ -170,8 +170,8 @@ const headlineGeometry = (context: MotionRenderContextV1) => {
   const horizontalPadding = width * (kind === 'portrait' ? 0.10 : 0.075)
   const verticalPadding = height * 0.075
   const maxWidth = width - horizontalPadding * 2
-  const preferredFontSize = Math.round(kind === 'portrait' ? Math.min(142, height * 0.072) : kind === 'square' ? Math.min(156, height * 0.088) : Math.min(168, height * 0.116))
-  const minimumFontSize = kind === 'portrait' ? 50 : 58
+  const preferredFontSize = Math.max(1, Math.round(kind === 'portrait' ? Math.min(142, height * 0.072) : kind === 'square' ? Math.min(156, height * 0.088) : Math.min(168, height * 0.116)))
+  const minimumFontSize = Math.max(1, Math.min(kind === 'portrait' ? 50 : 58, preferredFontSize))
   return { kind, horizontalPadding, verticalPadding, maxWidth, preferredFontSize, minimumFontSize }
 }
 

@@ -30,6 +30,13 @@ import { proposalPlacement } from '../../app/app-state'
 import type { ConversationState, PendingProposal, ProposalRepair, StudioState } from '../../app/app-state'
 import { ChatComposer } from '../../features/conversation/ChatComposer'
 import type { IntentContextInput } from '../../features/conversation/conversation-client'
+import {
+  CreativeProductionAiTools,
+  CreativeProductionContext,
+  CreativeProductionWorkspace,
+  useCreativeProductionController,
+  type CreativeProductionApply,
+} from '../../features/creative-production'
 import { NameplateRepair } from '../../features/proposal-repair/NameplateRepair'
 import { describeOperation } from '../../features/history/describe-operation'
 import {
@@ -287,7 +294,7 @@ export type StudioScreenProps = {
    * five separate change sets would leave four of them applied if the fifth
    * were refused, which is the exact half-finished state Gate C0 removed.
    */
-  onApplyOperations(operations: readonly EditOperation[], changeSetId: string): Promise<string | null>
+  onApplyOperations: CreativeProductionApply
   /** Put one file on the project's shelf, and say what it turned out to be. */
   onUploadAsset(file: File): Promise<MediaAsset | string>
   /** Where each extra file can be fetched from, for the preview. */
@@ -1356,6 +1363,11 @@ export function StudioScreen({
     compositionDurationTicks,
     Math.max(0, millisecondsToTicks(playheadMs)),
   )
+  const creativeProduction = useCreativeProductionController({
+    project: editProject,
+    playheadTicks,
+    onApply: onApplyOperations,
+  })
   // A direct project edit while a proposal is pending would move the footage
   // the proposal is anchored to, so both surfaces share one fail-closed policy.
   const timelineBusy = Boolean(proposal) || isRendering
@@ -2910,6 +2922,10 @@ export function StudioScreen({
             onDraftChange={setConversationDraft}
           />
 
+          {workspace === 'studio' && studioWorkspace === 'creative' ? (
+            <CreativeProductionAiTools controller={creativeProduction} />
+          ) : null}
+
           <section className="studio-screen__draft" aria-labelledby="studio-draft-label">
             <h3 id="studio-draft-label">Draft — not executed</h3>
             {draftRequest ? (
@@ -3037,16 +3053,23 @@ export function StudioScreen({
         </aside>
   )
 
+  const creativeAssetLabel = creativeProduction.candidate
+    ? assetOriginalNames[creativeProduction.candidate.source.assetId]
+      ?? (creativeProduction.candidate.source.assetId === primaryAssetId ? project.name : creativeProduction.candidate.source.assetId)
+    : 'Current primary source'
   const leftDockLabel = studioWorkspace === 'edit'
     ? 'Media'
-    : studioWorkspace === 'effects'
-      ? 'Effects'
-      : studioWorkspace === 'color'
-        ? 'Color'
-        : 'Audio'
+    : studioWorkspace === 'creative'
+      ? 'Creative'
+      : studioWorkspace === 'effects'
+        ? 'Effects'
+        : studioWorkspace === 'color'
+          ? 'Color'
+          : 'Audio'
   const visualToolSupported = ['caption', 'nameplate', 'title', 'callout', 'media-overlay'].includes(inspectorSelection.kind)
   const audioToolSupported = ['video', 'dialogue', 'music'].includes(inspectorSelection.kind)
   const toolSupported = studioWorkspace === 'edit'
+    || studioWorkspace === 'creative'
     || (studioWorkspace === 'effects' && (visualToolSupported || inspectorSelection.kind === 'video'))
     || (studioWorkspace === 'color' && visualToolSupported)
     || (studioWorkspace === 'audio' && audioToolSupported)
@@ -3466,6 +3489,8 @@ export function StudioScreen({
               onAddAsBroll={addMediaAsBroll}
               onAddAsMusic={addMediaAsMusic}
             />
+          ) : studioWorkspace === 'creative' ? (
+            <CreativeProductionWorkspace controller={creativeProduction} assetLabel={creativeAssetLabel} />
           ) : (
             <StudioWorkspacePanel
               workspace={studioWorkspace}
@@ -3486,9 +3511,11 @@ export function StudioScreen({
           >
             <div className="studio-screen__workspace-tool-heading">
               <span className="studio-screen__section-index">03</span>
-              <h2>{studioWorkspace === 'edit' ? 'Inspector' : studioWorkspace === 'effects' ? 'Effect controls' : studioWorkspace === 'color' ? 'Color controls' : 'Audio controls'}</h2>
+              <h2>{studioWorkspace === 'edit' ? 'Inspector' : studioWorkspace === 'creative' ? 'Creative context' : studioWorkspace === 'effects' ? 'Effect controls' : studioWorkspace === 'color' ? 'Color controls' : 'Audio controls'}</h2>
             </div>
-            {toolSupported ? <>
+            {studioWorkspace === 'creative' ? (
+              <CreativeProductionContext controller={creativeProduction} projectRevision={editProject.revision} assetLabel={creativeAssetLabel} />
+            ) : toolSupported ? <>
             {selectedVideoSelection && footageMotionDraft && studioWorkspace !== 'color' && studioWorkspace !== 'audio' ? (
               <FootageMotionInspector
                 draft={footageMotionDraft}

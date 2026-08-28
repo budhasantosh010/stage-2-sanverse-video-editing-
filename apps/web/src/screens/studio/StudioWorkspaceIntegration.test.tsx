@@ -154,7 +154,7 @@ describe('Studio workspace integration', () => {
     fireEvent.change(chat, { target: { value: 'keep one shared AI draft' } })
     await waitFor(() => expect(chat).toHaveValue('keep one shared AI draft'))
 
-    for (const name of ['Effects', 'Color', 'Audio', 'Edit']) {
+    for (const name of ['Creative', 'Effects', 'Color', 'Audio', 'Edit']) {
       await user.click(within(screen.getByRole('tablist', { name: 'Studio workspaces' })).getByRole('tab', { name }))
       expect(container.querySelectorAll('video')).toHaveLength(1)
       expect(container.querySelector('video')).toBe(video)

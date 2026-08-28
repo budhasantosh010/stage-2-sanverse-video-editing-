@@ -1,0 +1,27 @@
+{
+  "name": "@sanverse/creative-production-adapter",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sanverse/creative-direction": "0.0.0",
+    "@sanverse/edit-domain": "0.0.0",
+    "@sanverse/motion-agent-tools": "0.0.0",
+    "@sanverse/motion-contract": "0.0.0",
+    "@sanverse/motion-graph": "0.0.0",
+    "@sanverse/motion-library": "0.0.0",
+    "@sanverse/motion-storyboard": "0.0.0"
+  },
+  "devDependencies": {
+    "@sanverse/motion-mcp": "0.0.0",
+    "@sanverse/render-contract": "0.0.0",
+    "@types/node": "^24.3.0",
+    "typescript": "~5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
