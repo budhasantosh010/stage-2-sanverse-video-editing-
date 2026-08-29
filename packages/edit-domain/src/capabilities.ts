@@ -58,6 +58,8 @@ export const TIMELINE_MARKERS_PRIMITIVE_ID = 'sanverse.timeline.markers.primitiv
 export const TIMELINE_GROUPS_PRIMITIVE_ID = 'sanverse.timeline.groups.primitive/v1'
 export const VISUAL_PROPERTIES_PRIMITIVE_ID = 'sanverse.visual.properties.primitive/v1'
 export const FOOTAGE_MOTION_PRIMITIVE_ID = 'sanverse.footage.motion.primitive/v1'
+/** Apply one owner-approved immutable Creative Scene artifact over source footage. */
+export const CREATIVE_SCENE_PRIMITIVE_ID = 'sanverse.creative-scene.primitive/v1'
 
 /** "Put a title on it." */
 export const TITLE_COMPONENT_ID = 'sanverse.title.component/v1'
@@ -97,6 +99,14 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     accepts: 'A person\'s name and role, shown at a point the user indicated.',
     produces: Object.freeze(['add-nameplate']),
     requires: Object.freeze([NAMEPLATE_PRIMITIVE_ID]),
+  }),
+  Object.freeze({
+    capabilityId: CREATIVE_SCENE_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'One immutable owner-approved Creative Scene artifact, its source-anchored interval, presentation mode, and layer.',
+    produces: Object.freeze(['add-creative-scene']),
+    requires: Object.freeze([]),
   }),
   Object.freeze({
     capabilityId: SPLIT_PRIMITIVE_ID,

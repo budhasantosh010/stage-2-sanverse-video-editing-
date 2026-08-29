@@ -9,10 +9,13 @@
     "./caption-style": "./src/caption-style.ts",
     "./compile-project": "./src/compile-project.ts",
     "./overlay-style": "./src/overlay-style.ts",
-    "./visual-normalization": "./src/visual-normalization.ts"
+    "./visual-normalization": "./src/visual-normalization.ts",
+    "./creative-scene-artifact": "./src/creative-scene-artifact.ts"
   },
   "dependencies": {
-    "@sanverse/edit-domain": "*"
+    "@sanverse/edit-domain": "*",
+    "@sanverse/motion-contract": "0.0.0",
+    "@sanverse/motion-graph": "0.0.0"
   },
   "scripts": {
     "test": "vitest run",

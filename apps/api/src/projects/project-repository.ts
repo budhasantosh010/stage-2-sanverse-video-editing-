@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 
 export const PROJECT_ID_PATTERN = /^project_[a-z0-9]{16,64}$/
 export const EXPORT_ID_PATTERN = /^export_[a-z0-9]{16,64}$/
+export const CREATIVE_ARTIFACT_ID_PATTERN = /^creativeart_[a-f0-9]{64}$/
 
 export type ProjectManifest = {
   id: string
@@ -35,6 +36,13 @@ export type ProjectExportPaths = {
   trustedWorkDir: string
 }
 
+export type CreativeArtifactRecord = Readonly<{
+  artifactId: string
+  sha256: string
+  byteLength: number
+  serialized: string
+}>
+
 export interface ProjectRepository {
   /** Implementations must detect collisions before consuming body and clean partial stages on error. */
   stageSource(input: { projectId: string; body: AsyncIterable<Uint8Array> }): Promise<StagedSource>
@@ -46,6 +54,10 @@ export interface ProjectRepository {
   readProject(projectId: string): Promise<ProjectManifest>
   readProjectState(projectId: string): Promise<string | null>
   saveProjectState(projectId: string, serializedProject: string): Promise<void>
+  /** Immutable project-local owner-approved Creative Scene artifacts. */
+  putCreativeArtifact?(projectId: string, serialized: string): Promise<CreativeArtifactRecord>
+  readCreativeArtifact?(projectId: string, artifactId: string): Promise<CreativeArtifactRecord>
+  listCreativeArtifacts?(projectId: string): Promise<readonly Omit<CreativeArtifactRecord, 'serialized'>[]>
   /**
    * The user's filing of their own media, stored beside the project.
    *

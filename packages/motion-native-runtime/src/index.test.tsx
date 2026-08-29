@@ -86,6 +86,23 @@ describe('native runtime', () => {
     expect(markup).toContain('data-probe-opacity="0.25"')
   })
 
+  it('renders an approved scene override as the graph authority instead of regenerating candidate graph state', () => {
+    const scene = probeModule.createScene({}, {}, context)
+    const changed = applyMotionOperation(scene, { operationId: 'approved-opacity', type: 'set-property', target: { nodeId: 'probe-shape', property: 'opacity' }, value: constant(0.42) })
+    expect(changed.ok).toBe(true)
+    if (!changed.ok) return
+    const markup = renderToStaticMarkup(
+      <MotionComponentHost module={probeModule} props={{}} style={{}} context={context} sceneOverride={changed.scene} />,
+    )
+    expect(markup).toContain('data-probe-opacity="0.42"')
+  })
+
+  it('refuses a scene override from a different component identity rather than silently rendering the wrong module', () => {
+    const scene = probeModule.createScene({}, {}, context)
+    const mismatched = { ...scene, componentId: 'sanverse.other-component' }
+    expect(() => renderToStaticMarkup(<MotionComponentHost module={probeModule} props={{}} style={{}} context={context} sceneOverride={mismatched} />)).toThrow(/does not match/u)
+  })
+
   it('renders graph-native perspective even when it is the only transform', () => {
     const matrix = 'matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,32,18,0,1)'
     const scene = probeModule.createScene({}, {}, context)

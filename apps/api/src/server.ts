@@ -7,8 +7,9 @@ import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 
 import { createFilesystemProjectRepository } from './projects/filesystem-project-repository.ts'
-import { createProjectIntakeService, EXPORT_ID_PATTERN, PROJECT_ID_PATTERN, ProjectIntakeError, type ProjectRepository } from './projects/project-repository.ts'
+import { createProjectIntakeService, CREATIVE_ARTIFACT_ID_PATTERN, EXPORT_ID_PATTERN, PROJECT_ID_PATTERN, ProjectIntakeError, type ProjectRepository } from './projects/project-repository.ts'
 import { createProjectStateService, type ProjectStateService } from './projects/project-state-service.ts'
+import { canonicalCreativeArtifactJsonV1, validateCreativeSceneArtifactV1 } from '@sanverse/render-contract/creative-scene-artifact'
 import { ASSET_SCHEMA_VERSION, NAMEPLATE_COMPONENT_ID } from '@sanverse/edit-domain'
 import { RENDER_PLAN_SCHEMA_VERSION } from '@sanverse/render-contract'
 import { exportIdempotencyKey } from './render/export-identity.ts'
@@ -26,6 +27,7 @@ import type { IntentProviderPort } from './intent/intent-port.ts'
 import { createIntentService, type IntentService } from './intent/intent-service.ts'
 import { buildCaptionsChangeSet } from './transcripts/build-captions.ts'
 import { createFfmpegRenderAdapter } from './render/ffmpeg-render-adapter.ts'
+import { createLocalCreativeSceneFrameMaterializerV1 } from './render/creative-scene-frame-materializer.ts'
 import { createRenderService } from './render/render-service.ts'
 import {
   createMediaOrganizationService,
@@ -42,7 +44,7 @@ import {
 } from './jobs/local-export-job-store.ts'
 import {
   buildPortableProjectArchive,
-  restorePortableProject,
+  restorePortableProjectBundle,
 } from './projects/portable-project.ts'
 import { AnalysisError, parseAnalysisRequest } from './media-analysis/analysis-request.ts'
 import {
@@ -75,7 +77,11 @@ type ServerOptions = {
 const CHANGE_SET_ID_ROUTE_PATTERN = /^changeset_[a-z0-9]{8,64}$/
 const ASSET_ID_PATTERN = /^asset_[a-z0-9]{8,64}$/
 
-const MAX_EXPORT_REQUEST_BYTES = 1024 * 1024
+// Most JSON requests remain tiny; Creative Scene artifacts are explicitly bounded
+// to 2 MiB before storage, and their JSON string envelope can be larger due to
+// escaping. Keep one finite request ceiling rather than introducing an unbounded
+// artifact upload path.
+const MAX_EXPORT_REQUEST_BYTES = 4 * 1024 * 1024
 
 class ApiRequestError extends Error {
   readonly code: 'INVALID_JSON' | 'REQUEST_TOO_LARGE'
@@ -197,7 +203,13 @@ export function createSanverseServer(options: ServerOptions) {
   const mediaProbe = options.mediaProbe ?? createFfprobeMediaProbe()
   const mediaDescriber = options.mediaDescriber ?? createFfprobeMediaDescriber()
   const projectState = options.projectStateService ?? createProjectStateService({ repository, mediaProbe })
-  const renderService = options.renderService ?? (options.fontPath ? createRenderService({ renderer: createFfmpegRenderAdapter({ fontPath: options.fontPath, mediaProbe }) }) : undefined)
+  const renderService = options.renderService ?? (options.fontPath ? createRenderService({
+    renderer: createFfmpegRenderAdapter({
+      fontPath: options.fontPath,
+      mediaProbe,
+      creativeSceneFrameMaterializer: createLocalCreativeSceneFrameMaterializerV1(),
+    }),
+  }) : undefined)
   const generateExportId = options.exportIdGenerator ?? (() => `export_${randomBytes(16).toString('hex')}`)
   const mediaOrganization = createMediaOrganizationService({
     repository,
@@ -313,6 +325,9 @@ export function createSanverseServer(options: ServerOptions) {
         },
       })
     } catch (error) {
+      const code = errorCode(error) ?? 'EXPORT_FAILED'
+      const message = error instanceof Error ? error.message : 'The export job failed.'
+      console.error('Local export job failed.', { jobId, code, message })
       const current = await exportJobs.read(jobId).catch(() => null)
       if (current?.status !== 'cancelled') {
         const answer = describeFailure(error)
@@ -498,6 +513,54 @@ export function createSanverseServer(options: ServerOptions) {
         }
         const command = parseCommand((payload as { command: unknown }).command)
         json(response, 200, { organization: await mediaOrganization.apply(projectId, command) })
+        return
+      }
+
+      /*
+       * Immutable Creative Scene shelf data.
+       *
+       * Storing an artifact changes no project revision and creates no Undo
+       * entry. Only an accepted add-creative-scene operation makes it part of
+       * the finished video. The repository owns path confinement, immutable
+       * content-addressing, and re-hash-on-read tamper detection.
+       */
+      const creativeArtifactsMatch = /^\/api\/projects\/([^/]+)\/creative-artifacts(?:\/([^/]+))?$/.exec(requestUrl.pathname)
+      if (creativeArtifactsMatch && (request.method === 'GET' || request.method === 'POST')) {
+        const projectId = creativeArtifactsMatch[1]
+        const artifactId = creativeArtifactsMatch[2]
+        if (!PROJECT_ID_PATTERN.test(projectId)) { request.resume(); json(response, 404, { error: 'Project was not found.' }); return }
+        await repository.readProject(projectId)
+        if (request.method === 'POST') {
+          if (artifactId !== undefined || !repository.putCreativeArtifact) { request.resume(); json(response, 404, { error: 'Creative artifact storage is unavailable.' }); return }
+          const payload = await readJsonBody(request)
+          const serialized = typeof payload === 'object' && payload !== null ? (payload as { serialized?: unknown }).serialized : undefined
+          if (typeof serialized !== 'string' || serialized.length === 0 || Buffer.byteLength(serialized, 'utf8') > 2 * 1024 * 1024) {
+            throw new ApiRequestError('INVALID_JSON', 'A bounded canonical Creative artifact JSON string is required.')
+          }
+          let artifact: unknown
+          try { artifact = JSON.parse(serialized) } catch { throw new ApiRequestError('INVALID_JSON', 'Creative artifact JSON is invalid.') }
+          const validated = validateCreativeSceneArtifactV1(artifact)
+          if (!validated.ok || validated.value.projectId !== projectId) throw new ApiRequestError('INVALID_JSON', validated.ok ? 'Creative artifact belongs to a different project.' : validated.refusal.message)
+          const canonical = canonicalCreativeArtifactJsonV1(validated.value)
+          if (canonical !== serialized) throw new ApiRequestError('INVALID_JSON', 'Creative artifact bytes must use the canonical Sanverse JSON encoding before immutable storage.')
+          const stored = await repository.putCreativeArtifact(projectId, canonical)
+          json(response, 201, { artifactRef: { artifactId: stored.artifactId, sha256: stored.sha256, byteLength: stored.byteLength }, artifact: validated.value })
+          return
+        }
+        request.resume()
+        if (artifactId === undefined) {
+          if (!repository.listCreativeArtifacts) { json(response, 200, { artifacts: [] }); return }
+          json(response, 200, { artifacts: await repository.listCreativeArtifacts(projectId) })
+          return
+        }
+        if (!CREATIVE_ARTIFACT_ID_PATTERN.test(artifactId) || !repository.readCreativeArtifact) { json(response, 404, { error: 'Creative artifact was not found.' }); return }
+        const stored = await repository.readCreativeArtifact(projectId, artifactId)
+        const parsed = JSON.parse(stored.serialized) as unknown
+        const validated = validateCreativeSceneArtifactV1(parsed)
+        if (!validated.ok || validated.value.projectId !== projectId || canonicalCreativeArtifactJsonV1(validated.value) !== stored.serialized) {
+          throw new ApiRequestError('INVALID_JSON', 'Stored Creative artifact no longer satisfies its canonical schema/project contract.')
+        }
+        json(response, 200, { artifactRef: { artifactId: stored.artifactId, sha256: stored.sha256, byteLength: stored.byteLength }, artifact: validated.value })
         return
       }
 
@@ -701,12 +764,21 @@ export function createSanverseServer(options: ServerOptions) {
         const projectId = portableMatch[1]
         if (!PROJECT_ID_PATTERN.test(projectId)) { request.resume(); json(response, 404, { error: 'Project was not found.' }); return }
         if (request.method === 'GET') {
-          json(response, 200, buildPortableProjectArchive(await projectState.load(projectId)))
+          const project = await projectState.load(projectId)
+          const artifactRecords = repository.listCreativeArtifacts && repository.readCreativeArtifact
+            ? await Promise.all((await repository.listCreativeArtifacts(projectId)).map((record) => repository.readCreativeArtifact!(projectId, record.artifactId)))
+            : []
+          json(response, 200, buildPortableProjectArchive(project, new Date().toISOString(), artifactRecords))
           return
         }
         const archive = await readJsonBody(request)
-        const restored = restorePortableProject(archive, await projectState.load(projectId))
-        json(response, 200, { project: await projectState.restorePortable(projectId, restored) })
+        const restored = restorePortableProjectBundle(archive, await projectState.load(projectId))
+        if (restored.creativeArtifacts.length > 0 && !repository.putCreativeArtifact) throw new ApiRequestError('INVALID_JSON', 'This Sanverse storage adapter cannot restore Creative artifacts.')
+        for (const artifact of restored.creativeArtifacts) {
+          const stored = await repository.putCreativeArtifact!(projectId, artifact.serialized)
+          if (stored.artifactId !== artifact.artifactId || stored.sha256 !== artifact.sha256) throw new ApiRequestError('INVALID_JSON', 'A restored Creative artifact did not preserve its canonical content identity.')
+        }
+        json(response, 200, { project: await projectState.restorePortable(projectId, restored.project) })
         return
       }
 

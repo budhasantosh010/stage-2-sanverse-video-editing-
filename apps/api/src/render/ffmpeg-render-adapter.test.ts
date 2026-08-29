@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { link, mkdir, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 import { ms, probeJson, testOverlayNode, testPlan, testSegmentNode, testSourceFacts } from '../test-fixtures.ts'
@@ -58,6 +58,47 @@ describe('FFmpeg render adapter', () => {
     expect(filter).not.toContain("O'Brien")
     expect(filter).toContain('expansion=none')
     expect(filter).toContain(String.raw`gte(t\,1.000000000)*lt(t\,6.000000000)`)
+  })
+
+  it('feeds canonical Creative PNG frames as finite alpha inputs and places them at their accepted exact interval', () => {
+    const creative = {
+      nodeId: 'creative:one', kind: 'creative-scene' as const,
+      interval: { start: ms(2_000), duration: ms(1_000) }, sceneId: 'creative_scene_12345678',
+      artifactId: `creativeart_${'a'.repeat(64)}`, artifactSha256: 'a'.repeat(64), presentationMode: 'overlay' as const, layer: 3,
+    }
+    const sequence = {
+      nodeId: creative.nodeId,
+      frameDirectory: String.raw`C:\private\creative-one`,
+      framePattern: String.raw`C:\private\creative-one\frame-%06d.png`,
+      frameCount: 30,
+      ticksPerFrame: 48_000,
+      firstFrameSha256: 'b'.repeat(64),
+      lastFrameSha256: 'c'.repeat(64),
+    }
+    const graphInput = {
+      sourcePath: 'source.mp4', outputPath: 'output.mp4', fontPath: 'font.ttf', ...testSourceFacts,
+      plan: testPlan({ overlays: [creative] }), creativeSceneFrames: [sequence],
+    }
+    const args = buildFfmpegArguments(graphInput)
+    const patternIndex = args.indexOf(sequence.framePattern)
+    expect(patternIndex).toBeGreaterThan(0)
+    expect(args.slice(patternIndex - 5, patternIndex + 1)).toEqual(['-framerate', '30/1', '-start_number', '0', '-i', sequence.framePattern])
+    const filter = buildFilterGraph(graphInput)
+    expect(filter).toContain('[1:v]format=rgba,setpts=PTS-STARTPTS+2.000000000/TB[creative0]')
+    expect(filter).toContain("[vcat][creative0]overlay=x=0:y=0:eof_action=pass:shortest=0:enable='gte(t\\,2.000000000)*lt(t\\,3.000000000)'[vc0]")
+    expect(filter).toContain('[vc0]')
+  })
+
+  it('refuses accepted Creative nodes if the canonical frame materialization is absent or identity-mismatched', () => {
+    const creative = {
+      nodeId: 'creative:one', kind: 'creative-scene' as const,
+      interval: { start: ms(2_000), duration: ms(1_000) }, sceneId: 'creative_scene_12345678',
+      artifactId: `creativeart_${'a'.repeat(64)}`, artifactSha256: 'a'.repeat(64), presentationMode: 'overlay' as const, layer: 3,
+    }
+    const base = { sourcePath: 'source.mp4', outputPath: 'output.mp4', fontPath: 'font.ttf', ...testSourceFacts, plan: testPlan({ overlays: [creative] }) }
+    expect(() => buildFfmpegArguments(base)).toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
+    expect(() => buildFfmpegArguments({ ...base, creativeSceneFrames: [{ nodeId:'wrong', frameDirectory:'x', framePattern:'frame-%06d.png', frameCount:30, ticksPerFrame:48_000, firstFrameSha256:'b'.repeat(64), lastFrameSha256:'c'.repeat(64) }] }))
+      .toThrow(expect.objectContaining({ code: 'RENDER_INPUT_INVALID' }))
   })
 
   it('takes every visual number from the shared style contract, scaled to the video', () => {
@@ -235,6 +276,8 @@ describe('FFmpeg render adapter', () => {
     expect(await readFile(outputPath, 'utf8')).toBe('rendered')
     expect(calls).toHaveLength(3)
     expect(calls[1].args.at(-1)).not.toBe(outputPath)
+    expect(dirname(calls[1].cwd)).toBe(dirname(work))
+    expect(calls[1].cwd).not.toContain(basename(work))
     expect(externalizedPrimary).toBe(PRIMARY_TEXT)
   })
 

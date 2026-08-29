@@ -259,3 +259,28 @@ export const createCreativeProductionToolRegistryV16 = (input: Readonly<{
 
   return production
 }
+
+/**
+ * Stable discovery-only view of the legacy V1.6 production tool surface.
+ *
+ * Zero-project external MCP sessions must still advertise the existing tools so
+ * Codex/Claude/OpenCode schemas do not disappear before project selection. The
+ * real executable registry is created only after selection; this catalog owns no
+ * candidate/project state and every attempted invocation fails closed.
+ */
+export const createCreativeProductionToolCatalogV16 = (): SanverseToolRegistryV1 => {
+  const unavailableEngine = new Proxy(Object.freeze({}), {
+    get: () => () => creativeOperationRefusal('PROJECT_REQUIRED', 'Select or import a production project before using this Creative tool.'),
+  })
+  const catalog = createCreativeProductionToolRegistryV16({
+    workflow: Object.freeze({ engine: unavailableEngine }) as unknown as CreativeProductionWorkflowV16,
+    candidate: Object.freeze({}) as CreativeProductionCandidateV16,
+    readProject: () => { throw new Error('PROJECT_REQUIRED') },
+  })
+  return Object.freeze({
+    register: () => creativeOperationRefusal('TOOL_CATALOG_READ_ONLY', 'The discovery catalog is read-only.'),
+    get: catalog.get,
+    list: catalog.list,
+    invoke: async () => creativeOperationRefusal('PROJECT_REQUIRED', 'Select or import a production project before using this Creative tool.'),
+  })
+}

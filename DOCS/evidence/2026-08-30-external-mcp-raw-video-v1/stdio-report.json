@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "sanverse.external-mcp-stdio-audit/v1",
+  "serverVersion": {
+    "name": "sanverse-creative-engine",
+    "version": "1.0.0"
+  },
+  "toolCount": 52,
+  "projectId": "project_7fe8931c35f3cba540b630b54e5c442f",
+  "baselineRevision": 3,
+  "masterUnchanged": true,
+  "stderrClean": true
+}

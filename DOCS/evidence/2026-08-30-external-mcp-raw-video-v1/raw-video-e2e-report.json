@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "sanverse.external-mcp-raw-video-e2e-evidence/v1",
+  "initialProjectCount": 0,
+  "toolCount": 52,
+  "projectId": "project_c8812f59a952628ff26bf5175fb56483",
+  "importedRevision": 0,
+  "acceptedRevision": 1,
+  "opportunityCount": 3,
+  "sceneCount": 3,
+  "componentIds": [
+    "sanverse.lower-third-title",
+    "sanverse.lower-third-title",
+    "sanverse.lower-third-title"
+  ],
+  "componentFamilyCount": 1,
+  "ownerApprovals": {
+    "authority": "test-host",
+    "storyboard": 3,
+    "animatic": 3,
+    "motion": 3
+  },
+  "oneChangeSet": true,
+  "undo": true,
+  "redo": true,
+  "export": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "durationMs": 12000,
+    "videoCodec": "h264",
+    "audioCodec": "aac",
+    "audioSampleRate": 48000,
+    "audioChannels": 2,
+    "hasAudio": true,
+    "sha256": "a6657b0bd18e624d43631ecfc23a2c505b838a955a18082cb444f275b48fe3ee",
+    "downloadedSha256": "a6657b0bd18e624d43631ecfc23a2c505b838a955a18082cb444f275b48fe3ee",
+    "byteLength": 7174167,
+    "projectRevision": 1
+  }
+}

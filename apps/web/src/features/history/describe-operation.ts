@@ -142,6 +142,8 @@ export const describeOperation = (operation: EditOperation): string => {
       return operation.tracks.length > 0
         ? 'Changed how the main footage moves'
         : 'Reframed the main footage'
+    case 'add-creative-scene':
+      return 'Added an approved Creative scene'
     default: {
       const unreachable: never = operation
       void unreachable

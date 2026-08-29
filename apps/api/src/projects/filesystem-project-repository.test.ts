@@ -1,4 +1,4 @@
-import { link, mkdtemp, readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { chmod, link, mkdtemp, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -129,6 +129,39 @@ describe('filesystem project repository', () => {
     const state = JSON.stringify({ schemaVersion: 'sanverse.project/v1', projectId: newerId, history: { accepted: [], redoStack: [], issuedActionIds: [] } })
     await repository.saveProjectState(newerId, state)
     await expect(repository.readProjectState(newerId)).resolves.toBe(state)
+  })
+
+  it('stores Creative artifacts by immutable content hash, deduplicates identical bytes, and detects tampering', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sanverse-repo-'))
+    const repository = createFilesystemProjectRepository(root)
+    const projectId = 'project_1234567890abcdef'
+    const stage = await repository.stageSource({ projectId, body: body(new Uint8Array([1, 2, 3, 4])) })
+    await repository.publishProject(stage, manifest(projectId))
+
+    const serialized = JSON.stringify({ schemaVersion: 'sanverse.creative-scene-artifact/v1', sceneId: 'creative_scene_12345678', value: 1 })
+    const first = await repository.putCreativeArtifact!(projectId, serialized)
+    const second = await repository.putCreativeArtifact!(projectId, serialized)
+    expect(second).toEqual(first)
+    expect(first.artifactId).toBe(`creativeart_${first.sha256}`)
+    expect(await repository.readCreativeArtifact!(projectId, first.artifactId)).toEqual(first)
+    expect(await repository.listCreativeArtifacts!(projectId)).toEqual([{ artifactId: first.artifactId, sha256: first.sha256, byteLength: first.byteLength }])
+
+    const artifactPath = join(root, 'projects', projectId, 'creative-artifacts', `${first.artifactId}.json`)
+    await chmod(artifactPath, 0o600)
+    await writeFile(artifactPath, JSON.stringify({ schemaVersion: 'sanverse.creative-scene-artifact/v1', sceneId: 'creative_scene_12345678', value: 2 }))
+    await expect(repository.readCreativeArtifact!(projectId, first.artifactId)).rejects.toMatchObject({ code: 'CREATIVE_ARTIFACT_HASH_MISMATCH' })
+  })
+
+  it('refuses multiply linked Creative artifact files rather than trusting path names alone', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sanverse-repo-'))
+    const repository = createFilesystemProjectRepository(root)
+    const projectId = 'project_1234567890abcdef'
+    const stage = await repository.stageSource({ projectId, body: body(new Uint8Array([1, 2, 3, 4])) })
+    await repository.publishProject(stage, manifest(projectId))
+    const record = await repository.putCreativeArtifact!(projectId, JSON.stringify({ schemaVersion: 'sanverse.creative-scene-artifact/v1', sceneId: 'creative_scene_12345678' }))
+    const artifactPath = join(root, 'projects', projectId, 'creative-artifacts', `${record.artifactId}.json`)
+    await link(artifactPath, `${artifactPath}.link`)
+    await expect(repository.readCreativeArtifact!(projectId, record.artifactId)).rejects.toMatchObject({ code: 'CREATIVE_ARTIFACT_NOT_FOUND' })
   })
 
   it('streams export bytes from the validated open file when its pathname is replaced', async () => {

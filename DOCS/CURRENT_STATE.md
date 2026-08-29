@@ -1,6 +1,20 @@
 # Current State
 
-Last updated: 2026-08-29
+Last updated: 2026-08-30
+
+## External MCP Raw-Video Creative Orchestration V1 — implementation + automated RC complete
+
+The additive raw-video orchestration layer is technically complete through Batches 1–6 on branch `external-mcp-raw-video-v1`. Standard MCP is now ready with zero projects and exposes **52 discoverable tools**: all **34** previously released external tools remain visible, and **18** raw-video tools add project list/select/import, analysis-only transcript/source understanding, deterministic opportunity planning, generalized multi-scene creation/review, atomic production apply and existing export/status/cancel. Legacy project-specific calls fail closed with `PROJECT_REQUIRED` before selection rather than disappearing from discovery.
+
+A fresh isolated official Streamable HTTP MCP run proved the full bounded chain from **0 projects**: import MP4 → SRT analysis context → Source Understanding → 3 opportunities → 3 isolated Storyboards → exact test-host Storyboard/Animatic/Motion approvals → one three-operation `add-creative-scene` ChangeSet at revision 1 → real production export → one Undo removes all three → one Redo restores all three. Independent FFprobe verifies **H.264 1280×720 @ 30 fps + AAC 48 kHz stereo, exactly 12.000 s, 7,174,167 bytes**. Production and downloaded SHA-256 are both `a6657b0bd18e624d43631ecfc23a2c505b838a955a18082cb444f275b48fe3ee`.
+
+Batch 5 has real pixel evidence rather than inferred parity. Real Edge/CDP compared **3 scenes × 5 critical ticks = 15 samples**: the normal preview surface and exact-tick export surface are byte-identical PNGs at each tick; direct/backward/random seek to the same tick is byte-identical; and the final lossy H.264 composition has minimum SSIM **0.969474** against a required **0.96** floor. Both surfaces instantiate the same `CreativeSceneSurface` / Motion Library module / canonical Motion runtime and immutable artifact; temporary PNG sequences remain reproducible export cache only.
+
+The real export proof found two Windows long-path defects and closed both without changing authority: Edge's disposable CDP profile now uses a short OS-temp directory, and the disposable FFmpeg render workspace uses a short random same-volume sibling under the Sanverse data-root `projects` directory instead of nesting beneath the long project ID. A fresh zero-project E2E after both fixes passed again. Official STDIO also discovers **52 tools**, completes the legacy production-backed sandbox edit/review/discard after selection, and leaves accepted production state byte-identical.
+
+Final repository verification is authoritative in the documented Windows single-fork mode: **2,990 / 2,990 tests PASS across 25 workspaces**, including Web **1,238 / 1,238**, API **411 / 411**, Creative production adapter **30 / 30**, Edit Domain **491 / 491**, Motion MCP **27 / 27**, Motion Library **202 / 202**, and Render Contract **119 / 119**. Root all-workspace production build exits 0. The first parallel run had four 5-second web timeouts with no assertion mismatch; all four passed individually and the complete web/all-workspace single-fork reruns passed without production-code changes. Durable automated evidence: `DOCS/evidence/2026-08-30-external-mcp-raw-video-v1/`.
+
+The implementation/automated RC is complete, but the immutable tag `sanverse-external-mcp-raw-video-v1` is intentionally **withheld**. The contract's separate release gate still requires meaningful spoken source media, the target ten-opportunity/ten-scene representative benchmark, legitimate human Storyboard/timing/Motion review, representative multi-family parity captures and an actual 1× watch of the complete exported video. Test-host approvals and the owner's broad authorization to continue engineering are not recorded as evidence of an unseen human watch.
 
 ## External MCP Interoperability V1 — complete locally
 

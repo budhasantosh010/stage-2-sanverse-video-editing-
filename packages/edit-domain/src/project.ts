@@ -952,6 +952,7 @@ export {
   OPERATION_ID_PATTERN,
   OPERATION_SCHEMA_VERSION,
   isCaptionOperation,
+  isCreativeSceneOperation,
   isFootageMotionOperation,
   isNameplateOperation,
   isNonRenderOperation,
@@ -966,6 +967,16 @@ export {
   validateOperationAgainstComposition,
   type AddNameplateOperation,
 } from './operations.ts'
+export {
+  CREATIVE_ARTIFACT_ID_PATTERN,
+  CREATIVE_ARTIFACT_SHA256_PATTERN,
+  CREATIVE_SCENE_ID_PATTERN,
+  CREATIVE_SCENE_OPERATION_KIND,
+  CREATIVE_SCENE_PRESENTATION_MODES,
+  validateCreativeSceneOperation,
+  type AddCreativeSceneOperation,
+  type CreativeScenePresentationMode,
+} from './creative-scene.ts'
 export {
   DEFAULT_TRACK_OUTPUTS,
   TIMELINE_TRACK_IDS,
@@ -1171,6 +1182,7 @@ export {
   FOOTAGE_MOTION_PRIMITIVE_ID,
   CALLOUT_COMPONENT_ID,
   CALLOUT_PRIMITIVE_ID,
+  CREATIVE_SCENE_PRIMITIVE_ID,
   MEDIA_OVERLAY_COMPONENT_ID,
   MEDIA_OVERLAY_PRIMITIVE_ID,
   MUSIC_COMPONENT_ID,

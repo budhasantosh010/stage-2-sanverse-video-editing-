@@ -10,6 +10,7 @@ import {
   validateRenderPlan,
   type CalloutOverlayNode,
   type CaptionOverlayNode,
+  type CreativeSceneOverlayNode,
   type FootageMotionNode,
   type RenderPlan,
   type TextOverlayNode,
@@ -51,6 +52,11 @@ import {
 
 import { createCommandRunner, type CommandRunner } from '../process/command-runner.ts'
 import { createFfprobeMediaProbe, type MediaProbePort } from '../media/media-probe.ts'
+import {
+  CreativeSceneFrameMaterializerErrorV1,
+  type CreativeSceneFrameMaterializerPortV1,
+  type CreativeSceneFrameSequenceV1,
+} from './creative-scene-frame-materializer.ts'
 import { RenderError, type RenderPort, type RenderRequest, type RenderResult } from './render-port.ts'
 
 const DURATION_TOLERANCE_MS = 100
@@ -65,6 +71,8 @@ type AdapterOptions = {
   readonly ffprobeExecutable?: string
   readonly runCommand?: CommandRunner
   readonly mediaProbe?: MediaProbePort
+  /** Exact approved Motion frames, materialized by the canonical browser/native Motion runtime. */
+  readonly creativeSceneFrameMaterializer?: CreativeSceneFrameMaterializerPortV1
 }
 
 type BuildArgumentsInput = {
@@ -81,6 +89,8 @@ type BuildArgumentsInput = {
    * no B-roll, pictures, or music.
    */
   readonly extraSourcePaths?: Readonly<Record<string, string>>
+  /** Temporary PNG sequences produced from exact approved Creative artifacts for this export only. */
+  readonly creativeSceneFrames?: readonly CreativeSceneFrameSequenceV1[]
 }
 
 /**
@@ -760,6 +770,15 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
   if (!plan.ok) {
     throw renderError('RENDER_INPUT_INVALID', 'The render plan is invalid.')
   }
+  const creativeNodes = plan.value.overlays.filter((node): node is CreativeSceneOverlayNode => node.kind === 'creative-scene')
+  const creativeSequences = input.creativeSceneFrames ?? Object.freeze([])
+  if (creativeNodes.length !== creativeSequences.length) {
+    throw renderError('RENDER_INPUT_INVALID', 'Every accepted Creative Scene must have one exact-tick frame sequence from the canonical Motion renderer.')
+  }
+  const creativeByNodeId = new Map(creativeSequences.map((sequence) => [sequence.nodeId, sequence]))
+  if (creativeByNodeId.size !== creativeSequences.length || creativeNodes.some((node) => !creativeByNodeId.has(node.nodeId))) {
+    throw renderError('RENDER_INPUT_INVALID', 'Creative Scene frame sequence identity does not match the accepted render plan.')
+  }
   if (plan.value.segments.some((segment) =>
     segment.direction === 'reverse' &&
     segmentSourceDurationTicks(segment) > MAX_REVERSE_SOURCE_DURATION_TICKS)) {
@@ -959,7 +978,9 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
       `[vcat]${input.hasAudio ? '[acat]' : ''}`,
   )
 
-  const inputIndex = new Map(planInputs(plan.value).map((source) => [source.assetId, source.index]))
+  const productionInputs = planInputs(plan.value)
+  const inputIndex = new Map(productionInputs.map((source) => [source.assetId, source.index]))
+  const creativeInputIndex = new Map(creativeSequences.map((sequence, index) => [sequence.nodeId, productionInputs.length + index]))
   const totalSeconds = ticksToSeconds(plan.value.durationTicks)
 
   // ── Layer one: B-roll and pictures, composited UNDER everything written ────
@@ -1038,15 +1059,44 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
     videoLabel = next
   })
 
+  // ── Canonical Creative Scenes ──────────────────────────────────────────────
+  // Each input is a finite transparent PNG sequence rendered from the exact
+  // approved Motion artifact by the same browser/native runtime the preview
+  // uses. FFmpeg only places those pixels in time; it owns no Creative timing,
+  // easing, graph, or component logic.
+  const creativeOverlays = creativeNodes
+    .map((node, index) => ({ node, index, sequence: creativeByNodeId.get(node.nodeId)! }))
+    .sort((left, right) => left.node.layer - right.node.layer || left.index - right.index)
+  creativeOverlays.forEach(({ node, index, sequence }, creativeIndex) => {
+    const source = creativeInputIndex.get(node.nodeId)
+    if (source === undefined || sequence.frameCount <= 0 || sequence.ticksPerFrame <= 0) {
+      throw renderError('RENDER_INPUT_INVALID', 'A Creative Scene exact-tick frame sequence is invalid.')
+    }
+    const startSeconds = ticksToSeconds(node.interval.start.ticks)
+    const endSeconds = ticksToSeconds(node.interval.start.ticks + node.interval.duration.ticks)
+    const expectedFrameTicks = (PROJECT_TIMESCALE * input.frameRate.denominator) / input.frameRate.numerator
+    if (!Number.isSafeInteger(expectedFrameTicks) || sequence.ticksPerFrame !== expectedFrameTicks) {
+      throw renderError('RENDER_INPUT_INVALID', 'A Creative Scene frame sequence does not use the exact production frame clock.')
+    }
+    const prepared = `creative${index}`
+    graph.push(`[${source}:v]format=rgba,setpts=PTS-STARTPTS+${startSeconds}/TB[${prepared}]`)
+    const next = `vc${creativeIndex}`
+    graph.push(
+      `[${videoLabel}][${prepared}]overlay=x=0:y=0:eof_action=pass:shortest=0:` +
+        `enable='gte(t\\,${startSeconds})*lt(t\\,${endSeconds})'[${next}]`,
+    )
+    videoLabel = next
+  })
+
   // ── Layer two: everything written on the picture ──────────────────────────
   const written = plan.value.overlays
     .map((node, index) => ({ node, index, visual: visualForNode(plan.value, node.nodeId) }))
-    .filter((entry) => entry.node.kind !== 'media-overlay')
+    .filter((entry) => entry.node.kind !== 'media-overlay' && entry.node.kind !== 'creative-scene')
     .sort((left, right) =>
       (left.visual?.layer ?? 0) - (right.visual?.layer ?? 0) || left.index - right.index,
     )
   written.forEach(({ node, index, visual }, writtenIndex) => {
-    if (node.kind === 'media-overlay') return
+    if (node.kind === 'media-overlay' || node.kind === 'creative-scene') return
     const filters: string[] = []
     if (node.kind === 'caption-overlay') {
       for (const line of node.lines) {
@@ -1244,6 +1294,7 @@ export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
   const paths = input.extraSourcePaths ?? {}
   const rate = `${input.frameRate.numerator}/${input.frameRate.denominator}`
   const extraInputs: string[] = []
+  const creativeInputs: string[] = []
   // Input 0 is the main footage; every other source follows in the plan's own
   // order, which is exactly the order `planInputs` reports to the filter graph.
   for (const source of planInputs(input.plan).slice(1)) {
@@ -1261,6 +1312,12 @@ export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
       extraInputs.push('-i', path)
     }
   }
+  for (const sequence of input.creativeSceneFrames ?? []) {
+    if (!Number.isSafeInteger(sequence.frameCount) || sequence.frameCount <= 0 || !sequence.framePattern.toLowerCase().endsWith('.png')) {
+      throw renderError('RENDER_INPUT_INVALID', 'A Creative Scene frame sequence is invalid.')
+    }
+    creativeInputs.push('-framerate', rate, '-start_number', '0', '-i', sequence.framePattern)
+  }
 
   const hasOutputAudio = planHasAudio(input.plan, input.hasAudio)
 
@@ -1271,6 +1328,7 @@ export function buildFfmpegArguments(input: BuildArgumentsInput): string[] {
     '-n',
     '-i', input.sourcePath,
     ...extraInputs,
+    ...creativeInputs,
     '-filter_complex_script', FILTER_GRAPH_FILENAME,
     '-map', '[vout]',
     ...(hasOutputAudio ? ['-map', '[aout]'] : []),
@@ -1357,6 +1415,7 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
     ffprobeExecutable: options.ffprobeExecutable,
     runCommand,
   })
+  const creativeSceneFrameMaterializer = options.creativeSceneFrameMaterializer
 
   return {
     async render(request): Promise<RenderResult> {
@@ -1437,21 +1496,75 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
         }
       }
 
-      const renderTempDir = resolve(paths.work, `.render-${randomUUID()}`)
+      // Keep the private render directory on the same Sanverse-owned volume as
+      // the project, but do not nest it under the opaque project-id directory.
+      // On Windows, a long data root + project id + render UUID can make the
+      // process working directory exceed CreateProcess path limits. Node then
+      // reports ENOENT, which is indistinguishable from a missing executable at
+      // spawn time even though ffmpeg is installed. A sibling under the
+      // canonical projects directory is shorter, remains app-owned/private, and
+      // preserves same-volume hard-link publication.
+      const renderTempParent = await realpath(dirname(paths.work)).catch(() => {
+        throw renderError('RENDER_PATH_INVALID', 'The private render workspace parent is unavailable.')
+      })
+      if (renderTempParent !== dirname(paths.work)) {
+        throw renderError('RENDER_PATH_INVALID', 'The private render workspace parent is not canonical.')
+      }
+      const renderTempDir = resolve(renderTempParent, `.render-${randomUUID()}`)
       const partialPath = resolve(renderTempDir, 'output.mp4')
       try {
         await mkdir(renderTempDir, { recursive: false, mode: 0o700 })
         const canonicalRenderTempDir = await realpath(renderTempDir)
-        if (canonicalRenderTempDir !== renderTempDir || !isInside(paths.work, canonicalRenderTempDir)) {
+        if (canonicalRenderTempDir !== renderTempDir || !isInside(renderTempParent, canonicalRenderTempDir)) {
           throw renderError('RENDER_PATH_INVALID', 'The private render workspace is not safe.')
         }
         await copyFile(paths.fontPath, resolve(renderTempDir, 'font.ttf'), constants.COPYFILE_EXCL)
+
+        const creativeNodes = plan.value.overlays.filter((node): node is CreativeSceneOverlayNode => node.kind === 'creative-scene')
+        let creativeSceneFrames: readonly CreativeSceneFrameSequenceV1[] = Object.freeze([])
+        if (creativeNodes.length > 0) {
+          if (!creativeSceneFrameMaterializer) throw renderError('RENDER_INPUT_INVALID', 'Creative Scene export is unavailable because the canonical exact-tick Motion frame renderer is not configured.')
+          try {
+            creativeSceneFrames = await creativeSceneFrameMaterializer.materialize({
+              projectId: plan.value.projectId,
+              width: plan.value.width,
+              height: plan.value.height,
+              frameRate,
+              scenes: creativeNodes,
+              outputRoot: renderTempDir,
+              signal: request.signal,
+            })
+          } catch (error) {
+            if (error instanceof CreativeSceneFrameMaterializerErrorV1) {
+              if (error.code === 'CREATIVE_RENDERER_CANCELLED') throw renderError('RENDER_CANCELLED', error.message)
+              if (error.code === 'CREATIVE_RENDERER_UNAVAILABLE') throw renderError('RENDER_TOOL_UNAVAILABLE', error.message)
+              if (error.code === 'CREATIVE_RENDERER_INVALID') throw renderError('RENDER_INPUT_INVALID', error.message)
+              throw renderError('RENDER_FAILED', error.message)
+            }
+            throw error
+          }
+          if (creativeSceneFrames.length !== creativeNodes.length || new Set(creativeSceneFrames.map((sequence) => sequence.nodeId)).size !== creativeSceneFrames.length) {
+            throw renderError('RENDER_INPUT_INVALID', 'The canonical Creative renderer returned an incomplete frame set.')
+          }
+          for (const sequence of creativeSceneFrames) {
+            const directory = await realpath(sequence.frameDirectory).catch(() => '')
+            if (!directory || !isInside(canonicalRenderTempDir, directory) || !isInside(directory, sequence.framePattern)) throw renderError('RENDER_PATH_INVALID', 'A Creative frame sequence escaped the private render workspace.')
+            const firstFrame = resolve(sequence.frameDirectory, 'frame-000000.png')
+            const lastFrame = resolve(sequence.frameDirectory, `frame-${String(sequence.frameCount - 1).padStart(6, '0')}.png`)
+            for (const framePath of [firstFrame, lastFrame]) {
+              const actual = await realpath(framePath).catch(() => '')
+              const info = actual ? await lstat(actual).catch(() => null) : null
+              if (!actual || actual !== framePath || !info?.isFile() || info.size <= 0 || info.nlink !== 1) throw renderError('RENDER_PATH_INVALID', 'A Creative frame sequence contains an unsafe or missing frame.')
+            }
+          }
+        }
+
         // Text is handed to FFmpeg in files rather than on the command line, so
         // nothing a user typed can be read as filter syntax.
         const write = (name: string, contents: string) =>
           writeFile(resolve(renderTempDir, name), contents, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
         await Promise.all(plan.value.overlays.flatMap((node, index) => {
-          if (node.kind === 'media-overlay') return []
+          if (node.kind === 'media-overlay' || node.kind === 'creative-scene') return []
           if (node.kind === 'caption-overlay') {
             return node.lines.map((line, lineIndex) => write(`caption-${index}-${lineIndex}.txt`, line))
           }
@@ -1476,6 +1589,7 @@ export function createFfmpegRenderAdapter(options: AdapterOptions): RenderPort {
           frameRate,
           hasAudio: sourceProbe.hasAudio,
           extraSourcePaths: extraPaths,
+          creativeSceneFrames,
         }
         await write(FILTER_GRAPH_FILENAME, buildFilterGraph(buildInput))
         const command = buildFfmpegArguments(buildInput)

@@ -9,7 +9,7 @@ import {
   resolveProductionProjectId,
 } from './sanverse-mcp-shared.ts'
 
-const evidencePath = resolve(SANVERSE_ROOT, 'DOCS/evidence/2026-08-29-external-mcp-interop-v1/stdio-report.json')
+const evidencePath = resolve(SANVERSE_ROOT, 'DOCS/evidence/2026-08-30-external-mcp-raw-video-v1/stdio-report.json')
 
 const structured = (result: Awaited<ReturnType<Client['callTool']>>): Record<string, unknown> => {
   if ('structuredContent' in result && result.structuredContent && typeof result.structuredContent === 'object') return result.structuredContent as Record<string, unknown>
@@ -40,7 +40,10 @@ const main = async () => {
   await client.connect(transport)
   try {
     const listed = await client.listTools()
-    if (listed.tools.length !== 34) throw new Error(`Expected 34 tools over STDIO; found ${listed.tools.length}.`)
+    if (listed.tools.length !== 52) throw new Error(`Expected stable 52-tool raw-video + legacy surface over STDIO; found ${listed.tools.length}.`)
+    valueOf(await client.callTool({ name: 'production.select_project', arguments: { projectId } }), 'select project')
+    const selectedList = await client.listTools()
+    if (selectedList.tools.length !== 52) throw new Error(`Selecting a project changed STDIO tool discovery from 52 to ${selectedList.tools.length}.`)
     const initial = valueOf(await client.callTool({ name: 'production.get_creative_context', arguments: {} }), 'initial context')
     const revision = Number(initial.productionRevision)
     const created = valueOf(await client.callTool({

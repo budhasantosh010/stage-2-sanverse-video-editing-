@@ -51,6 +51,11 @@ import {
   validateSetTimelineGroupsOperation,
   type SetTimelineGroupsOperation,
 } from './timeline-groups.ts'
+import {
+  CREATIVE_SCENE_OPERATION_KIND,
+  validateCreativeSceneOperation,
+  type AddCreativeSceneOperation,
+} from './creative-scene.ts'
 import { findAsset, type MediaAsset } from './assets.ts'
 import {
   ZERO_TIME,
@@ -118,10 +123,12 @@ export type EditOperation =
   | SetTrackOutputOperation
   | SetTimelineMarkersOperation
   | SetTimelineGroupsOperation
+  | AddCreativeSceneOperation
 
 /** Every operation kind this build can execute. Unknown kinds are rejected. */
 export const EXECUTABLE_OPERATION_KINDS: readonly string[] = Object.freeze([
   'add-nameplate',
+  CREATIVE_SCENE_OPERATION_KIND,
   ...TIMELINE_OPERATION_KINDS,
   ...CAPTION_OPERATION_KINDS,
   ...OVERLAY_OPERATION_KINDS,
@@ -190,13 +197,17 @@ export const isFootageMotionOperation = (
  * belongs to the finished video rather than to a filmed moment — see the note
  * at the top of `overlay-operations.ts`.
  */
+export const isCreativeSceneOperation = (operation: EditOperation): operation is AddCreativeSceneOperation =>
+  operation.kind === CREATIVE_SCENE_OPERATION_KIND
+
 export const isSourceAnchoredOperation = (
   operation: EditOperation,
-): operation is AddNameplateOperation | Exclude<OverlayOperation, { kind: 'add-music' }> | SetFootageMotionOperation =>
+): operation is AddNameplateOperation | Exclude<OverlayOperation, { kind: 'add-music' }> | SetFootageMotionOperation | AddCreativeSceneOperation =>
   operation.kind === 'add-nameplate' ||
   operation.kind === 'add-title' ||
   operation.kind === 'add-callout' ||
   operation.kind === 'add-media-overlay' ||
+  operation.kind === CREATIVE_SCENE_OPERATION_KIND ||
   operation.kind === FOOTAGE_MOTION_OPERATION_KIND
 
 /** True for the operations that describe captions. */
@@ -339,6 +350,20 @@ export const validateOperation = (input: unknown, path = '$'): Result<EditOperat
   // because skipping it exports a video the user never approved.
   if (typeof input.kind !== 'string' || !EXECUTABLE_OPERATION_KINDS.includes(input.kind)) {
     return err({ code: 'OPERATION_INVALID', issues: [{ path: `${path}.kind`, code: 'OPERATION_KIND_UNKNOWN' }] })
+  }
+
+  if (input.kind === CREATIVE_SCENE_OPERATION_KIND) {
+    const creative = validateCreativeSceneOperation(input, path)
+    if (!creative.ok) {
+      return err({
+        code: 'OPERATION_INVALID',
+        issues: creative.error.issues.map((issue) => ({ path: issue.path, code: issue.code as OperationIssueCode })),
+      })
+    }
+    if (!capabilityProduces(creative.value.capabilityId, CREATIVE_SCENE_OPERATION_KIND)) {
+      return err({ code: 'OPERATION_INVALID', issues: [{ path: `${path}.capabilityId`, code: 'CAPABILITY_UNKNOWN' }] })
+    }
+    return ok(creative.value)
   }
 
   if (isCaptionOperationKind(input.kind)) {
@@ -519,6 +544,17 @@ export const validateOperationAgainstComposition = (
     if (placeSourceSpan(composition, operation.assetId, operation.sourceInterval).length === 0) {
       return fail('sourceInterval', 'SOURCE_SPAN_REMOVED')
     }
+    return ok(operation)
+  }
+
+  if (isCreativeSceneOperation(operation)) {
+    const asset = findAsset(assets, operation.assetId)
+    if (!asset) return fail('assetId', 'OVERLAY_ASSET_UNKNOWN')
+    if (asset.mediaKind !== 'video') return fail('assetId', 'OVERLAY_ASSET_WRONG_KIND')
+    if (!rangeWithin(operation.sourceInterval, { start: ZERO_TIME, duration: asset.duration })) return fail('sourceInterval', 'OVERLAY_SPAN_OUTSIDE_ASSET')
+    const usesAsset = composition.tracks.some((track) => track.clips.some((clip) => clip.assetId === operation.assetId))
+    if (!usesAsset) return fail('assetId', 'ASSET_NOT_IN_COMPOSITION')
+    if (placeSourceSpan(composition, operation.assetId, operation.sourceInterval).length === 0) return fail('sourceInterval', 'SOURCE_SPAN_REMOVED')
     return ok(operation)
   }
 

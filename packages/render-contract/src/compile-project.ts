@@ -8,6 +8,7 @@ import {
   effectiveComposition,
   effectiveFootageMotions,
   findAsset,
+  isCreativeSceneOperation,
   isNameplateOperation,
   mediaTime,
   placeSourceSpan,
@@ -235,6 +236,19 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
         primaryText: operation.primaryText,
         secondaryText: operation.secondaryText,
         styleId: NAMEPLATE_STYLE_ID,
+      }))
+      continue
+    }
+    if (isCreativeSceneOperation(operation)) {
+      placeAnchored(operation.assetId, operation.sourceInterval, (suffix, interval) => Object.freeze({
+        nodeId: `${operation.sceneId}${suffix}`,
+        kind: 'creative-scene' as const,
+        interval,
+        sceneId: operation.sceneId,
+        artifactId: operation.artifactId,
+        artifactSha256: operation.artifactSha256,
+        presentationMode: operation.presentationMode,
+        layer: operation.layer,
       }))
     }
   }

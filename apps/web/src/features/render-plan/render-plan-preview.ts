@@ -9,6 +9,7 @@ import { compileProjectToRenderPlan } from '@sanverse/render-contract/compile-pr
 import type {
   CalloutOverlayNode,
   CaptionOverlayNode,
+  CreativeSceneOverlayNode,
   MediaOverlayNode,
   RenderNode,
   RenderPlan,
@@ -123,6 +124,11 @@ export const visibleMediaOverlays = (plan: RenderPlan, ticks: number): readonly 
   plan.overlays.filter(
     (node): node is MediaOverlayNode => node.kind === 'media-overlay' && isNodeVisible(node, ticks),
   )
+
+export const visibleCreativeScenes = (plan: RenderPlan, ticks: number): readonly CreativeSceneOverlayNode[] =>
+  plan.overlays.filter(
+    (node): node is CreativeSceneOverlayNode => node.kind === 'creative-scene' && isNodeVisible(node, ticks),
+  ).sort((a, b) => a.layer - b.layer || a.nodeId.localeCompare(b.nodeId))
 
 /** Picture opacity for one explicit dip-to-black transition at an exact tick. */
 export const segmentVideoOpacityAt = (

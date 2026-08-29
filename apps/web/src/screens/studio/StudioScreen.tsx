@@ -121,6 +121,7 @@ import {
   segmentVideoOpacityAt,
   visibleCallouts,
   visibleCaptions,
+  visibleCreativeScenes,
   visibleMediaOverlays,
   visibleTitles,
   titleCssVariables,
@@ -170,6 +171,7 @@ import {
 import { NameplateComposer } from '../../features/nameplate/NameplateComposer'
 import { NameplateOverlay } from '../../features/nameplate/NameplateOverlay'
 import { CaptionOverlay } from '../../features/captions/CaptionOverlay'
+import { CreativeSceneOverlay } from '../../features/creative-scene/CreativeSceneSurface'
 import { AddOverlayPanel } from '../../features/overlays/AddOverlayPanel'
 import { OverlayRepairPanel } from '../../features/overlays/OverlayRepairPanel'
 import { CalloutOverlay, MediaOverlay, TitleOverlay } from '../../features/overlays/OverlayLayers'
@@ -1269,6 +1271,7 @@ export function StudioScreen({
   const previewTitles = previewPlan ? visibleTitles(previewPlan, playheadPreviewTicks) : []
   const previewCallouts = previewPlan ? visibleCallouts(previewPlan, playheadPreviewTicks) : []
   const previewMedia = previewPlan ? visibleMediaOverlays(previewPlan, playheadPreviewTicks) : []
+  const previewCreativeScenes = previewPlan ? visibleCreativeScenes(previewPlan, playheadPreviewTicks) : []
   const assetKinds = new Map(editProject.assets.map((asset) => [asset.assetId, asset.mediaKind]))
 
   /**
@@ -3332,6 +3335,15 @@ export function StudioScreen({
                       compositionHeight={composition.height}
                       scale={previewScale}
                       visualStyle={motionStyle(node)}
+                    />
+                  ))}
+                  {previewCreativeScenes.map((node) => (
+                    <CreativeSceneOverlay
+                      key={node.nodeId}
+                      projectId={editProject.projectId}
+                      node={node}
+                      compositionTicks={playheadPreviewTicks}
+                      scale={previewScale}
                     />
                   ))}
                   {previewCallouts.map((node) => (

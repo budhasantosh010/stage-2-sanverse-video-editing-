@@ -1,7 +1,7 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, PropsWithChildren, ReactNode } from 'react'
 import type { MotionComponentModuleV1, MotionCompositionV1, MotionRenderContextV1 } from '@sanverse/motion-contract'
-import type { MotionGraphBackedComponentModuleV1, MotionGraphOperationV1, MotionGraphPatchV1, ResolvedMotionNodeV1, ResolvedMotionSceneV1 } from '@sanverse/motion-graph'
+import type { MotionGraphBackedComponentModuleV1, MotionGraphOperationV1, MotionGraphPatchV1, MotionSceneV1, ResolvedMotionNodeV1, ResolvedMotionSceneV1 } from '@sanverse/motion-graph'
 import { applyMotionGraphPatches, applyMotionOperations, evaluateScene } from '@sanverse/motion-graph'
 
 export interface MotionCompositionFrameProps extends PropsWithChildren {
@@ -36,15 +36,19 @@ export interface MotionComponentHostProps<Props, Style> {
   readonly context: MotionRenderContextV1
   readonly graphPatches?: readonly MotionGraphPatchV1[]
   readonly graphOperations?: readonly MotionGraphOperationV1[]
+  /** Exact already-approved canonical Motion Scene. When present this is the graph authority; the component module only supplies the renderer. */
+  readonly sceneOverride?: MotionSceneV1
   readonly selectedGraphNodeId?: string | null
   readonly selectedGraphNodeIds?: readonly string[]
 }
 
-export function MotionComponentHost<Props, Style>({ module, props, style, context, graphPatches = [], graphOperations = [], selectedGraphNodeId = null, selectedGraphNodeIds = selectedGraphNodeId ? [selectedGraphNodeId] : [] }: MotionComponentHostProps<Props, Style>) {
+export function MotionComponentHost<Props, Style>({ module, props, style, context, graphPatches = [], graphOperations = [], sceneOverride, selectedGraphNodeId = null, selectedGraphNodeIds = selectedGraphNodeId ? [selectedGraphNodeId] : [] }: MotionComponentHostProps<Props, Style>) {
   const Component = module.Component
   const resolvedScene = isGraphBackedModule(module)
     ? (() => {
-        const patchedScene = applyMotionGraphPatches(module.createScene(props, style, context), graphPatches)
+        const sourceScene = sceneOverride ?? module.createScene(props, style, context)
+        if (sourceScene.componentId !== module.definition.id || sourceScene.componentVersion !== module.definition.version) throw new RangeError('Motion scene override does not match the selected component module/version.')
+        const patchedScene = applyMotionGraphPatches(sourceScene, graphPatches)
         const operated = applyMotionOperations(patchedScene, graphOperations, { durationTicks: context.durationTicks })
         if (!operated.ok) throw new RangeError(`Motion operation ${operated.error.operationId} failed in component host: ${operated.error.message}`)
         return evaluateScene(operated.scene, context)

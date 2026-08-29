@@ -1,10 +1,12 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { chmod, lstat, mkdir, open, readFile, readdir, realpath, rename, rm, stat } from 'node:fs/promises'
+import { chmod, link, lstat, mkdir, open, readFile, readdir, realpath, rename, rm, stat } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 
 import {
+  CREATIVE_ARTIFACT_ID_PATTERN,
   EXPORT_ID_PATTERN,
   PROJECT_ID_PATTERN,
+  type CreativeArtifactRecord,
   type MediaRange,
   type OpenMediaResult,
   type ProjectManifest,
@@ -12,7 +14,7 @@ import {
   type StagedSource,
 } from './project-repository.ts'
 
-type RepositoryErrorCode = 'INVALID_PROJECT_ID' | 'INVALID_EXPORT_ID' | 'PROJECT_COLLISION' | 'PROJECT_NOT_FOUND' | 'EXPORT_NOT_FOUND' | 'INVALID_RANGE'
+type RepositoryErrorCode = 'INVALID_PROJECT_ID' | 'INVALID_EXPORT_ID' | 'PROJECT_COLLISION' | 'PROJECT_NOT_FOUND' | 'EXPORT_NOT_FOUND' | 'CREATIVE_ARTIFACT_NOT_FOUND' | 'CREATIVE_ARTIFACT_HASH_MISMATCH' | 'INVALID_RANGE'
 
 class RepositoryError extends Error {
   readonly code: RepositoryErrorCode
@@ -233,6 +235,49 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
     }
   }
 
+  const MAX_CREATIVE_ARTIFACT_BYTES = 2 * 1024 * 1024
+
+  async function creativeArtifactRoot(projectId: string): Promise<string> {
+    const { sourcePath } = await resolvePublishedMedia(projectId)
+    const artifactsDir = join(dirname(sourcePath), 'creative-artifacts')
+    await mkdir(artifactsDir, { recursive: true })
+    const actual = await realpath(artifactsDir)
+    if (resolve(actual) !== resolve(artifactsDir)) throw new RepositoryError('CREATIVE_ARTIFACT_NOT_FOUND', 'The Creative artifact storage path is not safe.')
+    return artifactsDir
+  }
+
+  async function readCreativeArtifactRecord(projectId: string, artifactId: string): Promise<CreativeArtifactRecord> {
+    if (!CREATIVE_ARTIFACT_ID_PATTERN.test(artifactId)) throw new RepositoryError('CREATIVE_ARTIFACT_NOT_FOUND', 'Creative artifact ID is invalid.')
+    const artifactsDir = await creativeArtifactRoot(projectId)
+    const path = join(artifactsDir, `${artifactId}.json`)
+    let handle
+    try {
+      const before = await lstat(path, { bigint: true })
+      const actualBefore = await realpath(path)
+      if (!before.isFile() || before.size <= 0n || before.size > BigInt(MAX_CREATIVE_ARTIFACT_BYTES) || before.nlink !== 1n || resolve(actualBefore) !== resolve(path)) {
+        throw new RepositoryError('CREATIVE_ARTIFACT_NOT_FOUND', 'Creative artifact is unavailable.')
+      }
+      handle = await open(path, 'r')
+      const opened = await handle.stat({ bigint: true })
+      const after = await lstat(path, { bigint: true })
+      const actualAfter = await realpath(path)
+      if (!opened.isFile() || opened.nlink !== 1n || before.dev !== opened.dev || before.ino !== opened.ino || opened.dev !== after.dev || opened.ino !== after.ino || resolve(actualAfter) !== resolve(path)) {
+        throw new RepositoryError('CREATIVE_ARTIFACT_NOT_FOUND', 'Creative artifact is unavailable.')
+      }
+      const serialized = await handle.readFile('utf8')
+      try { JSON.parse(serialized) } catch { throw new RepositoryError('CREATIVE_ARTIFACT_HASH_MISMATCH', 'Creative artifact JSON is corrupt.') }
+      const sha256 = createHash('sha256').update(serialized).digest('hex')
+      if (artifactId !== `creativeart_${sha256}`) throw new RepositoryError('CREATIVE_ARTIFACT_HASH_MISMATCH', 'Creative artifact content no longer matches its immutable identity.')
+      return Object.freeze({ artifactId, sha256, byteLength: Buffer.byteLength(serialized, 'utf8'), serialized })
+    } catch (error) {
+      if (error instanceof RepositoryError) throw error
+      if (isCode(error, 'ENOENT', 'ENOTDIR')) throw new RepositoryError('CREATIVE_ARTIFACT_NOT_FOUND', 'Creative artifact was not found.')
+      throw error
+    } finally {
+      await handle?.close().catch(() => undefined)
+    }
+  }
+
   async function resolvePublishedExport(projectId: string, exportId: string): Promise<{ path: string; size: number }> {
     assertExportId(exportId)
     const { exportsDir } = await exportRoot(projectId)
@@ -419,6 +464,60 @@ export function createFilesystemProjectRepository(dataRoot: string): ProjectRepo
     async readProjectState(projectId: string): Promise<string | null> {
       assertProjectId(projectId)
       return readControlledProjectFile(projectId, 'edit-project.json')
+    },
+
+    async putCreativeArtifact(projectId: string, serialized: string): Promise<CreativeArtifactRecord> {
+      assertProjectId(projectId)
+      if (typeof serialized !== 'string' || serialized.length === 0 || Buffer.byteLength(serialized, 'utf8') > MAX_CREATIVE_ARTIFACT_BYTES) throw new Error('Creative artifact must be bounded non-empty JSON text.')
+      try { JSON.parse(serialized) } catch { throw new Error('Creative artifact must be valid JSON text.') }
+      const sha256 = createHash('sha256').update(serialized).digest('hex')
+      const artifactId = `creativeart_${sha256}`
+      const artifactsDir = await creativeArtifactRoot(projectId)
+      const finalPath = join(artifactsDir, `${artifactId}.json`)
+      try {
+        return await readCreativeArtifactRecord(projectId, artifactId)
+      } catch (error) {
+        if (!(error instanceof RepositoryError) || error.code !== 'CREATIVE_ARTIFACT_NOT_FOUND') throw error
+      }
+      const temporaryPath = join(artifactsDir, `.creative-${randomBytes(12).toString('hex')}.tmp`)
+      let handle
+      try {
+        handle = await open(temporaryPath, 'wx', 0o400)
+        await handle.writeFile(serialized, 'utf8')
+        await handle.sync()
+        await handle.close()
+        handle = undefined
+        await chmod(temporaryPath, 0o444)
+        try {
+          await link(temporaryPath, finalPath)
+        } catch (error) {
+          if (!isCode(error, 'EEXIST')) throw error
+        }
+        await rm(temporaryPath, { force: true })
+        await syncDirectory(artifactsDir)
+        const record = await readCreativeArtifactRecord(projectId, artifactId)
+        if (record.sha256 !== sha256 || record.serialized !== serialized) throw new RepositoryError('CREATIVE_ARTIFACT_HASH_MISMATCH', 'Creative artifact hash collision or content mismatch was detected.')
+        return record
+      } catch (error) {
+        await handle?.close().catch(() => undefined)
+        await rm(temporaryPath, { force: true }).catch(() => undefined)
+        throw error
+      }
+    },
+
+    async readCreativeArtifact(projectId: string, artifactId: string): Promise<CreativeArtifactRecord> {
+      assertProjectId(projectId)
+      return readCreativeArtifactRecord(projectId, artifactId)
+    },
+
+    async listCreativeArtifacts(projectId: string) {
+      assertProjectId(projectId)
+      const artifactsDir = await creativeArtifactRoot(projectId)
+      const entries = await readdir(artifactsDir, { withFileTypes: true })
+      const records = await Promise.all(entries
+        .filter((entry) => entry.isFile() && /^creativeart_[a-f0-9]{64}\.json$/u.test(entry.name))
+        .map((entry) => readCreativeArtifactRecord(projectId, entry.name.slice(0, -5))))
+      return Object.freeze(records.map(({ serialized: _serialized, ...record }) => Object.freeze(record)).sort((a, b) => a.artifactId.localeCompare(b.artifactId)))
     },
 
     /**

@@ -189,6 +189,18 @@ export type MediaOverlayNode = Readonly<{
   useOverlayAudio: boolean
 }>
 
+/** One immutable owner-approved canonical Motion Scene placed over source footage. */
+export type CreativeSceneOverlayNode = Readonly<{
+  nodeId: string
+  kind: 'creative-scene'
+  interval: TimeRange
+  sceneId: string
+  artifactId: string
+  artifactSha256: string
+  presentationMode: 'overlay' | 'split' | 'picture-in-picture' | 'full-screen-motion' | 'tracked-attached' | 'surface-embedded' | 'subject-environment' | 'bridge-takeover'
+  layer: number
+}>
+
 /**
  * Music under the finished video.
  *
@@ -216,6 +228,7 @@ export type RenderNode =
   | TitleOverlayNode
   | CalloutOverlayNode
   | MediaOverlayNode
+  | CreativeSceneOverlayNode
 
 /** One file a renderer must open to produce this video. */
 export type RenderSource = Readonly<{
@@ -716,7 +729,7 @@ export const validateRenderPlan = (
       }
       // An unrecognised node changes what the viewer sees, so it is refused,
       // never skipped.
-      const KINDS = ['text-overlay', 'caption-overlay', 'title-overlay', 'callout-overlay', 'media-overlay']
+      const KINDS = ['text-overlay', 'caption-overlay', 'title-overlay', 'callout-overlay', 'media-overlay', 'creative-scene']
       if (typeof node.kind !== 'string' || !KINDS.includes(node.kind)) {
         issues.push({ path: `${path}.kind`, code: 'NODE_KIND_UNKNOWN' })
         return
@@ -724,8 +737,9 @@ export const validateRenderPlan = (
       if (typeof node.nodeId !== 'string' || node.nodeId.length === 0) {
         issues.push({ path: `${path}.nodeId`, code: 'VALUE_OUT_OF_RANGE' })
       }
-      // A media overlay is a file, not a look, so it carries no style id.
-      if (node.kind !== 'media-overlay' && (typeof node.styleId !== 'string' || node.styleId.length === 0)) {
+      // Media and canonical Creative Scene nodes carry their own render authority,
+      // so neither uses the legacy overlay styleId field.
+      if (node.kind !== 'media-overlay' && node.kind !== 'creative-scene' && (typeof node.styleId !== 'string' || node.styleId.length === 0)) {
         issues.push({ path: `${path}.styleId`, code: 'VALUE_OUT_OF_RANGE' })
       }
       if (node.kind === 'title-overlay') {
@@ -760,6 +774,13 @@ export const validateRenderPlan = (
         if (typeof node.useOverlayAudio !== 'boolean') {
           issues.push({ path: `${path}.useOverlayAudio`, code: 'TYPE_INVALID' })
         }
+      }
+      if (node.kind === 'creative-scene') {
+        if (typeof node.sceneId !== 'string' || !/^creative_scene_[a-z0-9]{8,64}$/u.test(node.sceneId)) issues.push({ path: `${path}.sceneId`, code: 'VALUE_OUT_OF_RANGE' })
+        if (typeof node.artifactId !== 'string' || !/^creativeart_[a-f0-9]{32,64}$/u.test(node.artifactId)) issues.push({ path: `${path}.artifactId`, code: 'VALUE_OUT_OF_RANGE' })
+        if (typeof node.artifactSha256 !== 'string' || !/^[a-f0-9]{64}$/u.test(node.artifactSha256)) issues.push({ path: `${path}.artifactSha256`, code: 'VALUE_OUT_OF_RANGE' })
+        if (!['overlay','split','picture-in-picture','full-screen-motion','tracked-attached','surface-embedded','subject-environment','bridge-takeover'].includes(String(node.presentationMode))) issues.push({ path: `${path}.presentationMode`, code: 'VALUE_OUT_OF_RANGE' })
+        if (!Number.isSafeInteger(node.layer) || Number(node.layer) < 0 || Number(node.layer) > 100) issues.push({ path: `${path}.layer`, code: 'VALUE_OUT_OF_RANGE' })
       }
       if (node.kind === 'caption-overlay') {
         if (
