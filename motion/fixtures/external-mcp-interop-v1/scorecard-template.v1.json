@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "sanverse.external-mcp-benchmark-scorecard/v1",
+  "benchmarkRun": false,
+  "client": {
+    "name": "",
+    "version": "",
+    "model": "",
+    "provider": ""
+  },
+  "project": {
+    "fixtureId": "",
+    "baselineRevision": null,
+    "acceptedProjectUnchanged": null
+  },
+  "results": {
+    "installed": null,
+    "configured": null,
+    "transportConnected": null,
+    "toolsDiscovered": null,
+    "readContext": null,
+    "sandboxCreated": null,
+    "sandboxWriteCorrect": null,
+    "reviewCorrect": null,
+    "sandboxDiscarded": null,
+    "concurrentIsolation": null,
+    "staleRevisionRefused": null,
+    "ownerApprovalForgeryRefused": null,
+    "reconnectClean": null
+  },
+  "metrics": {
+    "toolCalls": null,
+    "successfulToolCalls": null,
+    "refusalsExpected": null,
+    "refusalsUnexpected": null,
+    "elapsedMs": null
+  },
+  "evidence": {
+    "eventLogRef": "",
+    "reviewRefs": [],
+    "notes": []
+  }
+}

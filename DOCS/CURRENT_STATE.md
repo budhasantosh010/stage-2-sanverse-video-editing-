@@ -1,6 +1,14 @@
 # Current State
 
-Last updated: 2026-08-28
+Last updated: 2026-08-29
+
+## External MCP Interoperability V1 — complete locally
+
+Sanverse now exposes the existing production-backed Creative Engine through a standards-compatible external MCP layer without creating another project, Motion Graph, approval, renderer or Undo authority. The official MCP SDK provides normal `initialize → initialized → tools/list → tools/call` behavior over both loopback Streamable HTTP and STDIO. The external production registry exposes **34 tools**; candidate writes remain sandbox-only by default, production revision-fenced and session-isolated, while owner approval stays host-only.
+
+Codex `0.144.1`, Claude Code `2.1.168` and OpenCode `1.18.8` can be configured reversibly through `npm run sanverse:mcp:setup -- --apply`, which backs up their configs and changes only the MCP entry named `sanverse`; unrelated MCPs and model/provider settings are preserved. `npm run sanverse:mcp:verify` checks installation/configuration plus MCP endpoint readiness and deliberately performs **no model/provider call**. Normal usage inside those clients is owner validation, not a release gate.
+
+Deterministic protocol/safety evidence includes Motion MCP **22/22**, Creative production adapter **14/14**, official HTTP and STDIO handshakes, Host/Origin/bearer protection, owner-approval forgery refusal, stale-revision and cross-session refusal, terminated/abandoned-session cleanup, and sandbox discard with accepted production state unchanged. The long-run audit completed **50 HTTP sessions / 300 MCP calls / 50 reviews** with final `activeSessions = 0`; the STDIO audit discovered all **34 tools** and completed one production-backed sandbox edit/review/discard cycle with unchanged accepted state. The authoritative repository matrix is **2,956/2,956 PASS across 25 workspaces** and the root all-workspace build passes. Final local release tag: `sanverse-external-mcp-interop-v1`. Durable status: `DOCS/motion/external-mcp-interop-v1/STATUS.md`.
 
 ## Creative Engine V1.6 — production editor integration complete locally
 

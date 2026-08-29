@@ -928,3 +928,11 @@ The visual loop found and fixed real issues before registration: full-screen-vs-
 Registration then moved the public catalog **89 → 99**. The Creative Library now has a first-class `Owner Approved CH1` collection with ten fresh posters and ten `A · PASSED` cards. Real Edge completed canonical 1× playback for all ten new entries. The durable review store is 99/99.
 
 Fresh scoped Creative/Motion/B1/Ingest tests are **473/473**, the root all-workspace build passes, `apps/web` remains unchanged, no source/reference media was copied, no external animation runtime was added, and A22/B2/B3/C6 remain unstarted. GitHub is not used; release history remains local.
+
+## 2026-08-29 — External MCP Interoperability V1
+
+Built the standards-compatible external MCP layer on top of the exact V1.6 production release without creating a second project/tool/approval/Undo authority. The existing internal registry is exposed through the official MCP SDK using both loopback Streamable HTTP and STDIO. The production-facing external registry has **34 tools**; writes are sandbox-only by default, revision-fenced and per-session isolated, and owner approval cannot be supplied by client JSON.
+
+Added reversible setup for installed Codex, Claude Code and OpenCode. Setup backs up client configuration and changes only the MCP entry named `sanverse`; model/provider settings are untouched. The owner clarified that actually running AI models inside those clients is not part of this implementation milestone, so the verifier was simplified to installation/configuration/endpoint readiness and performs **zero model/provider calls**.
+
+Protocol/safety proof is deterministic: Motion MCP **22/22**, Creative production adapter **14/14**, 50 fresh HTTP sessions with **300 calls / 50 reviews** and zero leaked sessions, plus a real SDK STDIO handshake discovering all **34 tools** and completing one sandbox edit/review/discard with accepted state unchanged. The full repository matrix is **2,956/2,956 PASS across 25 workspaces** and root all-workspace build passes. No `sites/**` change, raw-media addition, committed bearer/API-key-like literal or GitHub remote operation is part of the release. Local release tag: `sanverse-external-mcp-interop-v1`.

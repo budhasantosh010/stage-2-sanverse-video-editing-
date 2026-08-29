@@ -3,8 +3,22 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "test": "vitest run", "build": "tsc -p tsconfig.json" },
-  "dependencies": { "@sanverse/motion-agent-tools": "0.0.0", "@sanverse/motion-storyboard": "0.0.0" },
-  "devDependencies": { "@sanverse/motion-graph": "0.0.0", "@sanverse/motion-promotion": "0.0.0", "typescript": "~5.8.3", "vitest": "^3.2.4" }
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@sanverse/motion-agent-tools": "0.0.0",
+    "@sanverse/motion-storyboard": "0.0.0"
+  },
+  "devDependencies": {
+    "@sanverse/motion-graph": "0.0.0",
+    "@sanverse/motion-promotion": "0.0.0",
+    "typescript": "~5.8.3",
+    "vitest": "^3.2.4"
+  }
 }

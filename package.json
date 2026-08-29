@@ -19,6 +19,17 @@
     "motion:audit-camera-depth-v13": "vite-node scripts/audit-camera-depth-v13.ts",
     "motion:audit-expert-v14": "vite-node scripts/audit-expert-motion-v14.ts",
     "motion:audit-performance-v15": "vite-node scripts/audit-performance-v15.ts",
-    "motion:audit-production-v16": "vite-node scripts/audit-production-v16.ts"
+    "motion:audit-production-v16": "vite-node scripts/audit-production-v16.ts",
+    "sanverse:mcp:http": "vite-node scripts/sanverse-mcp.ts http",
+    "sanverse:mcp:stdio": "vite-node scripts/sanverse-mcp.ts stdio",
+    "sanverse:mcp:dev": "vite-node scripts/sanverse-mcp.ts dev",
+    "sanverse:mcp:status": "vite-node scripts/sanverse-mcp.ts status",
+    "sanverse:mcp:setup": "vite-node scripts/sanverse-mcp-setup.ts",
+    "sanverse:mcp:verify": "vite-node scripts/sanverse-mcp-verify.ts",
+    "sanverse:mcp:audit-longrun": "vite-node scripts/audit-external-mcp-longrun.ts",
+    "sanverse:mcp:audit-stdio": "vite-node scripts/audit-external-mcp-stdio.ts"
+  },
+  "devDependencies": {
+    "jsonc-parser": "^3.3.1"
   }
 }

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "sanverse.external-mcp-interop-report/v2",
+  "generatedAt": "2026-08-29T09:11:25.786Z",
+  "endpoint": {
+    "connected": true,
+    "payload": {
+      "status": "ready",
+      "mcp": "ready",
+      "api": "ready",
+      "projectConnected": true,
+      "toolCount": 34,
+      "writes": "sandbox-only-by-default",
+      "ownerApproval": "host-authority-only",
+      "activeSessions": 2
+    }
+  },
+  "clients": {
+    "codex": {
+      "installed": true,
+      "version": "codex-cli 0.144.1",
+      "configured": true
+    },
+    "claude": {
+      "installed": true,
+      "version": "2.1.168 (Claude Code)",
+      "configured": true
+    },
+    "opencode": {
+      "installed": true,
+      "version": "1.18.8",
+      "configured": true
+    }
+  },
+  "readyForUserValidation": true,
+  "modelOrProviderCallsRun": false,
+  "security": {
+    "acceptedProjectWritesExposed": false,
+    "ownerApprovalHostOnly": true,
+    "credentialsIncluded": false
+  }
+}

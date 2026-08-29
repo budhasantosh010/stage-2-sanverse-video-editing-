@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "sanverse.external-mcp-benchmark-cases/v1",
+  "rawVideoBenchmarkRunByThisRelease": false,
+  "cases": [
+    {
+      "id": "interop.read-context",
+      "class": "read",
+      "steps": ["production.get_creative_context"],
+      "pass": ["projectId is present", "productionRevision is a non-negative integer", "stale is false"]
+    },
+    {
+      "id": "interop.sandbox-opacity-roundtrip",
+      "class": "sandbox-write",
+      "steps": [
+        "production.get_creative_context",
+        "production.create_creative_sandbox",
+        "production.set_sandbox_selected_opacity",
+        "production.get_sandbox_review",
+        "discard_sandbox",
+        "production.get_creative_context"
+      ],
+      "pass": [
+        "one isolated sandbox is created for the client session",
+        "review resolves the selected semantic node with the requested opacity",
+        "reviewRef is present",
+        "sandbox is discarded",
+        "accepted production revision and serialized project are unchanged"
+      ]
+    },
+    {
+      "id": "interop.concurrent-isolation",
+      "class": "sandbox-write",
+      "steps": ["create two independent MCP sessions", "create one sandbox in each", "attempt cross-sandbox review"],
+      "pass": ["sandbox IDs differ", "cross-sandbox access refuses with SANDBOX_CONTEXT_MISMATCH"]
+    },
+    {
+      "id": "interop.stale-production-revision",
+      "class": "safety",
+      "steps": ["create sandbox at production revision N", "advance canonical project to N+1", "attempt sandbox mutation with N"],
+      "pass": ["mutation refuses with STALE_PRODUCTION_REVISION", "sandbox is not mutated"]
+    },
+    {
+      "id": "interop.owner-approval-forgery",
+      "class": "safety",
+      "steps": ["call record_owner_approval from external MCP with fabricated approval JSON"],
+      "pass": ["call refuses with OWNER_APPROVAL_REQUIRED", "canonical owner-gated tool does not execute"]
+    },
+    {
+      "id": "interop.reconnect-and-cleanup",
+      "class": "reliability",
+      "steps": ["connect through Streamable HTTP", "list/call tools", "terminate session", "reconnect", "repeat", "query health"],
+      "pass": ["reconnect succeeds", "one registry is created per MCP session", "activeSessions returns to zero", "abandoned sessions expire after the configured idle bound"]
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "sanverse.external-mcp-longrun/v1",
+  "generatedAt": "2026-08-29T08:20:41.196Z",
+  "cycles": 50,
+  "calls": 300,
+  "reviews": 50,
+  "elapsedMs": 34974,
+  "projectId": "project_8d2743ba5c7b2a08794ece9356ca4046",
+  "baselineRevision": 0,
+  "masterUnchanged": true,
+  "activeSessionsAfter": 0,
+  "healthBefore": {
+    "status": "ready",
+    "mcp": "ready",
+    "api": "ready",
+    "projectConnected": false,
+    "projectId": null,
+    "toolCount": 34,
+    "writes": "sandbox-only-by-default",
+    "ownerApproval": "host-authority-only",
+    "activeSessions": 0
+  },
+  "healthAfter": {
+    "status": "ready",
+    "mcp": "ready",
+    "api": "ready",
+    "projectConnected": true,
+    "projectId": "project_8d2743ba5c7b2a08794ece9356ca4046",
+    "toolCount": 34,
+    "writes": "sandbox-only-by-default",
+    "ownerApproval": "host-authority-only",
+    "activeSessions": 0
+  },
+  "rawVideoBenchmarkRun": false
+}
