@@ -1,5 +1,13 @@
 # Project Log
 
+## 2026-08-30 — Zero-setup local Sanverse MCP complete
+
+- Replaced the default local-agent path from authenticated loopback HTTP to tokenless STDIO for Codex, Claude Code and OpenCode while preserving the HTTP implementation unchanged for explicit debugging/future remote use. The same 52-tool registry, production API, sandbox/revision/approval/export/Undo authorities remain in force.
+- `scripts/sanverse-mcp.ts stdio` now starts or reuses the production API and web/render service itself. API/web stdout/stderr is redirected to ignored local runtime logs so MCP stdout remains clean protocol framing. A real cold-start test found Windows was splitting `C:\Program Files\...` when npm was launched indirectly; the launcher now resolves `npm-cli.js` and invokes it through `node.exe`.
+- `sanverse:mcp:setup -- --apply` now installs one persistent local STDIO `sanverse` entry for all three clients, removes the legacy Sanverse user token environment variable, and leaves unrelated MCP/model/provider settings untouched. No manual owner token/config/server step remains.
+- Direct STDIO verification reports **52 tools**, API ready, web ready, zero projects accepted and no legacy user token variable. Fresh Codex `0.144.1` from API/web-off state really called `production.list_projects`, with Sanverse event evidence `codex-mcp-client`, `ok=true`. OpenCode `1.18.8` cold startup independently auto-launched its Sanverse STDIO/API/web processes, and a real OpenCode model-driven call through the owner's existing 4097 service invoked `production.list_projects`, recorded by Sanverse as `opencode`, `ok=true`. Claude Code `2.1.168` reports the user-scope STDIO entry Connected; owner explicitly accepted configuration-only validation for Claude in this slice.
+- Focused gates pass: Motion MCP **27/27**, Creative Production Adapter **30/30**. Full documented Windows single-fork all-workspace regression exits 0 with the unchanged **2,990-test** inventory, and root all-workspace production build exits 0. Durable evidence: `DOCS/evidence/2026-08-30-zero-setup-local-mcp-v1/`.
+
 ## 2026-08-30 — External MCP Raw-Video V1 implementation and automated RC green
 
 - Completed the owner-approved additive raw-video orchestration program through Batches 1–6 without introducing a second project, Motion Graph, approval, timing, preview, export or Undo authority. Standard MCP is now zero-project-ready and exposes **52 discoverable tools**: all 34 prior external tools remain visible and 18 new tools add project intake/context, analysis-only transcript/source understanding, deterministic opportunity planning, generalized scene batches, exact host approval resolution, atomic production apply and existing export/status/cancel.

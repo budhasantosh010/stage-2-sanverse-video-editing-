@@ -1,0 +1,26 @@
+Focused regression:
+- @sanverse/motion-mcp: 27/27 PASS
+- @sanverse/creative-production-adapter: 30/30 PASS
+
+Full repository regression:
+- npm run test -- --pool=forks --poolOptions.forks.singleFork=true
+- PASS / exit 0
+- Test inventory unchanged from baseline: 2,990 tests across 25 workspaces
+
+Production build:
+- npm run build
+- PASS / exit 0
+
+Client verification:
+- Codex 0.144.1: real production.list_projects MCP call, ok=true
+- OpenCode 1.18.8: local STDIO config connected; cold launch auto-started Sanverse runtime; real production.list_projects MCP call, ok=true
+- Claude Code 2.1.168: user-scope STDIO config reports Connected; owner accepted configuration-level proof for this slice
+
+Transport/runtime:
+- default local transport: STDIO
+- same registry: 52 tools
+- API auto-start/reuse: PASS
+- web/render auto-start/reuse: PASS
+- local bearer token required: no
+- legacy SANVERSE_MCP_TOKEN user environment variable: absent
+- HTTP transport preserved for debugging/future remote use

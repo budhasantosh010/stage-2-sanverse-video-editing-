@@ -181,3 +181,15 @@ Status values: `Approved`, `Proposed`, `Deferred`, `Rejected`, `Superseded`.
 - Final release tagging additionally requires a meaningful real spoken-video benchmark targeting ten opportunities/ten scenes, legitimate owner Storyboard/timing/Motion approvals, actual 1× review of the final exported video, representative preview/export pixel-parity evidence, and cross-client MCP discovery smoke. If a genuinely human-only approval or meaningful-source prerequisite is unavailable, all engineering may finish but the immutable `sanverse-external-mcp-raw-video-v1` tag must be withheld rather than fabricating proof.
 - No push of this new release occurs unless the owner separately authorizes publication. Existing published history/tags and `sites/**` remain untouched.
 - Source: owner-provided `SANVERSE EXTERNAL MCP — RAW-VIDEO END-TO-END CREATIVE ORCHESTRATION V1` implementation program on 2026-08-29.
+
+### REQ-021 — Zero-setup local MCP for Codex, Claude Code and OpenCode
+
+- Status: Approved
+- Local Codex, Claude Code and OpenCode must use Sanverse through STDIO by default. The owner must not need to start `sanverse:mcp:dev`, manage a bearer token, set a Sanverse environment variable, synchronize worktree credentials, or manually edit MCP configuration before normal use.
+- The configured local `sanverse` STDIO command must start or reuse the existing Sanverse production API and existing web/render service before exposing the same stable **52-tool** registry. Startup output from those background services must never enter STDIO stdout; stdout remains reserved for MCP protocol framing.
+- Local STDIO requires no bearer credential. The previous HTTP implementation remains available for explicit debugging/future remote use and keeps its existing loopback/authentication protections, but HTTP is no longer the normal local-agent path.
+- One reversible setup action performed by the coding agent must install only the `sanverse` MCP entry for Codex, Claude Code and OpenCode, preserve unrelated MCP/model/provider settings, remove the legacy Sanverse user token environment variable, and require no owner copy/paste or manual config editing afterward.
+- Runtime and safety authority remain unchanged: the same production API, project/revision fences, sandbox-first writes, host-only owner approval, canonical Motion runtime, export authority and Undo/Redo protections apply over STDIO.
+- Verification requires direct STDIO discovery of 52 tools, automatic API + web readiness from a cold local state, no legacy user token environment variable, persisted STDIO configuration for all three clients, a real Codex `production.list_projects` call, and a real OpenCode `production.list_projects` call. Per owner instruction on 2026-08-30, Claude Code configuration-level `Connected` proof is sufficient for this slice; do not spend further time on its model-session timeout.
+- Full repository regression and all-workspace production build must pass before commit/push to `external-mcp-raw-video-v1`.
+- Source: owner-provided `SANVERSE ZERO-SETUP LOCAL MCP` implementation instruction and explicit autonomous-completion/push authorization on 2026-08-30.

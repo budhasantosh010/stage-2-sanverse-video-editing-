@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "sanverse.zero-setup-local-mcp-report/v1",
+  "generatedAt": "2026-08-30T14:30:39.663Z",
+  "transport": "stdio",
+  "launcher": "scripts/sanverse-mcp-stdio.mjs",
+  "runtime": {
+    "apiReady": true,
+    "webReady": true,
+    "apiUrl": "http://loopback:2001",
+    "webUrl": "http://loopback:2000"
+  },
+  "stdio": {
+    "toolCount": 52,
+    "projectCount": 0,
+    "stderrClean": true
+  },
+  "clients": {
+    "codex": {
+      "installed": true,
+      "version": "codex-cli 0.144.1",
+      "configuredForLocalStdio": true
+    },
+    "claude": {
+      "installed": true,
+      "version": "2.1.168 (Claude Code)",
+      "configuredForLocalStdio": true
+    },
+    "opencode": {
+      "installed": true,
+      "version": "1.18.8",
+      "configuredForLocalStdio": true
+    }
+  },
+  "clientProof": {
+    "codex": {
+      "clientName": "codex-mcp-client",
+      "clientVersion": "0.144.1",
+      "toolName": "production.list_projects",
+      "ok": true,
+      "at": "2026-08-30T12:00:09.659Z"
+    },
+    "opencode": {
+      "clientName": "opencode",
+      "clientVersion": "1.18.8",
+      "toolName": "production.list_projects",
+      "ok": true,
+      "at": "2026-08-30T14:24:35.778Z"
+    }
+  },
+  "ownerAcceptedClaudeConfigurationOnly": true,
+  "legacyUserTokenEnvironmentPresent": false,
+  "readyForUserValidation": true,
+  "modelOrProviderCallsRun": true,
+  "security": {
+    "acceptedProjectWritesExposed": false,
+    "ownerApprovalHostOnly": true,
+    "bearerTokenRequiredForLocalStdio": false,
+    "credentialsIncluded": false
+  }
+}

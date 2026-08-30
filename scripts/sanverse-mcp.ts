@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
+import { closeSync, existsSync, openSync } from 'node:fs'
 import { appendFile, mkdir } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { createCreativeProductionExternalOrchestrationSessionV1 } from '@sanverse/creative-production-adapter'
 import { connectSanverseStandardStdioV1, createSanverseStandardMcpHttpServerV1, importLocalVideoThroughProductionApiV1, parseImportRootsV1 } from '@sanverse/motion-mcp'
 import {
@@ -31,6 +32,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const command = process.argv[2] ?? 'dev'
 const SANVERSE_WEB_URL = (process.env.SANVERSE_WEB_URL ?? 'http://127.0.0.1:2000').replace(/\/$/u, '')
 const eventLogPath = join(SANVERSE_ROOT, '.sanverse-data', 'mcp', 'events.jsonl')
+const runtimeLogDir = join(SANVERSE_ROOT, '.sanverse-data', 'mcp', 'runtime')
 const recordToolCall = async (event: Readonly<Record<string, unknown>>) => {
   await mkdir(dirname(eventLogPath), { recursive: true })
   await appendFile(eventLogPath, `${JSON.stringify(event)}\n`, 'utf8')
@@ -76,13 +78,37 @@ const health = async () => {
 const npmInvocation = (): Readonly<{ command: string; args: readonly string[] }> => {
   if (process.platform !== 'win32') return Object.freeze({ command: 'npm', args: Object.freeze([]) })
   const npmExecPath = process.env.npm_execpath
-  if (!npmExecPath) throw new Error('npm_execpath is unavailable. Start with `npm run sanverse:mcp:dev`.')
-  return Object.freeze({ command: process.execPath, args: Object.freeze([npmExecPath]) })
+  if (npmExecPath) return Object.freeze({ command: process.execPath, args: Object.freeze([npmExecPath]) })
+  const located = spawnSync('where.exe', ['npm.cmd'], { encoding: 'utf8', windowsHide: true })
+  const npmShim = (located.stdout ?? '').split(/\r?\n/u).map((line) => line.trim()).find(Boolean)
+  if (!npmShim) throw new Error('npm.cmd is unavailable. Install Node.js/npm before starting Sanverse MCP.')
+  const npmCli = resolve(dirname(npmShim), 'node_modules', 'npm', 'bin', 'npm-cli.js')
+  if (!existsSync(npmCli)) throw new Error(`npm CLI entry is unavailable beside ${npmShim}.`)
+  return Object.freeze({ command: process.execPath, args: Object.freeze([npmCli]) })
 }
 
 const startWorkspaceDev = (workspace: '@sanverse/api' | '@sanverse/web'): ChildProcess => {
   const npm = npmInvocation()
   return spawn(npm.command, [...npm.args, 'run', 'dev', '--workspace', workspace], { cwd: SANVERSE_ROOT, stdio: ['ignore', 'inherit', 'inherit'], shell: false, windowsHide: true })
+}
+
+const startWorkspaceDevDetached = async (workspace: '@sanverse/api' | '@sanverse/web'): Promise<void> => {
+  await mkdir(runtimeLogDir, { recursive: true })
+  const npm = npmInvocation()
+  const label = workspace === '@sanverse/api' ? 'api' : 'web'
+  const logFd = openSync(join(runtimeLogDir, `${label}.log`), 'a')
+  try {
+    const child = spawn(npm.command, [...npm.args, 'run', 'dev', '--workspace', workspace], {
+      cwd: SANVERSE_ROOT,
+      detached: true,
+      stdio: ['ignore', logFd, logFd],
+      shell: false,
+      windowsHide: true,
+    })
+    child.unref()
+  } finally {
+    closeSync(logFd)
+  }
 }
 
 const webReady = async (): Promise<boolean> => {
@@ -101,6 +127,20 @@ const waitUntil = async (label: string, check: () => Promise<boolean>, timeoutMs
     await sleep(250)
   }
   throw new Error(`${label} did not become ready.`)
+}
+
+const ensureStdioRuntime = async (): Promise<void> => {
+  if (!(await apiReady())) {
+    console.error('Sanverse STDIO: starting production API automatically.')
+    await startWorkspaceDevDetached('@sanverse/api')
+    await waitUntil(`Sanverse API at ${SANVERSE_API_URL}`, apiReady)
+  } else console.error(`Sanverse STDIO: reusing production API at ${SANVERSE_API_URL}.`)
+
+  if (!(await webReady())) {
+    console.error('Sanverse STDIO: starting production web/render service automatically.')
+    await startWorkspaceDevDetached('@sanverse/web')
+    await waitUntil(`Sanverse web renderer at ${SANVERSE_WEB_URL}`, webReady)
+  } else console.error(`Sanverse STDIO: reusing production web renderer at ${SANVERSE_WEB_URL}.`)
 }
 
 const stopChild = (child: ChildProcess | null): void => {
@@ -170,8 +210,8 @@ const runDev = async () => {
 }
 
 const runStdio = async () => {
-  if (!(await apiReady())) throw new Error(`Sanverse API is not running at ${SANVERSE_API_URL}. Start it with npm run dev or npm run sanverse:mcp:dev.`)
-  console.error('Sanverse MCP STDIO connected to the existing production API. stdout is reserved for MCP framing.')
+  await ensureStdioRuntime()
+  console.error('Sanverse MCP STDIO ready. API/web were auto-started or reused; stdout is reserved for MCP framing.')
   await connectSanverseStandardStdioV1(createRegistry, { onToolCall: recordToolCall })
 }
 

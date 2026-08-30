@@ -18,6 +18,13 @@ Implementation branch: `external-mcp-raw-video-v1`
 - Two Windows long-path defects found by the real export proof are fixed without adding authority: the disposable Edge profile uses OS temp, and the disposable render workspace uses a short same-volume Sanverse data-root sibling rather than a project-ID-deep path.
 - The immutable release tag `sanverse-external-mcp-raw-video-v1` is **withheld** because the separate manual release proof still requires meaningful spoken source media, the target ten-scene review, legitimate human Storyboard/timing/Motion review, and an actual 1× watch of the final exported video. Test-host approvals and general implementation authorization are recorded distinctly and do not fabricate that visual evidence.
 
+### Zero-setup local MCP addendum — 2026-08-30
+
+- Per REQ-021 / DEC-019, local Codex, Claude Code and OpenCode now use tokenless STDIO as the default `sanverse` MCP path. The STDIO launcher starts/reuses the existing API and web/render services automatically and exposes the same 52-tool registry; no manual `sanverse:mcp:dev`, bearer-token synchronization, Sanverse user environment variable or owner config editing remains in the normal local workflow.
+- HTTP is preserved as an explicit debugging/future remote transport with its previous protections; no production/sandbox/approval/revision/export/Undo authority moved into the transport layer.
+- Real client proof is retained in `DOCS/evidence/2026-08-30-zero-setup-local-mcp-v1/`: Codex and OpenCode each produced a successful `production.list_projects` event from their actual MCP client identity; Claude Code's STDIO entry reports Connected and the owner explicitly accepted configuration-level validation for Claude in this slice.
+- The unchanged 2,990-test Windows single-fork repository matrix and root all-workspace build pass after the zero-setup changes.
+
 ## Mission
 
 Make one external MCP client able to start with a raw local video plus optional transcript/brief and finish through the real Sanverse production authorities:
