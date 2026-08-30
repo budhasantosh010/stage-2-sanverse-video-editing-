@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "sanverse.zero-setup-workspace-import-report/v1",
+  "generatedAt": "2026-08-30T19:38:16.561Z",
+  "toolCount": 53,
+  "workspaceInputDiscovered": true,
+  "workspaceIsolation": true,
+  "absolutePathLeaked": false,
+  "codexWorkflow": {
+    "sessionLabel": "b3f3d121-0323-40b2-910f-311fd3e5e1cf",
+    "clientName": "codex-mcp-client",
+    "clientVersion": "0.144.1",
+    "tools": [
+      "source.list_workspace_inputs",
+      "production.import_source_video",
+      "source.attach_transcript",
+      "source.analyze_video"
+    ],
+    "ok": true,
+    "at": "2026-08-30T19:16:03.453Z"
+  },
+  "opencodeWorkflow": {
+    "sessionLabel": "7b40b04d-18ab-4129-b1ce-4ee2af432f8c",
+    "clientName": "opencode",
+    "clientVersion": "1.18.8",
+    "tools": [
+      "source.list_workspace_inputs",
+      "production.import_source_video",
+      "source.attach_transcript",
+      "source.analyze_video"
+    ],
+    "ok": true,
+    "at": "2026-08-30T19:26:04.400Z"
+  },
+  "claudeStdioConfigured": true,
+  "httpImplicitWorkspaceGrant": false,
+  "localStdioBearerTokenRequired": false,
+  "ready": true
+}

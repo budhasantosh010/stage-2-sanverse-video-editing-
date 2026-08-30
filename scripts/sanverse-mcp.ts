@@ -4,7 +4,17 @@ import { closeSync, existsSync, openSync } from 'node:fs'
 import { appendFile, mkdir } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { createCreativeProductionExternalOrchestrationSessionV1 } from '@sanverse/creative-production-adapter'
-import { connectSanverseStandardStdioV1, createSanverseStandardMcpHttpServerV1, importLocalVideoThroughProductionApiV1, parseImportRootsV1 } from '@sanverse/motion-mcp'
+import {
+  LocalImportErrorV1,
+  connectSanverseStandardStdioV1,
+  createSanverseStandardMcpHttpServerV1,
+  importLocalVideoThroughProductionApiV1,
+  listPermittedWorkspaceInputsV1,
+  parseImportRootsV1,
+  readPermittedWorkspaceTextFileV1,
+  resolveLocalWorkspaceRootV1,
+  type SanverseExternalSessionContextV1,
+} from '@sanverse/motion-mcp'
 import {
   SANVERSE_API_URL,
   SANVERSE_MCP_ENDPOINT,
@@ -40,18 +50,44 @@ const recordToolCall = async (event: Readonly<Record<string, unknown>>) => {
 
 const sha256Text = async (text: string) => createHash('sha256').update(text).digest('hex')
 
-const createRegistry = async (sessionLabel: string) => {
+const createRegistry = async (sessionLabel: string, context: SanverseExternalSessionContextV1) => {
+  const explicitRoots = parseImportRootsV1()
+  let workspaceRoot: string | undefined
+  let workspaceError: unknown
+  if (context.transport === 'stdio') {
+    try { workspaceRoot = await resolveLocalWorkspaceRootV1(context.workspaceRoot ?? '') }
+    catch (error) { workspaceError = error }
+  }
+  const requireWorkspaceRoot = (): string => {
+    if (workspaceRoot) return workspaceRoot
+    if (workspaceError) throw workspaceError
+    throw new LocalImportErrorV1('WORKSPACE_ROOT_INVALID', 'The local STDIO coding-agent workspace is unavailable.')
+  }
+  const importRoots = context.transport === 'stdio' && workspaceRoot
+    ? Object.freeze([...explicitRoots, workspaceRoot])
+    : explicitRoots
+
   const session = await createCreativeProductionExternalOrchestrationSessionV1({
     sessionLabel,
     listProjects: listProductionProjects,
     readProject: readProductionProject,
     importSourceVideo: async ({ localPath }) => {
-      const imported = await importLocalVideoThroughProductionApiV1({ localPath, roots: parseImportRootsV1(), apiUrl: SANVERSE_API_URL })
+      if (context.transport === 'stdio' && !workspaceRoot) requireWorkspaceRoot()
+      const imported = await importLocalVideoThroughProductionApiV1({
+        localPath,
+        roots: importRoots,
+        apiUrl: SANVERSE_API_URL,
+        ...(workspaceRoot ? { relativeTo: workspaceRoot } : {}),
+      })
       const manifest = imported.manifest as { id?: unknown; sha256?: unknown; originalFilename?: unknown }
       if (typeof manifest.id !== 'string' || typeof manifest.sha256 !== 'string' || typeof manifest.originalFilename !== 'string') throw new Error('Production intake returned an invalid project manifest.')
       const project = await readProductionProject(manifest.id)
       return Object.freeze({ project, sourceSha256: manifest.sha256, originalFilename: manifest.originalFilename })
     },
+    ...(context.transport === 'stdio' ? {
+      listWorkspaceInputs: async () => listPermittedWorkspaceInputsV1({ workspaceRoot: requireWorkspaceRoot() }),
+      readWorkspaceTextFile: async ({ localPath }: Readonly<{ localPath: string }>) => readPermittedWorkspaceTextFileV1({ localPath, workspaceRoot: requireWorkspaceRoot() }),
+    } : {}),
     sha256Text,
     putCreativeArtifact: putProductionCreativeArtifact,
     readCreativeArtifact: readProductionCreativeArtifact,
@@ -68,7 +104,7 @@ const createRegistry = async (sessionLabel: string) => {
 
 const health = async () => {
   try {
-    const probe = await createRegistry('health-probe')
+    const probe = await createRegistry('health-probe', Object.freeze({ transport: 'http' as const }))
     return healthSummary(probe.registry.list().length)
   } catch {
     return healthSummary(0)
@@ -211,8 +247,9 @@ const runDev = async () => {
 
 const runStdio = async () => {
   await ensureStdioRuntime()
+  const callerWorkspace = process.env.SANVERSE_MCP_CALLER_WORKSPACE
   console.error('Sanverse MCP STDIO ready. API/web were auto-started or reused; stdout is reserved for MCP framing.')
-  await connectSanverseStandardStdioV1(createRegistry, { onToolCall: recordToolCall })
+  await connectSanverseStandardStdioV1(createRegistry, { ...(callerWorkspace ? { workspaceRoot: callerWorkspace } : {}), onToolCall: recordToolCall })
 }
 
 const main = async () => {

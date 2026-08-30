@@ -1,6 +1,6 @@
 {
   "schemaVersion": "sanverse.zero-setup-local-mcp-report/v1",
-  "generatedAt": "2026-08-30T14:30:39.663Z",
+  "generatedAt": "2026-08-30T19:38:16.561Z",
   "transport": "stdio",
   "launcher": "scripts/sanverse-mcp-stdio.mjs",
   "runtime": {
@@ -10,8 +10,11 @@
     "webUrl": "http://loopback:2000"
   },
   "stdio": {
-    "toolCount": 52,
-    "projectCount": 0,
+    "toolCount": 53,
+    "projectCount": 3,
+    "workspaceInputDiscovered": true,
+    "workspaceIsolation": true,
+    "absolutePathLeaked": false,
     "stderrClean": true
   },
   "clients": {
@@ -34,10 +37,10 @@
   "clientProof": {
     "codex": {
       "clientName": "codex-mcp-client",
-      "clientVersion": "0.144.1",
+      "clientVersion": "0.151.0-alpha.7.2",
       "toolName": "production.list_projects",
       "ok": true,
-      "at": "2026-08-30T12:00:09.659Z"
+      "at": "2026-08-30T18:37:12.184Z"
     },
     "opencode": {
       "clientName": "opencode",
@@ -45,6 +48,34 @@
       "toolName": "production.list_projects",
       "ok": true,
       "at": "2026-08-30T14:24:35.778Z"
+    },
+    "workspaceWorkflow": {
+      "codex": {
+        "sessionLabel": "b3f3d121-0323-40b2-910f-311fd3e5e1cf",
+        "clientName": "codex-mcp-client",
+        "clientVersion": "0.144.1",
+        "tools": [
+          "source.list_workspace_inputs",
+          "production.import_source_video",
+          "source.attach_transcript",
+          "source.analyze_video"
+        ],
+        "ok": true,
+        "at": "2026-08-30T19:16:03.453Z"
+      },
+      "opencode": {
+        "sessionLabel": "7b40b04d-18ab-4129-b1ce-4ee2af432f8c",
+        "clientName": "opencode",
+        "clientVersion": "1.18.8",
+        "tools": [
+          "source.list_workspace_inputs",
+          "production.import_source_video",
+          "source.attach_transcript",
+          "source.analyze_video"
+        ],
+        "ok": true,
+        "at": "2026-08-30T19:26:04.400Z"
+      }
     }
   },
   "ownerAcceptedClaudeConfigurationOnly": true,

@@ -41,12 +41,13 @@ describe('external raw-video orchestration session — batch 1', () => {
     })
     expect(session.activeProjectId()).toBeNull()
     const listed = session.registry.list().map((tool) => tool.id)
-    expect(listed).toHaveLength(52)
+    expect(listed).toHaveLength(53)
     expect(listed).toEqual(expect.arrayContaining([
       'production.list_projects',
       'production.select_project',
       'production.import_source_video',
       'production.get_project_context',
+      'source.list_workspace_inputs',
       'source.attach_transcript',
       'source.get_transcript',
       'source.analyze_video',
@@ -59,6 +60,42 @@ describe('external raw-video orchestration session — batch 1', () => {
     expect(context).toMatchObject({ ok: false, refusal: { code: 'PROJECT_REQUIRED' } })
     const legacyContext = await invoke(session, 'production.get_creative_context')
     expect(legacyContext).toMatchObject({ ok: false, refusal: { code: 'PROJECT_REQUIRED' } })
+  })
+
+  it('exposes safe workspace-relative input discovery and can attach an SRT by workspace-relative path', async () => {
+    const p = project('project_workspace1234567')
+    const session = await createCreativeProductionExternalOrchestrationSessionV1({
+      sessionLabel: 'workspace-inputs',
+      listProjects: async () => Object.freeze([{ id: p.projectId }]),
+      readProject: async () => p,
+      importSourceVideo: async () => { throw new Error('unused') },
+      listWorkspaceInputs: async () => Object.freeze([
+        Object.freeze({ relativePath: 'video.mp4', kind: 'video' as const, byteLength: 4096 }),
+        Object.freeze({ relativePath: 'transcript.srt', kind: 'transcript' as const, byteLength: 64 }),
+      ]),
+      readWorkspaceTextFile: async ({ localPath }) => {
+        expect(localPath).toBe('transcript.srt')
+        return Object.freeze({ relativePath: 'transcript.srt', format: 'srt' as const, contents: '1\n00:00:01,000 --> 00:00:03,000\nWorkspace transcript.\n' })
+      },
+      sha256Text: async (text) => `sha256:${text.length}`,
+    })
+    const listed = await invoke(session, 'source.list_workspace_inputs')
+    expect(listed).toMatchObject({ ok: true, value: { files: [{ relativePath: 'video.mp4' }, { relativePath: 'transcript.srt' }] } })
+    expect(JSON.stringify(listed)).not.toMatch(/[A-Z]:\\/u)
+    await invoke(session, 'production.select_project', { projectId: p.projectId })
+    const attached = await invoke(session, 'source.attach_transcript', { localPath: 'transcript.srt', transactionId: 'workspace_transcript_txn' })
+    expect(attached).toMatchObject({ ok: true, value: { projectId: p.projectId, cueCount: 1, analysisOnly: true } })
+  })
+
+  it('keeps workspace discovery unavailable when a transport does not provide workspace ports', async () => {
+    const session = await createCreativeProductionExternalOrchestrationSessionV1({
+      sessionLabel: 'http-no-workspace',
+      listProjects: async () => Object.freeze([]),
+      readProject: async () => { throw new Error('unused') },
+      importSourceVideo: async () => { throw new Error('unused') },
+      sha256Text: async (text) => `sha256:${text.length}`,
+    })
+    expect(await invoke(session, 'source.list_workspace_inputs')).toMatchObject({ ok: false, refusal: { code: 'WORKSPACE_UNAVAILABLE' } })
   })
 
   it('selects an existing project, enables the legacy production registry, and refreshes live project state', async () => {

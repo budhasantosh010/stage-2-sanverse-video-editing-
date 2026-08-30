@@ -78,9 +78,10 @@ describe('standard external MCP adapter', () => {
 
   it('serves authenticated Streamable HTTP with session reconnect and rejects non-local Origin', async () => {
     const created: string[] = []
+    const contexts: unknown[] = []
     const http = createSanverseStandardMcpHttpServerV1({
       token: 'test-token',
-      createRegistry: (label) => { created.push(label); return { registry: registry(), label } },
+      createRegistry: (label, context) => { created.push(label); contexts.push(context); return { registry: registry(), label } },
       health: () => ({ status: 'ready', mcp: 'ready', toolCount: 3, projectConnected: true }),
     })
     servers.push(http)
@@ -107,6 +108,7 @@ describe('standard external MCP adapter', () => {
     await client.connect(transport)
     expect((await client.listTools()).tools).toHaveLength(3)
     expect(created).toHaveLength(1)
+    expect(contexts[0]).toEqual({ transport: 'http' })
     const sessionId = transport.sessionId
     expect(sessionId).toBeTruthy()
     expect(await (await fetch(`http://127.0.0.1:${address.port}/healthz`)).json()).toMatchObject({ activeSessions: 1 })

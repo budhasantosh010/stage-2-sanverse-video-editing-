@@ -60,10 +60,24 @@ export interface ExternalProductionExportJobV1 {
   readonly error?: Readonly<{ code: string; message: string }>
 }
 
+export interface ExternalWorkspaceInputV1 {
+  readonly relativePath: string
+  readonly kind: 'video' | 'transcript' | 'image'
+  readonly byteLength: number
+}
+
+export interface ExternalWorkspaceTextFileV1 {
+  readonly relativePath: string
+  readonly format: 'plain' | 'srt' | 'vtt'
+  readonly contents: string
+}
+
 export interface ExternalProductionApiPortV1 {
   readonly listProjects: () => Promise<readonly ExternalProjectSummaryV1[]>
   readonly readProject: (projectId: string) => Promise<EditProject>
   readonly importSourceVideo: (input: Readonly<{ localPath: string; projectLabel?: string; transactionId: string }>) => Promise<ExternalImportSourceResultV1>
+  readonly listWorkspaceInputs?: () => Promise<readonly ExternalWorkspaceInputV1[]>
+  readonly readWorkspaceTextFile?: (input: Readonly<{ localPath: string }>) => Promise<ExternalWorkspaceTextFileV1>
   readonly sha256Text: (text: string) => Promise<string>
   readonly putCreativeArtifact?: (input: Readonly<{ projectId: string; serialized: string }>) => Promise<Readonly<{ ref: ExternalCreativeArtifactRefV1; artifact: unknown }>>
   readonly readCreativeArtifact?: (input: Readonly<{ projectId: string; artifactId: string }>) => Promise<Readonly<{ ref: ExternalCreativeArtifactRefV1; artifact: unknown }>>
@@ -277,6 +291,20 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
     execute: async () => creativeOperationOk(Object.freeze({ projects: Object.freeze((await options.listProjects()).map(freezeSummary)), activeProjectId: activeId }), 1),
   }))
   register(Object.freeze({
+    id: 'source.list_workspace_inputs', version: 1 as const, level: 'T0' as const, requiresSandbox: false,
+    inputSchema: emptySchema, outputSchema: outputRecordSchema, validateInput: passRecord,
+    execute: async () => {
+      if (!options.listWorkspaceInputs) return creativeOperationRefusal('WORKSPACE_UNAVAILABLE', 'Workspace input discovery is available only to a local STDIO coding-agent session.')
+      try {
+        const files = await options.listWorkspaceInputs()
+        return creativeOperationOk(Object.freeze({ files: Object.freeze(files.map((file) => Object.freeze({ relativePath: file.relativePath, kind: file.kind, byteLength: file.byteLength }))) }), 1)
+      } catch (error) {
+        const code = record(error) && typeof error.code === 'string' ? error.code : 'WORKSPACE_ROOT_INVALID'
+        return creativeOperationRefusal(code, error instanceof Error ? error.message : 'The local coding-agent workspace is unavailable.')
+      }
+    },
+  }))
+  register(Object.freeze({
     id: 'production.select_project', version: 1 as const, level: 'T1' as const, requiresSandbox: false,
     inputSchema: schema({ projectId: stringSchema }, ['projectId']), outputSchema: outputRecordSchema, validateInput: passRecord,
     execute: async (input: Record<string, unknown>) => {
@@ -304,7 +332,7 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
         return creativeOperationOk(Object.freeze({ ...projectContext(project), sourceSha256: imported.sourceSha256, originalFilename: imported.originalFilename }), project.revision)
       } catch (error) {
         const code = record(error) && typeof error.code === 'string' ? error.code : 'IMPORT_MEDIA_UNSUPPORTED'
-        const allowed = new Set(['IMPORT_ROOT_NOT_ALLOWED','IMPORT_PATH_INVALID','IMPORT_SYMLINK_ESCAPE','IMPORT_FILE_NOT_FOUND','IMPORT_MEDIA_UNSUPPORTED'])
+        const allowed = new Set(['WORKSPACE_ROOT_INVALID','IMPORT_ROOT_NOT_ALLOWED','IMPORT_PATH_INVALID','IMPORT_SYMLINK_ESCAPE','IMPORT_FILE_NOT_FOUND','IMPORT_MEDIA_UNSUPPORTED'])
         return creativeOperationRefusal(allowed.has(code) ? code : 'IMPORT_MEDIA_UNSUPPORTED', error instanceof Error ? error.message : 'The source video could not be imported.')
       }
     },
@@ -316,22 +344,42 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
   }))
   register(Object.freeze({
     id: 'source.attach_transcript', version: 1 as const, level: 'T1' as const, requiresSandbox: false,
-    inputSchema: schema({ format: stringSchema, contents: stringSchema, transactionId: stringSchema }, ['format','contents','transactionId']), outputSchema: outputRecordSchema, validateInput: passRecord,
+    inputSchema: schema({ format: stringSchema, contents: stringSchema, localPath: stringSchema, transactionId: stringSchema }, ['transactionId']), outputSchema: outputRecordSchema, validateInput: passRecord,
     execute: async (input: Record<string, unknown>) => {
       const current = await requireProject(); if (!current.ok) return current
       const project = current.value
       const source = project.assets.find((asset) => asset.mediaKind === 'video')
       if (!source) return creativeOperationRefusal('PROJECT_REQUIRED', 'The active project has no primary source video.')
-      if (!boundedText(input.contents, 2_000_000) || !boundedText(input.transactionId, 128) || !transactionIdPattern.test(input.transactionId)) return creativeOperationRefusal('TRANSCRIPT_INVALID', 'Transcript contents and a stable transactionId are required.')
-      const requested = input.format === 'plain' || input.format === 'srt' || input.format === 'vtt' ? input.format : null
-      if (!requested) return creativeOperationRefusal('TRANSCRIPT_INVALID', 'format must be plain, srt, or vtt.')
-      const existing = transcriptTransactions.get(input.transactionId)
+      if (!boundedText(input.transactionId, 128) || !transactionIdPattern.test(input.transactionId)) return creativeOperationRefusal('TRANSCRIPT_INVALID', 'A stable transactionId is required.')
+      const transactionId = input.transactionId
+      const hasContents = boundedText(input.contents, 2_000_000)
+      const hasLocalPath = boundedText(input.localPath, 4096)
+      if (hasContents === hasLocalPath) return creativeOperationRefusal('TRANSCRIPT_INVALID', 'Provide exactly one of transcript contents or a workspace-relative localPath.')
+      const existing = transcriptTransactions.get(transactionId)
       if (existing) {
         if (existing.projectId !== project.projectId) return creativeOperationRefusal('TRANSCRIPT_SOURCE_MISMATCH', 'That transcript transaction belongs to a different project.')
         return creativeOperationOk(Object.freeze({ transcriptRef: existing.id, projectId: existing.projectId, sourceAssetId: existing.sourceAssetId, cueCount: existing.cues.length, analysisOnly: true, cues: existing.cues }), existing.sourceRevision)
       }
-      const normalizedContents = input.contents.replace(/\r\n?/gu, '\n').trim()
-      const provenance = `provenance:external-transcript:${tail(`${project.projectId}:${input.transactionId}`)}`
+
+      let requested: SourceTranscriptV1['format'] | null = input.format === 'plain' || input.format === 'srt' || input.format === 'vtt' ? input.format : null
+      let contents: string
+      if (hasLocalPath) {
+        if (!options.readWorkspaceTextFile) return creativeOperationRefusal('WORKSPACE_UNAVAILABLE', 'Workspace transcript files are available only to a local STDIO coding-agent session.')
+        try {
+          const file = await options.readWorkspaceTextFile({ localPath: input.localPath as string })
+          contents = file.contents
+          requested ??= file.format
+        } catch (error) {
+          const code = record(error) && typeof error.code === 'string' ? error.code : 'TRANSCRIPT_INVALID'
+          return creativeOperationRefusal(code, error instanceof Error ? error.message : 'The workspace transcript file could not be read.')
+        }
+      } else {
+        contents = input.contents as string
+      }
+      if (!requested) return creativeOperationRefusal('TRANSCRIPT_INVALID', 'format must be plain, srt, or vtt when transcript contents are provided.')
+      const normalizedContents = contents.replace(/\r\n?/gu, '\n').trim()
+      if (!normalizedContents || normalizedContents.length > 2_000_000) return creativeOperationRefusal('TRANSCRIPT_INVALID', 'Transcript contents must be non-empty and bounded.')
+      const provenance = `provenance:external-transcript:${tail(`${project.projectId}:${transactionId}`)}`
       const parsed = requested === 'plain'
         ? Object.freeze([{ id: 'transcript:1', startTicks: 0, endTicks: source.duration.ticks, text: normalizedContents, provenance } satisfies TranscriptSegmentV1])
         : parseSrtOrVttTranscript(normalizedContents, provenance)
@@ -339,13 +387,13 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
         return creativeOperationRefusal('TRANSCRIPT_INVALID', 'Transcript cues must have non-empty text and valid source-bounded timestamps.', Object.freeze({ recovery: 'Fix cue timestamps so every cue lies within the source video duration.' }))
       }
       const digest = await options.sha256Text(normalizedContents)
-      const id = `transcript_${tail(`${project.projectId}:${source.assetId}:${digest}:${input.transactionId}`)}`
+      const id = `transcript_${tail(`${project.projectId}:${source.assetId}:${digest}:${transactionId}`)}`
       const transcript: SourceTranscriptV1 = Object.freeze({
         schemaVersion: SOURCE_TRANSCRIPT_SCHEMA_V1, id, projectId: project.projectId, sourceAssetId: source.assetId, sourceRevision: project.revision, sha256: digest,
         format: requested, analysisOnly: true as const,
         cues: Object.freeze(parsed.map((cue, index) => Object.freeze({ id: `${id}:cue:${index + 1}`, startTick: cue.startTicks, endTick: cue.endTicks, text: cue.text }))),
       })
-      transcripts.set(id, transcript); transcriptTransactions.set(input.transactionId, transcript)
+      transcripts.set(id, transcript); transcriptTransactions.set(transactionId, transcript)
       return creativeOperationOk(Object.freeze({ transcriptRef: id, projectId: project.projectId, sourceAssetId: source.assetId, cueCount: transcript.cues.length, analysisOnly: true, cues: transcript.cues }), project.revision)
     },
   }))

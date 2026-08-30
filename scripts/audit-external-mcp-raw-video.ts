@@ -87,10 +87,11 @@ try {
   await client.connect(transport)
   const listed = await client.listTools()
   const names = listed.tools.map((tool) => tool.name)
-  if (listed.tools.length !== 52) throw new Error(`Expected stable 52-tool raw-video + legacy MCP surface; found ${listed.tools.length}.`)
+  if (listed.tools.length !== 53) throw new Error(`Expected stable 53-tool raw-video + workspace-discovery + legacy MCP surface; found ${listed.tools.length}.`)
   for (const required of [
     'production.list_projects',
     'production.import_source_video',
+    'source.list_workspace_inputs',
     'source.attach_transcript',
     'source.analyze_video',
     'motion.plan_opportunities',

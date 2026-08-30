@@ -40,10 +40,10 @@ const main = async () => {
   await client.connect(transport)
   try {
     const listed = await client.listTools()
-    if (listed.tools.length !== 52) throw new Error(`Expected stable 52-tool raw-video + legacy surface over STDIO; found ${listed.tools.length}.`)
+    if (listed.tools.length !== 53) throw new Error(`Expected stable 53-tool raw-video + workspace-discovery + legacy surface over STDIO; found ${listed.tools.length}.`)
     valueOf(await client.callTool({ name: 'production.select_project', arguments: { projectId } }), 'select project')
     const selectedList = await client.listTools()
-    if (selectedList.tools.length !== 52) throw new Error(`Selecting a project changed STDIO tool discovery from 52 to ${selectedList.tools.length}.`)
+    if (selectedList.tools.length !== 53) throw new Error(`Selecting a project changed STDIO tool discovery from 53 to ${selectedList.tools.length}.`)
     const initial = valueOf(await client.callTool({ name: 'production.get_creative_context', arguments: {} }), 'initial context')
     const revision = Number(initial.productionRevision)
     const created = valueOf(await client.callTool({

@@ -2,6 +2,14 @@
 
 Last updated: 2026-08-30
 
+## Zero-Setup Workspace Import Fix V1 — complete
+
+The local STDIO launcher now preserves the coding agent caller directory and supplies it to Sanverse as a **validated session-only workspace import boundary** before Sanverse switches its own runtime CWD to the repo. No `SANVERSE_MCP_IMPORT_ROOT(S)` is required for files inside the folder the user deliberately opened; HTTP remains explicit-root-only.
+
+The MCP surface is now **53 tools** with read-only `source.list_workspace_inputs`. Relative video imports and transcript `localPath` reads resolve inside the same confinement boundary; traversal, outside paths, symlink/junction and UNC escapes still fail closed.
+
+The original real Codex MP4+SRT workflow now passes discovery -> import -> transcript attach -> source analysis with all four events `ok=true`; OpenCode later passed the same four-call chain. Focused gates: Motion MCP **30/30**, Creative Production Adapter **32/32**, affected builds PASS, zero-setup verifier PASS. Evidence: `DOCS/evidence/2026-08-30-zero-setup-workspace-import-v1/`.
+
 ## Zero-Setup Local MCP — implementation + verification complete
 
 Local Codex, Claude Code and OpenCode now use Sanverse through **tokenless STDIO by default**. The configured `sanverse` launcher automatically starts or reuses the existing production API at loopback port 2001 and the existing web/render service at loopback port 2000 before exposing the same stable **52-tool** registry. The owner no longer needs to run `sanverse:mcp:dev`, maintain a bearer token, set `SANVERSE_MCP_TOKEN`, synchronize worktree credentials, or edit client MCP config for normal local use. HTTP remains available separately with its existing loopback bearer/Host/Origin protections for debugging/future remote use.

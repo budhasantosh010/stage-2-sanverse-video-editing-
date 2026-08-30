@@ -2,11 +2,16 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 
+const callerWorkspace = process.cwd()
 const root = fileURLToPath(new URL('..', import.meta.url))
 const viteNode = resolve(root, 'node_modules', 'vite-node', 'vite-node.mjs')
 const entry = resolve(root, 'scripts', 'sanverse-mcp.ts')
 const child = spawn(process.execPath, [viteNode, entry, 'stdio'], {
   cwd: root,
+  env: {
+    ...process.env,
+    SANVERSE_MCP_CALLER_WORKSPACE: callerWorkspace,
+  },
   stdio: 'inherit',
   shell: false,
   windowsHide: true,

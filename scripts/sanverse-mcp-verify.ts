@@ -7,6 +7,8 @@ import { SANVERSE_API_URL, SANVERSE_MCP_TOKEN_ENV, SANVERSE_ROOT, apiReady } fro
 
 const evidenceRoot = resolve(SANVERSE_ROOT, 'DOCS/evidence/2026-08-30-zero-setup-local-mcp-v1')
 const reportPath = resolve(evidenceRoot, 'zero-setup-report.json')
+const workspaceEvidenceRoot = resolve(SANVERSE_ROOT, 'DOCS/evidence/2026-08-30-zero-setup-workspace-import-v1')
+const workspaceReportPath = resolve(workspaceEvidenceRoot, 'workspace-import-report.json')
 const eventLogPath = resolve(SANVERSE_ROOT, '.sanverse-data', 'mcp', 'events.jsonl')
 const launcherPath = resolve(SANVERSE_ROOT, 'scripts', 'sanverse-mcp-stdio.mjs')
 const webUrl = (process.env.SANVERSE_WEB_URL ?? 'http://127.0.0.1:2000').replace(/\/$/u, '')
@@ -82,14 +84,42 @@ const readClientProof = async () => {
     ok: event.ok === true,
     at: String(event.at ?? ''),
   }) : null
-  return Object.freeze({ codex: safe(find('codex-mcp-client')), opencode: safe(find('opencode')) })
+  const requiredWorkspaceTools = Object.freeze(['source.list_workspace_inputs', 'production.import_source_video', 'source.attach_transcript', 'source.analyze_video'])
+  const workspaceWorkflow = (clientName: string) => {
+    const matching = events.filter((event) => event.clientName === clientName && typeof event.sessionLabel === 'string')
+    const sessions = new Map<string, Record<string, unknown>[]>()
+    for (const event of matching) {
+      const key = String(event.sessionLabel)
+      const bucket = sessions.get(key) ?? []
+      bucket.push(event)
+      sessions.set(key, bucket)
+    }
+    for (const [sessionLabel, sessionEvents] of [...sessions.entries()].reverse()) {
+      if (!requiredWorkspaceTools.every((toolName) => sessionEvents.some((event) => event.toolName === toolName && event.ok === true))) continue
+      const first = sessionEvents.find((event) => event.toolName === 'source.list_workspace_inputs')
+      return Object.freeze({
+        sessionLabel,
+        clientName,
+        clientVersion: String(first?.clientVersion ?? ''),
+        tools: requiredWorkspaceTools,
+        ok: true,
+        at: String(first?.at ?? ''),
+      })
+    }
+    return null
+  }
+  return Object.freeze({
+    codex: safe(find('codex-mcp-client')),
+    opencode: safe(find('opencode')),
+    workspaceWorkflow: Object.freeze({ codex: workspaceWorkflow('codex-mcp-client'), opencode: workspaceWorkflow('opencode') }),
+  })
 }
 
-const directStdioProbe = async () => {
-  const transport = new StdioClientTransport({ command: process.execPath, args: [launcherPath], cwd: SANVERSE_ROOT, stderr: 'pipe' })
+const probeWorkspace = async (workspace: string, clientName: string) => {
+  const transport = new StdioClientTransport({ command: process.execPath, args: [launcherPath], cwd: workspace, stderr: 'pipe' })
   let stderr = ''
   transport.stderr?.on('data', (chunk) => { stderr += String(chunk) })
-  const client = new Client({ name: 'sanverse-zero-setup-verifier', version: '1.0.0' }, { capabilities: {} })
+  const client = new Client({ name: clientName, version: '1.0.0' }, { capabilities: {} })
   await client.connect(transport)
   try {
     const tools = await client.listTools()
@@ -99,14 +129,53 @@ const directStdioProbe = async () => {
       : null
     const value = structured?.ok === true && structured.value && typeof structured.value === 'object' ? structured.value as Record<string, unknown> : null
     const projects = Array.isArray(value?.projects) ? value.projects : []
-    return Object.freeze({ toolCount: tools.tools.length, projectCount: projects.length, stderrClean: !/exception|fatal/i.test(stderr) })
+    const workspaceResult = await client.callTool({ name: 'source.list_workspace_inputs', arguments: {} })
+    const workspaceStructured = 'structuredContent' in workspaceResult && workspaceResult.structuredContent && typeof workspaceResult.structuredContent === 'object'
+      ? workspaceResult.structuredContent as Record<string, unknown>
+      : null
+    const workspaceValue = workspaceStructured?.ok === true && workspaceStructured.value && typeof workspaceStructured.value === 'object'
+      ? workspaceStructured.value as Record<string, unknown>
+      : null
+    const files = Array.isArray(workspaceValue?.files) ? workspaceValue.files as Record<string, unknown>[] : []
+    return Object.freeze({
+      toolCount: tools.tools.length,
+      projectCount: projects.length,
+      relativePaths: Object.freeze(files.map((file) => String(file.relativePath ?? ''))),
+      absolutePathLeaked: JSON.stringify(workspaceStructured).includes(workspace),
+      stderrClean: !/exception|fatal/i.test(stderr),
+    })
   } finally {
     await transport.close()
   }
 }
 
+const directStdioProbe = async () => {
+  const root = resolve(SANVERSE_ROOT, '.sanverse-data', 'mcp')
+  const workspaceA = resolve(root, 'zero setup verifier workspace A')
+  const workspaceB = resolve(root, 'zero setup verifier workspace B')
+  await Promise.all([mkdir(workspaceA, { recursive: true }), mkdir(workspaceB, { recursive: true })])
+  await Promise.all([
+    writeFile(resolve(workspaceA, 'alpha.srt'), '1\n00:00:00,000 --> 00:00:01,000\nWorkspace alpha.\n', 'utf8'),
+    writeFile(resolve(workspaceB, 'beta.srt'), '1\n00:00:00,000 --> 00:00:01,000\nWorkspace beta.\n', 'utf8'),
+  ])
+  const [a, b] = await Promise.all([
+    probeWorkspace(workspaceA, 'sanverse-zero-setup-verifier-a'),
+    probeWorkspace(workspaceB, 'sanverse-zero-setup-verifier-b'),
+  ])
+  const workspaceInputDiscovered = a.relativePaths.includes('alpha.srt') && b.relativePaths.includes('beta.srt')
+  const workspaceIsolation = !a.relativePaths.includes('beta.srt') && !b.relativePaths.includes('alpha.srt')
+  return Object.freeze({
+    toolCount: a.toolCount,
+    projectCount: a.projectCount,
+    workspaceInputDiscovered,
+    workspaceIsolation,
+    absolutePathLeaked: a.absolutePathLeaked || b.absolutePathLeaked,
+    stderrClean: a.stderrClean && b.stderrClean,
+  })
+}
+
 const main = async () => {
-  await mkdir(evidenceRoot, { recursive: true })
+  await Promise.all([mkdir(evidenceRoot, { recursive: true }), mkdir(workspaceEvidenceRoot, { recursive: true })])
   const installations = Object.freeze({ codex: version('codex'), claude: version('claude'), opencode: version('opencode') })
   const stdio = await directStdioProbe()
   const config = configured()
@@ -119,7 +188,8 @@ const main = async () => {
   })
   const legacyUserTokenEnvironmentPresent = userTokenEnvPresent()
   const realClientProofComplete = clientProof.codex?.ok === true && clientProof.opencode?.ok === true
-  const readyForUserValidation = stdio.toolCount === 52 && runtime.apiReady && runtime.webReady && !legacyUserTokenEnvironmentPresent && realClientProofComplete && Object.values(clients).every((client) => client.installed && client.configuredForLocalStdio)
+  const workspaceWorkflowComplete = clientProof.workspaceWorkflow.codex?.ok === true && clientProof.workspaceWorkflow.opencode?.ok === true
+  const readyForUserValidation = stdio.toolCount === 53 && stdio.workspaceInputDiscovered && stdio.workspaceIsolation && !stdio.absolutePathLeaked && runtime.apiReady && runtime.webReady && !legacyUserTokenEnvironmentPresent && realClientProofComplete && workspaceWorkflowComplete && Object.values(clients).every((client) => client.installed && client.configuredForLocalStdio)
   const report = Object.freeze({
     schemaVersion: 'sanverse.zero-setup-local-mcp-report/v1',
     generatedAt: new Date().toISOString(),
@@ -135,7 +205,24 @@ const main = async () => {
     modelOrProviderCallsRun: true,
     security: Object.freeze({ acceptedProjectWritesExposed: false, ownerApprovalHostOnly: true, bearerTokenRequiredForLocalStdio: false, credentialsIncluded: false }),
   })
-  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8')
+  const workspaceReport = Object.freeze({
+    schemaVersion: 'sanverse.zero-setup-workspace-import-report/v1',
+    generatedAt: report.generatedAt,
+    toolCount: stdio.toolCount,
+    workspaceInputDiscovered: stdio.workspaceInputDiscovered,
+    workspaceIsolation: stdio.workspaceIsolation,
+    absolutePathLeaked: stdio.absolutePathLeaked,
+    codexWorkflow: clientProof.workspaceWorkflow.codex,
+    opencodeWorkflow: clientProof.workspaceWorkflow.opencode,
+    claudeStdioConfigured: clients.claude.configuredForLocalStdio,
+    httpImplicitWorkspaceGrant: false,
+    localStdioBearerTokenRequired: false,
+    ready: readyForUserValidation,
+  })
+  await Promise.all([
+    writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8'),
+    writeFile(workspaceReportPath, `${JSON.stringify(workspaceReport, null, 2)}\n`, 'utf8'),
+  ])
   console.log(JSON.stringify(report, null, 2))
   if (!readyForUserValidation) process.exitCode = 1
 }

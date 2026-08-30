@@ -1,5 +1,12 @@
 # Project Log
 
+## 2026-08-30 — Zero-setup workspace import bug fixed
+
+- Captured the coding agent caller CWD in the STDIO launcher and made it the validated session-only Sanverse workspace boundary; HTTP keeps explicit roots only.
+- Added `source.list_workspace_inputs`, taking discovery from 52 to **53 tools**, plus workspace-relative video import and transcript `localPath` reading without exposing absolute workspace paths.
+- Real Codex and OpenCode both completed discovery -> video import -> transcript attach -> source analysis with all calls `ok=true`; `IMPORT_ROOT_NOT_ALLOWED` no longer occurs in the original workflow. Motion MCP **30/30**, Creative Production Adapter **32/32**, affected builds PASS, verifier PASS.
+- Non-blocking Claude login and bounded root-build timeout are documented with WH details and one-line solutions in `DOCS/evidence/2026-08-30-zero-setup-workspace-import-v1/FAILURES.md`.
+
 ## 2026-08-30 — Zero-setup local Sanverse MCP complete
 
 - Replaced the default local-agent path from authenticated loopback HTTP to tokenless STDIO for Codex, Claude Code and OpenCode while preserving the HTTP implementation unchanged for explicit debugging/future remote use. The same 52-tool registry, production API, sandbox/revision/approval/export/Undo authorities remain in force.

@@ -19,7 +19,11 @@ export interface SanverseExternalRegistrySessionV1 {
   readonly registry: SanverseToolRegistryV1
   readonly label?: string
 }
-export type SanverseExternalRegistryFactoryV1 = (sessionLabel: string) => SanverseExternalRegistrySessionV1 | Promise<SanverseExternalRegistrySessionV1>
+export interface SanverseExternalSessionContextV1 {
+  readonly transport: 'stdio' | 'http'
+  readonly workspaceRoot?: string
+}
+export type SanverseExternalRegistryFactoryV1 = (sessionLabel: string, context: SanverseExternalSessionContextV1) => SanverseExternalRegistrySessionV1 | Promise<SanverseExternalRegistrySessionV1>
 export interface SanverseMcpToolCallEvidenceV1 {
   readonly at: string
   readonly sessionLabel: string
@@ -45,9 +49,10 @@ const freezeRecord = (value: Record<string, unknown>) => Object.freeze({ ...valu
 const descriptionById: Readonly<Record<string, string>> = Object.freeze({
   'production.list_projects': 'List production-backed Sanverse projects and this MCP session\'s active project. Works when there are zero projects and does not mutate production state.',
   'production.select_project': 'Select one existing Sanverse project for this MCP session only. This does not edit the project; project-specific tools read the live server-authoritative revision before mutation.',
-  'production.import_source_video': 'Import one allowlisted local source video through the existing Sanverse production intake authority and make it this session\'s active project. Requires a stable transactionId for idempotency; does not bypass media probing or filesystem confinement.',
+  'production.import_source_video': 'Import one allowlisted local source video through the existing Sanverse production intake authority and make it this session\'s active project. In local STDIO, relative paths resolve inside the coding-agent workspace; HTTP keeps explicit import-root confinement. Requires a stable transactionId.',
   'production.get_project_context': 'Read the active production project identity, exact revision, primary source/clip, duration, dimensions, frame rate, and audio state. Does not mutate the project.',
-  'source.attach_transcript': 'Attach plain, SRT, or WebVTT transcript text as analysis-only source context for the active project. It does not create visible captions. Requires a stable transactionId.',
+  'source.list_workspace_inputs': 'List supported video/transcript/image inputs inside this local STDIO coding-agent workspace using safe relative paths only. Does not expose absolute workspace paths or arbitrary filesystem contents; HTTP sessions refuse this tool.',
+  'source.attach_transcript': 'Attach plain, SRT, or WebVTT transcript as analysis-only source context for the active project. Local STDIO may supply a workspace-relative localPath so Sanverse reads the file inside the same confinement boundary; it does not create visible captions.',
   'source.get_transcript': 'Read a transcript previously attached in this MCP session. Does not mutate the project or create captions.',
   'source.analyze_video': 'Build a deterministic production-backed Source Understanding packet from the active source and optional attached transcript. Reports only supported evidence and explicit limitations; it does not fabricate face/object/tracking observations.',
   'motion.plan_opportunities': 'Plan deterministic source-bounded Motion opportunities from an exact Source Understanding packet using Sanverse Creative Direction and the real Motion Library/recipes. Validates agentCandidates rather than trusting them and does not mutate the accepted project.',
@@ -342,7 +347,7 @@ export const createSanverseStandardMcpHttpServerV1 = (options: SanverseStandardH
         if (!isInitializeRequest(body)) { json(response, 400, { jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Initialize the MCP session first.' } }); return }
         const sessionLabel = randomUUID()
         let sessionRegistry: Promise<SanverseExternalRegistrySessionV1> | undefined
-        const registryProvider = async () => (sessionRegistry ??= Promise.resolve(options.createRegistry(sessionLabel))).then((session) => session.registry)
+        const registryProvider = async () => (sessionRegistry ??= Promise.resolve(options.createRegistry(sessionLabel, Object.freeze({ transport: 'http' as const })))).then((session) => session.registry)
         const mcpServer = createSanverseStandardMcpServerV1(registryProvider, { sessionLabel, onToolCall: options.onToolCall })
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: randomUUID,
@@ -372,12 +377,16 @@ export const createSanverseStandardMcpHttpServerV1 = (options: SanverseStandardH
 
 export const connectSanverseStandardStdioV1 = async (
   createRegistry: SanverseExternalRegistryFactoryV1,
-  options: Readonly<{ onToolCall?: (event: SanverseMcpToolCallEvidenceV1) => void | Promise<void> }> = {},
+  options: Readonly<{
+    workspaceRoot?: string
+    onToolCall?: (event: SanverseMcpToolCallEvidenceV1) => void | Promise<void>
+  }> = {},
 ) => {
   const sessionLabel = randomUUID()
+  const sessionContext = Object.freeze({ transport: 'stdio' as const, ...(options.workspaceRoot ? { workspaceRoot: options.workspaceRoot } : {}) })
   let session: Promise<SanverseExternalRegistrySessionV1> | undefined
   const mcpServer = createSanverseStandardMcpServerV1(
-    async () => (session ??= Promise.resolve(createRegistry(sessionLabel))).then((value) => value.registry),
+    async () => (session ??= Promise.resolve(createRegistry(sessionLabel, sessionContext))).then((value) => value.registry),
     { sessionLabel, onToolCall: options.onToolCall },
   )
   const transport = new StdioServerTransport(process.stdin, process.stdout)
