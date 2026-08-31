@@ -44,6 +44,7 @@ export interface CreativeSceneWorkflowV1 {
   readonly engine: ClosedLoopEngineV1
   readonly initialize: () => Readonly<{ ok: boolean; message: string }>
   readonly reviseStoryboardOpacity: (opacity: number, expectedSandboxRevision: number) => Readonly<{ ok: boolean; message: string }>
+  readonly reviseStoryboardContent: (input: Readonly<{ text?: string; fontSize?: number; expectedSandboxRevision: number }>) => Readonly<{ ok: boolean; message: string }>
   readonly advanceAfterStoryboardApproval: () => Readonly<{ ok: boolean; message: string }>
   readonly advanceAfterAnimaticApproval: () => Readonly<{ ok: boolean; message: string }>
   readonly prepareMotionReview: () => Promise<Readonly<{ ok: boolean; message: string }>>
@@ -85,6 +86,23 @@ export interface CreativeSceneBatchSnapshotV1 {
   readonly readyForProductionApply: boolean
 }
 
+export interface PersistedCreativeSceneWorkflowV1 {
+  readonly schemaVersion: 'sanverse.persisted-creative-scene-workflow/v1'
+  readonly sceneId: string
+  readonly candidate: GenericCreativeSceneCandidateV1
+  readonly engineState: ClosedLoopEngineStateV1
+}
+
+export interface PersistedCreativeSceneBatchV1 {
+  readonly schemaVersion: 'sanverse.persisted-creative-scene-batch/v1'
+  readonly id: string
+  readonly projectId: string
+  readonly projectRevision: number
+  readonly opportunityMapId: string
+  readonly workflows: readonly PersistedCreativeSceneWorkflowV1[]
+  readonly pendingApprovalRequests: readonly HostApprovalRequestV1[]
+}
+
 export interface CreativeSceneBatchV1 {
   readonly id: string
   readonly projectId: string
@@ -93,10 +111,13 @@ export interface CreativeSceneBatchV1 {
   readonly sceneIds: readonly string[]
   readonly getWorkflow: (sceneId: string) => CreativeSceneWorkflowV1 | null
   readonly snapshot: () => CreativeSceneBatchSnapshotV1
+  readonly serialize: () => PersistedCreativeSceneBatchV1
   readonly requestOwnerReviews: (scope: OwnerApprovalScopeV1, now?: string) => Readonly<{ ok: boolean; message: string; requests?: readonly HostApprovalRequestV1[] }>
   readonly resolveOwnerApproval: (requestRef: string, resolver: HostApprovalResolverV1) => Promise<Readonly<{ ok: boolean; message: string; approved?: boolean }>>
   readonly advanceAll: (stage: 'animatic' | 'motion') => Promise<Readonly<{ ok: boolean; message: string }>>
   readonly reviseSceneOpacity: (sceneId: string, opacity: number, expectedSandboxRevision: number) => Readonly<{ ok: boolean; message: string }>
+  readonly reviseSceneStoryboard: (sceneId: string, input: Readonly<{ text?: string; fontSize?: number; expectedSandboxRevision: number }>) => Readonly<{ ok: boolean; message: string }>
+  readonly excludeScene: (sceneId: string) => Readonly<{ ok: boolean; message: string }>
 }
 
 export type CreateCreativeSceneBatchResultV1 =
@@ -195,6 +216,7 @@ export const createCreativeSceneWorkflowV1 = (input: Readonly<{
   candidate: GenericCreativeSceneCandidateV1
   styleLockId: string
   creativeLanguageId: string
+  restoredState?: ClosedLoopEngineStateV1
 }>): CreativeSceneWorkflowV1 => {
   const { planned, candidate } = input
   const opportunity = planned.opportunity
@@ -208,7 +230,7 @@ export const createCreativeSceneWorkflowV1 = (input: Readonly<{
       sourceCompositeFrameRefs: Object.freeze([`production-preview://${candidate.id}/source-composite`]),
     }),
   })
-  const engine = createClosedLoopEngineV1(Object.freeze({ id: candidate.source.projectId, revision: candidate.source.projectRevision, scene: candidate.scene }), renderer)
+  const engine = createClosedLoopEngineV1(Object.freeze({ id: candidate.source.projectId, revision: candidate.source.projectRevision, scene: candidate.scene }), renderer, input.restoredState)
   const workflow: CreativeSceneWorkflowV1 = {
     sceneId: candidate.id,
     planned,
@@ -217,6 +239,7 @@ export const createCreativeSceneWorkflowV1 = (input: Readonly<{
     creativeLanguageId: input.creativeLanguageId,
     engine,
     initialize: () => {
+      if (input.restoredState) return Object.freeze({ ok: true, message: 'Restored persisted Creative scene workflow state.' })
       const board = createStoryboardV1({
         id: `storyboard:${candidate.id}`,
         sourceRevision: candidate.source.projectRevision,
@@ -300,6 +323,24 @@ export const createCreativeSceneWorkflowV1 = (input: Readonly<{
       })
       return messageOf(qa, `Storyboard revised to sandbox revision ${revised.value.sandboxRevision}; prior approval no longer applies.`)
     },
+    reviseStoryboardContent: ({ text, fontSize, expectedSandboxRevision }) => {
+      const hasText = typeof text === 'string' && text.trim().length > 0 && text.length <= 240
+      const hasFontSize = typeof fontSize === 'number' && Number.isFinite(fontSize) && fontSize >= 8 && fontSize <= 320
+      if (!hasText && !hasFontSize) return Object.freeze({ ok: false, message: 'Provide bounded text and/or a fontSize from 8 through 320.' })
+      const sandbox = engine.getState().storyboardSandbox
+      if (!sandbox) return Object.freeze({ ok: false, message: 'Storyboard sandbox is not initialized.' })
+      const state = sandbox.storyboard.states[0]
+      if (!state) return Object.freeze({ ok: false, message: 'Storyboard has no editable state.' })
+      const textNode = Object.values(state.graphState.nodes).find((node) => node.type === 'text')
+      if (!textNode) return Object.freeze({ ok: false, message: 'This Storyboard has no text node that can receive the requested localized content revision.' })
+      const operations = [] as Array<Readonly<Record<string, unknown>>>
+      if (hasText) operations.push(Object.freeze({ operationId: `scene-text:${textNode.id}:r${expectedSandboxRevision}`, type: 'set-property' as const, target: Object.freeze({ nodeId: textNode.id, property: 'text.text' as const }), value: Object.freeze({ kind: 'constant' as const, value: text!.trim() }) }))
+      if (hasFontSize) operations.push(Object.freeze({ operationId: `scene-font-size:${textNode.id}:r${expectedSandboxRevision}`, type: 'set-property' as const, target: Object.freeze({ nodeId: textNode.id, property: 'text.fontSize' as const }), value: Object.freeze({ kind: 'constant' as const, value: fontSize! }) }))
+      const revised = engine.reviseStoryboard(Object.freeze({ transactionId: `scene-content:${candidate.id}:r${expectedSandboxRevision}`, expectedSandboxRevision, stateId: state.id, operations: Object.freeze(operations) }) as never)
+      if (!revised.ok) return messageOf(revised, '')
+      const qa = engine.validateStoryboard({ availableCapabilities: Object.freeze([candidate.componentId, ...opportunity.requiredCapabilities]), availableSourceIds: Object.freeze([candidate.source.assetId]), requiredRatio: candidate.scene.supportedAspectRatios[0], compositionBounds: Object.freeze({ width: candidate.renderContext.composition.width, height: candidate.renderContext.composition.height }) })
+      return messageOf(qa, `Storyboard content revised to sandbox revision ${revised.value.sandboxRevision}; prior approval no longer applies.`)
+    },
     advanceAfterStoryboardApproval: () => {
       const state = engine.getState()
       const board = state.storyboardSandbox?.storyboard
@@ -367,19 +408,26 @@ export const createCreativeSceneBatchV1 = (input: Readonly<{
   project: EditProject
   opportunityMap: MotionOpportunityMapV1
   transcriptTextByOpportunityId?: Readonly<Record<string, string>>
+  restored?: PersistedCreativeSceneBatchV1
 }>): CreateCreativeSceneBatchResultV1 => {
   if (input.project.projectId !== input.opportunityMap.projectId || input.project.revision !== input.opportunityMap.projectRevision) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'OPPORTUNITY_MAP_STALE', message: 'The opportunity map must target the exact current production project revision.' }) })
-  const batchId = `scenebatch_${tail(`${input.project.projectId}:${input.project.revision}:${input.opportunityMap.id}`)}`
+  const batchId = input.restored?.id ?? `scenebatch_${tail(`${input.project.projectId}:${input.project.revision}:${input.opportunityMap.id}`)}`
+  if (input.restored && (input.restored.projectId !== input.project.projectId || input.restored.projectRevision !== input.project.revision || input.restored.opportunityMapId !== input.opportunityMap.id)) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'CREATIVE_RUN_REHYDRATION_FAILED', message: 'Persisted scene batch identity/revision does not match the current project and opportunity map.' }) })
   const workflows = new Map<string, CreativeSceneWorkflowV1>()
-  const pending = new Map<string, HostApprovalRequestV1>()
+  const pending = new Map<string, HostApprovalRequestV1>((input.restored?.pendingApprovalRequests ?? []).map((request) => [request.requestRef, request]))
+  const restoredBySceneId = new Map((input.restored?.workflows ?? []).map((item) => [item.sceneId, item]))
   for (const planned of input.opportunityMap.opportunities) {
-    const built = buildGenericCreativeSceneCandidateV1({ project: input.project, planned, contentText: input.transcriptTextByOpportunityId?.[planned.opportunity.id] })
-    if (!built.ok) return Object.freeze({ ok: false as const, refusal: built.refusal })
-    const workflow = createCreativeSceneWorkflowV1({ planned, candidate: built.value, styleLockId: input.opportunityMap.styleLockId, creativeLanguageId: input.opportunityMap.creativeLanguage.id })
+    const deterministic = buildGenericCreativeSceneCandidateV1({ project: input.project, planned, contentText: input.transcriptTextByOpportunityId?.[planned.opportunity.id] })
+    if (!deterministic.ok) return Object.freeze({ ok: false as const, refusal: deterministic.refusal })
+    const restored = restoredBySceneId.get(deterministic.value.id)
+    const candidate = restored?.candidate ?? deterministic.value
+    if (restored && (candidate.id !== deterministic.value.id || candidate.opportunityId !== planned.opportunity.id || candidate.source.projectId !== input.project.projectId || candidate.source.projectRevision !== input.project.revision)) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'CREATIVE_RUN_REHYDRATION_FAILED', message: `Persisted scene ${restored.sceneId} does not match deterministic project/opportunity identity.` }) })
+    const workflow = createCreativeSceneWorkflowV1({ planned, candidate, styleLockId: input.opportunityMap.styleLockId, creativeLanguageId: input.opportunityMap.creativeLanguage.id, ...(restored ? { restoredState: restored.engineState } : {}) })
     const initialized = workflow.initialize()
-    if (!initialized.ok) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'SCENE_STORYBOARD_INITIALIZATION_FAILED', message: initialized.message, details: Object.freeze({ opportunityId: planned.opportunity.id, componentId: built.value.componentId }) }) })
+    if (!initialized.ok) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: restored ? 'CREATIVE_RUN_REHYDRATION_FAILED' : 'SCENE_STORYBOARD_INITIALIZATION_FAILED', message: initialized.message, details: Object.freeze({ opportunityId: planned.opportunity.id, componentId: candidate.componentId }) }) })
     workflows.set(workflow.sceneId, workflow)
   }
+  if (input.restored && restoredBySceneId.size !== workflows.size) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'CREATIVE_RUN_REHYDRATION_FAILED', message: 'Persisted scene count does not match deterministic opportunity-map scene count.' }) })
   const invalidateStaleRequests = () => {
     for (const [ref, request] of pending) {
       const workflow = workflows.get(request.sceneId)
@@ -406,13 +454,29 @@ export const createCreativeSceneBatchV1 = (input: Readonly<{
     projectId: input.project.projectId,
     projectRevision: input.project.revision,
     opportunityMap: input.opportunityMap,
-    sceneIds: Object.freeze([...workflows.keys()]),
+    get sceneIds() { return Object.freeze([...workflows.keys()]) },
     getWorkflow: (sceneId) => workflows.get(sceneId) ?? null,
     snapshot,
+    serialize: () => Object.freeze({
+      schemaVersion: 'sanverse.persisted-creative-scene-batch/v1' as const,
+      id: batchId,
+      projectId: input.project.projectId,
+      projectRevision: input.project.revision,
+      opportunityMapId: input.opportunityMap.id,
+      workflows: Object.freeze([...workflows.values()].map((workflow) => Object.freeze({
+        schemaVersion: 'sanverse.persisted-creative-scene-workflow/v1' as const,
+        sceneId: workflow.sceneId,
+        candidate: workflow.candidate,
+        engineState: workflow.state(),
+      })).sort((a, b) => a.sceneId.localeCompare(b.sceneId))),
+      pendingApprovalRequests: Object.freeze([...pending.values()].sort((a, b) => a.requestRef.localeCompare(b.requestRef))),
+    }),
     requestOwnerReviews: (scope, now = new Date().toISOString()) => {
       invalidateStaleRequests()
       const requests: HostApprovalRequestV1[] = []
       for (const workflow of workflows.values()) {
+        const target = currentTarget(workflow.state(), scope)
+        if (target && 'status' in target && target.status === 'owner-approved') continue
         const packet = workflow.engine.requestOwnerReview(scope)
         if (!packet.ok) return Object.freeze({ ok: false, message: `${workflow.sceneId}: ${packet.refusal.message}` })
         if (!packet.value.qaPassed) {
@@ -461,19 +525,30 @@ export const createCreativeSceneBatchV1 = (input: Readonly<{
     advanceAll: async (stage) => {
       invalidateStaleRequests()
       if (stage === 'animatic') {
+        let built = 0
         for (const workflow of workflows.values()) {
+          if (workflow.state().animatic) continue
           const result = workflow.advanceAfterStoryboardApproval()
           if (!result.ok) return Object.freeze({ ok: false, message: `${workflow.sceneId}: ${result.message}` })
+          built += 1
         }
-        return Object.freeze({ ok: true, message: `Built and structurally validated ${workflows.size} animatic(s).` })
+        return Object.freeze({ ok: true, message: `Built and structurally validated ${built} new animatic(s); already-advanced scenes were left untouched.` })
       }
+      let built = 0
+      let reviewed = 0
       for (const workflow of workflows.values()) {
-        const result = workflow.advanceAfterAnimaticApproval()
-        if (!result.ok) return Object.freeze({ ok: false, message: `${workflow.sceneId}: ${result.message}` })
-        const review = await workflow.prepareMotionReview()
-        if (!review.ok) return Object.freeze({ ok: false, message: `${workflow.sceneId}: ${review.message}` })
+        if (!workflow.state().motionDraft) {
+          const result = workflow.advanceAfterAnimaticApproval()
+          if (!result.ok) return Object.freeze({ ok: false, message: `${workflow.sceneId}: ${result.message}` })
+          built += 1
+        }
+        if (!workflow.state().visualEvidence) {
+          const review = await workflow.prepareMotionReview()
+          if (!review.ok) return Object.freeze({ ok: false, message: `${workflow.sceneId}: ${review.message}` })
+          reviewed += 1
+        }
       }
-      return Object.freeze({ ok: true, message: `Built, structurally validated, and prepared review evidence for ${workflows.size} Motion draft(s).` })
+      return Object.freeze({ ok: true, message: `Built ${built} new Motion draft(s) and prepared ${reviewed} new review packet(s); already-advanced scenes were left untouched.` })
     },
     reviseSceneOpacity: (sceneId, opacity, expectedSandboxRevision) => {
       invalidateStaleRequests()
@@ -482,6 +557,21 @@ export const createCreativeSceneBatchV1 = (input: Readonly<{
       const result = workflow.reviseStoryboardOpacity(opacity, expectedSandboxRevision)
       invalidateStaleRequests()
       return result
+    },
+    reviseSceneStoryboard: (sceneId, revisionInput) => {
+      invalidateStaleRequests()
+      const workflow = workflows.get(sceneId)
+      if (!workflow) return Object.freeze({ ok: false, message: 'Scene is not part of this batch.' })
+      const result = workflow.reviseStoryboardContent(revisionInput)
+      invalidateStaleRequests()
+      return result
+    },
+    excludeScene: (sceneId) => {
+      const workflow = workflows.get(sceneId)
+      if (!workflow) return Object.freeze({ ok: false, message: 'Scene is not part of this batch.' })
+      workflows.delete(sceneId)
+      for (const [ref, request] of pending) if (request.sceneId === sceneId) pending.delete(ref)
+      return Object.freeze({ ok: true, message: `Scene ${sceneId} is excluded from later stages; other scenes are unchanged.` })
     },
   }
   return Object.freeze({ ok: true as const, value: Object.freeze(batch) })

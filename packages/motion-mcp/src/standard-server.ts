@@ -1,5 +1,7 @@
-﻿import { randomUUID, timingSafeEqual } from 'node:crypto'
+﻿import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server as NodeHttpServer, type ServerResponse } from 'node:http'
+import { McpServer as McpServerV2, acceptedContent, createRequestStateCodec, fromJsonSchema, inputRequired, type ServerContext as ServerContextV2 } from '@modelcontextprotocol/server'
+import { serveStdio } from '@modelcontextprotocol/server/stdio'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
@@ -15,9 +17,26 @@ export interface SanverseExternalContextV1 {
   readonly sandboxId?: string
   readonly productionRevision?: number
 }
+export interface SanverseBrowserReviewDecisionRequestV1 {
+  readonly projectId: string
+  readonly runId: string
+  readonly reviewId: string
+  readonly decision: 'approve' | 'revise' | 'reject'
+  readonly revisionNote?: string
+  readonly evidenceHash: string
+  readonly subjectId: string
+  readonly subjectRevision: number
+  readonly scope?: string
+  readonly sceneId?: string
+  readonly artifacts: readonly Readonly<{ artifactId: string; label?: string; mimeType?: string; sha256?: string }>[]
+}
 export interface SanverseExternalRegistrySessionV1 {
   readonly registry: SanverseToolRegistryV1
   readonly label?: string
+  /** Host callback for chat-renderable review evidence. Not exposed as a tool. */
+  readonly readReviewArtifactBytes?: (input: Readonly<{ projectId: string; runId: string; reviewId: string; artifactId: string }>) => Promise<Uint8Array>
+  /** Trusted local-browser fallback when the MCP client cannot elicit human input. Not exposed as a tool. */
+  readonly requestBrowserReviewDecision?: (input: SanverseBrowserReviewDecisionRequestV1) => Promise<boolean>
 }
 export interface SanverseExternalSessionContextV1 {
   readonly transport: 'stdio' | 'http'
@@ -51,6 +70,15 @@ const descriptionById: Readonly<Record<string, string>> = Object.freeze({
   'production.select_project': 'Select one existing Sanverse project for this MCP session only. This does not edit the project; project-specific tools read the live server-authoritative revision before mutation.',
   'production.import_source_video': 'Import one allowlisted local source video through the existing Sanverse production intake authority and make it this session\'s active project. In local STDIO, relative paths resolve inside the coding-agent workspace; HTTP keeps explicit import-root confinement. Requires a stable transactionId.',
   'production.get_project_context': 'Read the active production project identity, exact revision, primary source/clip, duration, dimensions, frame rate, and audio state. Does not mutate the project.',
+  'creative.create_run': 'Create or idempotently reopen one durable project-scoped Creative Run for the active source and exact production base revision. The run persists analysis, opportunity, scene and review state so another MCP client session can resume it.',
+  'creative.list_runs': 'List durable Creative Runs for the active production project, including stage, scene count, pending-review count and updated time. Does not mutate production state.',
+  'creative.get_run': 'Read one durable Creative Run for the active project without making it active. Use creative.resume_run after reconnect when later scene/review tools need its restored in-memory workflow.',
+  'creative.resume_run': 'Rehydrate one durable Creative Run into this MCP session, restoring transcript/source/opportunity/scene/review state against the exact current production revision. Fails closed if persisted identity or revision no longer matches.',
+  'creative.cancel_run': 'Mark one durable Creative Run cancelled without mutating accepted production edits. Existing source media and production history remain unchanged.',
+  'creative.prepare_review': 'Prepare exact Storyboard, Animatic or Motion owner-review evidence for the active Creative Run. The host renders canonical review frames, persists their hashes, and local STDIO returns bounded images directly in chat; this requests review but creates no approval.',
+  'creative.get_review': 'Read one exact persisted Creative review record for the active run. Local STDIO also returns its hash-verified image evidence directly in chat when available.',
+  'creative.decide_review': 'Record Approve, Revise or Reject for one exact pending Creative review. Local STDIO requires MCP human confirmation bound to review ID, evidence hash, subject ID and subject revision; ordinary tool JSON cannot create host approval authority.',
+  'creative.revise_scene': 'Apply a bounded localized Storyboard text/font-size/opacity revision only after the exact review received a trusted Revise decision, then prepare a new exact review while leaving sibling scenes intact.',
   'source.list_workspace_inputs': 'List supported video/transcript/image inputs inside this local STDIO coding-agent workspace using safe relative paths only. Does not expose absolute workspace paths or arbitrary filesystem contents; HTTP sessions refuse this tool.',
   'source.attach_transcript': 'Attach plain, SRT, or WebVTT transcript as analysis-only source context for the active project. Local STDIO may supply a workspace-relative localPath so Sanverse reads the file inside the same confinement boundary; it does not create visible captions.',
   'source.get_transcript': 'Read a transcript previously attached in this MCP session. Does not mutate the project or create captions.',
@@ -375,6 +403,69 @@ export const createSanverseStandardMcpHttpServerV1 = (options: SanverseStandardH
   return server
 }
 
+interface ReviewDecisionRequestStateV1 {
+  readonly reviewId: string
+  readonly decision: 'approve' | 'revise' | 'reject'
+  readonly revisionNote?: string
+  readonly evidenceHash: string
+  readonly subjectId: string
+  readonly subjectRevision: number
+}
+
+const reviewFromToolResult = (result: unknown): Record<string, unknown> | null => {
+  if (!record(result) || result.ok === false || !record(result.value)) return null
+  return record(result.value.review) ? result.value.review : null
+}
+
+const resultProjectAndRun = (result: unknown): Readonly<{ projectId: string; runId: string }> | null => {
+  if (!record(result) || !record(result.value)) return null
+  const value = result.value
+  const projectId = typeof value.projectId === 'string' ? value.projectId : record(value.run) && typeof value.run.projectId === 'string' ? value.run.projectId : null
+  const runId = typeof value.runId === 'string' ? value.runId : record(value.run) && typeof value.run.runId === 'string' ? value.run.runId : null
+  return projectId && runId ? Object.freeze({ projectId, runId }) : null
+}
+
+const reviewsFromToolResult = (result: unknown): readonly Record<string, unknown>[] => {
+  if (!record(result) || !record(result.value)) return Object.freeze([])
+  const value = result.value
+  const nextReviews: Record<string, unknown>[] = []
+  if (record(value.nextReview)) nextReviews.push(value.nextReview)
+  if (Array.isArray(value.nextReviews)) for (const item of value.nextReviews as unknown[]) if (record(item)) nextReviews.push(item)
+  const source = nextReviews.length > 0 ? nextReviews : (() => {
+    const current: Record<string, unknown>[] = []
+    if (record(value.review)) current.push(value.review)
+    if (Array.isArray(value.reviews)) for (const item of value.reviews as unknown[]) if (record(item)) current.push(item)
+    return current
+  })()
+  const unique = new Map<string, Record<string, unknown>>()
+  for (const review of source) if (typeof review.reviewId === 'string') unique.set(review.reviewId, review)
+  return Object.freeze([...unique.values()])
+}
+
+const v2ToolResult = async (result: unknown, session: SanverseExternalRegistrySessionV1): Promise<any> => {
+  const base = modelResult(result)
+  const location = resultProjectAndRun(result)
+  const reviews = reviewsFromToolResult(result)
+  if (!location || reviews.length === 0 || !session.readReviewArtifactBytes) return base
+  const content: Array<Record<string, unknown>> = [...base.content]
+  let attached = 0
+  for (const review of reviews) {
+    if (attached >= 12) break
+    if (typeof review.reviewId !== 'string' || !Array.isArray(review.artifacts)) continue
+    for (const raw of review.artifacts) {
+      if (attached >= 12) break
+      if (!record(raw) || typeof raw.artifactId !== 'string' || typeof raw.mimeType !== 'string' || !raw.mimeType.startsWith('image/') || typeof raw.sha256 !== 'string') continue
+      const bytes = await session.readReviewArtifactBytes({ projectId: location.projectId, runId: location.runId, reviewId: review.reviewId, artifactId: raw.artifactId })
+      const digest = createHash('sha256').update(bytes).digest('hex')
+      if (digest !== raw.sha256) throw new Error(`Creative review artifact ${raw.artifactId} failed SHA-256 verification before chat presentation.`)
+      content.push(Object.freeze({ type: 'image', data: Buffer.from(bytes).toString('base64'), mimeType: raw.mimeType }))
+      attached += 1
+    }
+  }
+  if (attached === 12 && reviews.some((review) => Array.isArray(review.artifacts) && review.artifacts.length > 0)) content.push(Object.freeze({ type:'text', text:'Sanverse attached the first 12 review images. Call creative.get_review for an individual review to inspect all of its exact frames in chat.' }))
+  return Object.freeze({ ...base, content: Object.freeze(content) })
+}
+
 export const connectSanverseStandardStdioV1 = async (
   createRegistry: SanverseExternalRegistryFactoryV1,
   options: Readonly<{
@@ -384,13 +475,186 @@ export const connectSanverseStandardStdioV1 = async (
 ) => {
   const sessionLabel = randomUUID()
   const sessionContext = Object.freeze({ transport: 'stdio' as const, ...(options.workspaceRoot ? { workspaceRoot: options.workspaceRoot } : {}) })
-  let session: Promise<SanverseExternalRegistrySessionV1> | undefined
-  const mcpServer = createSanverseStandardMcpServerV1(
-    async () => (session ??= Promise.resolve(createRegistry(sessionLabel, sessionContext))).then((value) => value.registry),
-    { sessionLabel, onToolCall: options.onToolCall },
-  )
-  const transport = new StdioServerTransport(process.stdin, process.stdout)
-  await mcpServer.connect(transport)
-  return Object.freeze({ server: mcpServer, transport })
+  let sessionPromise: Promise<SanverseExternalRegistrySessionV1> | undefined
+  const session = async () => sessionPromise ??= Promise.resolve(createRegistry(sessionLabel, sessionContext))
+  const decisionCodec = createRequestStateCodec<ReviewDecisionRequestStateV1>({
+    key: randomBytes(32),
+    ttlSeconds: 10 * 60,
+    bind: (ctx: ServerContextV2) => ctx.mcpReq.method,
+  })
+
+  const handle = serveStdio(async () => {
+    const activeSession = await session()
+    const mcp = new McpServerV2(
+      { name: SANVERSE_STANDARD_MCP_SERVER_NAME, version: SANVERSE_STANDARD_MCP_SERVER_VERSION },
+      {
+        capabilities: { tools: {} },
+        instructions: 'Use Sanverse MCP for production-backed Creative Runs. Review evidence is returned directly in chat. Never fabricate owner approval: creative.decide_review requires trusted MCP human confirmation bound to the exact review evidence/revision. Reconnect by creative.list_runs + creative.resume_run.',
+        inputRequired: { maxRounds: 3, roundTimeoutMs: 10 * 60 * 1000, legacyShim: true },
+        requestState: { verify: decisionCodec.verify },
+      },
+    )
+
+    const recordEvidence = async (toolName: string, value: unknown, context: ToolExecutionContextV1) => {
+      if (!options.onToolCall) return
+      const refusal = record(value) && value.ok === false && record(value.refusal) ? value.refusal : null
+      const resultValue = record(value) && record(value.value) ? value.value : null
+      const client = mcp.server.getClientVersion()
+      await options.onToolCall(Object.freeze({
+        at: new Date().toISOString(),
+        sessionLabel,
+        clientName: client?.name ?? 'unknown-client',
+        clientVersion: client?.version ?? 'unknown',
+        toolName,
+        sandboxId: context.sandboxId ?? null,
+        productionRevision: context.revision ?? null,
+        ok: record(value) ? value.ok !== false : true,
+        refusalCode: refusal && typeof refusal.code === 'string' ? refusal.code : null,
+        resultSandboxId: resultValue && typeof resultValue.sandboxId === 'string' ? resultValue.sandboxId : null,
+        reviewRef: resultValue && typeof resultValue.reviewRef === 'string' ? resultValue.reviewRef : null,
+        resultRevision: record(value) && Number.isSafeInteger(value.revision) ? Number(value.revision) : null,
+      }))
+    }
+
+    for (const summary of activeSession.registry.list()) {
+      const definition = activeSession.registry.get(summary.id)
+      if (!definition) continue
+      mcp.registerTool(definition.id, {
+        title: definition.id,
+        description: descriptionById[definition.id] ?? fallbackDescription(definition),
+        inputSchema: fromJsonSchema(externalInputSchema(definition.inputSchema) as never),
+        annotations: {
+          readOnlyHint: writeClass(definition) === 'read',
+          destructiveHint: false,
+          idempotentHint: writeClass(definition) === 'read',
+          openWorldHint: false,
+        },
+        _meta: {
+          'io.sanverse/toolLevel': definition.level,
+          'io.sanverse/writeClass': writeClass(definition),
+          'io.sanverse/requiresSandbox': definition.requiresSandbox,
+          'io.sanverse/requiresOwnerApproval': definition.requiresOwnerApproval === true,
+        },
+      }, async (args: unknown, ctx: ServerContextV2) => {
+        const { input, context } = splitArguments(args)
+        if (definition.requiresOwnerApproval) {
+          const value = Object.freeze({ ok: false, refusal: Object.freeze({ code: 'OWNER_APPROVAL_REQUIRED', message: 'Owner approval is host authority. External MCP clients cannot manufacture OwnerApprovalV1 or satisfy approval by sending JSON.' }) })
+          await recordEvidence(definition.id, value, context)
+          return ownerGateRefusal() as never
+        }
+
+        if (definition.id === 'creative.decide_review') {
+          const reviewId = typeof input.reviewId === 'string' ? input.reviewId : ''
+          const decision = input.decision === 'approve' || input.decision === 'revise' || input.decision === 'reject' ? input.decision : null
+          const revisionNote = typeof input.revisionNote === 'string' ? input.revisionNote : undefined
+          if (!decision || !reviewId) {
+            const value = await activeSession.registry.invoke(definition.id, input, context)
+            await recordEvidence(definition.id, value, context)
+            return v2ToolResult(value, activeSession)
+          }
+          const lookup = await activeSession.registry.invoke('creative.get_review', Object.freeze({ reviewId }), context)
+          const review = reviewFromToolResult(lookup)
+          if (!review || typeof review.evidenceHash !== 'string' || typeof review.subjectId !== 'string' || !Number.isSafeInteger(review.subjectRevision)) {
+            await recordEvidence(definition.id, lookup, context)
+            return v2ToolResult(lookup, activeSession)
+          }
+          const expected: ReviewDecisionRequestStateV1 = Object.freeze({
+            reviewId,
+            decision,
+            ...(revisionNote ? { revisionNote } : {}),
+            evidenceHash: review.evidenceHash,
+            subjectId: review.subjectId,
+            subjectRevision: Number(review.subjectRevision),
+          })
+          const returnedState = ctx.mcpReq.requestState<ReviewDecisionRequestStateV1>()
+          const confirmed = acceptedContent<{ confirm: boolean }>(ctx.mcpReq.inputResponses, 'ownerConfirmation')
+          const hostContext = (): ToolExecutionContextV1 => Object.freeze({
+            ...context,
+            hostReviewDecision: Object.freeze({
+              reviewId,
+              decision,
+              evidenceHash: expected.evidenceHash,
+              subjectId: expected.subjectId,
+              subjectRevision: expected.subjectRevision,
+              confirmedAt: new Date().toISOString(),
+              ...(revisionNote ? { revisionNote } : {}),
+            }),
+          })
+          if (!returnedState) {
+            const canElicit = mcp.server.getClientCapabilities()?.elicitation !== undefined
+            if (!canElicit) {
+              const location = resultProjectAndRun(lookup)
+              if (!location || !activeSession.requestBrowserReviewDecision) {
+                const value = Object.freeze({ ok:false, refusal:Object.freeze({ code:'OWNER_CONFIRMATION_UNAVAILABLE', message:'This MCP client cannot render an owner elicitation and no trusted local-browser review fallback is available.' }) })
+                await recordEvidence(definition.id, value, context)
+                return v2ToolResult(value, activeSession)
+              }
+              const artifacts = Array.isArray(review.artifacts)
+                ? review.artifacts.filter(record).map((artifact) => Object.freeze({
+                    artifactId: typeof artifact.artifactId === 'string' ? artifact.artifactId : '',
+                    ...(typeof artifact.label === 'string' ? { label: artifact.label } : {}),
+                    ...(typeof artifact.mimeType === 'string' ? { mimeType: artifact.mimeType } : {}),
+                    ...(typeof artifact.sha256 === 'string' ? { sha256: artifact.sha256 } : {}),
+                  })).filter((artifact) => artifact.artifactId.length > 0)
+                : []
+              const browserConfirmed = await activeSession.requestBrowserReviewDecision(Object.freeze({
+                ...location,
+                reviewId,
+                decision,
+                ...(revisionNote ? { revisionNote } : {}),
+                evidenceHash: expected.evidenceHash,
+                subjectId: expected.subjectId,
+                subjectRevision: expected.subjectRevision,
+                ...(typeof review.scope === 'string' ? { scope: review.scope } : {}),
+                ...(typeof review.sceneId === 'string' ? { sceneId: review.sceneId } : {}),
+                artifacts: Object.freeze(artifacts),
+              }))
+              if (!browserConfirmed) {
+                const value = Object.freeze({ ok:false, refusal:Object.freeze({ code:'OWNER_CONFIRMATION_DECLINED', message:'The owner did not confirm this exact review decision in the trusted local browser.' }) })
+                await recordEvidence(definition.id, value, context)
+                return v2ToolResult(value, activeSession)
+              }
+              const trusted = hostContext()
+              const value = await activeSession.registry.invoke(definition.id, input, trusted)
+              await recordEvidence(definition.id, value, trusted)
+              return v2ToolResult(value, activeSession)
+            }
+            const requestState = await decisionCodec.mint(expected, ctx)
+            return inputRequired({
+              inputRequests: {
+                ownerConfirmation: inputRequired.elicit({
+                  message: `Sanverse asks you to confirm ${decision.toUpperCase()} for ${reviewId}. This decision is bound to evidence ${review.evidenceHash.slice(0, 12)}… and exact subject revision ${String(review.subjectRevision)}.${revisionNote ? ` Requested revision: ${revisionNote}` : ''}`,
+                  requestedSchema: {
+                    type: 'object',
+                    additionalProperties: false,
+                    properties: { confirm: { type: 'boolean', title: `Confirm ${decision}` } },
+                    required: ['confirm'],
+                  },
+                }),
+              },
+              requestState,
+            }) as never
+          }
+          const sameState = returnedState.reviewId === expected.reviewId && returnedState.decision === expected.decision && returnedState.evidenceHash === expected.evidenceHash && returnedState.subjectId === expected.subjectId && returnedState.subjectRevision === expected.subjectRevision && returnedState.revisionNote === expected.revisionNote
+          if (!sameState || !ctx.mcpReq.inputResponses || confirmed?.confirm !== true) {
+            const value = Object.freeze({ ok:false, refusal:Object.freeze({ code: sameState ? 'OWNER_CONFIRMATION_DECLINED' : 'OWNER_CONFIRMATION_STALE', message: sameState ? 'The owner did not confirm this exact review decision.' : 'The review changed between confirmation rounds; inspect the current evidence and decide again.' }) })
+            await recordEvidence(definition.id, value, context)
+            return v2ToolResult(value, activeSession)
+          }
+          const trusted = hostContext()
+          const value = await activeSession.registry.invoke(definition.id, input, trusted)
+          await recordEvidence(definition.id, value, trusted)
+          return v2ToolResult(value, activeSession)
+        }
+
+        const value = await activeSession.registry.invoke(definition.id, input, context)
+        await recordEvidence(definition.id, value, context)
+        return v2ToolResult(value, activeSession)
+      })
+    }
+    return mcp
+  }, { legacy: 'serve', onerror: (error) => console.error(`Sanverse MCP STDIO protocol error: ${error.message}`) })
+
+  return Object.freeze({ handle })
 }
 

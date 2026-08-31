@@ -156,3 +156,23 @@ Last updated: 2026-08-30
 - [x] Full suites 2,050 passing; production build exit 0
 - [x] Real browser workflow, 20 steps, four screen sizes measured
 - [ ] Owner visual acceptance
+
+## Chat-first review + resumable Creative Run V1 — 2026-08-31
+
+- [x] Durable project-scoped `CreativeRunV1` / `CreativeReviewV1` store with atomic bounded writes and fail-closed rehydration
+- [x] Closed-Loop/multi-scene state serialization and reconnect restoration without a second workflow engine
+- [x] Chat-native canonical review evidence with persisted SHA-256 identity and no absolute artifact-path exposure
+- [x] Trusted Approve / Request revision / Reject bridge; ordinary model JSON cannot mint host approval
+- [x] Integrity-protected MCP multi-round-trip request state with TTL/method binding and current-review revalidation
+- [x] Trusted loopback browser fallback for clients without elicitation; 2/2 direct tests PASS
+- [x] Review-vs-production artifact purpose gate; production still requires exact Motion approval
+- [x] Localized per-scene revision/rejection with unaffected sibling continuity
+- [x] Opportunity planner uses up-to-N useful moments, per-candidate validation/repair and bounded fallback
+- [x] Real STDIO audit: 62 tools, 3 Storyboard images, trusted confirmation, 3 Animatic images, reconnect restores same pending review
+- [x] Real Codex resume/read smoke PASS without mutation
+- [x] Real OpenCode resume/read smoke PASS without mutation
+- [x] Focused suites: Render Contract 120/120; Creative Adapter 34/34; Motion MCP 30/30; Motion Agent Tools 30/30; run store 2/2; browser fallback 2/2
+- [x] Full all-workspace repository test command exit 0
+- [x] Root all-workspace production build exit 0
+- [x] Final production dependency audit: 0 critical / 0 high / 0 moderate / 0 low
+- [ ] Final raw-video release tag — intentionally withheld; separate REQ-020 human final-video gate remains

@@ -115,14 +115,20 @@ describe('raw-video opportunity planning + multi-scene workflow', () => {
     expect(again).toEqual(planned)
   })
 
-  it('validates agent-proposed candidate bounds/count/overlap instead of silently resolving invalid proposals', () => {
+  it('rejects only bad agent candidates and preserves the valid remainder up to the requested maximum', () => {
     const p = project(), t = transcript(p), source = packet(p, t)
     const base = planMotionOpportunitiesV1({ packet: source, transcript: t, targetCount: 10 })
     if (!base.ok) throw new Error(base.refusal.message)
     const candidates = base.value.opportunities.map((entry) => entry.opportunity)
     const overlapped: MotionOpportunityV1[] = candidates.map((candidate, index) => index === 1 ? Object.freeze({ ...candidate, sourceStartTick: candidates[0]!.sourceStartTick + 100 }) : candidate)
-    expect(planMotionOpportunitiesV1({ packet: source, transcript: t, targetCount: 10, agentCandidates: overlapped })).toMatchObject({ ok: false, refusal: { code: 'OPPORTUNITY_OVERLAP' } })
-    expect(planMotionOpportunitiesV1({ packet: source, transcript: t, targetCount: 10, agentCandidates: candidates.slice(0, 9) })).toMatchObject({ ok: false, refusal: { code: 'OPPORTUNITY_COUNT_MISMATCH' } })
+    const repaired = planMotionOpportunitiesV1({ packet: source, transcript: t, maxCount: 10, agentCandidates: overlapped })
+    expect(repaired.ok).toBe(true)
+    if (!repaired.ok) return
+    expect(repaired.value.selectedCount).toBe(9)
+    expect(repaired.value.rejectedCandidates).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'OPPORTUNITY_OVERLAP' })]))
+    const short = planMotionOpportunitiesV1({ packet: source, transcript: t, maxCount: 10, agentCandidates: candidates.slice(0, 9) })
+    expect(short.ok).toBe(true)
+    if (short.ok) expect(short.value.selectedCount).toBe(9)
   })
 
   it('builds ten isolated canonical Motion Scene storyboards without owner approval and exposes exact-revision batch state', () => {

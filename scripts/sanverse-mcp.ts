@@ -36,7 +36,15 @@ import {
   redoProductionProject,
   undoProductionProject,
 } from './sanverse-mcp-shared.ts'
-import { resolveHostOwnerApprovalRefV1 } from './sanverse-mcp-approval-authority.ts'
+import { issueHostOwnerApprovalV1, resolveHostOwnerApprovalRefV1 } from './sanverse-mcp-approval-authority.ts'
+import { materializeCreativeReviewEvidenceV1 } from './sanverse-mcp-review-renderer.ts'
+import { requestBrowserReviewDecisionV1 } from './sanverse-mcp-browser-review.ts'
+import {
+  listCreativeRunFilesV1,
+  readCreativeRunFileV1,
+  readCreativeReviewArtifactV1,
+  writeCreativeRunFileV1,
+} from './sanverse-mcp-creative-run-store.ts'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const command = process.argv[2] ?? 'dev'
@@ -88,6 +96,12 @@ const createRegistry = async (sessionLabel: string, context: SanverseExternalSes
       listWorkspaceInputs: async () => listPermittedWorkspaceInputsV1({ workspaceRoot: requireWorkspaceRoot() }),
       readWorkspaceTextFile: async ({ localPath }: Readonly<{ localPath: string }>) => readPermittedWorkspaceTextFileV1({ localPath, workspaceRoot: requireWorkspaceRoot() }),
     } : {}),
+    listCreativeRuns: listCreativeRunFilesV1,
+    readCreativeRun: readCreativeRunFileV1,
+    writeCreativeRun: writeCreativeRunFileV1,
+    readReviewArtifactBytes: readCreativeReviewArtifactV1,
+    materializeReviewEvidence: materializeCreativeReviewEvidenceV1,
+    issueOwnerApprovalRef: async (request) => issueHostOwnerApprovalV1({ request }),
     sha256Text,
     putCreativeArtifact: putProductionCreativeArtifact,
     readCreativeArtifact: readProductionCreativeArtifact,
@@ -99,7 +113,12 @@ const createRegistry = async (sessionLabel: string, context: SanverseExternalSes
     cancelExportJob: cancelProductionExportJob,
     resolveOwnerApprovalRef: resolveHostOwnerApprovalRefV1,
   })
-  return Object.freeze({ registry: session.registry, label: sessionLabel })
+  return Object.freeze({
+    registry: session.registry,
+    label: sessionLabel,
+    readReviewArtifactBytes: readCreativeReviewArtifactV1,
+    ...(context.transport === 'stdio' ? { requestBrowserReviewDecision: requestBrowserReviewDecisionV1 } : {}),
+  })
 }
 
 const health = async () => {

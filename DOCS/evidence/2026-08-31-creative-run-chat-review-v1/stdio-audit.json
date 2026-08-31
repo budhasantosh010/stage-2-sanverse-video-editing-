@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "sanverse.creative-run-stdio-audit/v1",
+  "generatedAt": "2026-08-31T08:13:32.192Z",
+  "projectId": "project_21c01709e413d034d4cec25dcb4b1ca4",
+  "runId": "run_00n2km2k",
+  "toolCount": 62,
+  "firstSession": {
+    "storyboardReviewId": "review_016ng1u4",
+    "chatImageCount": 3,
+    "ownerConfirmationRounds": 1,
+    "nextReviewId": "review_000cuypa",
+    "nextReviewChatImageCount": 3
+  },
+  "reconnectSession": {
+    "resumedStage": "animatic-review",
+    "reviewId": "review_000cuypa",
+    "chatImageCount": 3
+  },
+  "security": {
+    "ownerDecisionViaMcpElicitation": true,
+    "ordinaryJsonCannotMintHostDecision": true
+  }
+}

@@ -801,3 +801,17 @@ ticks and preview/export parity are all unchanged.
 
 Tests 2,050. Build exit 0. Gates T2 to T7 have NOT started.
 Evidence: `DOCS/evidence/2026-08-04-timeline-completion/T1_CREATOR_INTERACTION.md`.
+
+## Chat-first review + resumable Creative Run V1 — 2026-08-31
+
+The external MCP Creative workflow now has durable project-scoped runs and reviews rather than session-only batch memory. A fresh MCP/client session can resume the same source/opportunity/scene state and the same pending review without reconstructing it from chat. Rehydration remains revision/identity fenced and fails closed on corrupt or mismatched state.
+
+Owner review is now chat-first. Canonical Creative review frames are rendered, persisted with SHA-256 identity, reverified before presentation, and attached as native MCP image content. The real STDIO audit exposed **62 tools**, showed three Storyboard frames, completed one trusted human-confirmation round, advanced only through the existing host approval authority, showed three new Animatic frames, disconnected, then resumed the exact same pending Animatic review with the same three frames.
+
+Clients without MCP elicitation have a trusted local-browser fallback restricted to STDIO/loopback. Ordinary model JSON cannot populate host review-decision context. Review artifacts are explicitly non-production; production Creative artifacts still require exact Motion owner approval.
+
+Opportunity planning now selects **up to N useful moments** and preserves valid candidates when a sibling is invalid. Scene revision/rejection is localized instead of rebuilding or dropping unrelated scenes.
+
+Real Codex and real OpenCode independently resumed/read the same persisted Animatic review without mutation. Focused suites pass (Render Contract 120/120, Creative Production Adapter 34/34, Motion MCP 30/30, Motion Agent Tools 30/30, run store 2/2, browser fallback 2/2). The full all-workspace repository test command exits 0, the fresh root all-workspace production build exits 0, and the final production dependency audit reports zero vulnerabilities at every severity.
+
+Evidence: `DOCS/evidence/2026-08-31-creative-run-chat-review-v1/`. The broader final raw-video release tag is still withheld because its separate legitimate multi-stage owner/final-video review gates are not replaced by this engineering slice.

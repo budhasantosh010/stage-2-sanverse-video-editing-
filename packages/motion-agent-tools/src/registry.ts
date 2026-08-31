@@ -1,7 +1,22 @@
 import { creativeOperationOk, creativeOperationRefusal, type CreativeOperationResultV1, type CreativeValidationResultV1 } from '@sanverse/motion-contract'
 
 export type SanverseToolLevelV1 = 'T0'|'T1'|'T2'
-export interface ToolExecutionContextV1 { readonly sandboxId?: string; readonly revision?: number; readonly availableCapabilities?: readonly string[] }
+export interface HostReviewDecisionContextV1 {
+  readonly reviewId: string
+  readonly decision: 'approve' | 'revise' | 'reject'
+  readonly evidenceHash: string
+  readonly subjectId: string
+  readonly subjectRevision: number
+  readonly confirmedAt: string
+  readonly revisionNote?: string
+}
+export interface ToolExecutionContextV1 {
+  readonly sandboxId?: string
+  readonly revision?: number
+  readonly availableCapabilities?: readonly string[]
+  /** Host-only context injected after trusted human confirmation; never parsed from MCP JSON arguments. */
+  readonly hostReviewDecision?: HostReviewDecisionContextV1
+}
 export interface SanverseToolDefinitionV1<TInput = unknown,TOutput = unknown> {
   readonly id: string
   readonly version: 1

@@ -39,6 +39,15 @@ export interface PlannedMotionOpportunityV1 {
     transcriptCueIds: readonly string[]
     observationIds: readonly string[]
   }>
+  readonly planningProvenance: Readonly<{
+    origin: 'agent-proposed' | 'semantic-auto' | 'fallback'
+    originalStartTick: number
+    originalEndTick: number
+    normalizedStartTick: number
+    normalizedEndTick: number
+    repairNotes: readonly string[]
+    score: number
+  }>
   readonly selectedCapabilityId: string
   readonly capabilityRankings: readonly PlannedCapabilityRankingV1[]
   readonly recipeMatches: readonly PlannedRecipeMatchV1[]
@@ -50,7 +59,11 @@ export interface MotionOpportunityMapV1 {
   readonly projectId: string
   readonly projectRevision: number
   readonly sourcePacketId: string
+  /** Backward-compatible alias for requestedMax. */
   readonly targetCount: number
+  readonly requestedMax: number
+  readonly selectedCount: number
+  readonly rejectedCandidates: readonly Readonly<{ id: string; code: string; message: string }>[]
   readonly styleLockId: string
   readonly styleRecommendation: StyleLockRecommendationV1
   readonly creativeLanguage: VideoCreativeLanguageV1
@@ -71,7 +84,9 @@ export type PlanMotionOpportunitiesResultV1 =
 export interface PlanMotionOpportunitiesInputV1 {
   readonly packet: SourceUnderstandingPacketV1
   readonly transcript?: SourceTranscriptV1
-  readonly targetCount: number
+  /** Backward compatible; interpreted as up-to-N. */
+  readonly targetCount?: number
+  readonly maxCount?: number
   readonly agentCandidates?: readonly MotionOpportunityV1[]
   readonly style?: Readonly<{
     palette?: readonly string[]
@@ -183,21 +198,51 @@ const styleLanguage = (input: PlanMotionOpportunitiesInputV1): PlanMotionOpportu
   return Object.freeze({ recommendation, language, styleLockId })
 }
 
-const autoOpportunities = (input: PlanMotionOpportunitiesInputV1): readonly MotionOpportunityV1[] => {
-  const { packet, targetCount } = input
-  const outputs: MotionOpportunityV1[] = []
-  for (let index = 0; index < targetCount; index += 1) {
-    const sourceStartTick = Math.floor(index * packet.sourceDurationTicks / targetCount)
-    const sourceEndTick = Math.floor((index + 1) * packet.sourceDurationTicks / targetCount)
-    const observations = packet.observations
-      .filter((item) => item.startTick < sourceEndTick && sourceStartTick < item.endTick)
-      .sort((left, right) => importanceFor(right.semanticKind) - importanceFor(left.semanticKind) || right.confidence - left.confidence || left.id.localeCompare(right.id))
-    const strongest = observations[0]
-    const communicationGoal = goalFor(strongest?.semanticKind)
-    const transcriptCueIds = new Set(observations.flatMap((item) => item.transcriptCueIds))
-    const cueText = input.transcript?.cues.find((cue) => transcriptCueIds.has(cue.id))?.text
-    outputs.push(Object.freeze({
-      id: `opportunity_${tail(`${packet.id}:${index}:${sourceStartTick}:${sourceEndTick}:${communicationGoal}`)}`,
+type CandidateWithProvenanceV1 = Readonly<{
+  opportunity: MotionOpportunityV1
+  origin: 'agent-proposed' | 'semantic-auto' | 'fallback'
+  originalStartTick: number
+  originalEndTick: number
+  repairNotes: readonly string[]
+  score: number
+}>
+
+type CandidateSelectionV1 = Readonly<{
+  accepted: readonly CandidateWithProvenanceV1[]
+  rejected: readonly Readonly<{ id: string; code: string; message: string }>[]
+}>
+
+const requestedMaxFor = (input: PlanMotionOpportunitiesInputV1): number => input.maxCount ?? input.targetCount ?? 10
+const usefulnessScore = (observation: SourceUnderstandingObservationV1): number => Number(bounded((importanceFor(observation.semanticKind) / 4) * 0.55 + observation.confidence * 0.45, 0, 1).toFixed(4))
+
+const semanticAutoOpportunities = (input: PlanMotionOpportunitiesInputV1, maxCount: number): readonly CandidateWithProvenanceV1[] => {
+  const semantic = input.packet.observations
+    .filter((item) => item.kind === 'semantic-moment')
+    .map((item) => Object.freeze({ item, score: usefulnessScore(item) }))
+    .filter((entry) => entry.score >= 0.56)
+    .sort((a, b) => b.score - a.score || importanceFor(b.item.semanticKind) - importanceFor(a.item.semanticKind) || a.item.startTick - b.item.startTick || a.item.id.localeCompare(b.item.id))
+  const outputs: CandidateWithProvenanceV1[] = []
+  for (const [index, entry] of semantic.entries()) {
+    if (outputs.length >= maxCount) break
+    const observation = entry.item
+    const matchingCues = input.transcript?.cues.filter((cue) => observation.transcriptCueIds.includes(cue.id)) ?? []
+    // Semantic-moment timing is the source-range authority. Transcript cues are
+    // supporting text evidence only: a plain transcript may be one whole-video
+    // cue, and widening every semantic moment to that cue would make otherwise
+    // distinct opportunities overlap the entire source.
+    let sourceStartTick = Math.max(0, observation.startTick)
+    let sourceEndTick = Math.min(input.packet.sourceDurationTicks, observation.endTick)
+    if (sourceEndTick - sourceStartTick < PROJECT_TIMESCALE) {
+      const missing = PROJECT_TIMESCALE - (sourceEndTick - sourceStartTick)
+      const before = Math.min(sourceStartTick, Math.floor(missing / 2))
+      sourceStartTick -= before
+      sourceEndTick = Math.min(input.packet.sourceDurationTicks, sourceEndTick + (missing - before))
+      if (sourceEndTick - sourceStartTick < PROJECT_TIMESCALE) sourceStartTick = Math.max(0, sourceEndTick - PROJECT_TIMESCALE)
+    }
+    const communicationGoal = goalFor(observation.semanticKind)
+    const cueText = matchingCues.map((cue) => cue.text).join(' ').trim()
+    const opportunity: MotionOpportunityV1 = Object.freeze({
+      id: `opportunity_${tail(`${input.packet.id}:semantic:${observation.id}:${sourceStartTick}:${sourceEndTick}`)}`,
       sourceStartTick,
       sourceEndTick,
       communicationGoal,
@@ -207,31 +252,100 @@ const autoOpportunities = (input: PlanMotionOpportunitiesInputV1): readonly Moti
       preserveSourceAudio: true,
       preserveSourceVideo: true,
       suggestedPlacement: index % 2 === 0 ? 'protect-speaker-safe-area-right' : 'protect-speaker-safe-area-left',
-      rationale: strongest
-        ? `${strongest.semanticKind ?? strongest.kind} evidence at ${strongest.startTick}-${strongest.endTick} supports a ${communicationGoal} visual.${cueText ? ` Transcript: ${cueText.slice(0, 160)}` : ''}`
-        : 'No stronger semantic event was present in this bounded source region, so a conservative headline treatment is proposed over the existing source.',
-      confidence: strongest ? bounded(strongest.confidence, 0, 1) : 0.55,
+      rationale: `${observation.semanticKind ?? observation.kind} evidence supports a ${communicationGoal} visual.${cueText ? ` Transcript: ${cueText.slice(0, 180)}` : ''}`,
+      confidence: bounded(observation.confidence, 0, 1),
       requiredCapabilities: Object.freeze([]),
-    }))
+    })
+    outputs.push(Object.freeze({ opportunity, origin: 'semantic-auto' as const, originalStartTick: observation.startTick, originalEndTick: observation.endTick, repairNotes: Object.freeze([]), score: entry.score }))
   }
   return Object.freeze(outputs)
 }
 
-const validateCandidateSet = (input: PlanMotionOpportunitiesInputV1, candidates: readonly MotionOpportunityV1[]): PlanMotionOpportunitiesResultV1 | null => {
-  if (candidates.length !== input.targetCount) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'OPPORTUNITY_COUNT_MISMATCH', message: `Expected exactly ${input.targetCount} opportunity candidates.` }) })
-  const validated: MotionOpportunityV1[] = []
-  for (const candidate of candidates) {
+const equalSliceFallback = (input: PlanMotionOpportunitiesInputV1, maxCount: number): readonly CandidateWithProvenanceV1[] => {
+  const count = Math.max(1, Math.min(maxCount, Math.floor(input.packet.sourceDurationTicks / PROJECT_TIMESCALE), 4))
+  const outputs: CandidateWithProvenanceV1[] = []
+  for (let index = 0; index < count; index += 1) {
+    const sourceStartTick = Math.floor(index * input.packet.sourceDurationTicks / count)
+    const sourceEndTick = Math.floor((index + 1) * input.packet.sourceDurationTicks / count)
+    const observations = input.packet.observations.filter((item) => item.startTick < sourceEndTick && sourceStartTick < item.endTick)
+      .sort((left, right) => importanceFor(right.semanticKind) - importanceFor(left.semanticKind) || right.confidence - left.confidence || left.id.localeCompare(right.id))
+    const strongest = observations[0]
+    const communicationGoal = goalFor(strongest?.semanticKind)
+    const opportunity: MotionOpportunityV1 = Object.freeze({
+      id: `opportunity_${tail(`${input.packet.id}:fallback:${index}:${sourceStartTick}:${sourceEndTick}`)}`,
+      sourceStartTick, sourceEndTick, communicationGoal,
+      recommendedPresentationMode: presentationFor(communicationGoal), recommendedSourceTreatment: 'normal' as const, recommendedBackgroundTreatment: 'source-video' as const,
+      preserveSourceAudio: true, preserveSourceVideo: true,
+      suggestedPlacement: index % 2 === 0 ? 'protect-speaker-safe-area-right' : 'protect-speaker-safe-area-left',
+      rationale: strongest ? `Fallback region retained strongest available ${strongest.semanticKind ?? strongest.kind} evidence.` : 'Last-resort deterministic fallback region; no stronger semantic moment exceeded the usefulness threshold.',
+      confidence: strongest ? bounded(strongest.confidence, 0, 1) : 0.5,
+      requiredCapabilities: Object.freeze([]),
+    })
+    outputs.push(Object.freeze({ opportunity, origin: 'fallback' as const, originalStartTick: sourceStartTick, originalEndTick: sourceEndTick, repairNotes: Object.freeze([]), score: strongest ? usefulnessScore(strongest) : 0.5 }))
+  }
+  return Object.freeze(outputs)
+}
+
+const transcriptGapFallbacks = (
+  input: PlanMotionOpportunitiesInputV1,
+  occupied: readonly CandidateWithProvenanceV1[],
+  maxCount: number,
+): readonly CandidateWithProvenanceV1[] => {
+  if (!input.transcript || occupied.length >= maxCount) return Object.freeze([])
+  const outputs: CandidateWithProvenanceV1[] = []
+  for (const [index, cue] of input.transcript.cues.entries()) {
+    if (occupied.length + outputs.length >= maxCount) break
+    const candidateRange = Object.freeze({ sourceStartTick: cue.startTick, sourceEndTick: cue.endTick })
+    if (occupied.some((entry) => overlap(entry.opportunity, candidateRange)) || outputs.some((entry) => overlap(entry.opportunity, candidateRange))) continue
+    if (cue.endTick - cue.startTick < PROJECT_TIMESCALE) continue
+    const opportunity: MotionOpportunityV1 = Object.freeze({
+      id: `opportunity_${tail(`${input.packet.id}:transcript-fallback:${cue.id}:${cue.startTick}:${cue.endTick}`)}`,
+      sourceStartTick: cue.startTick,
+      sourceEndTick: cue.endTick,
+      communicationGoal: 'headline',
+      recommendedPresentationMode: 'overlay',
+      recommendedSourceTreatment: 'normal',
+      recommendedBackgroundTreatment: 'source-video',
+      preserveSourceAudio: true,
+      preserveSourceVideo: true,
+      suggestedPlacement: index % 2 === 0 ? 'protect-speaker-safe-area-right' : 'protect-speaker-safe-area-left',
+      rationale: `Transcript-backed fallback retained an uncovered spoken source region because fewer than ${maxCount} stronger semantic opportunities were available. Transcript: ${cue.text.slice(0, 180)}`,
+      confidence: 0.5,
+      requiredCapabilities: Object.freeze([]),
+    })
+    outputs.push(Object.freeze({ opportunity, origin: 'fallback' as const, originalStartTick: cue.startTick, originalEndTick: cue.endTick, repairNotes: Object.freeze(['filled-uncovered-transcript-region']), score: 0.5 }))
+  }
+  return Object.freeze(outputs)
+}
+
+const validateCandidatesIndividually = (input: PlanMotionOpportunitiesInputV1, candidates: readonly CandidateWithProvenanceV1[], maxCount: number): CandidateSelectionV1 => {
+  const valid: CandidateWithProvenanceV1[] = []
+  const rejected: Array<Readonly<{ id: string; code: string; message: string }>> = []
+  for (const entry of candidates) {
+    const candidate = entry.opportunity
     const result = validateMotionOpportunityV1(candidate)
-    if (!result.ok) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: result.refusal.code, message: result.refusal.message, details: result.refusal.details }) })
-    if (result.value.sourceStartTick < 0 || result.value.sourceEndTick > input.packet.sourceDurationTicks) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'OPPORTUNITY_OUTSIDE_SOURCE', message: 'Every opportunity must stay inside the analyzed source duration.' }) })
-    if (result.value.sourceEndTick - result.value.sourceStartTick < PROJECT_TIMESCALE) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'OPPORTUNITY_TOO_SHORT', message: 'Every opportunity needs at least one second of source duration.' }) })
-    validated.push(result.value)
+    if (!result.ok) { rejected.push(Object.freeze({ id: candidate.id, code: result.refusal.code, message: result.refusal.message })); continue }
+    if (result.value.sourceStartTick < 0 || result.value.sourceEndTick > input.packet.sourceDurationTicks) { rejected.push(Object.freeze({ id: candidate.id, code: 'OPPORTUNITY_OUTSIDE_SOURCE', message: 'Opportunity lies outside the analyzed source duration.' })); continue }
+    if (result.value.sourceEndTick - result.value.sourceStartTick < PROJECT_TIMESCALE) { rejected.push(Object.freeze({ id: candidate.id, code: 'OPPORTUNITY_TOO_SHORT', message: 'Opportunity needs at least one second of source duration.' })); continue }
+    valid.push(Object.freeze({ ...entry, opportunity: result.value }))
   }
-  const ordered = [...validated].sort((a, b) => a.sourceStartTick - b.sourceStartTick || a.sourceEndTick - b.sourceEndTick || a.id.localeCompare(b.id))
-  for (let index = 1; index < ordered.length; index += 1) {
-    if (overlap(ordered[index - 1]!, ordered[index]!)) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'OPPORTUNITY_OVERLAP', message: 'Opportunity candidates must not overlap; overlapping visuals are never silently resolved by planning.' }) })
+  const ordered = valid.sort((a, b) => a.opportunity.sourceStartTick - b.opportunity.sourceStartTick || b.score - a.score || a.opportunity.id.localeCompare(b.opportunity.id))
+  const accepted: CandidateWithProvenanceV1[] = []
+  const maxRepairOverlapTicks = Math.floor(PROJECT_TIMESCALE * 0.25)
+  for (const entry of ordered) {
+    if (accepted.length >= maxCount) break
+    const previous = accepted.at(-1)
+    if (!previous || !overlap(previous.opportunity, entry.opportunity)) { accepted.push(entry); continue }
+    const overlapTicks = previous.opportunity.sourceEndTick - entry.opportunity.sourceStartTick
+    const repairedStart = previous.opportunity.sourceEndTick
+    if (overlapTicks > 0 && overlapTicks <= maxRepairOverlapTicks && entry.opportunity.sourceEndTick - repairedStart >= PROJECT_TIMESCALE) {
+      const repaired = Object.freeze({ ...entry.opportunity, sourceStartTick: repairedStart, rationale: `${entry.opportunity.rationale} Boundary trimmed ${overlapTicks} ticks to avoid a small overlap without moving the semantic moment.` })
+      accepted.push(Object.freeze({ ...entry, opportunity: repaired, repairNotes: Object.freeze([...entry.repairNotes, `trimmed-start-by-${overlapTicks}-ticks-to-remove-overlap`]) }))
+      continue
+    }
+    rejected.push(Object.freeze({ id: entry.opportunity.id, code: 'OPPORTUNITY_OVERLAP', message: `Candidate overlaps ${previous.opportunity.id}; repair would materially alter timing or leave less than one second.` }))
   }
-  return null
+  return Object.freeze({ accepted: Object.freeze(accepted), rejected: Object.freeze(rejected) })
 }
 
 const sourceEvidenceFor = (packet: SourceUnderstandingPacketV1, opportunity: MotionOpportunityV1) => {
@@ -258,23 +372,35 @@ const sceneSignature = (language: VideoCreativeLanguageV1, opportunity: MotionOp
 })
 
 export const planMotionOpportunitiesV1 = (input: PlanMotionOpportunitiesInputV1): PlanMotionOpportunitiesResultV1 => {
-  if (!Number.isSafeInteger(input.targetCount) || input.targetCount < 1 || input.targetCount > 32) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'OPPORTUNITY_TARGET_INVALID', message: 'targetCount must be an integer from 1 through 32.' }) })
-  if (input.packet.sourceDurationTicks < input.targetCount * PROJECT_TIMESCALE) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'OPPORTUNITY_TARGET_TOO_DENSE', message: 'The source is too short to allocate one second to every requested opportunity.' }) })
+  const requestedMax = requestedMaxFor(input)
+  if (!Number.isSafeInteger(requestedMax) || requestedMax < 1 || requestedMax > 32) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'OPPORTUNITY_TARGET_INVALID', message: 'maxCount/targetCount must be an integer from 1 through 32.' }) })
+  if (input.packet.sourceDurationTicks < PROJECT_TIMESCALE) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'OPPORTUNITY_TARGET_TOO_DENSE', message: 'The source is too short to contain a one-second motion opportunity.' }) })
   if (input.transcript && (input.transcript.projectId !== input.packet.projectId || input.transcript.sourceAssetId !== input.packet.sourceAssetId)) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'TRANSCRIPT_SOURCE_MISMATCH', message: 'The planning transcript does not belong to the analyzed source packet.' }) })
   let style: ReturnType<typeof styleLanguage>
   try { style = styleLanguage(input) }
   catch (error) { return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'STYLE_PLANNING_FAILED', message: error instanceof Error ? error.message : 'Style recommendation failed.' }) }) }
 
-  const candidates = input.agentCandidates ? Object.freeze([...input.agentCandidates]) : autoOpportunities(input)
-  const candidateRefusal = validateCandidateSet(input, candidates)
-  if (candidateRefusal) return candidateRefusal
-  const ordered = [...candidates].sort((a, b) => a.sourceStartTick - b.sourceStartTick || a.id.localeCompare(b.id))
+  const rawCandidates: readonly CandidateWithProvenanceV1[] = input.agentCandidates
+    ? Object.freeze(input.agentCandidates.map((opportunity) => Object.freeze({ opportunity, origin: 'agent-proposed' as const, originalStartTick: opportunity.sourceStartTick, originalEndTick: opportunity.sourceEndTick, repairNotes: Object.freeze([]), score: bounded(opportunity.confidence, 0, 1) })))
+    : (() => {
+        const semantic = semanticAutoOpportunities(input, requestedMax)
+        if (semantic.length === 0) return equalSliceFallback(input, requestedMax)
+        return Object.freeze([...semantic, ...transcriptGapFallbacks(input, semantic, requestedMax)])
+      })()
+  let selected = validateCandidatesIndividually(input, rawCandidates, requestedMax)
+  if (!input.agentCandidates && selected.accepted.length < requestedMax) {
+    const fallbackSelection = validateCandidatesIndividually(input, equalSliceFallback(input, requestedMax), requestedMax)
+    if (fallbackSelection.accepted.length > selected.accepted.length) selected = fallbackSelection
+  }
+  if (selected.accepted.length === 0) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'OPPORTUNITY_SOURCE_INVALID', message: 'No proposed or semantic opportunity survived source bounds, duration, overlap, and usefulness validation.', details: Object.freeze({ rejectedCandidates: selected.rejected }) }) })
+  const ordered = [...selected.accepted].sort((a, b) => a.opportunity.sourceStartTick - b.opportunity.sourceStartTick || a.opportunity.id.localeCompare(b.opportunity.id))
   const ratio = ratioFor(input.packet)
   const library = getMotionLibraryCapabilityRecordsV1().map((item): CapabilityCatalogItemV1 => Object.freeze({ ...item }))
   const catalog = buildCapabilityCatalogV1({ sanverse: library })
   const planned: PlannedMotionOpportunityV1[] = []
 
-  for (const opportunity of ordered) {
+  for (const entry of ordered) {
+    const opportunity = entry.opportunity
     const ranked = rankCapabilitiesV1(catalog, {
       communicationGoal: opportunity.communicationGoal,
       presentationMode: opportunity.recommendedPresentationMode,
@@ -299,6 +425,15 @@ export const planMotionOpportunitiesV1 = (input: PlanMotionOpportunitiesInputV1)
     planned.push(Object.freeze({
       opportunity,
       evidence: sourceEvidenceFor(input.packet, opportunity),
+      planningProvenance: Object.freeze({
+        origin: entry.origin,
+        originalStartTick: entry.originalStartTick,
+        originalEndTick: entry.originalEndTick,
+        normalizedStartTick: opportunity.sourceStartTick,
+        normalizedEndTick: opportunity.sourceEndTick,
+        repairNotes: Object.freeze([...entry.repairNotes]),
+        score: entry.score,
+      }),
       selectedCapabilityId: capabilityRankings[0]!.capabilityId,
       capabilityRankings,
       recipeMatches,
@@ -309,11 +444,14 @@ export const planMotionOpportunitiesV1 = (input: PlanMotionOpportunitiesInputV1)
     ok: true as const,
     value: Object.freeze({
       schemaVersion: MOTION_OPPORTUNITY_MAP_SCHEMA_V1,
-      id: `opmap_${tail(`${input.packet.id}:${input.targetCount}:${planned.map((item) => item.opportunity.id).join(':')}`)}`,
+      id: `opmap_${tail(`${input.packet.id}:${requestedMax}:${planned.map((item) => item.opportunity.id).join(':')}`)}`,
       projectId: input.packet.projectId,
       projectRevision: input.packet.projectRevision,
       sourcePacketId: input.packet.id,
-      targetCount: input.targetCount,
+      targetCount: requestedMax,
+      requestedMax,
+      selectedCount: planned.length,
+      rejectedCandidates: selected.rejected,
       styleLockId: style.styleLockId,
       styleRecommendation: style.recommendation,
       creativeLanguage: style.language,
