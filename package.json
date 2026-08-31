@@ -29,7 +29,8 @@
     "sanverse:mcp:audit-longrun": "vite-node scripts/audit-external-mcp-longrun.ts",
     "sanverse:mcp:audit-stdio": "vite-node scripts/audit-external-mcp-stdio.ts",
     "sanverse:mcp:audit-raw-video": "vite-node scripts/audit-external-mcp-raw-video.ts",
-    "sanverse:mcp:audit-creative-parity": "vite-node scripts/audit-creative-scene-parity.ts"
+    "sanverse:mcp:audit-creative-parity": "vite-node scripts/audit-creative-scene-parity.ts",
+    "sanverse:mcp:audit-continuation": "vite-node scripts/audit-mcp-continuation.ts"
   },
   "devDependencies": {
     "jsonc-parser": "^3.3.1"

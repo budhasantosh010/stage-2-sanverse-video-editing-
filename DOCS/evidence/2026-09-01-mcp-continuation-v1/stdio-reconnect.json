@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "sanverse.mcp-continuation-audit/v1",
+  "generatedAt": "2026-08-31T20:40:06.773Z",
+  "projectId": "project_21c01709e413d034d4cec25dcb4b1ca4",
+  "runId": "run_00n2km2k",
+  "reviewId": "review_000cuypa",
+  "transportProcesses": 2,
+  "processAClosedBeforeProcessB": true,
+  "samePersistedCreativeRun": true,
+  "sameReviewEvidenceIdentity": true,
+  "productionMutationRequested": false,
+  "first": {
+    "connectMs": 3243,
+    "snapshot": {
+      "stage": "animatic-review",
+      "reviewId": "review_000cuypa",
+      "reviewStatus": "pending",
+      "evidenceHash": "4fe870ea4a5c54a28e71ef4aa01fc5ba96181582355e8d6a8812e141d13f2369",
+      "subjectId": "animatic:creative_scene_010wcivv",
+      "subjectRevision": 1,
+      "artifactIdentity": [
+        "animatic-middle.png:b093232504ebb3134024589804aab4d3f22f742d7501496b910a5bb5589954df",
+        "animatic-opening.png:0f919687ec4cc34670b2c0e7c0dfe85748582612a9b1d953662fad9fcb3f8cb6",
+        "animatic-payoff.png:0f919687ec4cc34670b2c0e7c0dfe85748582612a9b1d953662fad9fcb3f8cb6"
+      ],
+      "chatImageCount": 3,
+      "toolCount": 62
+    },
+    "stderrHadHandshakeTimeout": false
+  },
+  "second": {
+    "connectMs": 3667,
+    "snapshot": {
+      "stage": "animatic-review",
+      "reviewId": "review_000cuypa",
+      "reviewStatus": "pending",
+      "evidenceHash": "4fe870ea4a5c54a28e71ef4aa01fc5ba96181582355e8d6a8812e141d13f2369",
+      "subjectId": "animatic:creative_scene_010wcivv",
+      "subjectRevision": 1,
+      "artifactIdentity": [
+        "animatic-middle.png:b093232504ebb3134024589804aab4d3f22f742d7501496b910a5bb5589954df",
+        "animatic-opening.png:0f919687ec4cc34670b2c0e7c0dfe85748582612a9b1d953662fad9fcb3f8cb6",
+        "animatic-payoff.png:0f919687ec4cc34670b2c0e7c0dfe85748582612a9b1d953662fad9fcb3f8cb6"
+      ],
+      "chatImageCount": 3,
+      "toolCount": 62
+    },
+    "stderrHadHandshakeTimeout": false
+  },
+  "contract": "Client task/session identity may survive independently of the MCP process. On client resume, a new Sanverse transport can reinitialize and creative.resume_run rehydrates the same durable Creative Run/review."
+}

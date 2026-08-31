@@ -1,6 +1,6 @@
 # Build Tracker
 
-Last updated: 2026-08-30
+Last updated: 2026-09-01
 
 | ID | Goal | Deliverable | Status | Evidence |
 |---|---|---|---|---|
@@ -176,3 +176,16 @@ Last updated: 2026-08-30
 - [x] Root all-workspace production build exit 0
 - [x] Final production dependency audit: 0 critical / 0 high / 0 moderate / 0 low
 - [ ] Final raw-video release tag — intentionally withheld; separate REQ-020 human final-video gate remains
+
+## Same-task MCP continuation V1 — 2026-09-01
+
+- [x] Task/session lifetime formally separated from disposable MCP transport lifetime (REQ-023 / DEC-021)
+- [x] Cold-start handshake remains nonblocking on API/web warm-up; production tool calls still wait for readiness
+- [x] Read-only continuation audit added as `npm run sanverse:mcp:audit-continuation`
+- [x] MCP process A fully closed before process B; both exposed 62 tools
+- [x] Process B restored exact `run_00n2km2k` / `review_000cuypa` stage, evidence hash and 3 artifact identities
+- [x] Repeated Process A/B reconnects completed within the expected local startup window; no handshake timeout; no production mutation requested
+- [x] Real Codex process A created thread `01a05984-09c9-77a0-a660-f22c44d334d1` and successfully read Sanverse
+- [x] Real second Codex process resumed that exact same thread ID and successfully re-read the same Sanverse run/review
+- [x] OpenCode `mcp list` reports Sanverse connected; model-run `init` stall reproduced equally on resumed and throwaway sessions and documented as unrelated/nonblocking
+- [ ] Final raw-video release tag — still intentionally withheld; this continuation slice does not satisfy REQ-020 human release gates

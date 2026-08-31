@@ -1,6 +1,16 @@
 # Current State
 
-Last updated: 2026-08-30
+Last updated: 2026-09-01
+
+## Same-task MCP continuation across restart — complete
+
+Sanverse now has an explicit continuation contract: a coding task/conversation is durable client state, while the local STDIO MCP process is disposable transport state. A client/laptop/process restart must resume the same task/session ID and launch a fresh Sanverse MCP transport; creating a replacement chat is not part of the recovery model. If an already-running client host has cached an MCP startup failure and exposes no in-process reconnect, the client runtime may need to be restarted/reinitialized, but the same task/session ID is retained.
+
+Provider-independent evidence launches two independent Sanverse STDIO child processes against the existing persisted `run_00n2km2k`. Process A closes fully before process B starts; both expose 62 tools and process B restores the exact `animatic-review` / `review_000cuypa` state, evidence hash and three artifact hashes/images without production mutation. Repeated final runs connected both fresh transports within the expected local startup window with no handshake-timeout evidence; exact per-run timings remain in `stdio-reconnect.json`.
+
+A real Codex `0.144.1` proof goes one level higher: process A created thread `01a05984-09c9-77a0-a660-f22c44d334d1`, called Sanverse and returned `CODEX_CONTINUATION_A stage=animatic-review review_id=review_000cuypa artifact_count=3`; process A exited; a separate `codex exec resume` process resumed that exact thread ID, relaunched/reconnected Sanverse and returned the matching `CODEX_CONTINUATION_B ... artifact_count=3`. Durable evidence: `DOCS/evidence/2026-09-01-mcp-continuation-v1/`.
+
+OpenCode `1.18.8` still reports `sanverse connected`, including under a test-only config with unrelated MCPs disabled. Its current model-driven `opencode run` path stalled at generic client `init` for both a resumed old session and a brand-new throwaway session, so that bounded smoke cannot be used as continuation evidence and is documented separately rather than mislabelled as an MCP failure.
 
 ## Zero-Setup Workspace Import Fix V1 — complete
 

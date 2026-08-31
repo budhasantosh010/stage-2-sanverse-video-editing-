@@ -1,5 +1,13 @@
 # Project Log
 
+## 2026-09-01 — Same-task MCP continuation proved across process restart
+
+- Corrected the recovery model: a coding task/session is durable client state and the local Sanverse STDIO process is disposable transport state. Laptop/client/process restart must resume the same task/session ID and relaunch MCP; creating a replacement chat is not required.
+- Added REQ-023 / DEC-021 plus `npm run sanverse:mcp:audit-continuation`. The read-only audit fully closes MCP process A before starting process B, and both independently expose 62 tools and restore exact `run_00n2km2k` / `review_000cuypa` Animatic state, evidence hash and three review artifact hashes/images. Repeated final reconnects stayed within the expected local startup window with no handshake-timeout evidence and no production mutation requested.
+- Real Codex `0.144.1` created thread `01a05984-09c9-77a0-a660-f22c44d334d1`, successfully read the persisted Sanverse review, exited, then a separate `codex exec resume` process resumed that exact same thread ID and successfully read the same stage/review/artifact count. This is direct same-task, new-process, new-MCP-transport evidence.
+- OpenCode `1.18.8` continues to report `sanverse connected`, including with an isolated test config containing only Sanverse. Its model-run path stalled at generic `init` for both the old resumed session and a new throwaway session, so that is documented as a separate client/provider initialization issue rather than being treated as evidence against MCP continuation.
+- The existing cold-start handshake hotfix remains authoritative: MCP initialization/tool discovery starts before API/web warm-up completes, while production calls still wait for shared runtime readiness. A still-running host that cached an old failed tool registry must reinitialize/reconnect its runtime, but it keeps the same task/session ID.
+
 ## 2026-08-30 — Zero-setup workspace import bug fixed
 
 - Captured the coding agent caller CWD in the STDIO launcher and made it the validated session-only Sanverse workspace boundary; HTTP keeps explicit roots only.
