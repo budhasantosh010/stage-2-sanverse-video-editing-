@@ -471,6 +471,8 @@ export const connectSanverseStandardStdioV1 = async (
   options: Readonly<{
     workspaceRoot?: string
     onToolCall?: (event: SanverseMcpToolCallEvidenceV1) => void | Promise<void>
+    /** Starts the MCP handshake immediately while shared production services warm up; tool execution waits here. */
+    beforeToolCall?: () => void | Promise<void>
   }> = {},
 ) => {
   const sessionLabel = randomUUID()
@@ -536,6 +538,7 @@ export const connectSanverseStandardStdioV1 = async (
           'io.sanverse/requiresOwnerApproval': definition.requiresOwnerApproval === true,
         },
       }, async (args: unknown, ctx: ServerContextV2) => {
+        await options.beforeToolCall?.()
         const { input, context } = splitArguments(args)
         if (definition.requiresOwnerApproval) {
           const value = Object.freeze({ ok: false, refusal: Object.freeze({ code: 'OWNER_APPROVAL_REQUIRED', message: 'Owner approval is host authority. External MCP clients cannot manufacture OwnerApprovalV1 or satisfy approval by sending JSON.' }) })

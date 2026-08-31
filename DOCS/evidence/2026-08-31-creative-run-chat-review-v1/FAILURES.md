@@ -86,6 +86,18 @@ Date: 2026-08-31
 - Status: RESOLVED in final tree. Fresh production audit reports 0 critical / 0 high / 0 moderate / 0 low.
 - One-line solution: use the final lockfile audit as release truth, while preserving intermediate warnings in the failure ledger for traceability.
 
+## F-08 — Cold-start STDIO handshake raced the client's 30-second startup deadline
+
+- What: external clients reported `MCP startup failed: timed out handshaking after 30 seconds`, so zero Sanverse tools loaded.
+- Where: `scripts/sanverse-mcp.ts` local STDIO startup ordering, before `connectSanverseStandardStdioV1` was reached.
+- When: first user retry after the Chat-first Creative Run V1 branch was pushed on 2026-08-31.
+- Who: Sanverse's zero-setup STDIO launcher sequencing; the external client correctly enforced its own handshake deadline.
+- Why: `runStdio()` synchronously awaited API readiness and then web/render readiness before starting the MCP protocol. Each readiness wait allowed up to 30 seconds, equal to the client's entire handshake budget.
+- How: on a cold or slow local runtime, service warm-up consumed the client's handshake window even though the MCP server code itself was healthy.
+- Tried: inspected launcher/runtime ordering; confirmed the orchestration session can be constructed without contacting production; moved runtime warm-up to a shared parallel promise and added a `beforeToolCall` gate so the handshake/tool catalog starts immediately while production tools still wait for API/web readiness. Motion MCP build passed, Motion MCP 30/30 passed, and installed `opencode mcp list` now reports `sanverse connected` through the exact configured launcher.
+- Status: RESOLVED.
+- One-line solution: never block MCP initialize/tools discovery on cold service warm-up; warm shared services in parallel and gate only production tool execution on readiness.
+
 ## Compatibility note — MCP wire revision
 
 The implementation uses the MCP v2 server's multi-round-trip `input_required` API, signed request state and legacy compatibility shim. The installed SDK/client combination used for acceptance did not advertise a 2026-07-28 wire-version negotiation, so this evidence deliberately does not claim that exact negotiated protocol revision. The security and resumable decision semantics were exercised through the compatibility path that the installed clients actually use.

@@ -265,10 +265,21 @@ const runDev = async () => {
 }
 
 const runStdio = async () => {
-  await ensureStdioRuntime()
+  let runtimeError: unknown
+  const runtimeReady = ensureStdioRuntime().catch((error) => {
+    runtimeError = error
+    console.error(`Sanverse STDIO runtime startup failed: ${error instanceof Error ? error.message : String(error)}`)
+  })
   const callerWorkspace = process.env.SANVERSE_MCP_CALLER_WORKSPACE
-  console.error('Sanverse MCP STDIO ready. API/web were auto-started or reused; stdout is reserved for MCP framing.')
-  await connectSanverseStandardStdioV1(createRegistry, { ...(callerWorkspace ? { workspaceRoot: callerWorkspace } : {}), onToolCall: recordToolCall })
+  console.error('Sanverse MCP STDIO handshake ready; API/web are warming or being reused in parallel. stdout is reserved for MCP framing.')
+  await connectSanverseStandardStdioV1(createRegistry, {
+    ...(callerWorkspace ? { workspaceRoot: callerWorkspace } : {}),
+    onToolCall: recordToolCall,
+    beforeToolCall: async () => {
+      await runtimeReady
+      if (runtimeError) throw runtimeError
+    },
+  })
 }
 
 const main = async () => {
