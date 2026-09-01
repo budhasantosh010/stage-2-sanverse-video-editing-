@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "sanverse.codex-creative-direction-gate-acceptance/v1",
+  "generatedAt": "2026-09-01T16:00:18.000Z",
+  "client": {
+    "name": "codex-cli",
+    "version": "0.144.1",
+    "threadId": "01a05db2-1fcb-7222-a5eb-444f67385c1b"
+  },
+  "projectId": "project_21c01709e413d034d4cec25dcb4b1ca4",
+  "productionRevisionBefore": 0,
+  "productionRevisionAfter": 0,
+  "runId": "run_00d140v0",
+  "sourcePacketId": "sourcepkt_01wffk8f",
+  "proposalId": "direction_00nwsubu",
+  "proposalRevision": 2,
+  "reviewId": "review_01j0yrfk",
+  "reviewArtifactCount": 1,
+  "reviewArtifactSha256": "20066411abe9c88c43f7ba176ef170cd0c5f5b6bf4d3491bab8b4566e726fafb",
+  "planningRefusedBeforeDirectionApproval": true,
+  "planningRefusedAfterDirectionRevision": true,
+  "requiredRefusalCode": "CREATIVE_DIRECTION_APPROVAL_REQUIRED",
+  "approvedStyleLockCreated": false,
+  "ownerDecisionToolCalled": false,
+  "productionMutation": false,
+  "applyCalled": false,
+  "exportCalled": false,
+  "sourceCodeEdited": false,
+  "finalMarker": "SANVERSE_CODEX_DIRECTION_GATE_OK run_id=run_00d140v0 proposal_id=direction_00nwsubu revision=2 review_id=review_01j0yrfk artifact_count=1 plan_blocked=true production_revision=0",
+  "truthBoundary": "This independent Codex run proves the model-facing Creative Direction gate through a pending revision-2 review. It intentionally does not claim or manufacture visual owner approval of that exact review."
+}

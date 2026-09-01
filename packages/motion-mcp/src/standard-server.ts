@@ -446,6 +446,24 @@ const reviewContextText = (review: Record<string, unknown>): string | null => {
   if (!record(review.context)) return null
   const context = review.context
   const scope = typeof review.scope === 'string' ? review.scope : 'creative'
+  if (scope === 'creative-direction' && context.kind === 'creative-direction') {
+    const palette = record(context.paletteRoles) ? context.paletteRoles : {}
+    const typography = record(context.typography) ? context.typography : {}
+    const composition = record(context.composition) ? context.composition : {}
+    const motion = record(context.motion) ? context.motion : {}
+    const language = record(context.creativeLanguage) ? context.creativeLanguage : {}
+    const lines = [
+      `Sanverse Creative Direction review · ${String(context.proposalId ?? '?')} · revision ${String(context.revision ?? '?')}`,
+      `Palette: background ${String(palette.background ?? '?')} · surface ${String(palette.surface ?? '?')} · text ${String(palette.text ?? '?')} · accent ${String(palette.accent ?? '?')}`,
+      `Typography/surface: ${String(typography.typeFamily ?? 'default family')} · ${String(typography.language ?? '?')} · radius ${String(record(context.surface) ? context.surface.radius ?? '?' : '?')}`,
+      `Composition: ${String(composition.density ?? '?')} density · ${String(composition.alignment ?? '?')} alignment · safe area ${String(composition.safeArea ?? '?')}`,
+      `Motion: ${String(motion.rhythm ?? '?')} · ${String(motion.primaryEase ?? '?')}/${String(motion.secondaryEase ?? '?')} · overshoot ${String(motion.overshootMax ?? '?')}`,
+      `Language: presentation ${Array.isArray(language.preferredPresentationModes) ? language.preferredPresentationModes.join(', ') : '?'} · transitions ${Array.isArray(language.transitionVocabulary) ? language.transitionVocabulary.join(', ') : '?'}`,
+    ]
+    if (Array.isArray(context.reasons)) for (const reason of context.reasons.slice(0, 6)) lines.push(`Reason: ${String(reason)}`)
+    lines.push('Owner approval of this exact evidence/revision is required before opportunity planning or Storyboard creation.')
+    return lines.join('\n')
+  }
   const sceneId = typeof review.sceneId === 'string' ? review.sceneId : 'unknown-scene'
   const goal = typeof context.communicationGoal === 'string' ? context.communicationGoal : ''
   const component = typeof context.componentId === 'string' ? `${context.componentId}@${String(context.componentVersion ?? '?')}` : 'unknown component'

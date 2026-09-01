@@ -1,9 +1,9 @@
 import {
   buildCapabilityCatalogV1,
   rankCapabilitiesV1,
-  recommendStyleLockV1,
   scoreSceneCohesionV1,
   validateMotionOpportunityV1,
+  type ApprovedStyleLockV1,
   type CapabilityCatalogItemV1,
   type MotionOpportunityV1,
   type RankedCapabilityV1,
@@ -64,7 +64,14 @@ export interface MotionOpportunityMapV1 {
   readonly requestedMax: number
   readonly selectedCount: number
   readonly rejectedCandidates: readonly Readonly<{ id: string; code: string; message: string }>[]
+  /** Compatibility alias; authority is styleLockRef. */
   readonly styleLockId: string
+  readonly styleLockRef: Readonly<{
+    styleLockId: string
+    proposalId: string
+    proposalRevision: number
+    contentHash: string
+  }>
   readonly styleRecommendation: StyleLockRecommendationV1
   readonly creativeLanguage: VideoCreativeLanguageV1
   readonly opportunities: readonly PlannedMotionOpportunityV1[]
@@ -84,18 +91,11 @@ export type PlanMotionOpportunitiesResultV1 =
 export interface PlanMotionOpportunitiesInputV1 {
   readonly packet: SourceUnderstandingPacketV1
   readonly transcript?: SourceTranscriptV1
+  readonly approvedStyleLock: ApprovedStyleLockV1
   /** Backward compatible; interpreted as up-to-N. */
   readonly targetCount?: number
   readonly maxCount?: number
   readonly agentCandidates?: readonly MotionOpportunityV1[]
-  readonly style?: Readonly<{
-    palette?: readonly string[]
-    typeFamily?: string
-    traits?: readonly string[]
-    motionIntensity?: number
-    overshootAllowance?: number
-    density?: 'low' | 'medium' | 'high'
-  }>
 }
 
 const bounded = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value))
@@ -152,50 +152,12 @@ const recipeGoalScore = (recipe: ComponentRecipe, goal: string): number => {
   return 5
 }
 
-const styleLanguage = (input: PlanMotionOpportunitiesInputV1): PlanMotionOpportunitiesResultV1 extends never ? never : Readonly<{ recommendation: StyleLockRecommendationV1; language: VideoCreativeLanguageV1; styleLockId: string }> => {
-  const durationSeconds = input.packet.sourceDurationTicks / PROJECT_TIMESCALE
-  const speechSeconds = input.transcript?.cues.reduce((sum, cue) => sum + Math.max(0, cue.endTick - cue.startTick), 0) ?? 0
-  const speechDensity = durationSeconds > 0 ? speechSeconds / input.packet.sourceDurationTicks : 0
-  const cueRate = durationSeconds > 0 ? (input.transcript?.cues.length ?? 0) / durationSeconds : 0
-  const informationDensity: 'low' | 'medium' | 'high' = cueRate > 0.65 ? 'high' : cueRate > 0.18 ? 'medium' : 'low'
-  const talkingHead = input.packet.observations.some((item) => item.kind === 'speech-present') || Boolean(input.transcript?.cues.length)
-  const palette = input.style?.palette?.length && input.style.palette.length >= 2
-    ? input.style.palette
-    : Object.freeze(['#0B0C10', '#FF7A1A', '#FFFFFF'])
-  const recommended = recommendStyleLockV1({
-    brand: Object.freeze({ palette, ...(input.style?.typeFamily ? { typeFamily: input.style.typeFamily } : {}), traits: Object.freeze([...(input.style?.traits ?? ['clean','editorial'])]) }),
-    existingStyle: Object.freeze({
-      ...(input.style?.motionIntensity === undefined ? {} : { motionIntensity: bounded(input.style.motionIntensity, 0, 1) }),
-      ...(input.style?.overshootAllowance === undefined ? {} : { overshootAllowance: bounded(input.style.overshootAllowance, 0, 0.4) }),
-      ...(input.style?.density ? { density: input.style.density } : {}),
-    }),
-    approvedAssetSignals: Object.freeze([]),
-    promotedAssetSignals: Object.freeze([]),
-    videoContext: Object.freeze({ talkingHead, informationDensity, negativeSpace: 'medium' as const, subjectPriority: talkingHead ? 'high' as const : 'medium' as const }),
-    locked: false,
-  })
-  if (!recommended.ok) throw new Error(`${recommended.refusal.code}: ${recommended.refusal.message}`)
-  const recommendation = recommended.value
-  const styleLockId = `stylelock_${tail(`${input.packet.id}:${JSON.stringify(recommendation)}`)}`
-  const language: VideoCreativeLanguageV1 = Object.freeze({
-    schemaVersion: 'sanverse.video-creative-language/v1' as const,
-    id: `language_${tail(`${input.packet.id}:${styleLockId}`)}`,
-    version: 1,
-    styleLockId,
-    preferredPresentationModes: Object.freeze<MotionPresentationModeV1[]>(['overlay','full-screen-motion','picture-in-picture']),
-    typographyLanguage: 'editorial' as const,
-    surfaceLanguage: 'soft-depth' as const,
-    motionRhythm: recommendation.motion.baseTiming,
-    transitionVocabulary: Object.freeze(['cut','fade','scale'] as const),
-    densityPolicy: recommendation.composition.density,
-    cameraPolicy: recommendation.motion.cameraAggressiveness > 0.45 ? 'expressive' as const : recommendation.motion.cameraAggressiveness > 0.1 ? 'restrained' as const : 'static' as const,
-    paletteRoles: Object.freeze(['background','surface','text','accent']),
-    easingFamily: Object.freeze([...new Set([recommendation.motion.primaryEase, recommendation.motion.secondaryEase])]) as readonly ('soft'|'linear'|'snappy')[],
-    overshootMax: recommendation.motion.overshootAllowance,
-    allowedExceptions: Object.freeze([]),
-  })
-  void speechDensity
-  return Object.freeze({ recommendation, language, styleLockId })
+const styleLanguage = (input: PlanMotionOpportunitiesInputV1): Readonly<{ recommendation: StyleLockRecommendationV1; language: VideoCreativeLanguageV1; styleLockId: string }> => {
+  const approved = input.approvedStyleLock
+  if (approved.locked !== true || approved.projectId !== input.packet.projectId || approved.sourcePacketId !== input.packet.id) {
+    throw new Error('CREATIVE_DIRECTION_APPROVAL_REQUIRED: Opportunity planning requires the exact owner-approved Creative Direction Style Lock for this source packet.')
+  }
+  return Object.freeze({ recommendation: approved.recommendation, language: approved.creativeLanguage, styleLockId: approved.styleLockId })
 }
 
 type CandidateWithProvenanceV1 = Readonly<{
@@ -376,9 +338,10 @@ export const planMotionOpportunitiesV1 = (input: PlanMotionOpportunitiesInputV1)
   if (!Number.isSafeInteger(requestedMax) || requestedMax < 1 || requestedMax > 32) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'OPPORTUNITY_TARGET_INVALID', message: 'maxCount/targetCount must be an integer from 1 through 32.' }) })
   if (input.packet.sourceDurationTicks < PROJECT_TIMESCALE) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'OPPORTUNITY_TARGET_TOO_DENSE', message: 'The source is too short to contain a one-second motion opportunity.' }) })
   if (input.transcript && (input.transcript.projectId !== input.packet.projectId || input.transcript.sourceAssetId !== input.packet.sourceAssetId)) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'TRANSCRIPT_SOURCE_MISMATCH', message: 'The planning transcript does not belong to the analyzed source packet.' }) })
-  let style: ReturnType<typeof styleLanguage>
-  try { style = styleLanguage(input) }
-  catch (error) { return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'STYLE_PLANNING_FAILED', message: error instanceof Error ? error.message : 'Style recommendation failed.' }) }) }
+  const lock = input.approvedStyleLock
+  if (!lock || lock.locked !== true) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'CREATIVE_DIRECTION_APPROVAL_REQUIRED', message: 'Opportunity planning requires an exact owner-approved Creative Direction Style Lock.' }) })
+  if (lock.projectId !== input.packet.projectId || lock.sourcePacketId !== input.packet.id || lock.creativeLanguage.styleLockId !== lock.styleLockId) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'STYLE_LOCK_REVISION_MISMATCH', message: 'Approved Style Lock does not match the exact project/source/creative-language authority.' }) })
+  const style = styleLanguage(input)
 
   const rawCandidates: readonly CandidateWithProvenanceV1[] = input.agentCandidates
     ? Object.freeze(input.agentCandidates.map((opportunity) => Object.freeze({ opportunity, origin: 'agent-proposed' as const, originalStartTick: opportunity.sourceStartTick, originalEndTick: opportunity.sourceEndTick, repairNotes: Object.freeze([]), score: bounded(opportunity.confidence, 0, 1) })))
@@ -405,7 +368,7 @@ export const planMotionOpportunitiesV1 = (input: PlanMotionOpportunitiesInputV1)
       communicationGoal: opportunity.communicationGoal,
       presentationMode: opportunity.recommendedPresentationMode,
       ratio,
-      styleTraits: Object.freeze(input.style?.traits ? [...input.style.traits] : ['clean','editorial']),
+      styleTraits: Object.freeze([style.language.typographyLanguage, style.language.surfaceLanguage, style.language.motionRhythm]),
       requiredEditability: 'full',
       allowedLibraryScopes: Object.freeze(['sanverse']),
       requiredCapabilities: opportunity.requiredCapabilities,
@@ -444,7 +407,7 @@ export const planMotionOpportunitiesV1 = (input: PlanMotionOpportunitiesInputV1)
     ok: true as const,
     value: Object.freeze({
       schemaVersion: MOTION_OPPORTUNITY_MAP_SCHEMA_V1,
-      id: `opmap_${tail(`${input.packet.id}:${requestedMax}:${planned.map((item) => item.opportunity.id).join(':')}`)}`,
+      id: `opmap_${tail(`${input.packet.id}:${lock.contentHash}:${requestedMax}:${planned.map((item) => item.opportunity.id).join(':')}`)}`,
       projectId: input.packet.projectId,
       projectRevision: input.packet.projectRevision,
       sourcePacketId: input.packet.id,
@@ -453,6 +416,7 @@ export const planMotionOpportunitiesV1 = (input: PlanMotionOpportunitiesInputV1)
       selectedCount: planned.length,
       rejectedCandidates: selected.rejected,
       styleLockId: style.styleLockId,
+      styleLockRef: Object.freeze({ styleLockId: lock.styleLockId, proposalId: lock.proposalId, proposalRevision: lock.proposalRevision, contentHash: lock.contentHash }),
       styleRecommendation: style.recommendation,
       creativeLanguage: style.language,
       opportunities: Object.freeze(planned),

@@ -18,7 +18,7 @@ const fixture = (purpose: 'production' | 'review', approvalId: string | null): C
     component: Object.freeze({ props: Object.freeze({ text: 'Review proof' }), style: Object.freeze({}) }),
     motion: Object.freeze({ motionPlanId: 'motion-plan:review', motionDraftId: 'motion-draft:review', motionDraftRevision: 1, motionOwnerApprovalId: approvalId, scene, selectedNodeId: root.id, semanticNodeIds: Object.freeze([root.id]) }),
     governance: Object.freeze({
-      artifactPurpose: purpose, styleLockId: 'style-lock:review', creativeLanguageId: 'creative-language:review', cohesionScore: 1, requiredCapabilities: Object.freeze([]), structuralQaPassed: true as const,
+      artifactPurpose: purpose, styleLockId: 'stylelock_review123', styleLockContentHash: 'd'.repeat(64), creativeDirectionRevision: 2, creativeLanguageId: 'creative-language:review', cohesionScore: 1, requiredCapabilities: Object.freeze([]), structuralQaPassed: true as const,
       reviewEvidence: Object.freeze({ canonicalReviewRef: 'review-only://proof', posterRef: 'review-only://proof/poster', criticalFrameRefs: Object.freeze([]), kvsAnchorFrameRefs: Object.freeze([]), entrancePayoffExitFrameRefs: Object.freeze([]), sourceCompositeFrameRefs: Object.freeze([]) }),
     }),
   })
@@ -29,5 +29,11 @@ describe('Creative scene artifact purpose gates', () => {
     expect(validateCreativeSceneArtifactV1(fixture('review', null))).toMatchObject({ ok: true })
     expect(validateCreativeSceneArtifactV1(fixture('production', null))).toMatchObject({ ok: false, refusal: { code: 'CREATIVE_ARTIFACT_INVALID', message: 'Production Creative artifacts require exact Motion owner-approval lineage.' } })
     expect(validateCreativeSceneArtifactV1(fixture('production', 'approval_review123'))).toMatchObject({ ok: true })
+  })
+
+  it('requires exact Approved Style Lock provenance for both review and production artifacts', () => {
+    const review = fixture('review', null)
+    expect(validateCreativeSceneArtifactV1({ ...review, governance: { ...review.governance, styleLockContentHash: undefined } })).toMatchObject({ ok: false, refusal: { code: 'CREATIVE_ARTIFACT_INVALID' } })
+    expect(validateCreativeSceneArtifactV1({ ...review, governance: { ...review.governance, creativeDirectionRevision: undefined } })).toMatchObject({ ok: false, refusal: { code: 'CREATIVE_ARTIFACT_INVALID' } })
   })
 })

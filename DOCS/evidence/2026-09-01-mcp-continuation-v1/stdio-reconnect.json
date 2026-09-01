@@ -1,51 +1,52 @@
 {
-  "schemaVersion": "sanverse.mcp-continuation-audit/v1",
-  "generatedAt": "2026-09-01T12:30:36.936Z",
+  "schemaVersion": "sanverse.mcp-continuation-audit/v2",
+  "generatedAt": "2026-09-01T15:56:00.981Z",
   "projectId": "project_21c01709e413d034d4cec25dcb4b1ca4",
-  "runId": "run_00n2km2k",
-  "reviewId": "review_000cuypa",
-  "transportProcesses": 2,
+  "productionRevision": 0,
+  "runId": "run_01vkby94",
+  "reviewId": "review_01aggmt7",
+  "transportProcesses": 3,
   "processAClosedBeforeProcessB": true,
-  "samePersistedCreativeRun": true,
-  "sameReviewEvidenceIdentity": true,
-  "productionMutationRequested": false,
-  "first": {
-    "connectMs": 3675,
+  "processBClosedBeforeProcessC": true,
+  "reconnectBeforeApproval": {
+    "exactPendingReviewIdentity": true,
     "snapshot": {
-      "stage": "animatic-review",
-      "reviewId": "review_000cuypa",
-      "reviewStatus": "pending",
-      "evidenceHash": "4fe870ea4a5c54a28e71ef4aa01fc5ba96181582355e8d6a8812e141d13f2369",
-      "subjectId": "animatic:creative_scene_010wcivv",
+      "stage": "creative-direction-review",
+      "reviewId": "review_01aggmt7",
+      "evidenceHash": "7042b3d05db0ba8169e40486b7f0a98afdd4169c6fc6d3633cec12e4e5eaed54",
+      "subjectId": "direction_000v1r1c",
       "subjectRevision": 1,
       "artifactIdentity": [
-        "animatic-middle.png:b093232504ebb3134024589804aab4d3f22f742d7501496b910a5bb5589954df",
-        "animatic-opening.png:0f919687ec4cc34670b2c0e7c0dfe85748582612a9b1d953662fad9fcb3f8cb6",
-        "animatic-payoff.png:0f919687ec4cc34670b2c0e7c0dfe85748582612a9b1d953662fad9fcb3f8cb6"
+        "creative-direction-board.png:6f6f699e11ee50cc2a5fe8d9747a3ba9e8f9d0b8d83a0394724297cec87654b0"
       ],
-      "chatImageCount": 3,
-      "toolCount": 69
-    },
+      "chatImageCount": 1
+    }
+  },
+  "approvalAfterReconnect": {
+    "trustedConfirmationRounds": 1,
+    "styleLockId": "stylelock_6b04261d86f627f8",
+    "contentHash": "6b04261d86f627f82cfb28b7759fef8440c3dce972ce1b20cbae83452c271c6f",
+    "proposalRevision": 1
+  },
+  "reconnectAfterApproval": {
+    "stage": "opportunity-planning",
+    "exactApprovedStyleLockIdentity": true,
+    "styleLockId": "stylelock_6b04261d86f627f8",
+    "contentHash": "6b04261d86f627f82cfb28b7759fef8440c3dce972ce1b20cbae83452c271c6f"
+  },
+  "productionMutationRequested": false,
+  "productionMutationObserved": false,
+  "first": {
+    "connectMs": 3909,
     "stderrHadHandshakeTimeout": false
   },
   "second": {
-    "connectMs": 3613,
-    "snapshot": {
-      "stage": "animatic-review",
-      "reviewId": "review_000cuypa",
-      "reviewStatus": "pending",
-      "evidenceHash": "4fe870ea4a5c54a28e71ef4aa01fc5ba96181582355e8d6a8812e141d13f2369",
-      "subjectId": "animatic:creative_scene_010wcivv",
-      "subjectRevision": 1,
-      "artifactIdentity": [
-        "animatic-middle.png:b093232504ebb3134024589804aab4d3f22f742d7501496b910a5bb5589954df",
-        "animatic-opening.png:0f919687ec4cc34670b2c0e7c0dfe85748582612a9b1d953662fad9fcb3f8cb6",
-        "animatic-payoff.png:0f919687ec4cc34670b2c0e7c0dfe85748582612a9b1d953662fad9fcb3f8cb6"
-      ],
-      "chatImageCount": 3,
-      "toolCount": 69
-    },
+    "connectMs": 4136,
     "stderrHadHandshakeTimeout": false
   },
-  "contract": "Client task/session identity may survive independently of the MCP process. On client resume, a new Sanverse transport can reinitialize and creative.resume_run rehydrates the same durable Creative Run/review."
+  "third": {
+    "connectMs": 3931,
+    "stderrHadHandshakeTimeout": false
+  },
+  "contract": "A Creative Run persists independently of MCP process lifetime. Pending Creative Direction evidence survives one fresh STDIO process; exact trusted approval can occur after reconnect; the resulting Approved Style Lock then survives another fresh STDIO process without mutating production."
 }

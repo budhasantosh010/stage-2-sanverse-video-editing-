@@ -113,6 +113,7 @@ export interface StoryboardStyleConstraintV1 {
   readonly hard: Readonly<{
     allowedColors?: readonly string[]
     allowedFontFamilies?: readonly string[]
+    paletteRoles?: Readonly<{ background:string; surface:string; text:string; accent:string }>
   }>
   readonly soft: Readonly<{
     preferredPresentationModes?: readonly string[]

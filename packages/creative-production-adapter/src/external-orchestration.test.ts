@@ -41,7 +41,7 @@ describe('external raw-video orchestration session — batch 1', () => {
     })
     expect(session.activeProjectId()).toBeNull()
     const listed = session.registry.list().map((tool) => tool.id)
-    expect(listed).toHaveLength(69)
+    expect(listed).toHaveLength(73)
     expect(listed).toEqual(expect.arrayContaining([
       'production.list_projects',
       'production.select_project',

@@ -7,7 +7,7 @@ import { validateMotionScene, type MotionSceneV1 } from '@sanverse/motion-graph'
 
 export type KeyVisualPurposeV1 = 'opening'|'establish'|'build'|'explain'|'hero'|'payoff'|'resolve'|'end'|'custom'
 export type StoryboardStatusV1 = 'draft'|'qa'|'awaiting-owner'|'owner-approved'|'rejected'
-export type OwnerApprovalScopeV1 = 'storyboard'|'animatic'|'motion'
+export type OwnerApprovalScopeV1 = 'creative-direction'|'storyboard'|'animatic'|'motion'
 
 export interface StoryboardPresentationSetupV1 {
   readonly schemaVersion: 'sanverse.storyboard-presentation-setup/v1'
@@ -120,7 +120,7 @@ export const createStoryboardV1 = (input: Omit<StoryboardV1,'schemaVersion'>): S
 
 export const validateOwnerApprovalV1 = (input: unknown): CreativeValidationResultV1<OwnerApprovalV1> => {
   if (!record(input) || input.schemaVersion !== 'sanverse.owner-approval/v1') return creativeRefusal('UNSUPPORTED_APPROVAL_VERSION','Approval must use sanverse.owner-approval/v1.')
-  if (!id(input.id) || !id(input.subjectId) || !['storyboard','animatic','motion'].includes(String(input.scope)) || input.status !== 'owner-approved') return creativeRefusal('INVALID_APPROVAL','Approval identity/scope/status is invalid.')
+  if (!id(input.id) || !id(input.subjectId) || !['creative-direction','storyboard','animatic','motion'].includes(String(input.scope)) || input.status !== 'owner-approved') return creativeRefusal('INVALID_APPROVAL','Approval identity/scope/status is invalid.')
   if (!Number.isSafeInteger(input.subjectRevision) || Number(input.subjectRevision) < 1) return creativeRefusal('INVALID_APPROVAL','Approval must target an exact positive subject revision.')
   if (typeof input.approvedAt !== 'string' || Number.isNaN(Date.parse(input.approvedAt))) return creativeRefusal('INVALID_APPROVAL','approvedAt must be an ISO-compatible timestamp.')
   if (input.notes !== undefined && (!Array.isArray(input.notes) || !input.notes.every((note) => typeof note === 'string'))) return creativeRefusal('INVALID_APPROVAL','Approval notes must be strings.')

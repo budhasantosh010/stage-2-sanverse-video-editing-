@@ -41,6 +41,9 @@ describe('MCP local import confinement', () => {
     await mkdir(nested)
     await writeFile(resolve(root, 'raw video.mp4'), Buffer.from('bounded fixture'))
     await writeFile(resolve(root, 'transcript.srt'), '1\n00:00:00,000 --> 00:00:01,000\nHello.\n')
+    await writeFile(resolve(root, 'brand.md'), '# Brand\nUse purple and restrained motion.\n')
+    await writeFile(resolve(root, 'creative-guidelines.txt'), 'Use editorial typography.\n')
+    await writeFile(resolve(root, 'notes.txt'), 'This remains ordinary transcript/plain text.\n')
     await writeFile(resolve(nested, 'logo.png'), Buffer.from('image'))
 
     expect(await resolveLocalWorkspaceRootV1(root)).toBe(root)
@@ -48,11 +51,17 @@ describe('MCP local import confinement', () => {
     expect(video.safeRelativePath).toBe('raw video.mp4')
     const transcript = await readPermittedWorkspaceTextFileV1({ localPath: 'transcript.srt', workspaceRoot: root })
     expect(transcript).toMatchObject({ relativePath: 'transcript.srt', format: 'srt' })
+    expect(await readPermittedWorkspaceTextFileV1({ localPath: 'brand.md', workspaceRoot: root })).toMatchObject({ relativePath: 'brand.md', format: 'brief' })
+    expect(await readPermittedWorkspaceTextFileV1({ localPath: 'creative-guidelines.txt', workspaceRoot: root })).toMatchObject({ relativePath: 'creative-guidelines.txt', format: 'brief' })
+    expect(await readPermittedWorkspaceTextFileV1({ localPath: 'notes.txt', workspaceRoot: root })).toMatchObject({ relativePath: 'notes.txt', format: 'plain' })
 
     const listed = await listPermittedWorkspaceInputsV1({ workspaceRoot: root })
     expect(listed).toEqual(expect.arrayContaining([
       expect.objectContaining({ relativePath: 'raw video.mp4', kind: 'video' }),
       expect.objectContaining({ relativePath: 'transcript.srt', kind: 'transcript' }),
+      expect.objectContaining({ relativePath: 'brand.md', kind: 'brief' }),
+      expect.objectContaining({ relativePath: 'creative-guidelines.txt', kind: 'brief' }),
+      expect.objectContaining({ relativePath: 'notes.txt', kind: 'transcript' }),
       expect.objectContaining({ relativePath: `assets${process.platform === 'win32' ? '\\' : '/'}logo.png`, kind: 'image' }),
     ]))
     expect(JSON.stringify(listed)).not.toContain(root)

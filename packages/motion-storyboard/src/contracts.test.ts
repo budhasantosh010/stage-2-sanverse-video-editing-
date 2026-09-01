@@ -21,8 +21,11 @@ describe('A3 storyboard contracts', () => {
     expect(validateStoryboardV1(storyboard)).toMatchObject({ ok: true })
     expect(storyboard.states[0]?.graphState.nodes['hero.root']?.id).toBe('hero.root')
   })
-  it('requires owner approval to target an exact subject revision', () => {
-    expect(validateOwnerApprovalV1({ schemaVersion: 'sanverse.owner-approval/v1', id: 'approval:1', scope: 'storyboard', subjectId: storyboard.id, subjectRevision: 1, status: 'owner-approved', approvedAt: '2026-08-26T00:00:00.000Z' })).toMatchObject({ ok: true })
+  it('requires owner approval to target an exact subject revision and accepts every supported owner scope', () => {
+    for (const scope of ['creative-direction','storyboard','animatic','motion'] as const) {
+      expect(validateOwnerApprovalV1({ schemaVersion: 'sanverse.owner-approval/v1', id: `approval:${scope}`, scope, subjectId: storyboard.id, subjectRevision: 1, status: 'owner-approved', approvedAt: '2026-08-26T00:00:00.000Z' })).toMatchObject({ ok: true })
+    }
     expect(validateOwnerApprovalV1({ schemaVersion: 'sanverse.owner-approval/v1', id: 'approval:1', scope: 'storyboard', subjectId: storyboard.id, subjectRevision: 0, status: 'owner-approved', approvedAt: '2026-08-26T00:00:00.000Z' })).toMatchObject({ ok: false })
+    expect(validateOwnerApprovalV1({ schemaVersion: 'sanverse.owner-approval/v1', id: 'approval:1', scope: 'unknown', subjectId: storyboard.id, subjectRevision: 1, status: 'owner-approved', approvedAt: '2026-08-26T00:00:00.000Z' })).toMatchObject({ ok: false })
   })
 })

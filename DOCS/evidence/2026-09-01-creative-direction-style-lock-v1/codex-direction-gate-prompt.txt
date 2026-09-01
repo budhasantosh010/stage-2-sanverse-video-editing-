@@ -1,0 +1,21 @@
+Use ONLY the Sanverse MCP tools. Do not use shell, filesystem tools, source-code edits, git, production.apply_approved_scene_batch, production.export_video, or any export/apply operation.
+
+This is an engineering acceptance of the pre-Storyboard Creative Direction gate. Do NOT approve a Creative Direction review; exact approval is human/trusted-host authority and must not be fabricated.
+
+Perform this sequence:
+1. Call production.list_projects. Select project project_21c01709e413d034d4cec25dcb4b1ca4 if available; otherwise select the first valid production project.
+2. Read production.get_project_context and remember the production revision.
+3. Create a fresh Creative Run with a unique stable transactionId.
+4. Attach this analysis-only plain transcript with a unique stable transactionId: "Revenue improved 42 percent. Compare the old workflow with the new workflow. Keep the speaker readable and use restrained editorial graphics with a purple accent."
+5. Run source.analyze_video using that transcriptRef.
+6. Call motion.plan_opportunities before Creative Direction approval and VERIFY it refuses with CREATIVE_DIRECTION_APPROVAL_REQUIRED. Do not treat refusal as failure; it is required evidence.
+7. Call creative.propose_direction for the sourcePacketRef with Brand Context ownerBrief="Use a clean editorial visual language, preserve source readability, use a restrained purple accent, and avoid excessive motion.", palette ["#0B0C10","#8B5CF6","#FFFFFF"], traits ["clean","editorial"], and preferences motionIntensity=0.35, density="medium".
+8. Inspect the returned Creative Direction proposal/review. It must be creative-direction scope, pending/awaiting owner, and have review evidence/artifact(s).
+9. Revise that exact proposal revision using creative.revise_direction: set paletteRoles.accent="#8B5CF6", baseTiming="calm", and reason="Use the approved purple accent with calmer motion for source-first readability." Verify the proposal revision increments to 2 and a fresh review exists.
+10. Call creative.get_direction and verify: proposal revision=2, approvedStyleLock is null/absent, stage is creative-direction-review, and the latest review targets revision 2.
+11. Again call motion.plan_opportunities and VERIFY it still refuses with CREATIVE_DIRECTION_APPROVAL_REQUIRED.
+12. Re-read production.get_project_context and verify the production revision is unchanged.
+13. Do not call creative.decide_review. Do not approve/reject/revise the review through the owner-decision tool.
+
+Return one final line exactly in this shape, filled with the real IDs/counts you observed:
+SANVERSE_CODEX_DIRECTION_GATE_OK run_id=<run_id> proposal_id=<proposal_id> revision=2 review_id=<review_id> artifact_count=<N> plan_blocked=true production_revision=<revision>

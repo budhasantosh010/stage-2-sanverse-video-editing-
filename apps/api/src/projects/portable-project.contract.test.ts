@@ -73,7 +73,7 @@ test('portable archive carries exact immutable Creative artifacts and rebinds th
     motion: Object.freeze({ motionPlanId: 'motion-plan:portable', motionDraftId: 'motion-draft:portable', motionDraftRevision: 1, motionOwnerApprovalId: 'approval_portable', scene, selectedNodeId: root.id, semanticNodeIds: Object.freeze([root.id]) }),
     governance: Object.freeze({
       artifactPurpose: 'production',
-      styleLockId: 'style-lock:portable', creativeLanguageId: 'creative-language:portable', cohesionScore: 1, requiredCapabilities: Object.freeze([]), structuralQaPassed: true,
+      styleLockId: 'style-lock:portable', styleLockContentHash: 'd'.repeat(64), creativeDirectionRevision: 1, creativeLanguageId: 'creative-language:portable', cohesionScore: 1, requiredCapabilities: Object.freeze([]), structuralQaPassed: true,
       reviewEvidence: Object.freeze({ canonicalReviewRef: 'production-preview://portable', posterRef: 'production-preview://portable/poster', criticalFrameRefs: Object.freeze([]), kvsAnchorFrameRefs: Object.freeze([]), entrancePayoffExitFrameRefs: Object.freeze([]), sourceCompositeFrameRefs: Object.freeze([]) }),
     }),
   })

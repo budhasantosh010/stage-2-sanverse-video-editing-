@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createProject, mediaTime, type EditProject } from '@sanverse/edit-domain'
-import type { MotionOpportunityV1 } from '@sanverse/creative-direction'
+import type { ApprovedStyleLockV1, MotionOpportunityV1 } from '@sanverse/creative-direction'
 import { planMotionOpportunitiesV1 } from './opportunity-planner.ts'
-import { createCreativeSceneBatchV1 } from './multi-scene-workflow.ts'
+import { createCreativeSceneBatchV1, type SceneHostApprovalRequestV1 } from './multi-scene-workflow.ts'
 import type { SourceTranscriptV1, SourceUnderstandingPacketV1 } from './external-orchestration.ts'
 
 const project = (): EditProject => {
@@ -81,7 +81,30 @@ const packet = (p: EditProject, t: SourceTranscriptV1): SourceUnderstandingPacke
   })
 }
 
-const ownerApproval = (request: Readonly<{ requestRef: string; scope: 'storyboard'|'animatic'|'motion'; subjectId: string; subjectRevision: number }>) => Object.freeze({
+const approvedStyleLock = (source: SourceUnderstandingPacketV1): ApprovedStyleLockV1 => Object.freeze({
+  schemaVersion: 'sanverse.approved-style-lock/v1',
+  styleLockId: 'stylelock_1234567890abcdef',
+  proposalId: 'direction_12345678',
+  proposalRevision: 1,
+  projectId: source.projectId,
+  sourcePacketId: source.id,
+  recommendation: Object.freeze({
+    schemaVersion: 'sanverse.style-lock-recommendation/v1',
+    visual: Object.freeze({ paletteRoles: Object.freeze({ background:'#0B0C10', surface:'#15171D', text:'#FFFFFF', accent:'#FF7A1A' }), typeFamily:'Inter', radius:16, stroke:1, shadow:.22, depth:.18, texture:'none' as const }),
+    motion: Object.freeze({ baseTiming:'balanced' as const, primaryEase:'soft' as const, secondaryEase:'soft' as const, overshootAllowance:.12, travelDistance:48, staggerRhythm:.12, holdDiscipline:'balanced' as const, cameraAggressiveness:.2, effectIntensity:.3 }),
+    composition: Object.freeze({ density:'low' as const, alignment:'adaptive' as const, safeArea:.1, negativeSpacePreference:'preserve' as const, subjectPriority:'high' as const }),
+    reasons: Object.freeze(['Owner-approved test Creative Direction.']),
+  }),
+  creativeLanguage: Object.freeze({
+    schemaVersion:'sanverse.video-creative-language/v1', id:'language_12345678', version:1, styleLockId:'stylelock_1234567890abcdef',
+    preferredPresentationModes:Object.freeze(['overlay','full-screen-motion','picture-in-picture'] as const), typographyLanguage:'editorial', surfaceLanguage:'soft-depth', motionRhythm:'balanced', transitionVocabulary:Object.freeze(['cut','fade','scale'] as const), densityPolicy:'low', cameraPolicy:'restrained', paletteRoles:Object.freeze(['background','surface','text','accent']), easingFamily:Object.freeze(['soft'] as const), overshootMax:.12, allowedExceptions:Object.freeze([]),
+  }),
+  ownerApprovalId: 'approval:creative-direction:test',
+  locked: true,
+  contentHash: 'd'.repeat(64),
+})
+
+const ownerApproval = (request: Pick<SceneHostApprovalRequestV1, 'requestRef'|'scope'|'subjectId'|'subjectRevision'>) => Object.freeze({
   schemaVersion: 'sanverse.owner-approval/v1' as const,
   id: `approval:${request.requestRef}`,
   scope: request.scope,
@@ -94,7 +117,7 @@ const ownerApproval = (request: Readonly<{ requestRef: string; scope: 'storyboar
 describe('raw-video opportunity planning + multi-scene workflow', () => {
   it('uses source evidence plus the real B2 Motion Library and existing recipe catalog to deterministically plan ten non-overlapping opportunities', () => {
     const p = project(), t = transcript(p), source = packet(p, t)
-    const planned = planMotionOpportunitiesV1({ packet: source, transcript: t, targetCount: 10 })
+    const planned = planMotionOpportunitiesV1({ packet: source, approvedStyleLock: approvedStyleLock(source), transcript: t, targetCount: 10 })
     expect(planned.ok).toBe(true)
     if (!planned.ok) return
     expect(planned.value.opportunities).toHaveLength(10)
@@ -111,29 +134,29 @@ describe('raw-video opportunity planning + multi-scene workflow', () => {
       expect(entry.evidence.sourcePacketId).toBe(source.id)
       if (index > 0) expect(planned.value.opportunities[index - 1]!.opportunity.sourceEndTick).toBeLessThanOrEqual(entry.opportunity.sourceStartTick)
     }
-    const again = planMotionOpportunitiesV1({ packet: source, transcript: t, targetCount: 10 })
+    const again = planMotionOpportunitiesV1({ packet: source, approvedStyleLock: approvedStyleLock(source), transcript: t, targetCount: 10 })
     expect(again).toEqual(planned)
   })
 
   it('rejects only bad agent candidates and preserves the valid remainder up to the requested maximum', () => {
     const p = project(), t = transcript(p), source = packet(p, t)
-    const base = planMotionOpportunitiesV1({ packet: source, transcript: t, targetCount: 10 })
+    const base = planMotionOpportunitiesV1({ packet: source, approvedStyleLock: approvedStyleLock(source), transcript: t, targetCount: 10 })
     if (!base.ok) throw new Error(base.refusal.message)
     const candidates = base.value.opportunities.map((entry) => entry.opportunity)
     const overlapped: MotionOpportunityV1[] = candidates.map((candidate, index) => index === 1 ? Object.freeze({ ...candidate, sourceStartTick: candidates[0]!.sourceStartTick + 100 }) : candidate)
-    const repaired = planMotionOpportunitiesV1({ packet: source, transcript: t, maxCount: 10, agentCandidates: overlapped })
+    const repaired = planMotionOpportunitiesV1({ packet: source, approvedStyleLock: approvedStyleLock(source), transcript: t, maxCount: 10, agentCandidates: overlapped })
     expect(repaired.ok).toBe(true)
     if (!repaired.ok) return
     expect(repaired.value.selectedCount).toBe(9)
     expect(repaired.value.rejectedCandidates).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'OPPORTUNITY_OVERLAP' })]))
-    const short = planMotionOpportunitiesV1({ packet: source, transcript: t, maxCount: 10, agentCandidates: candidates.slice(0, 9) })
+    const short = planMotionOpportunitiesV1({ packet: source, approvedStyleLock: approvedStyleLock(source), transcript: t, maxCount: 10, agentCandidates: candidates.slice(0, 9) })
     expect(short.ok).toBe(true)
     if (short.ok) expect(short.value.selectedCount).toBe(9)
   })
 
   it('builds ten isolated canonical Motion Scene storyboards without owner approval and exposes exact-revision batch state', () => {
     const p = project(), t = transcript(p), source = packet(p, t)
-    const planned = planMotionOpportunitiesV1({ packet: source, transcript: t, targetCount: 10 })
+    const planned = planMotionOpportunitiesV1({ packet: source, approvedStyleLock: approvedStyleLock(source), transcript: t, targetCount: 10 })
     if (!planned.ok) throw new Error(planned.refusal.message)
     const batch = createCreativeSceneBatchV1({ project: p, opportunityMap: planned.value })
     expect(batch.ok).toBe(true)
@@ -148,7 +171,7 @@ describe('raw-video opportunity planning + multi-scene workflow', () => {
 
   it('enforces host-resolved exact-revision Storyboard→Animatic→Motion owner gates for all scenes', async () => {
     const p = project(), t = transcript(p), source = packet(p, t)
-    const planned = planMotionOpportunitiesV1({ packet: source, transcript: t, targetCount: 10 })
+    const planned = planMotionOpportunitiesV1({ packet: source, approvedStyleLock: approvedStyleLock(source), transcript: t, targetCount: 10 })
     if (!planned.ok) throw new Error(planned.refusal.message)
     const made = createCreativeSceneBatchV1({ project: p, opportunityMap: planned.value })
     if (!made.ok) throw new Error(made.refusal.message)
@@ -180,7 +203,7 @@ describe('raw-video opportunity planning + multi-scene workflow', () => {
 
   it('invalidates an issued approval request when the affected storyboard revision changes and refuses wildcard approval material', async () => {
     const p = project(), t = transcript(p), source = packet(p, t)
-    const planned = planMotionOpportunitiesV1({ packet: source, transcript: t, targetCount: 2 })
+    const planned = planMotionOpportunitiesV1({ packet: source, approvedStyleLock: approvedStyleLock(source), transcript: t, targetCount: 2 })
     if (!planned.ok) throw new Error(planned.refusal.message)
     const made = createCreativeSceneBatchV1({ project: p, opportunityMap: planned.value })
     if (!made.ok) throw new Error(made.refusal.message)

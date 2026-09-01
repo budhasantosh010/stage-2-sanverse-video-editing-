@@ -14,18 +14,24 @@ const valueOf = (result: Awaited<ReturnType<Client['callTool']>>): Record<string
   if (!record(result.structuredContent) || result.structuredContent.ok === false || !record(result.structuredContent.value)) throw new Error(`Tool refusal/result mismatch: ${JSON.stringify(result.structuredContent ?? result.content)}`)
   return result.structuredContent.value
 }
+const refusalCodeOf = (result: Awaited<ReturnType<Client['callTool']>>): string | null => record(result.structuredContent) && result.structuredContent.ok === false && record(result.structuredContent.refusal) && typeof result.structuredContent.refusal.code === 'string' ? result.structuredContent.refusal.code : null
 const imageCount = (result: Awaited<ReturnType<Client['callTool']>>): number => result.content.filter((item) => item.type === 'image').length
 
 const transport = new StdioClientTransport({ command: process.execPath, args: [launcher], cwd: SANVERSE_ROOT, stderr: 'pipe', maxBufferSize: 64 * 1024 * 1024 })
 const stderr: string[] = []
 transport.stderr?.on('data', (chunk) => stderr.push(String(chunk)))
-const client = new Client({ name: 'sanverse-storyboard-authoring-audit', version: '1.0.0' }, { capabilities: {} })
+const confirmations: Array<Record<string, unknown>> = []
+const client = new Client({ name: 'sanverse-storyboard-authoring-audit', version: '1.0.0' }, { capabilities: { elicitation: {} }, inputRequired: { autoFulfill: true, maxRounds: 4 } })
+client.setRequestHandler('elicitation/create', async (request) => {
+  confirmations.push(request as unknown as Record<string, unknown>)
+  return { action: 'accept' as const, content: { confirm: true } }
+})
 
 try {
   await client.connect(transport)
   const tools = await client.listTools()
-  if (tools.tools.length !== 69) throw new Error(`Expected 69 Sanverse tools, received ${tools.tools.length}.`)
-  const requiredTools = ['creative.inspect_storyboard','creative.get_storyboard_authoring_schema','creative.apply_storyboard_graph_operations','creative.prepare_review']
+  if (tools.tools.length !== 73) throw new Error(`Expected 73 Sanverse tools, received ${tools.tools.length}.`)
+  const requiredTools = ['creative.propose_direction','creative.get_direction','creative.revise_direction','creative.reopen_direction','creative.inspect_storyboard','creative.get_storyboard_authoring_schema','creative.apply_storyboard_graph_operations','creative.prepare_review']
   for (const id of requiredTools) if (!tools.tools.some((tool) => tool.name === id)) throw new Error(`Missing required authoring tool ${id}.`)
 
   const listed = valueOf(await client.callTool({ name:'production.list_projects', arguments:{} }))
@@ -43,7 +49,27 @@ try {
   const runId = String(created.runId ?? '')
   const transcript = valueOf(await client.callTool({ name:'source.attach_transcript', arguments:{ format:'plain', contents:'The plan costs $29. Compare the current plan with the improved plan. Make the price unmistakable and show a strong circular proof point.', transactionId:`authoring_audit_${suffix}_transcript` } }))
   const analyzed = valueOf(await client.callTool({ name:'source.analyze_video', arguments:{ transcriptRef:transcript.transcriptRef } }))
+  const blockedBeforeDirection = await client.callTool({ name:'motion.plan_opportunities', arguments:{ sourcePacketRef:analyzed.id, transcriptRef:transcript.transcriptRef, maxCount:3 } })
+  if (refusalCodeOf(blockedBeforeDirection) !== 'CREATIVE_DIRECTION_APPROVAL_REQUIRED') throw new Error('Opportunity planning did not fail closed before Creative Direction approval.')
+
+  const proposedResult = await client.callTool({ name:'creative.propose_direction', arguments:{ sourcePacketRef:analyzed.id, brandContext:{ ownerBrief:'Use a clear editorial direction with a restrained purple accent and source-first readability.', palette:['#0B0C10','#8B5CF6','#FFFFFF'], traits:['clean','editorial'] }, preferences:{ motionIntensity:0.35, density:'medium' } } })
+  const proposed = valueOf(proposedResult)
+  if (!record(proposed.proposal) || !record(proposed.review) || proposed.review.scope !== 'creative-direction' || imageCount(proposedResult) < 1) throw new Error('Creative Direction proposal did not produce a chat-visible review board.')
+  const firstDirectionReviewId = String(proposed.review.reviewId ?? '')
+  const proposalId = String(proposed.proposal.proposalId ?? '')
+  const revisedResult = await client.callTool({ name:'creative.revise_direction', arguments:{ proposalId, expectedRevision:1, changes:{ paletteRoles:{ accent:'#8B5CF6' }, baseTiming:'calm' }, reason:'Use the approved purple accent with calmer motion.' } })
+  const revised = valueOf(revisedResult)
+  if (!record(revised.proposal) || Number(revised.proposal.revision) !== 2 || !record(revised.review)) throw new Error('Creative Direction revision did not advance to revision 2 with fresh evidence.')
+  const staleDirectionDecision = await client.callTool({ name:'creative.decide_review', arguments:{ reviewId:firstDirectionReviewId, decision:'approve' } })
+  if (refusalCodeOf(staleDirectionDecision) !== 'CREATIVE_DIRECTION_STALE') throw new Error('Stale Creative Direction review evidence was not refused.')
+  const approvedDirectionResult = await client.callTool({ name:'creative.decide_review', arguments:{ reviewId:String(revised.review.reviewId ?? ''), decision:'approve' } })
+  const approvedDirection = valueOf(approvedDirectionResult)
+  if (approvedDirection.decision !== 'approved' || !record(approvedDirection.approvedStyleLock)) throw new Error('Exact revised Creative Direction did not compile into an Approved Style Lock.')
+  const approvedStyleLock = approvedDirection.approvedStyleLock
+  if (Number(approvedStyleLock.proposalRevision) !== 2 || typeof approvedStyleLock.contentHash !== 'string' || !/^[a-f0-9]{64}$/u.test(approvedStyleLock.contentHash)) throw new Error('Approved Style Lock provenance is incomplete.')
+
   const planned = valueOf(await client.callTool({ name:'motion.plan_opportunities', arguments:{ sourcePacketRef:analyzed.id, transcriptRef:transcript.transcriptRef, maxCount:3 } }))
+  if (!record(planned.styleLockRef) || planned.styleLockRef.styleLockId !== approvedStyleLock.styleLockId || planned.styleLockRef.contentHash !== approvedStyleLock.contentHash || Number(planned.styleLockRef.proposalRevision) !== 2) throw new Error('Opportunity map did not preserve exact Approved Style Lock provenance.')
   const batch = valueOf(await client.callTool({ name:'motion.create_scene_batch', arguments:{ opportunityMapId:planned.id, transactionId:`authoring_audit_${suffix}_batch` } }))
   const batchId = String(batch.id ?? '')
   const scenes = Array.isArray(batch.scenes) ? batch.scenes.filter(record) : []
@@ -124,6 +150,7 @@ try {
     batchId,
     sceneId:chosen.sceneId,
     toolCount:tools.tools.length,
+    creativeDirection:Object.freeze({ proposalId, approvedRevision:2, styleLockId:String(approvedStyleLock.styleLockId ?? ''), contentHash:String(approvedStyleLock.contentHash ?? ''), staleReviewRefused:true, confirmationRounds:confirmations.length }),
     authoring:Object.freeze({ currency:'£29', shape:'ellipse', duplicatedNodeId:duplicateId, semanticPartId:partId, finalSandboxRevision:revision }),
     review:Object.freeze({ reviewId:String(selectedReview.reviewId ?? ''), kvsCount:selectedStates.length, artifactCount:selectedArtifacts.length, chatImageCount:imageCount(reviewResult), sourceComposite:true, contextHash:createHash('sha256').update(JSON.stringify(selectedReview.context)).digest('hex') }),
     productionMutation:false,

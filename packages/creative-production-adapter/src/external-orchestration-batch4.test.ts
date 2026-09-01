@@ -2,8 +2,11 @@ import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { acceptChangeSetAtomic, createProject, redoChangeSet, undoChangeSet, type ChangeSet, type EditProject } from '@sanverse/edit-domain'
 import { mediaTime } from '@sanverse/edit-domain/time'
+import type { ToolExecutionContextV1 } from '@sanverse/motion-agent-tools'
 import { createCreativeProductionExternalOrchestrationSessionV1, type ExternalCreativeArtifactRefV1 } from './external-orchestration.ts'
 import { canonicalCreativeArtifactJsonV1, type CreativeSceneArtifactV1 } from './creative-artifact.ts'
+import type { CreativeReviewV1, CreativeRunV1 } from './creative-run.ts'
+import type { HostApprovalRequestV1 } from './multi-scene-workflow.ts'
 
 const baseProject = (): EditProject => {
   const projectId = 'project_1234567890abcdef'
@@ -17,9 +20,11 @@ const baseProject = (): EditProject => {
 }
 
 const sha256 = async (text: string) => createHash('sha256').update(text).digest('hex')
-const invoke = async (session: Awaited<ReturnType<typeof createCreativeProductionExternalOrchestrationSessionV1>>, id: string, input: unknown = {}) => session.registry.invoke(id, input)
+const digest = (text: string) => createHash('sha256').update(text).digest('hex')
+const invoke = async (session: Awaited<ReturnType<typeof createCreativeProductionExternalOrchestrationSessionV1>>, id: string, input: unknown = {}, context: ToolExecutionContextV1 = Object.freeze({})) => session.registry.invoke(id, input, context)
+const materializeReview = async ({review}:Readonly<{review:CreativeReviewV1}>):Promise<CreativeReviewV1>=>Object.freeze({...review,evidenceHash:digest(`${review.reviewId}:${review.subjectId}:${review.subjectRevision}`),artifacts:Object.freeze([Object.freeze({artifactId:`frame-${review.reviewId}.png`,kind:'image' as const,label:'Review evidence',mimeType:'image/png' as const,byteLength:12,sha256:digest('review-evidence')})])})
 
-const approval = (request: Readonly<{ requestRef:string; scope:'storyboard'|'animatic'|'motion'; subjectId:string; subjectRevision:number }>) => Object.freeze({
+const approval = (request: Pick<HostApprovalRequestV1,'requestRef'|'scope'|'subjectId'|'subjectRevision'>) => Object.freeze({
   schemaVersion:'sanverse.owner-approval/v1' as const,
   id:`approval:${request.requestRef}`,
   scope:request.scope,
@@ -32,13 +37,19 @@ const approval = (request: Readonly<{ requestRef:string; scope:'storyboard'|'ani
 describe('raw-video external orchestration — immutable artifact + atomic production apply', () => {
   it('stages approved artifacts, accepts three scenes in one ChangeSet, deduplicates retry, and one Undo/Redo removes/restores all', async () => {
     let current = baseProject()
+    const runs = new Map<string, CreativeRunV1>()
     const artifactShelf = new Map<string, Readonly<{ ref: ExternalCreativeArtifactRefV1; artifact: unknown; serialized: string }>>()
     const session = await createCreativeProductionExternalOrchestrationSessionV1({
       sessionLabel:'batch4-atomic',
       listProjects:async()=>Object.freeze([{id:current.projectId}]),
       readProject:async()=>current,
       importSourceVideo:async()=>{throw new Error('unused')},
+      listCreativeRuns:async()=>Object.freeze([...runs.values()]),
+      readCreativeRun:async({runId})=>runs.get(runId)??null,
+      writeCreativeRun:async(run)=>{runs.set(run.runId,structuredClone(run))},
+      materializeReviewEvidence:materializeReview as never,
       sha256Text:sha256,
+      issueOwnerApprovalRef:async(request:HostApprovalRequestV1)=>Object.freeze({approvalRef:`approvalref_${request.requestRef}`}),
       resolveOwnerApprovalRef:async ({approvalRef,request}) => approvalRef === `approvalref_${request.requestRef}` ? approval(request) : null,
       putCreativeArtifact:async ({serialized}) => {
         const digest = await sha256(serialized)
@@ -65,8 +76,14 @@ describe('raw-video external orchestration — immutable artifact + atomic produ
     })
 
     expect((await invoke(session,'production.select_project',{projectId:current.projectId})).ok).toBe(true)
+    expect((await invoke(session,'creative.create_run',{transactionId:'creative_run_batch4_001'})).ok).toBe(true)
     const transcript = await invoke(session,'source.attach_transcript',{format:'plain',contents:'Revenue grew 82 percent. Compare both options. Then explain the final takeaway.',transactionId:'transcript_txn_batch4'}) as any
     const analyzed = await invoke(session,'source.analyze_video',{transcriptRef:transcript.value.transcriptRef}) as any
+    const proposed = await invoke(session,'creative.propose_direction',{sourcePacketRef:analyzed.value.id}) as any
+    expect(proposed.ok).toBe(true)
+    const directionReview=proposed.value.review as CreativeReviewV1
+    const approvedDirection=await invoke(session,'creative.decide_review',{reviewId:directionReview.reviewId,decision:'approve'},Object.freeze({hostReviewDecision:Object.freeze({reviewId:directionReview.reviewId,decision:'approve' as const,evidenceHash:directionReview.evidenceHash,subjectId:directionReview.subjectId,subjectRevision:directionReview.subjectRevision,confirmedAt:'2026-09-01T12:00:00.000Z'})})) as any
+    expect(approvedDirection.ok).toBe(true)
     const planned = await invoke(session,'motion.plan_opportunities',{sourcePacketRef:analyzed.value.id,transcriptRef:transcript.value.transcriptRef,targetCount:3}) as any
     const created = await invoke(session,'motion.create_scene_batch',{opportunityMapId:planned.value.id,transactionId:'scene_batch_txn_004'}) as any
     const batchId = created.value.id as string

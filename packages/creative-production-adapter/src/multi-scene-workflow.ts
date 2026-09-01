@@ -44,11 +44,15 @@ export interface GenericCreativeSceneCandidateV1 {
   }>
 }
 
+export type SceneOwnerApprovalScopeV1 = Exclude<OwnerApprovalScopeV1, 'creative-direction'>
+
 export interface CreativeSceneWorkflowV1 {
   readonly sceneId: string
   readonly planned: PlannedMotionOpportunityV1
   readonly candidate: GenericCreativeSceneCandidateV1
   readonly styleLockId: string
+  readonly styleLockContentHash: string
+  readonly creativeDirectionRevision: number
   readonly creativeLanguageId: string
   readonly engine: ClosedLoopEngineV1
   readonly initialize: () => Readonly<{ ok: boolean; message: string }>
@@ -68,8 +72,8 @@ export interface CreativeSceneWorkflowV1 {
 export interface HostApprovalRequestV1 {
   readonly schemaVersion: 'sanverse.host-approval-request/v1'
   readonly requestRef: string
-  readonly batchId: string
-  readonly sceneId: string
+  readonly batchId?: string
+  readonly sceneId?: string
   readonly scope: OwnerApprovalScopeV1
   readonly subjectId: string
   readonly subjectRevision: number
@@ -77,6 +81,8 @@ export interface HostApprovalRequestV1 {
 }
 
 export type HostApprovalResolverV1 = (request: HostApprovalRequestV1) => Promise<OwnerApprovalV1 | null>
+export type SceneHostApprovalRequestV1 = HostApprovalRequestV1 & Readonly<{ batchId: string; sceneId: string; scope: SceneOwnerApprovalScopeV1 }>
+export type SceneHostApprovalResolverV1 = (request: SceneHostApprovalRequestV1) => Promise<OwnerApprovalV1 | null>
 
 export interface CreativeSceneBatchSnapshotV1 {
   readonly schemaVersion: typeof CREATIVE_SCENE_BATCH_SCHEMA_V1
@@ -95,7 +101,7 @@ export interface CreativeSceneBatchSnapshotV1 {
     animatic: Readonly<{ id: string; revision: number; status: string }> | null
     motion: Readonly<{ id: string; revision: number; status: string; reviewReady: boolean }> | null
   }>[]
-  readonly pendingApprovalRequests: readonly HostApprovalRequestV1[]
+  readonly pendingApprovalRequests: readonly SceneHostApprovalRequestV1[]
   readonly readyForProductionApply: boolean
 }
 
@@ -113,7 +119,7 @@ export interface PersistedCreativeSceneBatchV1 {
   readonly projectRevision: number
   readonly opportunityMapId: string
   readonly workflows: readonly PersistedCreativeSceneWorkflowV1[]
-  readonly pendingApprovalRequests: readonly HostApprovalRequestV1[]
+  readonly pendingApprovalRequests: readonly SceneHostApprovalRequestV1[]
 }
 
 export interface CreativeSceneBatchV1 {
@@ -125,8 +131,8 @@ export interface CreativeSceneBatchV1 {
   readonly getWorkflow: (sceneId: string) => CreativeSceneWorkflowV1 | null
   readonly snapshot: () => CreativeSceneBatchSnapshotV1
   readonly serialize: () => PersistedCreativeSceneBatchV1
-  readonly requestOwnerReviews: (scope: OwnerApprovalScopeV1, now?: string) => Readonly<{ ok: boolean; message: string; requests?: readonly HostApprovalRequestV1[] }>
-  readonly resolveOwnerApproval: (requestRef: string, resolver: HostApprovalResolverV1) => Promise<Readonly<{ ok: boolean; message: string; approved?: boolean }>>
+  readonly requestOwnerReviews: (scope: SceneOwnerApprovalScopeV1, now?: string) => Readonly<{ ok: boolean; message: string; requests?: readonly SceneHostApprovalRequestV1[] }>
+  readonly resolveOwnerApproval: (requestRef: string, resolver: SceneHostApprovalResolverV1) => Promise<Readonly<{ ok: boolean; message: string; approved?: boolean }>>
   readonly advanceAll: (stage: 'animatic' | 'motion') => Promise<Readonly<{ ok: boolean; message: string }>>
   readonly reviseSceneOpacity: (sceneId: string, opacity: number, expectedSandboxRevision: number) => Readonly<{ ok: boolean; message: string }>
   readonly reviseSceneStoryboard: (sceneId: string, input: Readonly<{ text?: string; fontSize?: number; expectedSandboxRevision: number }>) => Readonly<{ ok: boolean; message: string }>
@@ -144,7 +150,7 @@ const tail = (value: string): string => {
   return (hash >>> 0).toString(36).padStart(8, '0').slice(0, 12)
 }
 const messageOf = (value: { ok: boolean; refusal?: { message: string } }, success: string) => Object.freeze({ ok: value.ok, message: value.ok ? success : value.refusal?.message ?? 'Creative workflow step failed.' })
-const currentTarget = (state: ClosedLoopEngineStateV1, scope: OwnerApprovalScopeV1) => scope === 'storyboard'
+const currentTarget = (state: ClosedLoopEngineStateV1, scope: SceneOwnerApprovalScopeV1) => scope === 'storyboard'
   ? state.storyboardSandbox?.storyboard ?? null
   : scope === 'animatic'
     ? state.animatic
@@ -193,20 +199,41 @@ const storyboardStyleConstraint = (map: MotionOpportunityMapV1): StoryboardStyle
   return Object.freeze({
     schemaVersion: 'sanverse.storyboard-style-constraint/v1' as const,
     styleLockId: map.styleLockId,
-    hard: Object.freeze({ allowedColors: Object.freeze([...new Set([palette.background, palette.surface, palette.text, palette.accent])]), ...(typeFamily ? { allowedFontFamilies: Object.freeze([typeFamily]) } : {}) }),
+    hard: Object.freeze({ allowedColors: Object.freeze([...new Set([palette.background, palette.surface, palette.text, palette.accent])]), paletteRoles: Object.freeze({ ...palette }), ...(typeFamily ? { allowedFontFamilies: Object.freeze([typeFamily]) } : {}) }),
     soft: Object.freeze({ preferredPresentationModes: Object.freeze([...map.creativeLanguage.preferredPresentationModes]), maximumRadius: Math.max(map.styleRecommendation.visual.radius * 2, map.styleRecommendation.visual.radius + 8), maximumNodesPerState: 96 }),
   })
 }
 const constantStringValue = (value: unknown): string | null => record(value) && value.kind === 'constant' && typeof value.value === 'string' ? value.value : null
-const styleConstraintForScene = (base: StoryboardStyleConstraintV1, scene: MotionSceneV1): StoryboardStyleConstraintV1 => {
-  const colors = new Set(base.hard.allowedColors ?? [])
-  const fonts = new Set(base.hard.allowedFontFamilies ?? [])
-  for (const node of Object.values(scene.nodes)) {
-    if (node.type === 'text') { fonts.add(node.fontFamily); const fill=constantStringValue(node.fillColor); if(fill)colors.add(fill) }
-    if (node.type === 'shape' || node.type === 'path') { const fill=constantStringValue(node.fillColor),stroke=constantStringValue(node.strokeColor); if(fill&&fill!=='transparent')colors.add(fill);if(stroke&&stroke!=='transparent')colors.add(stroke) }
+
+type StyleNormalizationResultV1 = Readonly<{ ok:true; value:MotionSceneV1 }> | Readonly<{ ok:false; code:'STYLE_HARD_LOCK_VIOLATION'|'STYLE_BINDING_AMBIGUOUS'; message:string }>
+export const normalizeSceneToApprovedStyleV1 = (scene: MotionSceneV1, constraint: StoryboardStyleConstraintV1): StyleNormalizationResultV1 => {
+  const palette = constraint.hard.paletteRoles
+  const fonts = constraint.hard.allowedFontFamilies ?? Object.freeze([])
+  if (!palette) return Object.freeze({ok:false as const,code:'STYLE_BINDING_AMBIGUOUS' as const,message:'Approved Style Lock must expose semantic background, surface, text, and accent roles before component normalization.'})
+  const { background, surface, text, accent } = palette
+  const font=fonts[0]
+  const nodes:Record<string,MotionSceneV1['nodes'][string]>={}
+  for(const [id,node] of Object.entries(scene.nodes)){
+    if(node.type==='text'){
+      const fill=constantStringValue(node.fillColor)
+      if(fill===null)return Object.freeze({ok:false as const,code:'STYLE_BINDING_AMBIGUOUS' as const,message:`Text node ${id} has non-constant color and cannot be deterministically bound to the approved Style Lock.`})
+      nodes[id]=Object.freeze({...node,...(font?{fontFamily:font}:{}),fillColor:constant(text!)}) as typeof node
+      continue
+    }
+    if(node.type==='shape'||node.type==='path'){
+      const fill=constantStringValue(node.fillColor),stroke=constantStringValue(node.strokeColor)
+      if(fill===null||stroke===null)return Object.freeze({ok:false as const,code:'STYLE_BINDING_AMBIGUOUS' as const,message:`Graphic node ${id} has animated/unknown hard colors and cannot be silently rebound.`})
+      const lowered=id.toLowerCase()
+      const roleColor=/(?:background|backdrop|root)/u.test(lowered)?background:/(?:accent|indicator|badge|value|highlight)/u.test(lowered)?accent:surface
+      nodes[id]=Object.freeze({...node,fillColor:fill==='transparent'?node.fillColor:constant(roleColor!),strokeColor:stroke==='transparent'?node.strokeColor:constant(roleColor!)}) as typeof node
+      continue
+    }
+    nodes[id]=node
   }
-  return Object.freeze({ ...base, hard:Object.freeze({ allowedColors:Object.freeze([...colors]), ...(fonts.size>0?{allowedFontFamilies:Object.freeze([...fonts])}:{}) }) })
+  return Object.freeze({ok:true as const,value:Object.freeze({...scene,nodes:Object.freeze(nodes)})})
 }
+
+const styleConstraintForScene = (base: StoryboardStyleConstraintV1): StoryboardStyleConstraintV1 => base
 
 export const buildGenericCreativeSceneCandidateV1 = (input: Readonly<{
   project: EditProject
@@ -216,6 +243,7 @@ export const buildGenericCreativeSceneCandidateV1 = (input: Readonly<{
 }>): CreateCreativeSceneBatchResultV1 extends never ? never : Readonly<{ ok: true; value: GenericCreativeSceneCandidateV1 } | { ok: false; refusal: Readonly<{ code: string; message: string }> }> => {
   const opportunity = input.planned.opportunity
   const rankedIds = input.planned.capabilityRankings.map((item) => item.capabilityId)
+  let styleRefusal: Readonly<{ code: string; message: string }> | null = null
   for (const componentId of rankedIds) {
     const module = (MOTION_COMPONENT_MODULES as Readonly<Record<string, MotionComponentModuleV1<unknown, unknown>>>)[componentId]
     if (!module || !isGraphBacked(module)) continue
@@ -259,6 +287,9 @@ export const buildGenericCreativeSceneCandidateV1 = (input: Readonly<{
     } else if (!props.sourceBoundViaProps && unresolvedDefaults.size > 0) continue
     const stillDefault = Object.values(scene.nodes).some((node) => node.type === 'text' && (() => { const value=constantStringValue(node.text); return value !== null && unresolvedDefaults.has(value.trim()) })())
     if (stillDefault) continue
+    const normalized = normalizeSceneToApprovedStyleV1(scene, input.styleConstraint)
+    if (!normalized.ok) { styleRefusal = Object.freeze({ code: normalized.code, message: normalized.message }); continue }
+    scene = normalized.value
     const semanticNodeIds = selectedNodes(scene)
     const selectedNodeId = semanticNodeIds[0] ?? scene.rootNodeId
     return Object.freeze({
@@ -276,17 +307,19 @@ export const buildGenericCreativeSceneCandidateV1 = (input: Readonly<{
         renderContext,
         selectedNodeId,
         semanticNodeIds,
-        authoringMetadata: Object.freeze({ schemaVersion: 'sanverse.creative-scene-authoring-metadata/v1' as const, sourceBoundText: text, defaultContentFingerprints: props.defaultFingerprints.filter((fingerprint) => fingerprint !== text), styleConstraint: styleConstraintForScene(input.styleConstraint, scene) }),
+        authoringMetadata: Object.freeze({ schemaVersion: 'sanverse.creative-scene-authoring-metadata/v1' as const, sourceBoundText: text, defaultContentFingerprints: props.defaultFingerprints.filter((fingerprint) => fingerprint !== text), styleConstraint: styleConstraintForScene(input.styleConstraint) }),
       }),
     })
   }
-  return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'SCENE_CAPABILITY_UNBUILDABLE', message: `None of the ranked Motion Library capabilities could build a canonical scene for ${opportunity.id}.` }) })
+  return Object.freeze({ ok: false as const, refusal: styleRefusal ?? Object.freeze({ code: 'SCENE_CAPABILITY_UNBUILDABLE', message: `None of the ranked Motion Library capabilities could build a canonical scene for ${opportunity.id}.` }) })
 }
 
 export const createCreativeSceneWorkflowV1 = (input: Readonly<{
   planned: PlannedMotionOpportunityV1
   candidate: GenericCreativeSceneCandidateV1
   styleLockId: string
+  styleLockContentHash: string
+  creativeDirectionRevision: number
   creativeLanguageId: string
   restoredState?: ClosedLoopEngineStateV1
 }>): CreativeSceneWorkflowV1 => {
@@ -316,6 +349,8 @@ export const createCreativeSceneWorkflowV1 = (input: Readonly<{
     planned,
     candidate,
     styleLockId: input.styleLockId,
+    styleLockContentHash: input.styleLockContentHash,
+    creativeDirectionRevision: input.creativeDirectionRevision,
     creativeLanguageId: input.creativeLanguageId,
     engine,
     initialize: () => {
@@ -547,7 +582,7 @@ export const createCreativeSceneBatchV1 = (input: Readonly<{
   const batchId = input.restored?.id ?? `scenebatch_${tail(`${input.project.projectId}:${input.project.revision}:${input.opportunityMap.id}`)}`
   if (input.restored && (input.restored.projectId !== input.project.projectId || input.restored.projectRevision !== input.project.revision || input.restored.opportunityMapId !== input.opportunityMap.id)) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'CREATIVE_RUN_REHYDRATION_FAILED', message: 'Persisted scene batch identity/revision does not match the current project and opportunity map.' }) })
   const workflows = new Map<string, CreativeSceneWorkflowV1>()
-  const pending = new Map<string, HostApprovalRequestV1>((input.restored?.pendingApprovalRequests ?? []).map((request) => [request.requestRef, request]))
+  const pending = new Map<string, SceneHostApprovalRequestV1>((input.restored?.pendingApprovalRequests ?? []).map((request) => [request.requestRef, request]))
   const restoredBySceneId = new Map((input.restored?.workflows ?? []).map((item) => [item.sceneId, item]))
   const styleConstraint = storyboardStyleConstraint(input.opportunityMap)
   for (const planned of input.opportunityMap.opportunities) {
@@ -559,7 +594,7 @@ export const createCreativeSceneBatchV1 = (input: Readonly<{
       ? Object.freeze({ ...restoredCandidate, authoringMetadata: restoredCandidate.authoringMetadata ?? deterministic.value.authoringMetadata })
       : deterministic.value
     if (restored && (candidate.id !== deterministic.value.id || candidate.opportunityId !== planned.opportunity.id || candidate.source.projectId !== input.project.projectId || candidate.source.projectRevision !== input.project.revision)) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'CREATIVE_RUN_REHYDRATION_FAILED', message: `Persisted scene ${restored.sceneId} does not match deterministic project/opportunity identity.` }) })
-    const workflow = createCreativeSceneWorkflowV1({ planned, candidate, styleLockId: input.opportunityMap.styleLockId, creativeLanguageId: input.opportunityMap.creativeLanguage.id, ...(restored ? { restoredState: restored.engineState } : {}) })
+    const workflow = createCreativeSceneWorkflowV1({ planned, candidate, styleLockId: input.opportunityMap.styleLockRef.styleLockId, styleLockContentHash: input.opportunityMap.styleLockRef.contentHash, creativeDirectionRevision: input.opportunityMap.styleLockRef.proposalRevision, creativeLanguageId: input.opportunityMap.creativeLanguage.id, ...(restored ? { restoredState: restored.engineState } : {}) })
     const initialized = workflow.initialize()
     if (!initialized.ok) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: restored ? 'CREATIVE_RUN_REHYDRATION_FAILED' : 'SCENE_STORYBOARD_INITIALIZATION_FAILED', message: initialized.message, details: Object.freeze({ opportunityId: planned.opportunity.id, componentId: candidate.componentId }) }) })
     workflows.set(workflow.sceneId, workflow)
@@ -610,7 +645,7 @@ export const createCreativeSceneBatchV1 = (input: Readonly<{
     }),
     requestOwnerReviews: (scope, now = new Date().toISOString()) => {
       invalidateStaleRequests()
-      const requests: HostApprovalRequestV1[] = []
+      const requests: SceneHostApprovalRequestV1[] = []
       for (const workflow of workflows.values()) {
         const target = currentTarget(workflow.state(), scope)
         if (target && 'status' in target && target.status === 'owner-approved') continue

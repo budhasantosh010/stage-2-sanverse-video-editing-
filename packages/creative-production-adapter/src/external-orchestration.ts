@@ -3,10 +3,21 @@ import { createCreativeProductionToolCatalogV16 } from './production-tools.ts'
 import { createSanverseToolRegistryV1, type SanverseToolDefinitionV1, type SanverseToolRegistryV1, type SanverseToolSummaryV1, type ToolExecutionContextV1 } from '@sanverse/motion-agent-tools'
 import { creativeOperationOk, creativeOperationRefusal, creativeValidationOk, type CreativeOperationResultV1, type CreativeValidationResultV1 } from '@sanverse/motion-contract'
 import { CREATIVE_SCENE_PRIMITIVE_ID, emptyExtensions, type ChangeSet, type EditProject } from '@sanverse/edit-domain'
-import type { MotionOpportunityV1 } from '@sanverse/creative-direction'
+import {
+  applyCreativeDirectionChangesV1,
+  buildVideoCreativeLanguageDraftV1,
+  canonicalApprovedStyleContentV1,
+  compileVideoCreativeLanguageV1,
+  recommendStyleLockV1,
+  type ApprovedStyleLockV1,
+  type BrandContextV1,
+  type CreativeDirectionChangesV1,
+  type CreativeDirectionProposalV1,
+  type MotionOpportunityV1,
+} from '@sanverse/creative-direction'
 import { PROJECT_TIMESCALE, mediaTime } from '@sanverse/edit-domain/time'
 import { MOTION_GRAPH_OPERATION_TYPES, type MotionGraphOperationV1 } from '@sanverse/motion-graph'
-import { diffStoryboardStatesV1, type OwnerApprovalV1, type StoryboardSandboxOperationV1, type StoryboardStateTargetV1 } from '@sanverse/motion-storyboard'
+import { diffStoryboardStatesV1, validateOwnerApprovalV1, type OwnerApprovalV1, type StoryboardSandboxOperationV1, type StoryboardStateTargetV1 } from '@sanverse/motion-storyboard'
 import {
   DeterministicTranscriptSemanticAnalyzer,
   analyzeVideoUnderstanding,
@@ -15,7 +26,8 @@ import {
   type TranscriptSegmentV1,
 } from '@sanverse/video-understanding'
 import { planMotionOpportunitiesV1, type MotionOpportunityMapV1 } from './opportunity-planner.ts'
-import { createCreativeSceneBatchV1, type CreativeSceneBatchV1, type HostApprovalRequestV1 } from './multi-scene-workflow.ts'
+import { deriveCreativeVideoContextV1 } from './creative-direction-context.ts'
+import { createCreativeSceneBatchV1, type CreativeSceneBatchV1, type HostApprovalRequestV1, type SceneOwnerApprovalScopeV1 } from './multi-scene-workflow.ts'
 import { buildCreativeSceneArtifactV1, canonicalCreativeArtifactJsonV1, validateCreativeSceneArtifactV1, type CreativeSceneArtifactV1 } from './creative-artifact.ts'
 import {
   CREATIVE_REVIEW_SCHEMA_V1,
@@ -72,13 +84,13 @@ export interface ExternalProductionExportJobV1 {
 
 export interface ExternalWorkspaceInputV1 {
   readonly relativePath: string
-  readonly kind: 'video' | 'transcript' | 'image'
+  readonly kind: 'video' | 'transcript' | 'image' | 'brief'
   readonly byteLength: number
 }
 
 export interface ExternalWorkspaceTextFileV1 {
   readonly relativePath: string
-  readonly format: 'plain' | 'srt' | 'vtt'
+  readonly format: 'plain' | 'srt' | 'vtt' | 'brief'
   readonly contents: string
 }
 
@@ -92,7 +104,7 @@ export interface ExternalProductionApiPortV1 {
   readonly readCreativeRun?: (input: Readonly<{ projectId: string; runId: string }>) => Promise<CreativeRunV1 | null>
   readonly writeCreativeRun?: (run: CreativeRunV1) => Promise<void>
   readonly readReviewArtifactBytes?: (input: Readonly<{ projectId: string; runId: string; reviewId: string; artifactId: string }>) => Promise<Uint8Array>
-  readonly materializeReviewEvidence?: (input: Readonly<{ run: CreativeRunV1; review: CreativeReviewV1; batch: CreativeSceneBatchV1 }>) => Promise<CreativeReviewV1>
+  readonly materializeReviewEvidence?: (input: Readonly<{ run: CreativeRunV1; review: CreativeReviewV1; batch?: CreativeSceneBatchV1 }>) => Promise<CreativeReviewV1>
   /** Host-only approval issuance. This callback is never exposed as an MCP tool or JSON field. */
   readonly issueOwnerApprovalRef?: (request: HostApprovalRequestV1) => Promise<Readonly<{ approvalRef: string }>>
   readonly sha256Text: (text: string) => Promise<string>
@@ -183,6 +195,7 @@ const approvalRefPattern = /^approvalref_[a-z0-9:_-]{8,160}$/u
 const exportJobRefPattern = /^job_[a-z0-9]{16,64}$/u
 const runRefPattern = /^run_[a-z0-9]{8,64}$/u
 const reviewRefPattern = /^review_[a-z0-9]{8,64}$/u
+const directionRefPattern = /^direction_[a-z0-9]{8,64}$/u
 const tail = (value: string): string => {
   let hash = 2166136261
   for (let index = 0; index < value.length; index += 1) { hash ^= value.charCodeAt(index); hash = Math.imul(hash, 16777619) }
@@ -355,7 +368,7 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
     if (run.transcript) { transcripts.set(run.transcript.id, run.transcript); transcriptTransactions.set(`rehydrated:${run.transcript.id}`, run.transcript) }
     if (run.sourceUnderstanding) sourcePackets.set(run.sourceUnderstanding.id, run.sourceUnderstanding)
     if (run.opportunityMap) opportunityMaps.set(run.opportunityMap.id, run.opportunityMap)
-    if (run.sceneBatch && run.opportunityMap) {
+    if (run.sceneBatch && run.opportunityMap && run.approvedStyleLock) {
       const restored = createCreativeSceneBatchV1({ project, opportunityMap: run.opportunityMap, transcriptTextByOpportunityId: transcriptTextByOpportunity(run.opportunityMap), restored: run.sceneBatch })
       if (!restored.ok) throw new Error(`CREATIVE_RUN_REHYDRATION_FAILED: ${restored.refusal.message}`)
       sceneBatches.set(restored.value.id, restored.value)
@@ -535,6 +548,7 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
         if (!options.readWorkspaceTextFile) return creativeOperationRefusal('WORKSPACE_UNAVAILABLE', 'Workspace transcript files are available only to a local STDIO coding-agent session.')
         try {
           const file = await options.readWorkspaceTextFile({ localPath: input.localPath as string })
+          if (file.format === 'brief') return creativeOperationRefusal('TRANSCRIPT_INVALID', 'The selected workspace file is classified as a creative brief, not a transcript.')
           contents = file.contents
           requested ??= file.format
         } catch (error) {
@@ -622,9 +636,104 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
       })
       sourcePackets.set(id, packet)
       const run = activeRun()
-      if (run && run.projectId === project.projectId && run.sourceAssetId === source.assetId) await updateActiveRun({ sourceUnderstanding: packet, stage: 'opportunity-planning' })
+      if (run && run.projectId === project.projectId && run.sourceAssetId === source.assetId) await updateActiveRun({ sourceUnderstanding: packet, stage: 'creative-direction', opportunityMap: undefined, sceneBatch: undefined, sceneIds: Object.freeze([]) })
       return creativeOperationOk(Object.freeze({ ...packet, ...(activeRunId ? { runId: activeRunId } : {}) }), project.revision)
     },
+  }))
+
+  const directionReviewContext = (proposal: CreativeDirectionProposalV1): CreativeReviewV1['context'] => Object.freeze({
+    kind: 'creative-direction' as const,
+    proposalId: proposal.proposalId,
+    revision: proposal.revision,
+    sourcePacketId: proposal.sourcePacketId,
+    ...(proposal.brandContextId ? { brandContextId: proposal.brandContextId } : {}),
+    paletteRoles: proposal.styleRecommendation.visual.paletteRoles,
+    typography: Object.freeze({ ...(proposal.styleRecommendation.visual.typeFamily ? { typeFamily: proposal.styleRecommendation.visual.typeFamily } : {}), language: proposal.creativeLanguageDraft.typographyLanguage }),
+    surface: Object.freeze({ radius: proposal.styleRecommendation.visual.radius, stroke: proposal.styleRecommendation.visual.stroke, shadow: proposal.styleRecommendation.visual.shadow, depth: proposal.styleRecommendation.visual.depth, texture: proposal.styleRecommendation.visual.texture }),
+    composition: Object.freeze({ ...proposal.styleRecommendation.composition }),
+    motion: Object.freeze({ rhythm: proposal.creativeLanguageDraft.motionRhythm, primaryEase: proposal.styleRecommendation.motion.primaryEase, secondaryEase: proposal.styleRecommendation.motion.secondaryEase, overshootMax: proposal.styleRecommendation.motion.overshootAllowance, travelDistance: proposal.styleRecommendation.motion.travelDistance, staggerRhythm: proposal.styleRecommendation.motion.staggerRhythm, holdDiscipline: proposal.styleRecommendation.motion.holdDiscipline, cameraAggressiveness: proposal.styleRecommendation.motion.cameraAggressiveness, effectIntensity: proposal.styleRecommendation.motion.effectIntensity }),
+    creativeLanguage: Object.freeze({ preferredPresentationModes: proposal.creativeLanguageDraft.preferredPresentationModes, transitionVocabulary: proposal.creativeLanguageDraft.transitionVocabulary, surfaceLanguage: proposal.creativeLanguageDraft.surfaceLanguage, cameraPolicy: proposal.creativeLanguageDraft.cameraPolicy }),
+    reasons: proposal.reasons,
+  })
+
+  const prepareDirectionReview = async (run: CreativeRunV1, proposal: CreativeDirectionProposalV1): Promise<CreativeReviewV1> => {
+    if (!options.materializeReviewEvidence) throw new Error('REVIEW_RENDERER_UNAVAILABLE: this host cannot materialize Creative Direction review evidence.')
+    const now = new Date().toISOString()
+    const requestRef = `approvalreq_${tail(`${run.runId}:${proposal.proposalId}:${proposal.revision}:creative-direction`)}`
+    const reviewId = `review_${tail(`${run.runId}:${requestRef}:${proposal.proposalId}:${proposal.revision}`)}`
+    const seedHash = await options.sha256Text(JSON.stringify({ runId: run.runId, reviewId, requestRef, proposalId: proposal.proposalId, revision: proposal.revision, proposal }))
+    const existing = run.reviews.find((review) => review.scope === 'creative-direction' && review.subjectId === proposal.proposalId && review.subjectRevision === proposal.revision && review.status === 'pending' && review.artifacts.length > 0)
+    if (existing) return existing
+    const draft: CreativeReviewV1 = Object.freeze({ schemaVersion: CREATIVE_REVIEW_SCHEMA_V1, reviewId, runId: run.runId, scope: 'creative-direction', requestRef, subjectId: proposal.proposalId, subjectRevision: proposal.revision, evidenceHash: seedHash, status: 'pending', context: directionReviewContext(proposal), artifacts: Object.freeze([]), createdAt: now, updatedAt: now })
+    const rendered = await options.materializeReviewEvidence({ run, review: draft })
+    if (rendered.scope !== 'creative-direction' || rendered.subjectId !== proposal.proposalId || rendered.subjectRevision !== proposal.revision || rendered.artifacts.length === 0) throw new Error('CREATIVE_REVIEW_INVALID: Creative Direction renderer returned evidence for another subject/revision.')
+    return rendered
+  }
+
+  const persistDirectionReview = async (proposal: CreativeDirectionProposalV1, brandContext?: BrandContextV1): Promise<Readonly<{ run: CreativeRunV1; review: CreativeReviewV1 }>> => {
+    const run = activeRun()
+    if (!run) throw new Error('CREATIVE_RUN_NOT_FOUND: create or resume a Creative Run first.')
+    const preliminary = await updateActiveRun({ ...(brandContext ? { brandContext } : {}), creativeDirectionProposal: proposal, approvedStyleLock: undefined, opportunityMap: undefined, sceneBatch: undefined, sceneIds: Object.freeze([]), reviews: Object.freeze(run.reviews.filter((review) => review.scope === 'creative-direction')), stage: 'creative-direction-review' })
+    if (!preliminary) throw new Error('CREATIVE_RUN_STORE_FAILED: Creative Direction proposal could not be persisted.')
+    const review = await prepareDirectionReview(preliminary, proposal)
+    const persisted = await updateActiveRun({ reviews: replaceReview(preliminary.reviews, review), stage: 'creative-direction-review' })
+    if (!persisted) throw new Error('CREATIVE_RUN_STORE_FAILED: Creative Direction review could not be persisted.')
+    return Object.freeze({ run: persisted, review })
+  }
+
+  register(Object.freeze({
+    id: 'creative.propose_direction', version: 1 as const, level: 'T2' as const, requiresSandbox: false,
+    inputSchema: schema({ sourcePacketRef:stringSchema, brandContext:objectSchema, preferences:objectSchema }, ['sourcePacketRef']), outputSchema: outputRecordSchema, validateInput: passRecord,
+    execute: async (input: Record<string, unknown>) => {
+      const current=await requireProject(); if(!current.ok)return current
+      const run=activeRun(); if(!run)return creativeOperationRefusal('CREATIVE_RUN_NOT_FOUND','Create or resume a Creative Run before proposing Creative Direction.')
+      if(!boundedText(input.sourcePacketRef,96)||!sourcePacketRefPattern.test(input.sourcePacketRef))return creativeOperationRefusal('CREATIVE_DIRECTION_REQUIRED','A valid sourcePacketRef is required.')
+      const packet=sourcePackets.get(input.sourcePacketRef); if(!packet||run.sourceUnderstanding?.id!==packet.id)return creativeOperationRefusal('CREATIVE_DIRECTION_STALE','Creative Direction must target the active run Source Understanding packet.')
+      const rawBrand: Record<string, unknown> = record(input.brandContext) ? input.brandContext : {}
+      const allowedBrandKeys=new Set(['ownerBrief','briefPath','palette','typeFamilies','traits','logoAssetRefs','referenceAssetRefs'])
+      if(Object.keys(rawBrand).some((key)=>!allowedBrandKeys.has(key)))return creativeOperationRefusal('BRAND_CONTEXT_INVALID','Brand Context contains an unsupported field.')
+      let ownerBrief=typeof rawBrand.ownerBrief==='string'?rawBrand.ownerBrief.trim():''
+      const briefSources:string[]=[]
+      if(rawBrand.briefPath!==undefined){
+        if(!boundedText(rawBrand.briefPath,4096)||!options.readWorkspaceTextFile)return creativeOperationRefusal('BRAND_CONTEXT_INVALID','briefPath must name a bounded workspace .md/.txt brief available to local STDIO.')
+        try{const file=await options.readWorkspaceTextFile({localPath:String(rawBrand.briefPath)});if(file.format!=='brief'&&file.format!=='plain')return creativeOperationRefusal('BRAND_CONTEXT_INVALID','The selected workspace text file is not classified as a creative brief.');ownerBrief=file.contents.trim();briefSources.push(file.relativePath)}catch(error){return creativeOperationRefusal('BRAND_CONTEXT_INVALID',error instanceof Error?error.message:'The workspace brief could not be read.')}
+      }
+      if(ownerBrief.length>20_000)return creativeOperationRefusal('BRAND_CONTEXT_INVALID','Owner brief must be 20,000 characters or fewer.')
+      const palette=Array.isArray(rawBrand.palette)?rawBrand.palette.filter((item):item is string=>typeof item==='string'&&/^#[a-f0-9]{6}$/iu.test(item)):[]
+      if(Array.isArray(rawBrand.palette)&&palette.length!==rawBrand.palette.length)return creativeOperationRefusal('BRAND_CONTEXT_INVALID','Brand palette entries must be six-digit hex colors.')
+      if(palette.length===1)return creativeOperationRefusal('BRAND_CONTEXT_INVALID','Brand palette must provide at least two colors or remain unspecified.')
+      const typeFamilies=Array.isArray(rawBrand.typeFamilies)?rawBrand.typeFamilies.filter((item):item is string=>boundedText(item,120)):[]
+      const traits=Array.isArray(rawBrand.traits)?rawBrand.traits.filter((item):item is string=>boundedText(item,80)):[]
+      const logoAssetRefs=Array.isArray(rawBrand.logoAssetRefs)?rawBrand.logoAssetRefs.filter((item):item is string=>boundedText(item,180)):[]
+      const referenceAssetRefs=Array.isArray(rawBrand.referenceAssetRefs)?rawBrand.referenceAssetRefs.filter((item):item is string=>boundedText(item,180)):[]
+      const brandPayload=JSON.stringify({projectId:run.projectId,sourceAssetId:run.sourceAssetId,ownerBrief,palette,typeFamilies,traits,logoAssetRefs,referenceAssetRefs,briefSources})
+      const brandHash=await options.sha256Text(brandPayload)
+      const brandContext:BrandContextV1=Object.freeze({schemaVersion:'sanverse.brand-context/v1',id:`brandctx_${brandHash.slice(0,16)}`,projectId:run.projectId,sourceAssetId:run.sourceAssetId,...(ownerBrief?{ownerBrief}:{}),...(palette.length?{palette:Object.freeze(palette)}:{}),...(typeFamilies.length?{typeFamilies:Object.freeze(typeFamilies)}:{}),traits:Object.freeze(traits),logoAssetRefs:Object.freeze(logoAssetRefs),referenceAssetRefs:Object.freeze(referenceAssetRefs),approvedAssetSignals:Object.freeze([]),promotedAssetSignals:Object.freeze([]),provenance:Object.freeze({briefSources:Object.freeze(briefSources),assetRefs:Object.freeze([...logoAssetRefs,...referenceAssetRefs])})})
+      const preferences: Record<string, unknown> = record(input.preferences) ? input.preferences : {}
+      const allowedPreferenceKeys=new Set(['motionIntensity','overshootAllowance','density'])
+      if(Object.keys(preferences).some((key)=>!allowedPreferenceKeys.has(key)))return creativeOperationRefusal('CREATIVE_DIRECTION_INVALID','Creative Direction preferences contain an unsupported field.')
+      const videoContext=deriveCreativeVideoContextV1(packet,run.transcript)
+      const recommendation=recommendStyleLockV1({brand:Object.freeze({palette:Object.freeze(palette.length>=2?palette:['#0B0C10','#FF7A1A','#FFFFFF']),...(typeFamilies[0]?{typeFamily:typeFamilies[0]}:{}),traits:Object.freeze(traits.length?traits:['clean','editorial'])}),existingStyle:Object.freeze({...(typeof preferences.motionIntensity==='number'?{motionIntensity:Math.max(0,Math.min(1,preferences.motionIntensity))}:{}),...(typeof preferences.overshootAllowance==='number'?{overshootAllowance:Math.max(0,Math.min(.4,preferences.overshootAllowance))}:{}),...(preferences.density==='low'||preferences.density==='medium'||preferences.density==='high'?{density:preferences.density}:{})}),approvedAssetSignals:Object.freeze([]),promotedAssetSignals:Object.freeze([]),videoContext,locked:false})
+      if(!recommendation.ok)return creativeOperationRefusal('CREATIVE_DIRECTION_INVALID',recommendation.refusal.message,recommendation.refusal.details)
+      const proposalId=`direction_${tail(`${run.runId}:${packet.id}:${brandHash}`)}`
+      const proposal:CreativeDirectionProposalV1=Object.freeze({schemaVersion:'sanverse.creative-direction-proposal/v1',proposalId,projectId:run.projectId,projectRevision:run.baseProjectRevision,sourcePacketId:packet.id,brandContextId:brandContext.id,revision:1,status:'awaiting-owner',styleRecommendation:recommendation.value,creativeLanguageDraft:buildVideoCreativeLanguageDraftV1(recommendation.value),reasons:recommendation.value.reasons})
+      try{const prepared=await persistDirectionReview(proposal,brandContext);return creativeOperationOk(Object.freeze({proposal,review:prepared.review,run:summarizeCreativeRunV1(prepared.run),next:'OWNER_CREATIVE_DIRECTION_REVIEW_REQUIRED'}),current.value.revision)}catch(error){return creativeOperationRefusal('CREATIVE_DIRECTION_REVIEW_REQUIRED',error instanceof Error?error.message:'Creative Direction review could not be prepared.')}
+    },
+  }))
+
+  register(Object.freeze({
+    id:'creative.get_direction',version:1 as const,level:'T0' as const,requiresSandbox:false,inputSchema:emptySchema,outputSchema:outputRecordSchema,validateInput:passRecord,
+    execute:async()=>{const current=await requireProject();if(!current.ok)return current;const run=activeRun();if(!run)return creativeOperationRefusal('CREATIVE_RUN_NOT_FOUND','Create or resume a Creative Run first.');return creativeOperationOk(Object.freeze({proposal:run.creativeDirectionProposal??null,approvedStyleLock:run.approvedStyleLock??null,review:run.creativeDirectionProposal?run.reviews.filter((review)=>review.scope==='creative-direction'&&review.subjectId===run.creativeDirectionProposal!.proposalId).sort((a,b)=>b.subjectRevision-a.subjectRevision)[0]??null:null,stage:run.stage}),current.value.revision)}
+  }))
+
+  register(Object.freeze({
+    id:'creative.revise_direction',version:1 as const,level:'T2' as const,requiresSandbox:false,inputSchema:schema({proposalId:stringSchema,expectedRevision:integerSchema,changes:objectSchema,reason:stringSchema},['proposalId','expectedRevision','changes']),outputSchema:outputRecordSchema,validateInput:passRecord,
+    execute:async(input:Record<string,unknown>)=>{const current=await requireProject();if(!current.ok)return current;const run=activeRun();const proposal=run?.creativeDirectionProposal;if(!run||!proposal)return creativeOperationRefusal('CREATIVE_DIRECTION_REQUIRED','No active Creative Direction proposal exists.');if(input.proposalId!==proposal.proposalId||Number(input.expectedRevision)!==proposal.revision)return creativeOperationRefusal('CREATIVE_DIRECTION_REVISION_MISMATCH','Creative Direction revision changed; inspect the current proposal before revising.');if(!record(input.changes))return creativeOperationRefusal('INVALID_CREATIVE_DIRECTION_CHANGE','changes must be a typed Creative Direction object.');const allowed=new Set(['paletteRoles','typeFamily','radius','stroke','shadow','depth','texture','density','alignment','safeArea','negativeSpacePreference','subjectPriority','baseTiming','primaryEase','secondaryEase','overshootAllowance','travelDistance','staggerRhythm','holdDiscipline','cameraAggressiveness','effectIntensity','preferredPresentationModes','transitionVocabulary','typographyLanguage','surfaceLanguage']);if(Object.keys(input.changes).some((key)=>!allowed.has(key)))return creativeOperationRefusal('INVALID_CREATIVE_DIRECTION_CHANGE','Creative Direction revision contains an unsupported field.');let revised:CreativeDirectionProposalV1;try{revised=applyCreativeDirectionChangesV1(proposal,input.changes as CreativeDirectionChangesV1)}catch(error){return creativeOperationRefusal('INVALID_CREATIVE_DIRECTION_CHANGE',error instanceof Error?error.message:'Creative Direction changes are invalid.')}if(typeof input.reason==='string'&&input.reason.trim())revised=Object.freeze({...revised,reasons:Object.freeze([...revised.reasons,input.reason.trim().slice(0,500)])});try{const prepared=await persistDirectionReview(revised,run.brandContext);return creativeOperationOk(Object.freeze({proposal:revised,review:prepared.review,run:summarizeCreativeRunV1(prepared.run),next:'OWNER_CREATIVE_DIRECTION_REVIEW_REQUIRED'}),current.value.revision)}catch(error){return creativeOperationRefusal('CREATIVE_DIRECTION_REVIEW_REQUIRED',error instanceof Error?error.message:'Revised Creative Direction review could not be prepared.')}}
+  }))
+
+  register(Object.freeze({
+    id:'creative.reopen_direction',version:1 as const,level:'T2' as const,requiresSandbox:false,inputSchema:schema({proposalId:stringSchema,expectedRevision:integerSchema},['proposalId','expectedRevision']),outputSchema:outputRecordSchema,validateInput:passRecord,
+    execute:async(input:Record<string,unknown>)=>{const current=await requireProject();if(!current.ok)return current;const run=activeRun();const proposal=run?.creativeDirectionProposal;if(!run||!proposal||input.proposalId!==proposal.proposalId||Number(input.expectedRevision)!==proposal.revision)return creativeOperationRefusal('CREATIVE_DIRECTION_REVISION_MISMATCH','Reopen must target the exact current Creative Direction proposal revision.');if(!run.approvedStyleLock)return creativeOperationRefusal('CREATIVE_DIRECTION_REQUIRED','Creative Direction is already open and has no approved Style Lock.');const next:CreativeDirectionProposalV1=Object.freeze({...proposal,revision:proposal.revision+1,status:'awaiting-owner'});try{const prepared=await persistDirectionReview(next,run.brandContext);return creativeOperationOk(Object.freeze({proposal:next,review:prepared.review,run:summarizeCreativeRunV1(prepared.run),invalidated:Object.freeze(['opportunity-map','storyboard','animatic','motion','downstream-reviews']),next:'OWNER_CREATIVE_DIRECTION_REVIEW_REQUIRED'}),current.value.revision)}catch(error){return creativeOperationRefusal('CREATIVE_DIRECTION_REVIEW_REQUIRED',error instanceof Error?error.message:'Reopened Creative Direction review could not be prepared.')}}
   }))
 
   const transcriptTextByOpportunity = (map: MotionOpportunityMapV1): Readonly<Record<string, string>> => {
@@ -642,7 +751,7 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
 
   register(Object.freeze({
     id: 'motion.plan_opportunities', version: 1 as const, level: 'T2' as const, requiresSandbox: false,
-    inputSchema: schema({ sourcePacketRef: stringSchema, transcriptRef: stringSchema, targetCount: Object.freeze({ type: 'integer' }), maxCount: Object.freeze({ type: 'integer' }), agentCandidates: Object.freeze({ type: 'array' }), style: Object.freeze({ type: 'object' }) }, ['sourcePacketRef']), outputSchema: outputRecordSchema, validateInput: passRecord,
+    inputSchema: schema({ sourcePacketRef: stringSchema, transcriptRef: stringSchema, targetCount: Object.freeze({ type: 'integer' }), maxCount: Object.freeze({ type: 'integer' }), agentCandidates: Object.freeze({ type: 'array' }) }, ['sourcePacketRef']), outputSchema: outputRecordSchema, validateInput: passRecord,
     execute: async (input: Record<string, unknown>) => {
       const current = await requireProject(); if (!current.ok) return current
       if (!boundedText(input.sourcePacketRef, 96) || !sourcePacketRefPattern.test(input.sourcePacketRef)) return creativeOperationRefusal('SOURCE_ANALYSIS_STALE', 'A valid sourcePacketRef is required.')
@@ -660,17 +769,21 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
         if (!transcript) return creativeOperationRefusal('TRANSCRIPT_INVALID', 'The planning transcript is unknown in this MCP session.')
       }
       if (input.agentCandidates !== undefined && !Array.isArray(input.agentCandidates)) return creativeOperationRefusal('OPPORTUNITY_SOURCE_INVALID', 'agentCandidates must be an array when provided.')
+      const run = activeRun()
+      const approvedStyleLock = run?.approvedStyleLock
+      if (!run || !approvedStyleLock) return creativeOperationRefusal('CREATIVE_DIRECTION_APPROVAL_REQUIRED', 'Approve the active Creative Direction review before opportunity planning. No Storyboard may be created from a draft style recommendation.')
+      if (approvedStyleLock.projectId !== current.value.projectId || approvedStyleLock.sourcePacketId !== packet.id) return creativeOperationRefusal('STYLE_LOCK_REVISION_MISMATCH', 'The approved Style Lock does not match the exact current project/source packet.')
       const planned = planMotionOpportunitiesV1({
         packet,
+        approvedStyleLock,
         ...(transcript ? { transcript } : {}),
         ...(Number.isSafeInteger(Number(input.maxCount)) && Number(input.maxCount) > 0 ? { maxCount: Number(input.maxCount) } : Number.isSafeInteger(Number(input.targetCount)) && Number(input.targetCount) > 0 ? { targetCount: Number(input.targetCount) } : { maxCount: 10 }),
         ...(Array.isArray(input.agentCandidates) ? { agentCandidates: input.agentCandidates as MotionOpportunityV1[] } : {}),
-        ...(record(input.style) ? { style: input.style as never } : {}),
       })
       if (!planned.ok) return creativeOperationRefusal(planned.refusal.code, planned.refusal.message, planned.refusal.details)
       opportunityMaps.set(planned.value.id, planned.value)
-      const run = activeRun()
-      if (run && run.projectId === current.value.projectId) await updateActiveRun({ opportunityMap: planned.value, stage: 'storyboard' })
+      const currentRun = activeRun()
+      if (currentRun && currentRun.projectId === current.value.projectId) await updateActiveRun({ opportunityMap: planned.value, stage: 'opportunity-planning' })
       return creativeOperationOk(Object.freeze({ ...planned.value, ...(activeRunId ? { runId: activeRunId } : {}) }), current.value.revision)
     },
   }))
@@ -684,6 +797,8 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
       const map = opportunityMaps.get(input.opportunityMapId)
       if (!map) return creativeOperationRefusal('OPPORTUNITY_MAP_STALE', 'The opportunity map is unknown in this MCP session.')
       if (map.projectId !== current.value.projectId || map.projectRevision !== current.value.revision) return creativeOperationRefusal('OPPORTUNITY_MAP_STALE', 'The opportunity map no longer matches the current production revision.')
+      const run = activeRun()
+      if (!run?.approvedStyleLock || run.opportunityMap?.id !== map.id || map.styleLockRef.styleLockId !== run.approvedStyleLock.styleLockId || map.styleLockRef.contentHash !== run.approvedStyleLock.contentHash || map.styleLockRef.proposalRevision !== run.approvedStyleLock.proposalRevision) return creativeOperationRefusal('OPPORTUNITY_MAP_STALE', 'The opportunity map is no longer active under the current approved Creative Direction Style Lock.')
       return creativeOperationOk(map, current.value.revision)
     },
   }))
@@ -699,6 +814,9 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
     }
     const current = await requireProject()
     if (!current.ok) return Object.freeze({ ok: false as const, refusal: current.refusal })
+    const run = activeRun()
+    if (!run?.approvedStyleLock) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'CREATIVE_DIRECTION_APPROVAL_REQUIRED', message: 'Scene creation requires an exact owner-approved Creative Direction Style Lock.' }) })
+    if (!map.styleLockRef || map.styleLockRef.styleLockId !== run.approvedStyleLock.styleLockId || map.styleLockRef.contentHash !== run.approvedStyleLock.contentHash || map.styleLockRef.proposalRevision !== run.approvedStyleLock.proposalRevision) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'STYLE_LOCK_REVISION_MISMATCH', message: 'The opportunity map was planned under a different or stale Style Lock revision.' }) })
     if (map.projectId !== current.value.projectId || map.projectRevision !== current.value.revision) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'OPPORTUNITY_MAP_STALE', message: 'The opportunity map no longer matches the current production revision.' }) })
     const selected = opportunityId ? map.opportunities.filter((item) => item.opportunity.id === opportunityId) : map.opportunities
     if (selected.length === 0) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'SCENE_SESSION_NOT_FOUND', message: 'The requested opportunity is not present in the opportunity map.' }) })
@@ -709,8 +827,8 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
     if (!made.ok) return Object.freeze({ ok: false as const, refusal: made.refusal })
     sceneBatches.set(made.value.id, made.value)
     sceneBatchTransactions.set(transactionId, made.value.id)
-    const run = activeRun()
-    if (run && run.opportunityMap?.id === map.id) await updateActiveRun({ sceneBatch: made.value.serialize(), sceneIds: made.value.sceneIds, stage: 'storyboard' })
+    const currentRun = activeRun()
+    if (currentRun && currentRun.opportunityMap?.id === map.id) await updateActiveRun({ sceneBatch: made.value.serialize(), sceneIds: made.value.sceneIds, stage: 'storyboard' })
     return Object.freeze({ ok: true as const, batch: made.value })
   }
 
@@ -730,9 +848,9 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
     const run = activeRun()
     if (run && run.projectId === batch.projectId) await updateActiveRun({ sceneBatch: batch.serialize(), sceneIds: batch.sceneIds, stage: 'storyboard' })
   }
-  const reviewStage = (scope: CreativeReviewScopeV1): CreativeRunV1['stage'] => scope === 'storyboard' ? 'storyboard-review' : scope === 'animatic' ? 'animatic-review' : 'motion-review'
+  const reviewStage = (scope: SceneOwnerApprovalScopeV1): CreativeRunV1['stage'] => scope === 'storyboard' ? 'storyboard-review' : scope === 'animatic' ? 'animatic-review' : 'motion-review'
   const replaceReview = (reviews: readonly CreativeReviewV1[], next: CreativeReviewV1): readonly CreativeReviewV1[] => Object.freeze([...reviews.filter((review) => review.reviewId !== next.reviewId), next])
-  const latestReviewByScene = (run: CreativeRunV1, scope: CreativeReviewScopeV1, sceneIds: readonly string[]): readonly CreativeReviewV1[] => Object.freeze(sceneIds.map((sceneId) => run.reviews
+  const latestReviewByScene = (run: CreativeRunV1, scope: SceneOwnerApprovalScopeV1, sceneIds: readonly string[]): readonly CreativeReviewV1[] => Object.freeze(sceneIds.map((sceneId) => run.reviews
     .filter((review) => review.scope === scope && review.sceneId === sceneId)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.subjectRevision - a.subjectRevision)[0]).filter((review): review is CreativeReviewV1 => Boolean(review)))
 
@@ -747,7 +865,7 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
     return serialized.length <= 160 ? serialized : `${serialized.slice(0, 157)}...`
   }
 
-  const reviewContextFor = (batch: CreativeSceneBatchV1, sceneId: string, scope: CreativeReviewScopeV1): CreativeReviewV1['context'] | null => {
+  const reviewContextFor = (batch: CreativeSceneBatchV1, sceneId: string, scope: SceneOwnerApprovalScopeV1): CreativeReviewV1['context'] | null => {
     const workflow = batch.getWorkflow(sceneId)
     if (!workflow) return null
     const state = workflow.state()
@@ -806,7 +924,7 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
     })
   }
 
-  const prepareRunReviews = async (scope: CreativeReviewScopeV1): Promise<Readonly<{ ok: true; run: CreativeRunV1; reviews: readonly CreativeReviewV1[] }> | Readonly<{ ok: false; code: string; message: string }>> => {
+  const prepareRunReviews = async (scope: SceneOwnerApprovalScopeV1): Promise<Readonly<{ ok: true; run: CreativeRunV1; reviews: readonly CreativeReviewV1[] }> | Readonly<{ ok: false; code: string; message: string }>> => {
     const active = requireActiveRunBatch()
     if (!active) return Object.freeze({ ok: false as const, code: 'CREATIVE_RUN_NOT_READY', message: 'The active Creative Run has no resumable scene batch.' })
     if (!options.materializeReviewEvidence) return Object.freeze({ ok: false as const, code: 'REVIEW_RENDERER_UNAVAILABLE', message: 'This host cannot materialize chat-first Creative review evidence.' })
@@ -848,7 +966,7 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
     return Object.freeze({ ok: true as const, run: persisted, reviews: Object.freeze(materialized) })
   }
 
-  const advanceAfterResolvedReviews = async (scope: CreativeReviewScopeV1): Promise<Readonly<{ ok: true; run: CreativeRunV1; nextReviews: readonly CreativeReviewV1[] }> | Readonly<{ ok: false; code: string; message: string }>> => {
+  const advanceAfterResolvedReviews = async (scope: SceneOwnerApprovalScopeV1): Promise<Readonly<{ ok: true; run: CreativeRunV1; nextReviews: readonly CreativeReviewV1[] }> | Readonly<{ ok: false; code: string; message: string }>> => {
     const active = requireActiveRunBatch()
     if (!active) return Object.freeze({ ok: false as const, code: 'CREATIVE_RUN_NOT_READY', message: 'The active Creative Run has no resumable scene batch.' })
     const latest = latestReviewByScene(active.run, scope, active.batch.sceneIds)
@@ -857,7 +975,7 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
       const run = await updateActiveRun({ sceneBatch: active.batch.serialize(), sceneIds: active.batch.sceneIds, stage: 'ready-for-apply' })
       return run ? Object.freeze({ ok: true as const, run, nextReviews: Object.freeze([]) }) : Object.freeze({ ok: false as const, code: 'CREATIVE_RUN_STORE_FAILED', message: 'The approved Motion run could not be persisted.' })
     }
-    const nextScope: CreativeReviewScopeV1 = scope === 'storyboard' ? 'animatic' : 'motion'
+    const nextScope: SceneOwnerApprovalScopeV1 = scope === 'storyboard' ? 'animatic' : 'motion'
     const advanced = await active.batch.advanceAll(nextScope)
     if (!advanced.ok) return Object.freeze({ ok: false as const, code: scope === 'storyboard' ? 'STORYBOARD_APPROVAL_REQUIRED' : 'ANIMATIC_APPROVAL_REQUIRED', message: advanced.message })
     await updateActiveRun({ sceneBatch: active.batch.serialize(), sceneIds: active.batch.sceneIds, stage: nextScope })
@@ -1012,9 +1130,16 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
     id: 'creative.prepare_review', version: 1 as const, level: 'T1' as const, requiresSandbox: false,
     inputSchema: schema({ scope: stringSchema }, ['scope']), outputSchema: outputRecordSchema, validateInput: passRecord,
     execute: async (input: Record<string, unknown>) => {
-      const scope = input.scope === 'storyboard' || input.scope === 'animatic' || input.scope === 'motion' ? input.scope : null
-      if (!scope) return creativeOperationRefusal('INVALID_TOOL_INPUT', 'scope must be storyboard, animatic, or motion.')
+      const scope = input.scope === 'creative-direction' || input.scope === 'storyboard' || input.scope === 'animatic' || input.scope === 'motion' ? input.scope : null
+      if (!scope) return creativeOperationRefusal('INVALID_TOOL_INPUT', 'scope must be creative-direction, storyboard, animatic, or motion.')
       try {
+        if (scope === 'creative-direction') {
+          const run = activeRun(); const proposal = run?.creativeDirectionProposal
+          if (!run || !proposal) return creativeOperationRefusal('CREATIVE_DIRECTION_REQUIRED', 'No Creative Direction proposal exists for review.')
+          const review = await prepareDirectionReview(run, proposal)
+          const persisted = await updateActiveRun({ reviews: replaceReview(run.reviews, review), stage:'creative-direction-review' })
+          return persisted ? creativeOperationOk(Object.freeze({ run:summarizeCreativeRunV1(persisted), reviews:Object.freeze([review]), next:'OWNER_CREATIVE_DIRECTION_REVIEW_REQUIRED' }), persisted.baseProjectRevision) : creativeOperationRefusal('CREATIVE_RUN_STORE_FAILED','Creative Direction review state could not be persisted.')
+        }
         const prepared = await prepareRunReviews(scope)
         if (!prepared.ok) return creativeOperationRefusal(prepared.code, prepared.message)
         return creativeOperationOk(Object.freeze({ run: summarizeCreativeRunV1(prepared.run), reviews: prepared.reviews }), prepared.run.baseProjectRevision)
@@ -1045,9 +1170,9 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
       const decision = input.decision === 'approve' || input.decision === 'revise' || input.decision === 'reject' ? input.decision : null
       if (!decision) return creativeOperationRefusal('INVALID_TOOL_INPUT', 'decision must be approve, revise, or reject.')
       if (input.revisionNote !== undefined && !boundedText(input.revisionNote, 1000)) return creativeOperationRefusal('INVALID_TOOL_INPUT', 'revisionNote must be bounded text when provided.')
-      const active = requireActiveRunBatch()
-      if (!active) return creativeOperationRefusal('CREATIVE_RUN_NOT_READY', 'Resume a Creative Run with a scene batch before deciding a review.')
-      const review = active.run.reviews.find((item) => item.reviewId === input.reviewId)
+      const reviewRun = activeRun()
+      if (!reviewRun) return creativeOperationRefusal('CREATIVE_RUN_NOT_FOUND', 'Create or resume the Creative Run before deciding a review.')
+      const review = reviewRun.reviews.find((item) => item.reviewId === input.reviewId)
       if (!review || review.status !== 'pending') return creativeOperationRefusal('CREATIVE_REVIEW_STALE', 'The review is unavailable or no longer pending.')
       const host = context.hostReviewDecision
       if (!host || host.reviewId !== review.reviewId || host.decision !== decision || host.evidenceHash !== review.evidenceHash || host.subjectId !== review.subjectId || host.subjectRevision !== review.subjectRevision) {
@@ -1055,6 +1180,40 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
       }
       if (decision === 'revise' && !boundedText(input.revisionNote, 1000)) return creativeOperationRefusal('REVISION_NOTE_REQUIRED', 'A revision decision requires a concrete bounded revisionNote.')
       const now = host.confirmedAt
+      if (review.scope === 'creative-direction') {
+        const run = activeRun()
+        const proposal = run?.creativeDirectionProposal
+        if (!run || !proposal || proposal.proposalId !== review.subjectId || proposal.revision !== review.subjectRevision) return creativeOperationRefusal('CREATIVE_DIRECTION_STALE', 'The Creative Direction review no longer targets the active proposal revision.')
+        if (decision === 'approve') {
+          if (!options.issueOwnerApprovalRef || !options.resolveOwnerApprovalRef) return creativeOperationRefusal('OWNER_APPROVAL_REQUIRED', 'The host approval authority is unavailable; Creative Direction approval fails closed.')
+          const request: HostApprovalRequestV1 = Object.freeze({ schemaVersion:'sanverse.host-approval-request/v1', requestRef:review.requestRef, scope:'creative-direction', subjectId:proposal.proposalId, subjectRevision:proposal.revision, issuedAt:review.createdAt })
+          const issued = await options.issueOwnerApprovalRef(request)
+          const approval = await options.resolveOwnerApprovalRef({ approvalRef:issued.approvalRef, request })
+          if (!approval) return creativeOperationRefusal('OWNER_APPROVAL_REQUIRED', 'Trusted host confirmation has not produced approval for this exact Creative Direction revision.')
+          const valid = (await import('@sanverse/motion-storyboard')).validateOwnerApprovalV1(approval)
+          if (!valid.ok || approval.scope !== 'creative-direction' || approval.subjectId !== proposal.proposalId || approval.subjectRevision !== proposal.revision) return creativeOperationRefusal('APPROVAL_REVISION_MISMATCH', 'Host approval does not match the exact Creative Direction proposal revision.')
+          const contentHash = await options.sha256Text(canonicalApprovedStyleContentV1(proposal))
+          const styleLockId = `stylelock_${contentHash.slice(0,16)}`
+          const approvedStyleLock: ApprovedStyleLockV1 = Object.freeze({ schemaVersion:'sanverse.approved-style-lock/v1', styleLockId, proposalId:proposal.proposalId, proposalRevision:proposal.revision, projectId:proposal.projectId, sourcePacketId:proposal.sourcePacketId, recommendation:proposal.styleRecommendation, creativeLanguage:compileVideoCreativeLanguageV1({styleLockId,proposalRevision:proposal.revision,draft:proposal.creativeLanguageDraft}), ownerApprovalId:approval.id, locked:true, contentHash })
+          const approvedProposal: CreativeDirectionProposalV1 = Object.freeze({ ...proposal, status:'owner-approved', ownerApprovalId:approval.id })
+          const approvedReview: CreativeReviewV1 = Object.freeze({ ...review, status:'approved', approvalRef:issued.approvalRef, updatedAt:now })
+          const persisted = await updateActiveRun({ creativeDirectionProposal:approvedProposal, approvedStyleLock, reviews:replaceReview(run.reviews,approvedReview), stage:'opportunity-planning' })
+          return persisted ? creativeOperationOk(Object.freeze({decision:'approved',review:approvedReview,approvedStyleLock,run:summarizeCreativeRunV1(persisted),next:'OPPORTUNITY_PLANNING_ALLOWED'}),current.value.revision) : creativeOperationRefusal('CREATIVE_RUN_STORE_FAILED','Approved Creative Direction could not be persisted.')
+        }
+        if (decision === 'reject') {
+          const rejectedProposal:CreativeDirectionProposalV1=Object.freeze({...proposal,status:'rejected'})
+          const rejectedReview:CreativeReviewV1=Object.freeze({...review,status:'rejected',updatedAt:now})
+          const persisted=await updateActiveRun({creativeDirectionProposal:rejectedProposal,approvedStyleLock:undefined,reviews:replaceReview(run.reviews,rejectedReview),stage:'creative-direction-review'})
+          return persisted?creativeOperationOk(Object.freeze({decision:'rejected',review:rejectedReview,run:summarizeCreativeRunV1(persisted),next:'REVISE_OR_PROPOSE_CREATIVE_DIRECTION'}),current.value.revision):creativeOperationRefusal('CREATIVE_RUN_STORE_FAILED','Rejected Creative Direction state could not be persisted.')
+        }
+        const revisionRequestedProposal:CreativeDirectionProposalV1=Object.freeze({...proposal,status:'draft'})
+        const revisionRequestedReview:CreativeReviewV1=Object.freeze({...review,status:'revision-requested',revisionNote:String(input.revisionNote),updatedAt:now})
+        const persisted=await updateActiveRun({creativeDirectionProposal:revisionRequestedProposal,approvedStyleLock:undefined,reviews:replaceReview(run.reviews,revisionRequestedReview),stage:'creative-direction-review'})
+        return persisted?creativeOperationOk(Object.freeze({decision:'revision-requested',review:revisionRequestedReview,run:summarizeCreativeRunV1(persisted),next:'REVISE_CREATIVE_DIRECTION'}),current.value.revision):creativeOperationRefusal('CREATIVE_RUN_STORE_FAILED','Creative Direction revision request could not be persisted.')
+      }
+      if (!review.sceneId) return creativeOperationRefusal('CREATIVE_REVIEW_INVALID', 'Scene review is missing its scene identity.')
+      const active = requireActiveRunBatch()
+      if (!active) return creativeOperationRefusal('CREATIVE_RUN_NOT_READY', 'Resume a Creative Run with a scene batch before deciding a scene review.')
       if (decision === 'approve') {
         const request = active.batch.snapshot().pendingApprovalRequests.find((item) => item.requestRef === review.requestRef)
         if (!request || request.sceneId !== review.sceneId || request.scope !== review.scope || request.subjectId !== review.subjectId || request.subjectRevision !== review.subjectRevision) return creativeOperationRefusal('APPROVAL_STALE', 'The host approval request no longer matches this exact review revision.')
@@ -1100,6 +1259,7 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
       const review = active.run.reviews.find((item) => item.reviewId === input.reviewId)
       if (!review || review.status !== 'revision-requested') return creativeOperationRefusal('REVISION_REQUEST_REQUIRED', 'The exact review must have a trusted revision decision before scene changes are accepted.')
       if (review.scope !== 'storyboard') return creativeOperationRefusal('LOCALIZED_REVISION_UNSUPPORTED', 'This first localized revision bridge supports Storyboard content/style changes only; later-stage changes fail closed rather than silently rebuilding unrelated scenes.')
+      if (!review.sceneId) return creativeOperationRefusal('CREATIVE_REVIEW_INVALID', 'Storyboard review is missing its scene identity.')
       const workflow = active.batch.getWorkflow(review.sceneId)
       const sandbox = workflow?.state().storyboardSandbox
       if (!workflow || !sandbox) return creativeOperationRefusal('CREATIVE_REVIEW_STALE', 'The reviewed Storyboard scene is no longer available.')

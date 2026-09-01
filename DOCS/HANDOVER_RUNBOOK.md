@@ -4,22 +4,13 @@ Use this runbook when a new session, agent, or context window resumes the projec
 
 ## Current handoff
 
-**Active branch:** `external-mcp-raw-video-v1`. General Storyboard implementation/evidence baseline:
-`acff478efd024926b2cc455cd60efdd721030966`. Verify current HEAD with Git because later documentation-only release-readiness syncs may sit above that implementation commit.
+**Active implementation line:** `external-mcp-raw-video-v1`; the latest isolated engineering slice is REQ-025 / Pre-Storyboard Creative Direction + Approved Style Lock V1. Verify current HEAD/remote SHA with Git before resuming because this handoff is updated before the final commit identifier is inserted.
 
-**Current completed engineering slice:** REQ-024 / General Storyboard Authoring
-Surface V1. The standard local Sanverse MCP exposes 69 tools; external coding
-agents can inspect and author the canonical Motion Graph inside revision-fenced
-Storyboard state, preserve exact owner design locks, carry the approved
-Storyboard structure into Motion Forge, reconnect from durable Creative Runs,
-and review exact source-composited KVS pixels in chat. Deterministic STDIO and
-real Codex `0.144.1` acceptance are green. Evidence:
-`DOCS/evidence/2026-09-01-general-storyboard-authoring-v1/`.
+**Current completed engineering slice:** raw-video Creative Runs now require video-wide Creative Direction authority after Source Understanding and before opportunity planning/Storyboard. The standard local Sanverse MCP exposes **73 tools**, including `creative.propose_direction`, `creative.get_direction`, `creative.revise_direction` and `creative.reopen_direction`. Brand Context remains evidence; draft direction remains revisable review state; only exact trusted-host approval of one review revision/evidence hash creates a content-derived Approved Style Lock. That exact Style Lock hash/revision is carried through opportunity planning, Storyboard/Motion and immutable Creative artifacts. V1 runs migrate without fabricated approval, and reopening direction invalidates downstream active authority without production mutation.
 
-**Machine-verifiable gate:** green. The authoritative Windows single-fork root
-test command exits 0, the all-workspace production build exits 0, the named
-Storyboard authoring audit passes, and dependency/secret/media hygiene is clean.
-The working branch was pushed with local/remote SHA parity at the commit above.
+Deterministic real-project STDIO acceptance is green through exact trusted test-host direction approval and the full General Storyboard authoring battery. A three-process continuation audit proves pending Creative Direction review identity before approval and exact Approved Style Lock identity after approval across fresh transports. Real Codex `0.144.1` independently proves the model-facing direction gate through pending revision 2 while deliberately **not** fabricating visual owner approval. Evidence: `DOCS/evidence/2026-09-01-creative-direction-style-lock-v1/`, `DOCS/evidence/2026-09-01-general-storyboard-authoring-v1/`, and `DOCS/evidence/2026-09-01-mcp-continuation-v1/`.
+
+**Machine-verifiable gate:** green. The authoritative Windows single-fork root test command exits 0 with Web 1,239/1,239, API 411/411, Creative Direction 46/46, Creative Adapter 37/37, Edit Domain 491/491, Motion Library 202/202, Motion Graph 148/148, Render Contract 121/121, Motion MCP 30/30, Agent Tools 30/30 and Storyboard 16/16. The all-workspace production build exits 0, and production dependency audit is zero vulnerabilities at every severity. Verify the final Git SHA parity from the newest evidence/HEAD when resuming.
 
 **Only active raw-video release blocker:** REQ-020's manual release proof. Do
 not create `sanverse-external-mcp-raw-video-v1` from broad implementation
@@ -39,7 +30,7 @@ benchmark can legitimately start. Do not split the synthetic cue into invented
 "real" source moments.
 
 When resuming this branch, read `START_HERE.md`, `DOCS/CURRENT_STATE.md`, this
-runbook, `DOCS/REQUIREMENTS.md` REQ-020/023/024, `DOCS/DECISIONS.md` DEC-021/022,
+runbook, `DOCS/REQUIREMENTS.md` REQ-020/023/024/025, `DOCS/DECISIONS.md` DEC-021/022/023,
 and `DOCS/plans/SANVERSE_EXTERNAL_MCP_RAW_VIDEO_V1.md`. Older P1 handoffs below
 are historical context, not the current branch gate.
 

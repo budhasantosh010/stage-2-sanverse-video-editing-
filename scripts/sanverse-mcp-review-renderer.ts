@@ -111,11 +111,45 @@ const captureTick = async (cdp: CdpClient, tick: number, width: number, height: 
   return new Uint8Array(bytes)
 }
 
+const escapeHtml = (value: unknown): string => String(value ?? '').replace(/[&<>"']/gu, (character) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[character]!)
+
+const materializeCreativeDirectionBoardV1 = async (input: Readonly<{ run: CreativeRunV1; review: CreativeReviewV1 }>): Promise<CreativeReviewV1> => {
+  if (input.review.scope !== 'creative-direction' || input.review.context?.kind !== 'creative-direction') throw new Error('CREATIVE_REVIEW_INVALID: Creative Direction board requires Creative Direction review context.')
+  const context = input.review.context
+  const project = await readProductionProject(input.run.projectId)
+  const source = project.assets.find((asset) => asset.assetId === input.run.sourceAssetId && asset.mediaKind === 'video')
+  const sourceVersion = source && /^[a-f0-9]{64}$/u.test(source.sha256.toLowerCase()) ? source.sha256.toLowerCase().slice(0, 16) : null
+  const sourceUrl = sourceVersion ? `${WEB_URL}/api/projects/${encodeURIComponent(input.run.projectId)}/media-analysis/frame?assetId=${encodeURIComponent(input.run.sourceAssetId)}&assetVersion=${encodeURIComponent(sourceVersion)}&sourceTicks=0&width=640` : null
+  const palette = context.paletteRoles
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+    *{box-sizing:border-box}html,body{margin:0;width:1280px;height:720px;background:#0b0c10;color:#fff;font-family:Inter,Arial,sans-serif;overflow:hidden}.board{display:grid;grid-template-columns:430px 1fr;height:100%;gap:28px;padding:32px}.left,.right{display:flex;flex-direction:column;gap:18px}.title{font-size:28px;font-weight:800;letter-spacing:-.02em}.sub{font-size:13px;color:#aeb3bf}.frame{height:238px;border-radius:18px;overflow:hidden;border:1px solid #30343d;background:#17191f}.frame img{width:100%;height:100%;object-fit:cover}.frame .missing{display:grid;place-items:center;height:100%;color:#8b909c}.card{background:#17191f;border:1px solid #30343d;border-radius:16px;padding:16px}.label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#8b909c;margin-bottom:9px}.swatches{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.swatch{height:60px;border-radius:10px;border:1px solid rgba(255,255,255,.16);position:relative}.swatch span{position:absolute;bottom:5px;left:6px;font-size:10px;background:rgba(0,0,0,.55);padding:2px 4px;border-radius:4px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.value{font-size:16px;font-weight:700}.detail{font-size:12px;line-height:1.5;color:#c2c6cf}.metric{font-size:36px;font-weight:800;letter-spacing:-.04em}.reason{font-size:12px;color:#c8ccd4;margin:3px 0}.pill{display:inline-block;border:1px solid #4b515c;border-radius:999px;padding:5px 8px;margin:3px 4px 0 0;font-size:11px}.accent{color:${escapeHtml(palette.accent)}}
+  </style></head><body><main class="board"><section class="left"><div><div class="title">Sanverse Creative Direction</div><div class="sub">Revision ${context.revision} · video-wide language, not scene layout</div></div><div class="frame">${sourceUrl?`<img src="${escapeHtml(sourceUrl)}"/>`:'<div class="missing">Source frame unavailable</div>'}</div><div class="card"><div class="label">Palette</div><div class="swatches">${Object.entries(palette).map(([role,color])=>`<div class="swatch" style="background:${escapeHtml(color)}"><span>${escapeHtml(role)} · ${escapeHtml(color)}</span></div>`).join('')}</div></div><div class="card"><div class="label">Typography</div><div class="metric" style="font-family:${escapeHtml(context.typography.typeFamily || 'Inter')}">Headline 82%</div><div class="detail">${escapeHtml(context.typography.typeFamily || 'unspecified')} · ${escapeHtml(context.typography.language)}</div></div></section><section class="right"><div class="grid"><div class="card"><div class="label">Surface</div><div class="value">${escapeHtml(context.creativeLanguage.surfaceLanguage)}</div><div class="detail">radius ${context.surface.radius}px · stroke ${context.surface.stroke} · shadow ${context.surface.shadow} · depth ${context.surface.depth} · ${escapeHtml(context.surface.texture)}</div></div><div class="card"><div class="label">Composition</div><div class="value">${escapeHtml(context.composition.density)} density · ${escapeHtml(context.composition.alignment)}</div><div class="detail">safe area ${Math.round(context.composition.safeArea*100)}% · subject ${escapeHtml(context.composition.subjectPriority)} · negative space ${escapeHtml(context.composition.negativeSpacePreference)}</div></div><div class="card"><div class="label">Motion language</div><div class="value">${escapeHtml(context.motion.rhythm)} · ${escapeHtml(context.motion.primaryEase)}</div><div class="detail">overshoot ≤ ${context.motion.overshootMax} · travel ${context.motion.travelDistance}px · stagger ${context.motion.staggerRhythm}s · camera ${context.motion.cameraAggressiveness} · effects ${context.motion.effectIntensity} · ${escapeHtml(context.motion.holdDiscipline)} holds</div></div><div class="card"><div class="label">Transitions / modes</div><div>${context.creativeLanguage.transitionVocabulary.map((item)=>`<span class="pill">${escapeHtml(item)}</span>`).join('')}</div><div>${context.creativeLanguage.preferredPresentationModes.map((item)=>`<span class="pill">${escapeHtml(item)}</span>`).join('')}</div></div></div><div class="card" style="flex:1"><div class="label">Why this direction</div>${context.reasons.map((reason)=>`<p class="reason">• ${escapeHtml(reason)}</p>`).join('')}<p class="reason accent">Owner approval of this exact revision creates the Style Lock. No Storyboard is created before that approval.</p></div></section></main></body></html>`
+  const port = await reservePort()
+  const profileDir = await mkdtemp(join(tmpdir(), 'sanverse-direction-browser-'))
+  const browser = spawn(browserExecutable(), ['--headless=new','--hide-scrollbars','--disable-background-networking','--disable-component-update','--disable-default-apps','--disable-extensions','--disable-sync','--no-first-run','--no-default-browser-check','--force-color-profile=srgb','--force-device-scale-factor=1',`--remote-debugging-port=${port}`,`--user-data-dir=${profileDir}`,'about:blank'], { stdio:'ignore', windowsHide:true })
+  let cdp:CdpClient|null=null
+  try {
+    cdp=await connectCdp(await waitForTarget(port,browser)); await cdp.send('Page.enable'); await cdp.send('Runtime.enable'); await cdp.send('Emulation.setDeviceMetricsOverride',{width:1280,height:720,deviceScaleFactor:1,mobile:false,screenWidth:1280,screenHeight:720})
+    await cdp.send('Page.navigate',{url:`data:text/html;charset=utf-8,${encodeURIComponent(html)}`})
+    await sleep(150)
+    await cdp.evaluate(`Promise.all([...document.images].map(img=>img.complete?Promise.resolve():new Promise(r=>{img.onload=img.onerror=r})))`)
+    const shot=await cdp.send('Page.captureScreenshot',{format:'png',fromSurface:true,clip:{x:0,y:0,width:1280,height:720,scale:1}})
+    const bytes=new Uint8Array(Buffer.from(String(shot.data),'base64'))
+    const artifactId='creative-direction-board.png'
+    const written=await writeCreativeReviewArtifactV1({projectId:input.run.projectId,runId:input.run.runId,reviewId:input.review.reviewId,artifactId,bytes})
+    const artifact=Object.freeze({artifactId,kind:'image' as const,label:`Creative Direction Board · Revision ${context.revision}`,mimeType:'image/png' as const,byteLength:written.byteLength,sha256:written.sha256,resourceUri:`sanverse://creative-run/${input.run.runId}/reviews/${input.review.reviewId}/${artifactId}`})
+    const evidenceHash=sha256(JSON.stringify({runId:input.run.runId,reviewId:input.review.reviewId,scope:input.review.scope,subjectId:input.review.subjectId,subjectRevision:input.review.subjectRevision,context,artifact:{artifactId,sha256:written.sha256}}))
+    return Object.freeze({...input.review,evidenceHash,artifacts:Object.freeze([artifact]),updatedAt:new Date().toISOString()})
+  } finally { cdp?.close(); if(browser.exitCode===null)browser.kill(); await rm(profileDir,{recursive:true,force:true}).catch(()=>undefined) }
+}
+
 export const materializeCreativeReviewEvidenceV1 = async (input: Readonly<{
   run: CreativeRunV1
   review: CreativeReviewV1
-  batch: CreativeSceneBatchV1
+  batch?: CreativeSceneBatchV1
 }>): Promise<CreativeReviewV1> => {
+  if (input.review.scope === 'creative-direction') return materializeCreativeDirectionBoardV1({ run: input.run, review: input.review })
+  if (!input.batch || !input.review.sceneId) throw new Error('CREATIVE_REVIEW_STALE: scene review requires an active scene batch and scene identity.')
   const workflow = input.batch.getWorkflow(input.review.sceneId)
   if (!workflow) throw new Error('CREATIVE_REVIEW_STALE: review scene is no longer part of the active batch.')
   const project = await readProductionProject(input.run.projectId)

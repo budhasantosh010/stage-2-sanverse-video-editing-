@@ -79,6 +79,18 @@ const ports = (current: EditProject, runs: Map<string, CreativeRunV1>) => ({
   resolveOwnerApprovalRef: async ({ approvalRef, request }: Readonly<{ approvalRef: string; request: HostApprovalRequestV1 }>) => approvalRef === `approvalref_${request.requestRef}` ? ownerApproval(request) : null,
 })
 
+const approveCreativeDirection = async (
+  session: Awaited<ReturnType<typeof createCreativeProductionExternalOrchestrationSessionV1>>,
+  sourcePacketRef: string,
+): Promise<void> => {
+  const proposed = await invoke(session, 'creative.propose_direction', { sourcePacketRef }) as any
+  expect(proposed.ok).toBe(true)
+  const review = proposed.value.review as CreativeReviewV1
+  const context: ToolExecutionContextV1 = Object.freeze({ hostReviewDecision: Object.freeze({ reviewId: review.reviewId, decision: 'approve' as const, evidenceHash: review.evidenceHash, subjectId: review.subjectId, subjectRevision: review.subjectRevision, confirmedAt: '2026-08-31T07:29:00.000Z' }) })
+  const approved = await invoke(session, 'creative.decide_review', { reviewId: review.reviewId, decision: 'approve' }, context) as any
+  expect(approved).toMatchObject({ ok: true, value: { decision: 'approved', approvedStyleLock: { locked: true } } })
+}
+
 describe('durable Creative Run reconnect + localized review decisions', () => {
   it('rehydrates the exact pending Storyboard review in a fresh session and rejects client-only approval', async () => {
     const current = project()
@@ -91,6 +103,7 @@ describe('durable Creative Run reconnect + localized review decisions', () => {
     const runId = created.value.runId as string
     const transcript = await invoke(first, 'source.attach_transcript', { format: 'plain', contents: 'Revenue grew 82 percent. Compare both options and explain the takeaway.', transactionId: 'transcript_reconnect_001' }) as any
     const analyzed = await invoke(first, 'source.analyze_video', { transcriptRef: transcript.value.transcriptRef }) as any
+    await approveCreativeDirection(first, analyzed.value.id)
     const planned = await invoke(first, 'motion.plan_opportunities', { sourcePacketRef: analyzed.value.id, maxCount: 2 }) as any
     expect(planned.value.selectedCount).toBe(2)
     const batch = await invoke(first, 'motion.create_scene_batch', { opportunityMapId: planned.value.id, transactionId: 'scene_batch_reconnect_001' }) as any
@@ -100,9 +113,11 @@ describe('durable Creative Run reconnect + localized review decisions', () => {
     expect(prepared.value.reviews).toHaveLength(2)
     const review = prepared.value.reviews[0] as CreativeReviewV1
     expect(review.context).toBeDefined()
-    expect(review.context?.states.length).toBeGreaterThanOrEqual(2)
-    expect(review.context?.states.every((state) => state.sourceFrameTick === review.context!.sourceStartTick + state.localTick)).toBe(true)
-    expect(review.context?.states.every((state) => state.backgroundTreatment.length > 0 && state.presentationMode.length > 0)).toBe(true)
+    if (!review.context || review.context.kind === 'creative-direction') throw new Error('Expected scene review context.')
+    const reviewContext = review.context
+    expect(reviewContext.states.length).toBeGreaterThanOrEqual(2)
+    expect(reviewContext.states.every((state) => state.sourceFrameTick === reviewContext.sourceStartTick + state.localTick)).toBe(true)
+    expect(reviewContext.states.every((state) => state.backgroundTreatment.length > 0 && state.presentationMode.length > 0)).toBe(true)
     const persistedBeforeReconnect = structuredClone(runs.get(runId)!)
 
     const second = await createCreativeProductionExternalOrchestrationSessionV1({ sessionLabel: 'creative-run-second', ...ports(current, runs) })
@@ -130,6 +145,7 @@ describe('durable Creative Run reconnect + localized review decisions', () => {
     const runId = created.value.runId as string
     const transcript = await invoke(session, 'source.attach_transcript', { format: 'plain', contents: 'Revenue grew 82 percent. Compare both options and explain the takeaway.', transactionId: 'transcript_reject_001' }) as any
     const analyzed = await invoke(session, 'source.analyze_video', { transcriptRef: transcript.value.transcriptRef }) as any
+    await approveCreativeDirection(session, analyzed.value.id)
     const planned = await invoke(session, 'motion.plan_opportunities', { sourcePacketRef: analyzed.value.id, maxCount: 2 }) as any
     await invoke(session, 'motion.create_scene_batch', { opportunityMapId: planned.value.id, transactionId: 'scene_batch_reject_001' })
     const prepared = await invoke(session, 'creative.prepare_review', { scope: 'storyboard' }) as any

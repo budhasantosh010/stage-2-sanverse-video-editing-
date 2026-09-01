@@ -65,6 +65,8 @@ export const buildCreativeSceneArtifactV1 = (workflow: CreativeSceneWorkflowV1):
     governance: Object.freeze({
       artifactPurpose: 'production' as const,
       styleLockId: workflow.styleLockId,
+      styleLockContentHash: workflow.styleLockContentHash,
+      creativeDirectionRevision: workflow.creativeDirectionRevision,
       creativeLanguageId: workflow.creativeLanguageId,
       cohesionScore: selectedRanking?.cohesionScore ?? 0,
       requiredCapabilities: Object.freeze([...planned.opportunity.requiredCapabilities]),
@@ -139,6 +141,8 @@ export const buildCreativeSceneReviewArtifactV1 = (
     governance: Object.freeze({
       artifactPurpose: 'review' as const,
       styleLockId: workflow.styleLockId,
+      styleLockContentHash: workflow.styleLockContentHash,
+      creativeDirectionRevision: workflow.creativeDirectionRevision,
       creativeLanguageId: workflow.creativeLanguageId,
       cohesionScore: selectedRanking?.cohesionScore ?? 0,
       requiredCapabilities: Object.freeze([...planned.opportunity.requiredCapabilities]),

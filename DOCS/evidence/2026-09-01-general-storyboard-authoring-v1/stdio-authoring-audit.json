@@ -1,26 +1,34 @@
 {
   "schemaVersion": "sanverse.storyboard-authoring-stdio-audit/v1",
-  "generatedAt": "2026-09-01T13:21:24.087Z",
+  "generatedAt": "2026-09-01T15:54:31.832Z",
   "projectId": "project_21c01709e413d034d4cec25dcb4b1ca4",
   "productionRevision": 0,
-  "runId": "run_01m4j3e8",
-  "batchId": "scenebatch_00wmhk75",
-  "sceneId": "creative_scene_017p2yj9",
-  "toolCount": 69,
+  "runId": "run_017ui8wn",
+  "batchId": "scenebatch_01pff74a",
+  "sceneId": "creative_scene_01m8ubtn",
+  "toolCount": 73,
+  "creativeDirection": {
+    "proposalId": "direction_01rn1bce",
+    "approvedRevision": 2,
+    "styleLockId": "stylelock_46622b0a92ffbfac",
+    "contentHash": "46622b0a92ffbfac12df83afeb352007a1c93916613f713ab87477ac05a99aa8",
+    "staleReviewRefused": true,
+    "confirmationRounds": 2
+  },
   "authoring": {
     "currency": "£29",
     "shape": "ellipse",
-    "duplicatedNodeId": "agent-proof-mtip3zvt",
-    "semanticPartId": "part:agent-proof-mtip3zvt",
+    "duplicatedNodeId": "agent-proof-mtiuksud",
+    "semanticPartId": "part:agent-proof-mtiuksud",
     "finalSandboxRevision": 4
   },
   "review": {
-    "reviewId": "review_00airejh",
+    "reviewId": "review_00djtkgz",
     "kvsCount": 2,
     "artifactCount": 2,
     "chatImageCount": 6,
     "sourceComposite": true,
-    "contextHash": "2c95a561ea20d17ffb58fc20c1dd9fea3b0c8a15d422b67598dd65d69d907879"
+    "contextHash": "9f2ed14ff8441bd6e4bbb247321f733faa85d6642bea382f652bfec6f5f884d6"
   },
   "productionMutation": false
 }

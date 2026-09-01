@@ -5,7 +5,7 @@ export interface StyleIntelligenceInputV1 {
   readonly existingStyle:Readonly<{accent?:string;surface?:string;primaryText?:string;radius?:number;motionIntensity?:number;overshootAllowance?:number;density?:'low'|'medium'|'high'}>
   readonly approvedAssetSignals:readonly Readonly<{motionIntensity?:number;overshoot?:number;density?:'low'|'medium'|'high';surface?:string}>[]
   readonly promotedAssetSignals:readonly Readonly<{motionIntensity?:number;overshoot?:number;density?:'low'|'medium'|'high'}>[]
-  readonly videoContext:Readonly<{talkingHead:boolean;informationDensity:'low'|'medium'|'high';negativeSpace:'low'|'medium'|'high';subjectPriority:'low'|'medium'|'high'}>
+  readonly videoContext:Readonly<{talkingHead:boolean;informationDensity:'low'|'medium'|'high';negativeSpace:'low'|'medium'|'high'|'unknown';subjectPriority:'low'|'medium'|'high'}>
   readonly locked:boolean
   readonly explicitStyleRevision?:boolean
 }

@@ -22,7 +22,7 @@ export interface PermittedImportFileV1 {
   readonly byteLength: number
 }
 
-export type WorkspaceInputKindV1 = 'video' | 'transcript' | 'image'
+export type WorkspaceInputKindV1 = 'video' | 'transcript' | 'image' | 'brief'
 export interface WorkspaceInputV1 {
   readonly relativePath: string
   readonly kind: WorkspaceInputKindV1
@@ -31,7 +31,7 @@ export interface WorkspaceInputV1 {
 
 export interface WorkspaceTextFileV1 {
   readonly relativePath: string
-  readonly format: 'plain' | 'srt' | 'vtt'
+  readonly format: 'plain' | 'srt' | 'vtt' | 'brief'
   readonly contents: string
 }
 
@@ -107,8 +107,11 @@ export async function resolvePermittedImportFileV1(input: Readonly<{
 const ignoredDirectoryNames = new Set(['.git', '.hg', '.svn', '.sanverse-data', 'node_modules', 'dist', 'build', 'coverage', 'tmp', 'temp'])
 const inputKind = (path: string): WorkspaceInputKindV1 | null => {
   const extension = extname(path).toLowerCase()
+  const name = basename(path).toLowerCase()
   if (extension === '.mp4') return 'video'
-  if (extension === '.srt' || extension === '.vtt' || extension === '.txt') return 'transcript'
+  if (extension === '.srt' || extension === '.vtt') return 'transcript'
+  if (extension === '.md') return 'brief'
+  if (extension === '.txt') return /(?:brand|brief|style|creative|direction|guideline|identity)/u.test(name) ? 'brief' : 'transcript'
   if (extension === '.png' || extension === '.jpg' || extension === '.jpeg' || extension === '.webp') return 'image'
   return null
 }
@@ -162,8 +165,8 @@ export async function readPermittedWorkspaceTextFileV1(input: Readonly<{
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 8_000_000) throw new RangeError('maxBytes must be between 1 and 8000000.')
   if (file.byteLength > maxBytes) throw new LocalImportErrorV1('IMPORT_MEDIA_UNSUPPORTED', 'The workspace transcript file is too large.')
   const extension = extname(file.safeRelativePath).toLowerCase()
-  const format = extension === '.srt' ? 'srt' as const : extension === '.vtt' ? 'vtt' as const : extension === '.txt' ? 'plain' as const : null
-  if (!format) throw new LocalImportErrorV1('IMPORT_MEDIA_UNSUPPORTED', 'Only .srt, .vtt, and .txt workspace transcript files are supported.')
+  const format = extension === '.srt' ? 'srt' as const : extension === '.vtt' ? 'vtt' as const : extension === '.md' ? 'brief' as const : extension === '.txt' ? (inputKind(file.safeRelativePath) === 'brief' ? 'brief' as const : 'plain' as const) : null
+  if (!format) throw new LocalImportErrorV1('IMPORT_MEDIA_UNSUPPORTED', 'Only bounded .srt, .vtt, .txt, and .md workspace text files are supported.')
   const contents = await readFile(file.absolutePath, 'utf8').catch(() => { throw new LocalImportErrorV1('IMPORT_FILE_NOT_FOUND', 'The workspace transcript file could not be read.') })
   return Object.freeze({ relativePath: file.safeRelativePath, format, contents })
 }
