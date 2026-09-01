@@ -17,7 +17,7 @@ flowchart LR
   G6["G6 Motion and effects"]
   G7["G7 Components and compound AI"]
   G8["G8 Trustworthy local alpha"]
-  G9["G9 External API/MCP if justified"]
+  G9["G9 External API/MCP"]
   G10["G10 Production SaaS"]
   G11["G11 Advanced vision"]
   G12["G12 Data and specialized models"]
@@ -55,19 +55,20 @@ Legend: `[x]` complete, `[~]` partly complete or awaiting owner evidence, `[ ]` 
 | G6 | Transform, keyframes, easing, bounce, transitions, and basic effects | [~] Executable technical batch complete; owner workflow/performance evidence remains open |
 | G7 | Versioned reusable components and compound AI plans | [~] Significant technical slices exist; full goal exit remains open |
 | G8 | Recoverable, measurable local alpha used on real videos | [~] Technical controls complete; owner workflows, representative users, and agreed budgets remain open |
-| G9 | Stable external API/MCP over the same engine | [?] Build only when an external-client use case is proven |
+| G9 | Stable external API/MCP over the same engine | [~] Local standards-compatible MCP is implemented and production-backed; the human raw-video release gate and any future public/remote API operations remain open/conditional |
 | G10 | Identity, tenancy, cloud jobs/storage/rendering, billing, security, and operations | [?] Enter when local-alpha evidence and distribution intent justify SaaS |
 | G11 | Tracking, segmentation, occlusion, and advanced spatial editing | [?] Evidence-driven |
 | G12 | Evaluation flywheel, routing, and specialized models | [?] Consent- and data-driven |
 
 ## Current position
 
-- G4-A's exact-time project/change-set/render chassis is complete and remains authoritative.
-- The fake-provider AI proposal loop, transcript captions, cutting/audio primitives, motion/effect slices, recovery controls, Production Timeline V1, Inspector V1, and Canvas Direct Manipulation V1 exist in executable code.
-- P1-E Media Bin V1 is technically complete with real-browser/media/export evidence. One accepted project now feeds one Media view model, one display-label authority, one usage index, and App-owned source probing; `UX-011` is resolved. The next interface milestone is P1-F only after explicit owner instruction.
-- G1 and the later workflow/local-alpha exits retain owner-only evidence gaps; automation cannot truthfully close native feel, final UX judgment, repeated non-editor workflows, or agreed performance budgets.
-- The first real AI-provider call remains blocked on the owner's keys and explicit decision about data leaving the machine.
-- Conditional cloud/SaaS/API goals remain conditional; technical progress does not silently authorize them.
+- G4-A's exact-time project/change-set/render chassis remains authoritative, and the later Timeline/Media/Canvas/Inspector/Motion/Creative Engine work builds on that same project, revision, history, preview and export truth rather than replacing it.
+- G9 has been entered because a real external-client use case was explicitly approved. Local standards-compatible Sanverse MCP is now production-backed and zero-setup through STDIO for Codex/Claude Code/OpenCode, with durable Creative Run continuation, raw-video orchestration, and the 69-tool General Storyboard authoring surface on branch `external-mcp-raw-video-v1`.
+- REQ-024 General Storyboard Authoring V1 is machine/client complete: typed canonical Motion Graph editing inside Storyboard state, exact revision/approval locks, approved-Storyboard → Motion structural continuity, source-composited review, real Codex acceptance, full regression/build, and clean security/media hygiene.
+- REQ-020 raw-video orchestration is an automated release candidate, not a human-certified release. The remaining tag gate requires meaningful real spoken source media with truthful timed evidence, a representative ~10-scene benchmark, legitimate owner Storyboard/timing/Motion approvals, representative parity captures, and an actual 1× watch. Automation must not manufacture those facts.
+- G1/G5-C/G6/G7/G8 still retain broader owner/non-editor/performance evidence gaps. Those product-wide human exits are separate from the current G9 engineering release candidate.
+- The default automatic transcription provider still fails closed (`TRANSCRIPTION_DISABLED`) and no local/offline recognizer is wired. A real timed sidecar/transcription is therefore required for truthful speech-timed release benchmarking unless that capability is separately implemented/authorized.
+- G10-G12 remain conditional. Current local MCP progress does not silently authorize SaaS operations, public remote API exposure, advanced vision, or data/model programs.
 
 ## Anti-drift measurement
 

@@ -4,30 +4,44 @@ Use this runbook when a new session, agent, or context window resumes the projec
 
 ## Current handoff
 
-**P1-F.1A Gate B — Media Library V2 Essentials is complete**, with evidence in
-`DOCS/evidence/2026-08-03-p1f1a-creator-editor-core/`.
+**Active branch:** `external-mcp-raw-video-v1`. General Storyboard implementation/evidence baseline:
+`acff478efd024926b2cc455cd60efdd721030966`. Verify current HEAD with Git because later documentation-only release-readiness syncs may sit above that implementation commit.
 
-The one thing to carry forward: **a user's filing of their media lives on the
-server beside the project, and is not part of the project.** Folders, sorting,
-filtering and search change nothing about the video — proved byte-identical in
-the real browser. `DOCS/decisions/ADR-MEDIA-ORGANIZATION-V1.md` holds the
-reasoning, including what was rejected and why.
+**Current completed engineering slice:** REQ-024 / General Storyboard Authoring
+Surface V1. The standard local Sanverse MCP exposes 69 tools; external coding
+agents can inspect and author the canonical Motion Graph inside revision-fenced
+Storyboard state, preserve exact owner design locks, carry the approved
+Storyboard structure into Motion Forge, reconnect from durable Creative Runs,
+and review exact source-composited KVS pixels in chat. Deterministic STDIO and
+real Codex `0.144.1` acceptance are green. Evidence:
+`DOCS/evidence/2026-09-01-general-storyboard-authoring-v1/`.
 
-Media-to-Timeline drag is built and tested but switched off
-(`MEDIA_DRAG_ENABLED = false` in
-`apps/web/src/features/media/media-drag-contract.ts`). Gate C flips that one
-boolean, adds a visible affordance, and makes Timeline lanes accept
-`application/vnd.sanverse.media-drag+json`.
+**Machine-verifiable gate:** green. The authoritative Windows single-fork root
+test command exits 0, the all-workspace production build exits 0, the named
+Storyboard authoring audit passes, and dependency/secret/media hygiene is clean.
+The working branch was pushed with local/remote SHA parity at the commit above.
 
-Suites: 1,283 total (web 631, edit-domain 312, api 248, render-contract 65,
-intent-domain 27). All-workspace build passes.
+**Only active raw-video release blocker:** REQ-020's manual release proof. Do
+not create `sanverse-external-mcp-raw-video-v1` from broad implementation
+approval. The tag requires meaningful spoken source media with truthful timed
+source/transcript evidence, a representative target of ~10 opportunities/~10
+scenes, legitimate owner Storyboard/timing/Motion approvals, representative
+preview/export parity captures, and an actual 1× owner watch of the complete
+export.
 
-**Gate C (Creator Timeline Core) has not started. Gate D has not started.
-P1-F.2 has not started.** Two pre-existing defects are open and recorded:
-FAIL-047 and FAIL-048.
+The persisted local `check .mp4` is a real 29.49-second MP4 with audio, but its
+current attached analysis transcript is synthetic one-cue text spanning the
+whole clip. It is not evidence of the spoken words or their timing. The shipped
+`NullTranscriptionAdapter` fails closed with `TRANSCRIPTION_DISABLED`; no
+local/offline recognizer is wired. Therefore a truthful sidecar/transcription
+or another meaningful spoken source is required before the ten-scene manual
+benchmark can legitimately start. Do not split the synthetic cue into invented
+"real" source moments.
 
-Read in this order when resuming: `DOCS/HANDOFF.md`, `DOCS/CURRENT_STATE.md`,
-then the Gate B evidence above.
+When resuming this branch, read `START_HERE.md`, `DOCS/CURRENT_STATE.md`, this
+runbook, `DOCS/REQUIREMENTS.md` REQ-020/023/024, `DOCS/DECISIONS.md` DEC-021/022,
+and `DOCS/plans/SANVERSE_EXTERNAL_MCP_RAW_VIDEO_V1.md`. Older P1 handoffs below
+are historical context, not the current branch gate.
 
 ### Previous handoff
 ## Fast resume

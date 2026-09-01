@@ -1,5 +1,13 @@
 # Project Log
 
+## 2026-09-01 — Post-RC resume truth and raw-video release-readiness audit
+
+- Reconciled the mandatory resume docs with the actual `external-mcp-raw-video-v1` branch state after General Storyboard Authoring V1. `START_HERE.md` and `HANDOVER_RUNBOOK.md` had still named old P1-F milestones as the current gate, and `GOALS.md` still described G9 External MCP as hypothetical even though the local standards-compatible MCP branch is implemented.
+- Updated the resume path to the real 69-tool General Storyboard release candidate at `acff478efd024926b2cc455cd60efdd721030966`, while preserving older P1 milestones as historical/product-wide context rather than deleting them.
+- Audited whether REQ-020's remaining meaningful spoken-video/~10-scene benchmark could truthfully continue from currently available local media. `check .mp4` is a real ~29.49-second 1920×1080/30fps source with audio, but the persisted analysis transcript is synthetic one-cue text spanning the whole clip. It does not prove what was actually spoken or when.
+- Confirmed the shipped automatic transcription boundary fails closed through `NullTranscriptionAdapter` with `TRANSCRIPTION_DISABLED`; no production local/offline recognizer is wired. Therefore no ten-scene "real spoken source" proof is manufactured from synthetic timing.
+- Result: all currently available autonomous engineering is complete. The immutable `sanverse-external-mcp-raw-video-v1` tag remains correctly withheld until a meaningful spoken source plus truthful timed sidecar/transcription is available and the owner actually performs the Storyboard/timing/Motion approvals and 1× final watch. Evidence: `DOCS/evidence/2026-09-01-raw-video-release-readiness/STATUS.md`.
+
 ## 2026-09-01 — General Storyboard Authoring Surface V1 completed
 
 - Expanded the canonical Motion Graph/Storyboard authority rather than adding special-case MCP template setters: typed static node changes, replace-node/subtree, semantic-part authoring, bounded atomic multi-KVS graph/design transactions, style/default-content QA, typed inspection/schema, presentation/KVS controls, lock/reopen and persistent revision fencing.
