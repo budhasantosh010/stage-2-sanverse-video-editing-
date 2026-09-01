@@ -3,6 +3,7 @@ import type { CSSProperties, PropsWithChildren, ReactNode } from 'react'
 import type { MotionComponentModuleV1, MotionCompositionV1, MotionRenderContextV1 } from '@sanverse/motion-contract'
 import type { MotionGraphBackedComponentModuleV1, MotionGraphOperationV1, MotionGraphPatchV1, MotionSceneV1, ResolvedMotionNodeV1, ResolvedMotionSceneV1 } from '@sanverse/motion-graph'
 import { applyMotionGraphPatches, applyMotionOperations, evaluateScene } from '@sanverse/motion-graph'
+import { MotionExpertNodeSurface } from './expert-surface.tsx'
 
 export interface MotionCompositionFrameProps extends PropsWithChildren {
   readonly composition: MotionCompositionV1
@@ -44,9 +45,10 @@ export interface MotionComponentHostProps<Props, Style> {
 
 export function MotionComponentHost<Props, Style>({ module, props, style, context, graphPatches = [], graphOperations = [], sceneOverride, selectedGraphNodeId = null, selectedGraphNodeIds = selectedGraphNodeId ? [selectedGraphNodeId] : [] }: MotionComponentHostProps<Props, Style>) {
   const Component = module.Component
-  const resolvedScene = isGraphBackedModule(module)
+  const baselineScene = isGraphBackedModule(module) ? module.createScene(props, style, context) : null
+  const resolvedScene = baselineScene
     ? (() => {
-        const sourceScene = sceneOverride ?? module.createScene(props, style, context)
+        const sourceScene = sceneOverride ?? baselineScene
         if (sourceScene.componentId !== module.definition.id || sourceScene.componentVersion !== module.definition.version) throw new RangeError('Motion scene override does not match the selected component module/version.')
         const patchedScene = applyMotionGraphPatches(sourceScene, graphPatches)
         const operated = applyMotionOperations(patchedScene, graphOperations, { durationTicks: context.durationTicks })
@@ -58,7 +60,7 @@ export function MotionComponentHost<Props, Style>({ module, props, style, contex
   return (
     <div data-motion-component-id={module.definition.id} data-motion-component-version={module.definition.version} data-motion-graph-backed={resolvedScene ? 'true' : 'false'} style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
       {resolvedScene
-        ? <MotionResolvedSceneContext.Provider value={{ scene: resolvedScene, selectedNodeId: selectedGraphNodeId, selectedNodeIds: Object.freeze([...selectedGraphNodeIds]) }}>{component}</MotionResolvedSceneContext.Provider>
+        ? <MotionResolvedSceneContext.Provider value={{ scene: resolvedScene, selectedNodeId: selectedGraphNodeId, selectedNodeIds: Object.freeze([...selectedGraphNodeIds]) }}>{component}{baselineScene ? <MotionGraphSupplementSurface scene={resolvedScene} baselineScene={baselineScene} context={context} /> : null}</MotionResolvedSceneContext.Provider>
         : component}
     </div>
   )
@@ -173,6 +175,78 @@ export const mergeMotionGraphNodeDecorationStyle = (base: CSSProperties, node: R
     maskSize: maskImage ? '100% 100%' : undefined,
     maskMode: maskImage ? 'luminance' : undefined,
   }
+}
+
+export interface MotionGraphSupplementSurfaceProps {
+  readonly scene: ResolvedMotionSceneV1
+  readonly baselineScene: MotionSceneV1
+  readonly context: MotionRenderContextV1
+}
+
+const supplementImageSource = (source: string): string => {
+  if (source.startsWith('/') || source.startsWith('blob:') || source.startsWith('data:image/')) return source
+  throw new RangeError(`Motion image source ${source} is not renderable by the local native graph surface.`)
+}
+
+const circlePath = (value: string): Readonly<{ cx: number; cy: number; radius: number }> | null => {
+  const match = /^circle:([+-]?(?:\d+(?:\.\d+)?|\.\d+)),([+-]?(?:\d+(?:\.\d+)?|\.\d+)),([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/u.exec(value.trim())
+  if (!match) return null
+  const cx = Number(match[1]), cy = Number(match[2]), radius = Number(match[3])
+  return Number.isFinite(cx) && Number.isFinite(cy) && Number.isFinite(radius) && radius >= 0 ? Object.freeze({ cx, cy, radius }) : null
+}
+
+/**
+ * Renders canonical graph nodes authored beyond a registered component's
+ * shipped scene. The component keeps ownership of its native React pixels;
+ * this surface closes the previous hole where newly-authored graph nodes were
+ * valid canonical data but had no browser pixels at all.
+ */
+export function MotionGraphSupplementSurface({ scene, baselineScene, context }: MotionGraphSupplementSurfaceProps) {
+  const supplementMemo = new Map<string, boolean>()
+  const isAuthored = (nodeId: string): boolean => {
+    const node = scene.nodes[nodeId]
+    if (!node) return false
+    const baseline = baselineScene.nodes[nodeId]
+    return !baseline || baseline.type !== node.type
+  }
+  const hasSupplement = (nodeId: string): boolean => {
+    const cached = supplementMemo.get(nodeId)
+    if (cached !== undefined) return cached
+    const node = scene.nodes[nodeId]
+    if (!node || !node.effectiveEnabled || !node.visible) { supplementMemo.set(nodeId, false); return false }
+    const result = isAuthored(nodeId) || (node.type === 'group' && node.childIds.some(hasSupplement))
+    supplementMemo.set(nodeId, result)
+    return result
+  }
+  if (!hasSupplement(scene.rootNodeId)) return null
+
+  const renderNode = (nodeId: string): ReactNode => {
+    const node = scene.nodes[nodeId]
+    if (!node || !node.effectiveEnabled || !node.visible || !hasSupplement(nodeId)) return null
+    if (node.type === 'group') {
+      return <div key={node.id} data-motion-generic-group-id={node.id} data-motion-node-id={node.id} style={mergeMotionGraphNodeStyle({ position:'absolute', inset:0, pointerEvents:'none' }, node)}>{node.childIds.filter(hasSupplement).map(renderNode)}</div>
+    }
+    if (!isAuthored(node.id)) return null
+    if (node.type === 'shape') {
+      const radius = node.shape === 'ellipse' ? '50%' : node.shape === 'rounded-rectangle' ? node.radius : 0
+      return <div key={node.id} data-motion-generic-node-id={node.id} data-motion-node-id={node.id} data-motion-generic-node-type="shape" style={mergeMotionGraphNodeStyle({ position:'absolute', left:'50%', top:'50%', width:node.width, height:node.height, transform:'translate(-50%, -50%)', background:node.fillColor, border:node.strokeWidth > 0 && node.strokeColor !== 'transparent' ? `${node.strokeWidth}px solid ${node.strokeColor}` : 'none', borderRadius:radius, boxSizing:'border-box', pointerEvents:'none' }, node)} />
+    }
+    if (node.type === 'text') {
+      return <div key={node.id} data-motion-generic-node-id={node.id} data-motion-node-id={node.id} data-motion-generic-node-type="text" style={mergeMotionGraphNodeStyle({ position:'absolute', left:'50%', top:'50%', transform:'translate(-50%, -50%)', color:node.fillColor, fontFamily:node.fontFamily, fontSize:node.fontSize, fontWeight:node.fontWeight, textAlign:node.textAlign, whiteSpace:'pre-wrap', lineHeight:1.05, maxWidth:'100%', pointerEvents:'none' }, node)}>{node.text}</div>
+    }
+    if (node.type === 'path') {
+      const circle = circlePath(node.pathData)
+      const trim = Math.max(0, Math.min(1, node.trimProgress))
+      const pathProps = { fill:node.fillColor, stroke:node.strokeColor, strokeWidth:node.strokeWidth, pathLength:1, strokeDasharray:1, strokeDashoffset:1-trim, vectorEffect:'non-scaling-stroke' as const }
+      return <svg key={node.id} data-motion-generic-node-id={node.id} data-motion-node-id={node.id} data-motion-generic-node-type="path" viewBox={`0 0 ${context.composition.width} ${context.composition.height}`} preserveAspectRatio="none" style={mergeMotionGraphNodeStyle({ position:'absolute', inset:0, width:'100%', height:'100%', overflow:'visible', pointerEvents:'none' }, node)}>{circle ? <circle cx={circle.cx} cy={circle.cy} r={circle.radius} {...pathProps} /> : <path d={node.pathData} {...pathProps} />}</svg>
+    }
+    if (node.type === 'image') {
+      return <img key={node.id} data-motion-generic-node-id={node.id} data-motion-node-id={node.id} data-motion-generic-node-type="image" src={supplementImageSource(node.source)} alt="" style={mergeMotionGraphNodeStyle({ position:'absolute', left:'50%', top:'50%', width:node.width, height:node.height, transform:'translate(-50%, -50%)', objectFit:node.fit, opacity:node.imageOpacity, pointerEvents:'none' }, node)} />
+    }
+    return <div key={node.id} data-motion-generic-node-id={node.id} data-motion-node-id={node.id} data-motion-generic-node-type="expert" style={mergeMotionGraphNodeStyle({ position:'absolute', left:'50%', top:'50%', width:node.expert.width, height:node.expert.height, transform:'translate(-50%, -50%)', pointerEvents:'none' }, node)}><MotionExpertNodeSurface node={node} context={context} /></div>
+  }
+
+  return <div data-motion-graph-supplement-surface="true" style={{ position:'absolute', inset:0, pointerEvents:'none' }}>{renderNode(scene.rootNodeId)}</div>
 }
 
 export const useMotionGraphNodeStyle = (nodeId: string, base: CSSProperties): CSSProperties => {

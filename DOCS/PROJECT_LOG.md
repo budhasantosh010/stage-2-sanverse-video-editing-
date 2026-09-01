@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-09-01 — Canonical Motion Graph Supplemental Renderer V1 completed
+
+- Closed the renderer blocker reported from real Sanverse Storyboard work: custom canonical Motion Graph nodes could pass structural QA and sit under `root.childIds` while every review/export pixel still came only from the registered component's bespoke React/CSS surface.
+- Added REQ-026 / DEC-024 and one shared `MotionComponentHost` supplemental graph renderer instead of replacing 99 component renderers or introducing an MCP-only renderer. Registered component-native baseline pixels remain authoritative; newly authored reachable canonical shape/text/path/Expert nodes receive a deterministic pixel path from the exact evaluated scene. Authored ancestor visibility/opacity/transforms/effects/masks/blend and supplemental sibling order are preserved. Unresolved opaque image sources fail closed.
+- Wrote the production regression red first: an enabled authored ellipse under the canonical root existed in graph state but was absent from static markup. After the implementation, Motion Native Runtime passes **14/14**, including nested group presentation, disabled/unreachable omission, no baseline duplication and fail-closed image resolution.
+- Real Microsoft Edge exercised the actual source-composited `/render/creative-scene` route with registered `sanverse.floating-value-cloud` pixels plus an authored magenta ellipse, cyan rounded rectangle and custom text. All authored nodes were visible in the browser. Preview and export PNG bytes were exactly identical at the same tick, both SHA-256 `6ab09670b5645636303e0ec069073c0c41491e361c34cfce1e8aab833bf38c74`; accepted production revision remained unchanged.
+- The existing 73-tool STDIO Storyboard-authoring audit remained green after the renderer change with zero production mutation. The authoritative repository single-fork matrix also remained green, and production dependency audit reports 0 vulnerabilities across 153 production dependencies. Durable non-media evidence and the transparent failure record are under `DOCS/evidence/2026-09-01-motion-graph-renderer-v1/`.
+- Explicit V1 boundary: supplemental authored nodes composite above the bespoke component surface; this slice does not claim arbitrary interleaving inside every bespoke component DOM subtree. Broad engineering authorization was not converted into Storyboard/Creative Direction/Motion owner approval, and the REQ-020 final human raw-video release tag remains withheld.
+
 ## 2026-09-01 — Pre-Storyboard Creative Direction + Approved Style Lock V1 completed
 
 - Added the missing authority boundary between Source Understanding and opportunity/Storyboard planning. Brand Context remains evidence; a persisted/revisable `CreativeDirectionProposalV1` remains draft review state; only exact trusted-host review approval creates a content-derived `ApprovedStyleLockV1`.

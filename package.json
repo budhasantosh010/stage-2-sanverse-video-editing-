@@ -31,7 +31,8 @@
     "sanverse:mcp:audit-raw-video": "vite-node scripts/audit-external-mcp-raw-video.ts",
     "sanverse:mcp:audit-creative-parity": "vite-node scripts/audit-creative-scene-parity.ts",
     "sanverse:mcp:audit-continuation": "vite-node scripts/audit-mcp-continuation.ts",
-    "sanverse:mcp:audit-storyboard-authoring": "vite-node scripts/audit-storyboard-authoring-stdio.ts"
+    "sanverse:mcp:audit-storyboard-authoring": "vite-node scripts/audit-storyboard-authoring-stdio.ts",
+    "sanverse:mcp:audit-graph-renderer": "vite-node scripts/audit-motion-graph-supplement-renderer.ts"
   },
   "devDependencies": {
     "jsonc-parser": "^3.3.1"

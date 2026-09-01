@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "sanverse.motion-graph-supplement-renderer-audit/v1",
+  "projectId": "project_a9ee18d5df7fc4ce36b0797fa87be5ad",
+  "productionRevision": 1,
+  "artifactId": "creativeart_28a49d5f7e5221a44c5bf0c3b64245e67a2c2b5129d47a51df79fab0e3fa3fd1",
+  "artifactSha256": "28a49d5f7e5221a44c5bf0c3b64245e67a2c2b5129d47a51df79fab0e3fa3fd1",
+  "componentId": "sanverse.floating-value-cloud",
+  "localTick": 720000,
+  "authoredNodeIds": ["audit.custom.magenta", "audit.custom.cyan", "audit.custom.text"],
+  "domProof": {
+    "supplement": true,
+    "nodes": [
+      {"id":"audit.custom.magenta","present":true,"type":"shape","background":"rgb(255, 0, 170)","width":"260px","height":"180px","visibility":"visible"},
+      {"id":"audit.custom.cyan","present":true,"type":"shape","background":"rgb(0, 221, 255)","width":"290px","height":"170px","visibility":"visible"},
+      {"id":"audit.custom.text","present":true,"type":"text","color":"rgb(255, 255, 255)","visibility":"visible"}
+    ]
+  },
+  "previewSha256": "6ab09670b5645636303e0ec069073c0c41491e361c34cfce1e8aab833bf38c74",
+  "exportSha256": "6ab09670b5645636303e0ec069073c0c41491e361c34cfce1e8aab833bf38c74",
+  "previewExportExactPixelEquality": true,
+  "sourceCompositeVisualInspection": "PASS: real source frame + registered Floating Value Cloud native visuals + authored magenta ellipse + authored cyan rounded rectangle + authored GRAPH NODES text were simultaneously visible in the captured Edge frame.",
+  "productionMutation": false
+}

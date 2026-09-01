@@ -97,6 +97,75 @@ describe('native runtime', () => {
     expect(markup).toContain('data-probe-opacity="0.42"')
   })
 
+  it('renders enabled authored graph nodes added under the canonical root instead of omitting them from the native surface', () => {
+    const scene = probeModule.createScene({}, {}, context)
+    const root = scene.nodes['probe-root']
+    expect(root?.type).toBe('group')
+    if (!root || root.type !== 'group') return
+    const authored: MotionShapeNodeV1 = Object.freeze({
+      ...nodeBase('authored-shape', 'Authored Shape', 'probe-root'),
+      type: 'shape',
+      shape: 'ellipse',
+      width: constant(280),
+      height: constant(140),
+      fillColor: constant('#ff0044'),
+      strokeColor: constant('#ffffff'),
+      strokeWidth: constant(6),
+      radius: constant(70),
+      transform: Object.freeze({ ...nodeBase('tmp','tmp',null).transform, positionX: constant(320), positionY: constant(-120) }),
+    })
+    const override = createMotionScene({
+      ...scene,
+      nodes: Object.freeze({
+        ...scene.nodes,
+        'probe-root': Object.freeze({ ...root, childIds: Object.freeze([...root.childIds, authored.id]) }),
+        [authored.id]: authored,
+      }),
+    })
+    const markup = renderToStaticMarkup(<MotionComponentHost module={probeModule} props={{}} style={{}} context={context} sceneOverride={override} />)
+    expect(markup).toContain('data-motion-generic-node-id="authored-shape"')
+    expect(markup).toContain('background:#ff0044')
+    expect(markup).toContain('border-radius:50%')
+  })
+
+  it('renders nested authored text/path nodes through ancestor group presentation while leaving shipped nodes on the native surface', () => {
+    const scene = probeModule.createScene({}, {}, context)
+    const root = scene.nodes['probe-root']
+    expect(root?.type).toBe('group')
+    if (!root || root.type !== 'group') return
+    const groupBase = nodeBase('authored-group','Authored Group','probe-root')
+    const group = Object.freeze({ ...groupBase, type:'group' as const, childIds:Object.freeze(['authored-text','authored-path']), opacity:constant(0.5), transform:Object.freeze({ ...groupBase.transform, positionX:constant(80) }) })
+    const text = Object.freeze({ ...nodeBase('authored-text','Authored Text','authored-group'), type:'text' as const, text:constant('CUSTOM'), fillColor:constant('#00ffaa'), fontFamily:'Inter', fontSize:constant(72), fontWeight:constant(800), textAlign:'center' as const })
+    const path = Object.freeze({ ...nodeBase('authored-path','Authored Path','authored-group'), type:'path' as const, pathData:'M100 100 L500 100', fillColor:constant('transparent'), strokeColor:constant('#ffcc00'), strokeWidth:constant(8), trimProgress:constant(0.5) })
+    const disabled = Object.freeze({ ...nodeBase('disabled-authored','Disabled','probe-root'), enabled:false, type:'shape' as const, shape:'rectangle' as const, width:constant(100), height:constant(100), fillColor:constant('#ff0000'), strokeColor:constant('transparent'), strokeWidth:constant(0), radius:constant(0) })
+    const override = createMotionScene({ ...scene, nodes:Object.freeze({ ...scene.nodes, 'probe-root':Object.freeze({ ...root, childIds:Object.freeze([...root.childIds, group.id, disabled.id]) }), [group.id]:group, [text.id]:text, [path.id]:path, [disabled.id]:disabled }) })
+    const markup = renderToStaticMarkup(<MotionComponentHost module={probeModule} props={{}} style={{}} context={context} sceneOverride={override} />)
+    expect(markup).toContain('data-motion-generic-group-id="authored-group"')
+    expect(markup).toContain('translate3d(80px, 0px, 0)')
+    expect(markup).toContain('opacity:0.5')
+    expect(markup).toContain('data-motion-generic-node-id="authored-text"')
+    expect(markup).toContain('CUSTOM')
+    expect(markup).toContain('data-motion-generic-node-id="authored-path"')
+    expect(markup).toContain('stroke-dashoffset="0.5"')
+    expect(markup).not.toContain('data-motion-generic-node-id="probe-shape"')
+    expect(markup).not.toContain('data-motion-generic-node-id="disabled-authored"')
+  })
+
+  it('fails closed for an authored image source the local graph renderer cannot resolve instead of silently omitting it', () => {
+    const scene = probeModule.createScene({}, {}, context)
+    const root = scene.nodes['probe-root']
+    expect(root?.type).toBe('group')
+    if (!root || root.type !== 'group') return
+    const image = Object.freeze({ ...nodeBase('authored-image','Authored Image','probe-root'), type:'image' as const, source:'asset://unresolved-image', width:constant(320), height:constant(180), fit:'cover' as const, imageOpacity:constant(1) })
+    const override = createMotionScene({ ...scene, nodes:Object.freeze({ ...scene.nodes, 'probe-root':Object.freeze({ ...root, childIds:Object.freeze([...root.childIds, image.id]) }), [image.id]:image }) })
+    expect(() => renderToStaticMarkup(<MotionComponentHost module={probeModule} props={{}} style={{}} context={context} sceneOverride={override} />)).toThrow(/not renderable by the local native graph surface/u)
+  })
+
+  it('does not create a supplemental surface when the scene contains only the registered component baseline', () => {
+    const markup = renderToStaticMarkup(<MotionComponentHost module={probeModule} props={{}} style={{}} context={context} />)
+    expect(markup).not.toContain('data-motion-graph-supplement-surface')
+  })
+
   it('refuses a scene override from a different component identity rather than silently rendering the wrong module', () => {
     const scene = probeModule.createScene({}, {}, context)
     const mismatched = { ...scene, componentId: 'sanverse.other-component' }
