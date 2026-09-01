@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { constant, createMotionScene, nodeBase } from '@sanverse/motion-graph'
 import { createStoryboardV1, type KeyVisualStateV1, type OwnerApprovalV1 } from './contracts.ts'
 import { createStoryboardSandboxV1, applyStoryboardSandboxTransactionV1 } from './sandbox.ts'
-import { approveStoryboardSandboxV1, inspectStoryboardTransitionV1, refineStoryboardTransitionV1, reopenStoryboardSandboxV1, reviseStoryboardStateGraphV1, runStoryboardStructuralQaV1 } from './iteration.ts'
+import { applyStoryboardDesignTransactionV1, applyStoryboardGraphOperationsV1, approveStoryboardSandboxV1, inspectStoryboardTransitionV1, refineStoryboardTransitionV1, reopenStoryboardSandboxV1, reviseStoryboardStateGraphV1, runStoryboardStructuralQaV1 } from './iteration.ts'
 
 const scene = () => createMotionScene({
   componentId: 'sanverse.storyboard-iteration-proof', componentVersion: 1, rootNodeId: 'root', supportedAspectRatios: ['16:9'], semanticParts: Object.freeze([{ id: 'hero', label: 'Hero', role: 'content-group' as const, nodeIds: Object.freeze(['hero']) }]), exposures: Object.freeze([]),
@@ -39,6 +39,29 @@ describe('Batch 3 Storyboard Iteration V1', () => {
     if(!refined.ok)return
     expect(refined.value.sandbox.storyboard.states.map((item)=>item.id)).toEqual(['state:a','state:mid','state:b'])
     expect(refined.value.sandbox.storyboard.states[1]?.graphState.nodes.hero?.name).toBe('Middle Hero')
+  })
+
+  it('applies one canonical graph batch across every KVS containing a semantic node with one Storyboard/sandbox revision', () => {
+    const sandbox=createStoryboardSandboxV1('sandbox:iteration',7,storyboard())
+    const result=applyStoryboardGraphOperationsV1(sandbox,{transactionId:'tx:all-states',expectedSandboxRevision:1,targets:{mode:'all-states-containing-node',nodeId:'hero'},operations:Object.freeze([{operationId:'op:hero-name',type:'rename-node' as const,nodeId:'hero',name:'Approved Hero'}])})
+    expect(result.ok).toBe(true)
+    if(!result.ok)return
+    expect(result.value.sandbox.sandboxRevision).toBe(2)
+    expect(result.value.sandbox.storyboard.revision).toBe(2)
+    expect(result.value.sandbox.storyboard.states.map((item)=>item.graphState.nodes.hero?.name)).toEqual(['Approved Hero','Approved Hero'])
+    expect(result.value.sandbox.transactions.at(-1)?.operationTypes).toEqual(['replace-state','replace-state'])
+  })
+
+  it('combines graph and setup/state edits into one atomic design transaction', () => {
+    const sandbox=createStoryboardSandboxV1('sandbox:iteration',7,storyboard())
+    const setup={...sandbox.storyboard.setup,backgroundTreatment:'graphical' as const}
+    const result=applyStoryboardDesignTransactionV1(sandbox,{transactionId:'tx:design',expectedSandboxRevision:1,graphEdits:Object.freeze([{stateId:'state:a',operations:Object.freeze([{operationId:'op:design-name',type:'rename-node' as const,nodeId:'hero',name:'Designed Hero'}])}]),sandboxOperations:Object.freeze([{type:'set-setup' as const,setup}])})
+    expect(result.ok).toBe(true)
+    if(!result.ok)return
+    expect(result.value.sandbox.sandboxRevision).toBe(2)
+    expect(result.value.sandbox.storyboard.revision).toBe(2)
+    expect(result.value.sandbox.storyboard.states[0]?.graphState.nodes.hero?.name).toBe('Designed Hero')
+    expect(result.value.sandbox.storyboard.setup.backgroundTreatment).toBe('graphical')
   })
 
   it('runs deterministic structural QA and refuses missing media/capabilities rather than machine-approving', () => {

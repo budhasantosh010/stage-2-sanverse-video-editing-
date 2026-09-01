@@ -442,6 +442,44 @@ const reviewsFromToolResult = (result: unknown): readonly Record<string, unknown
   return Object.freeze([...unique.values()])
 }
 
+const reviewContextText = (review: Record<string, unknown>): string | null => {
+  if (!record(review.context)) return null
+  const context = review.context
+  const scope = typeof review.scope === 'string' ? review.scope : 'creative'
+  const sceneId = typeof review.sceneId === 'string' ? review.sceneId : 'unknown-scene'
+  const goal = typeof context.communicationGoal === 'string' ? context.communicationGoal : ''
+  const component = typeof context.componentId === 'string' ? `${context.componentId}@${String(context.componentVersion ?? '?')}` : 'unknown component'
+  const revisions = [Number.isSafeInteger(context.storyboardRevision) ? `Storyboard r${String(context.storyboardRevision)}` : null, Number.isSafeInteger(context.sandboxRevision) ? `sandbox r${String(context.sandboxRevision)}` : null].filter(Boolean).join(' / ')
+  const lines = [`Sanverse ${scope} review · ${sceneId}${revisions ? ` · ${revisions}` : ''}`, `Goal: ${goal}`, `Lineage: ${component}`]
+  if (Array.isArray(context.states)) {
+    for (const raw of context.states.slice(0, 12)) {
+      if (!record(raw)) continue
+      const changed = Array.isArray(raw.changedNodes) ? raw.changedNodes.filter(record).map((node) => {
+        if (Array.isArray(node.changes) && node.changes.length > 0) {
+          return node.changes.filter(record).map((change) => `${String(node.nodeId ?? '?')}.${String(change.property ?? '?')} ${String(change.from ?? '?')} → ${String(change.to ?? '?')}`).join(', ')
+        }
+        return `${String(node.nodeId ?? '?')}[${Array.isArray(node.changedProperties) ? node.changedProperties.join(',') : ''}]`
+      }).filter(Boolean) : []
+      const flags = [raw.focusChanged === true ? 'focus' : null, raw.presentationModeChanged === true ? 'presentation' : null, raw.sourceTreatmentChanged === true ? 'source-treatment' : null, raw.backgroundTreatmentChanged === true ? 'background' : null].filter(Boolean)
+      const structural = [Array.isArray(raw.addedNodeIds) && raw.addedNodeIds.length ? `+${raw.addedNodeIds.join(',')}` : null, Array.isArray(raw.removedNodeIds) && raw.removedNodeIds.length ? `-${raw.removedNodeIds.join(',')}` : null].filter(Boolean)
+      const delta = [...structural, ...changed, ...flags].join('; ') || 'no design delta from starting component'
+      lines.push(`KVS ${String(raw.semanticPurpose ?? raw.stateId ?? '?')} · local ${String(raw.localTick ?? '?')} · source ${String(raw.sourceFrameTick ?? '?')} · ${String(raw.presentationMode ?? '?')}/${String(raw.sourceTreatment ?? '?')}/${String(raw.backgroundTreatment ?? '?')} · ${delta}`)
+    }
+  }
+  if (Array.isArray(context.qaFindings)) {
+    const findings = context.qaFindings.filter(record)
+    const errors = findings.filter((finding) => finding.severity === 'error').length
+    const warnings = findings.filter((finding) => finding.severity === 'warning').length
+    lines.push(`QA: ${errors === 0 ? 'PASS' : `${errors} error(s)`}${warnings ? ` · ${warnings} warning(s)` : ''}`)
+    for (const finding of findings.slice(0, 5)) lines.push(`- ${String(finding.severity ?? 'finding').toUpperCase()} ${String(finding.code ?? '')}: ${String(finding.message ?? '')}`)
+  }
+  if (Array.isArray(context.recentTransactions) && context.recentTransactions.length > 0) {
+    const recent = context.recentTransactions.filter(record).at(-1)
+    if (recent) lines.push(`Latest design transaction: ${String(recent.transactionId ?? '?')} [${Array.isArray(recent.operationTypes) ? recent.operationTypes.join(', ') : ''}]`)
+  }
+  return lines.join('\n')
+}
+
 const v2ToolResult = async (result: unknown, session: SanverseExternalRegistrySessionV1): Promise<any> => {
   const base = modelResult(result)
   const location = resultProjectAndRun(result)
@@ -452,6 +490,8 @@ const v2ToolResult = async (result: unknown, session: SanverseExternalRegistrySe
   for (const review of reviews) {
     if (attached >= 12) break
     if (typeof review.reviewId !== 'string' || !Array.isArray(review.artifacts)) continue
+    const contextText = reviewContextText(review)
+    if (contextText) content.push(Object.freeze({ type: 'text', text: contextText }))
     for (const raw of review.artifacts) {
       if (attached >= 12) break
       if (!record(raw) || typeof raw.artifactId !== 'string' || typeof raw.mimeType !== 'string' || !raw.mimeType.startsWith('image/') || typeof raw.sha256 !== 'string') continue

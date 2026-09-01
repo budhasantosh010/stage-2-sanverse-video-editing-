@@ -1,6 +1,6 @@
 {
   "schemaVersion": "sanverse.mcp-continuation-audit/v1",
-  "generatedAt": "2026-08-31T20:40:06.773Z",
+  "generatedAt": "2026-09-01T12:30:36.936Z",
   "projectId": "project_21c01709e413d034d4cec25dcb4b1ca4",
   "runId": "run_00n2km2k",
   "reviewId": "review_000cuypa",
@@ -10,7 +10,7 @@
   "sameReviewEvidenceIdentity": true,
   "productionMutationRequested": false,
   "first": {
-    "connectMs": 3243,
+    "connectMs": 3675,
     "snapshot": {
       "stage": "animatic-review",
       "reviewId": "review_000cuypa",
@@ -24,12 +24,12 @@
         "animatic-payoff.png:0f919687ec4cc34670b2c0e7c0dfe85748582612a9b1d953662fad9fcb3f8cb6"
       ],
       "chatImageCount": 3,
-      "toolCount": 62
+      "toolCount": 69
     },
     "stderrHadHandshakeTimeout": false
   },
   "second": {
-    "connectMs": 3667,
+    "connectMs": 3613,
     "snapshot": {
       "stage": "animatic-review",
       "reviewId": "review_000cuypa",
@@ -43,7 +43,7 @@
         "animatic-payoff.png:0f919687ec4cc34670b2c0e7c0dfe85748582612a9b1d953662fad9fcb3f8cb6"
       ],
       "chatImageCount": 3,
-      "toolCount": 62
+      "toolCount": 69
     },
     "stderrHadHandshakeTimeout": false
   },

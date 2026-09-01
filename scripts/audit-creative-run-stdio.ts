@@ -62,7 +62,7 @@ let firstPrepareImageCount = 0
 let approvalImageCount = 0
 try {
   const tools = await first.client.listTools()
-  if (tools.tools.length !== 62) throw new Error(`Expected 62 Sanverse tools, received ${tools.tools.length}.`)
+  if (tools.tools.length !== 69) throw new Error(`Expected 69 Sanverse tools, received ${tools.tools.length}.`)
   valueOf(await first.client.callTool({ name: 'production.select_project', arguments: { projectId: PROJECT_ID } }))
   const created = valueOf(await first.client.callTool({ name: 'creative.create_run', arguments: { transactionId: `${auditSuffix}_create_run` } }))
   runId = String(created.runId ?? '')
@@ -123,7 +123,7 @@ const report = Object.freeze({
   generatedAt: new Date().toISOString(),
   projectId: PROJECT_ID,
   runId,
-  toolCount: 62,
+  toolCount: 69,
   firstSession: Object.freeze({ storyboardReviewId, chatImageCount: firstPrepareImageCount, ownerConfirmationRounds: first.confirmations.length, nextReviewId: animaticReviewId, nextReviewChatImageCount: approvalImageCount }),
   reconnectSession: Object.freeze({ resumedStage, reviewId: animaticReviewId, chatImageCount: reconnectImageCount }),
   security: Object.freeze({ ownerDecisionViaMcpElicitation: true, ordinaryJsonCannotMintHostDecision: true }),

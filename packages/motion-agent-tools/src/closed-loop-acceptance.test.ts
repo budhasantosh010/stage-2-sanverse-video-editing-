@@ -21,6 +21,7 @@ describe('Closed-Loop V1 acceptance matrix',()=>{
     expectOk(await registry.invoke('create_storyboard_sandbox',{sandboxId:'sandbox:1',storyboard:storyboard()}))
     const ctx={sandboxId:'sandbox:1'} as const
     expectOk(await registry.invoke('revise_storyboard',{transactionId:'tx:storyboard:1',expectedSandboxRevision:1,stateId:'state:b',operations:[{operationId:'op:state-b-x',type:'set-property',target:{nodeId:'hero',property:'transform.positionX'},value:constant(.1)}]},ctx))
+    expectOk(await registry.invoke('revise_storyboard',{transactionId:'tx:storyboard:baseline',expectedSandboxRevision:2,stateId:'state:a',operations:[{operationId:'op:approved-structure',type:'rename-node',nodeId:'hero',name:'Approved Hero Structure'}]},ctx))
     expectOk(await registry.invoke('validate_storyboard',{availableCapabilities:[],requiredRatio:'16:9'},ctx))
     const storyboardReview=await registry.invoke('request_owner_review',{stage:'storyboard'},ctx);expectOk(storyboardReview);expect(engine.getState().storyboardSandbox?.storyboard.status).toBe('draft')
     expect(await registry.invoke('record_owner_approval',{approval:approval('storyboard','storyboard:closed-loop',999,'approval:forged')},ctx)).toMatchObject({ok:false,refusal:{code:'APPROVAL_REVISION_MISMATCH'}})
@@ -35,6 +36,7 @@ describe('Closed-Loop V1 acceptance matrix',()=>{
 
     expectOk(await registry.invoke('build_motion_plan',{id:'motion-plan:1'},ctx))
     expectOk(await registry.invoke('revise_motion',{action:'build',id:'motion-draft:1'},ctx))
+    expect(engine.getState().motionDraft?.scene.nodes.hero?.name).toBe('Approved Hero Structure')
     expectOk(await registry.invoke('validate_motion',{durationTicks:1_440_000,ticksPerSecond:1_440_000,composition:{width:1920,height:1080,fpsNumerator:30,fpsDenominator:1},sampleTicks:[0,360_000,720_000,1_080_000,1_440_000],expectedSemanticNodeIds:['root','hero'],requiredCapabilities:[],availableCapabilities:[]},ctx))
     const motionRevision=engine.getState().motionDraft!.revision
     expectOk(await registry.invoke('render_review',{stage:'motion',subjectId:'motion-draft:1',subjectRevision:motionRevision,startTick:0,endTick:1_440_000,criticalTicks:[0,720_000,1_440_000]},ctx))

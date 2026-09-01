@@ -7,13 +7,16 @@ import {
 import type { EditProject } from '@sanverse/edit-domain'
 import { PROJECT_TIMESCALE } from '@sanverse/edit-domain/time'
 import type { MotionComponentModuleV1, MotionRenderContextV1 } from '@sanverse/motion-contract'
-import type { MotionGraphBackedComponentModuleV1, MotionSceneV1 } from '@sanverse/motion-graph'
+import { applyMotionOperations, constant, type MotionGraphBackedComponentModuleV1, type MotionGraphOperationV1, type MotionSceneV1 } from '@sanverse/motion-graph'
 import { MOTION_COMPONENT_MODULES } from '@sanverse/motion-library'
 import {
   createStoryboardV1,
   validateOwnerApprovalV1,
   type OwnerApprovalScopeV1,
   type OwnerApprovalV1,
+  type StoryboardSandboxOperationV1,
+  type StoryboardStateTargetV1,
+  type StoryboardStyleConstraintV1,
 } from '@sanverse/motion-storyboard'
 import { resolveCreativeProductionSourceV16, type CreativeProductionSourceContextV16 } from './production-adapter.ts'
 import type { MotionOpportunityMapV1, PlannedMotionOpportunityV1 } from './opportunity-planner.ts'
@@ -33,6 +36,12 @@ export interface GenericCreativeSceneCandidateV1 {
   readonly renderContext: MotionRenderContextV1
   readonly selectedNodeId: string
   readonly semanticNodeIds: readonly string[]
+  readonly authoringMetadata: Readonly<{
+    schemaVersion: 'sanverse.creative-scene-authoring-metadata/v1'
+    sourceBoundText: string
+    defaultContentFingerprints: readonly string[]
+    styleConstraint: StoryboardStyleConstraintV1
+  }>
 }
 
 export interface CreativeSceneWorkflowV1 {
@@ -45,6 +54,10 @@ export interface CreativeSceneWorkflowV1 {
   readonly initialize: () => Readonly<{ ok: boolean; message: string }>
   readonly reviseStoryboardOpacity: (opacity: number, expectedSandboxRevision: number) => Readonly<{ ok: boolean; message: string }>
   readonly reviseStoryboardContent: (input: Readonly<{ text?: string; fontSize?: number; expectedSandboxRevision: number }>) => Readonly<{ ok: boolean; message: string }>
+  readonly inspectStoryboard: () => Readonly<{ ok: boolean; message: string; value?: unknown }>
+  readonly applyStoryboardGraphOperations: (input: Readonly<{ transactionId: string; expectedSandboxRevision: number; targets: StoryboardStateTargetV1; operations: readonly MotionGraphOperationV1[] }>) => Readonly<{ ok: boolean; message: string; value?: unknown }>
+  readonly applyStoryboardDesign: (input: Readonly<{ transactionId: string; expectedSandboxRevision: number; graphEdits?: readonly Readonly<{ stateId: string; operations: readonly MotionGraphOperationV1[] }>[]; sandboxOperations?: readonly StoryboardSandboxOperationV1[] }>) => Readonly<{ ok: boolean; message: string; value?: unknown }>
+  readonly reopenStoryboard: (expectedSandboxRevision: number) => Readonly<{ ok: boolean; message: string; value?: unknown }>
   readonly advanceAfterStoryboardApproval: () => Readonly<{ ok: boolean; message: string }>
   readonly advanceAfterAnimaticApproval: () => Readonly<{ ok: boolean; message: string }>
   readonly prepareMotionReview: () => Promise<Readonly<{ ok: boolean; message: string }>>
@@ -141,25 +154,64 @@ const isGraphBacked = (module: MotionComponentModuleV1<unknown, unknown>): modul
   typeof (module as Partial<MotionGraphBackedComponentModuleV1<unknown, unknown>>).createScene === 'function'
 
 const clampText = (value: string, max: number): string => value.trim().slice(0, max)
-const adaptProps = (module: MotionComponentModuleV1<unknown, unknown>, text: string): unknown => {
-  if (!record(module.defaultProps)) return module.defaultProps
+const CONTENT_PROP_KEYS = new Set(['text','headline','title','label','eyebrow','value','subtitle','subhead','description'])
+const defaultContentFingerprints = (value: unknown): readonly string[] => {
+  if (!record(value)) return Object.freeze([])
+  return Object.freeze([...new Set(Object.entries(value).filter(([key, entry]) => CONTENT_PROP_KEYS.has(key) && typeof entry === 'string').map(([, entry]) => String(entry).trim()).filter((entry) => entry.length >= 2))])
+}
+type AdaptPropsResultV1 = Readonly<{ ok: true; value: unknown; defaultFingerprints: readonly string[]; sourceBoundViaProps: boolean }> | Readonly<{ ok: false; message: string }>
+const adaptProps = (module: MotionComponentModuleV1<unknown, unknown>, text: string): AdaptPropsResultV1 => {
+  if (!record(module.defaultProps)) return Object.freeze({ ok: false as const, message: `Component ${module.definition.id} has no object-shaped authorable props; refusing silent default-content fallback.` })
   const candidate: Record<string, unknown> = { ...module.defaultProps }
   const short = clampText(text, 48)
   const medium = clampText(text, 90)
-  for (const key of ['text','headline','title','label','eyebrow','value']) if (typeof candidate[key] === 'string') candidate[key] = key === 'value' ? short : medium
-  for (const key of ['subtitle','subhead','description']) if (typeof candidate[key] === 'string') candidate[key] = clampText(text, 120)
-  const validated = module.validateProps(candidate)
-  return validated.ok ? validated.value : module.defaultProps
+  let bound = false
+  for (const key of ['text','headline','title','label','eyebrow','value']) if (typeof candidate[key] === 'string') { candidate[key] = key === 'value' ? short : medium; bound = true }
+  for (const key of ['subtitle','subhead','description']) if (typeof candidate[key] === 'string') { candidate[key] = clampText(text, 120); bound = true }
+  if (bound) {
+    const validated = module.validateProps(candidate)
+    if (validated.ok) return Object.freeze({ ok: true as const, value: validated.value, defaultFingerprints: defaultContentFingerprints(module.defaultProps), sourceBoundViaProps: true })
+    // The default instance may be used only as a structural template. The caller
+    // must immediately bind source content through the canonical Motion Graph
+    // before this candidate can escape construction.
+    const defaults = module.validateProps(module.defaultProps)
+    if (!defaults.ok) return Object.freeze({ ok: false as const, message: `Component ${module.definition.id} rejected source-bound props and has no valid structural default template.` })
+    return Object.freeze({ ok: true as const, value: defaults.value, defaultFingerprints: defaultContentFingerprints(module.defaultProps), sourceBoundViaProps: false })
+  }
+  const defaults = module.validateProps(module.defaultProps)
+  if (!defaults.ok) return Object.freeze({ ok: false as const, message: `Component ${module.definition.id} default props are invalid, so it cannot be safely materialized for canonical graph binding.` })
+  return Object.freeze({ ok: true as const, value: defaults.value, defaultFingerprints: defaultContentFingerprints(module.defaultProps), sourceBoundViaProps: false })
 }
 
 const selectedNodes = (scene: MotionSceneV1): readonly string[] => {
   const semantic = scene.semanticParts.flatMap((part) => part.nodeIds).filter((id) => Boolean(scene.nodes[id]))
   return Object.freeze(semantic.length > 0 ? [...new Set(semantic)] : [scene.rootNodeId])
 }
+const storyboardStyleConstraint = (map: MotionOpportunityMapV1): StoryboardStyleConstraintV1 => {
+  const palette = map.styleRecommendation.visual.paletteRoles
+  const typeFamily = map.styleRecommendation.visual.typeFamily
+  return Object.freeze({
+    schemaVersion: 'sanverse.storyboard-style-constraint/v1' as const,
+    styleLockId: map.styleLockId,
+    hard: Object.freeze({ allowedColors: Object.freeze([...new Set([palette.background, palette.surface, palette.text, palette.accent])]), ...(typeFamily ? { allowedFontFamilies: Object.freeze([typeFamily]) } : {}) }),
+    soft: Object.freeze({ preferredPresentationModes: Object.freeze([...map.creativeLanguage.preferredPresentationModes]), maximumRadius: Math.max(map.styleRecommendation.visual.radius * 2, map.styleRecommendation.visual.radius + 8), maximumNodesPerState: 96 }),
+  })
+}
+const constantStringValue = (value: unknown): string | null => record(value) && value.kind === 'constant' && typeof value.value === 'string' ? value.value : null
+const styleConstraintForScene = (base: StoryboardStyleConstraintV1, scene: MotionSceneV1): StoryboardStyleConstraintV1 => {
+  const colors = new Set(base.hard.allowedColors ?? [])
+  const fonts = new Set(base.hard.allowedFontFamilies ?? [])
+  for (const node of Object.values(scene.nodes)) {
+    if (node.type === 'text') { fonts.add(node.fontFamily); const fill=constantStringValue(node.fillColor); if(fill)colors.add(fill) }
+    if (node.type === 'shape' || node.type === 'path') { const fill=constantStringValue(node.fillColor),stroke=constantStringValue(node.strokeColor); if(fill&&fill!=='transparent')colors.add(fill);if(stroke&&stroke!=='transparent')colors.add(stroke) }
+  }
+  return Object.freeze({ ...base, hard:Object.freeze({ allowedColors:Object.freeze([...colors]), ...(fonts.size>0?{allowedFontFamilies:Object.freeze([...fonts])}:{}) }) })
+}
 
 export const buildGenericCreativeSceneCandidateV1 = (input: Readonly<{
   project: EditProject
   planned: PlannedMotionOpportunityV1
+  styleConstraint: StoryboardStyleConstraintV1
   contentText?: string
 }>): CreateCreativeSceneBatchResultV1 extends never ? never : Readonly<{ ok: true; value: GenericCreativeSceneCandidateV1 } | { ok: false; refusal: Readonly<{ code: string; message: string }> }> => {
   const opportunity = input.planned.opportunity
@@ -182,12 +234,31 @@ export const buildGenericCreativeSceneCandidateV1 = (input: Readonly<{
     })
     const text = input.contentText?.trim() || opportunity.communicationGoal
     const props = adaptProps(module, text)
-    const propsValid = module.validateProps(props)
+    if (!props.ok) continue
     const styleValid = module.validateStyle(module.defaultStyle)
-    if (!propsValid.ok || !styleValid.ok) continue
+    if (!styleValid.ok) continue
     let scene: MotionSceneV1
-    try { scene = module.createScene(propsValid.value, styleValid.value, renderContext) }
+    try { scene = module.createScene(props.value, styleValid.value, renderContext) }
     catch { continue }
+    const unresolvedDefaults = new Set(props.defaultFingerprints.filter((fingerprint) => fingerprint !== text))
+    const textNodes = Object.values(scene.nodes).filter((node) => node.type === 'text')
+    const defaultTextNodes = textNodes.filter((node) => {
+      const value = constantStringValue(node.text)
+      return value !== null && unresolvedDefaults.has(value.trim())
+    })
+    const graphBindTargets = props.sourceBoundViaProps ? defaultTextNodes : (defaultTextNodes.length > 0 ? defaultTextNodes : textNodes.slice(0, 1))
+    if (graphBindTargets.length > 0) {
+      const bound = applyMotionOperations(scene, Object.freeze(graphBindTargets.map((node, index) => Object.freeze({
+        operationId:`source-bind:${node.id}:${index}`,
+        type:'set-property' as const,
+        target:Object.freeze({nodeId:node.id,property:'text.text' as const}),
+        value:constant(clampText(text,120)),
+      }))))
+      if (!bound.ok) continue
+      scene = bound.scene
+    } else if (!props.sourceBoundViaProps && unresolvedDefaults.size > 0) continue
+    const stillDefault = Object.values(scene.nodes).some((node) => node.type === 'text' && (() => { const value=constantStringValue(node.text); return value !== null && unresolvedDefaults.has(value.trim()) })())
+    if (stillDefault) continue
     const semanticNodeIds = selectedNodes(scene)
     const selectedNodeId = semanticNodeIds[0] ?? scene.rootNodeId
     return Object.freeze({
@@ -199,12 +270,13 @@ export const buildGenericCreativeSceneCandidateV1 = (input: Readonly<{
         componentId,
         componentVersion: module.definition.version,
         source: source.value,
-        props: propsValid.value,
+        props: props.value,
         style: styleValid.value,
         scene,
         renderContext,
         selectedNodeId,
         semanticNodeIds,
+        authoringMetadata: Object.freeze({ schemaVersion: 'sanverse.creative-scene-authoring-metadata/v1' as const, sourceBoundText: text, defaultContentFingerprints: props.defaultFingerprints.filter((fingerprint) => fingerprint !== text), styleConstraint: styleConstraintForScene(input.styleConstraint, scene) }),
       }),
     })
   }
@@ -231,6 +303,14 @@ export const createCreativeSceneWorkflowV1 = (input: Readonly<{
     }),
   })
   const engine = createClosedLoopEngineV1(Object.freeze({ id: candidate.source.projectId, revision: candidate.source.projectRevision, scene: candidate.scene }), renderer, input.restoredState)
+  const storyboardQaContext = () => Object.freeze({
+    availableCapabilities: Object.freeze([candidate.componentId, ...opportunity.requiredCapabilities]),
+    availableSourceIds: Object.freeze([candidate.source.assetId]),
+    requiredRatio: candidate.scene.supportedAspectRatios[0],
+    compositionBounds: Object.freeze({ width: candidate.renderContext.composition.width, height: candidate.renderContext.composition.height }),
+    styleConstraint: candidate.authoringMetadata.styleConstraint,
+    defaultContentFingerprints: candidate.authoringMetadata.defaultContentFingerprints,
+  })
   const workflow: CreativeSceneWorkflowV1 = {
     sceneId: candidate.id,
     planned,
@@ -289,12 +369,7 @@ export const createCreativeSceneWorkflowV1 = (input: Readonly<{
       })
       const created = engine.createStoryboardSandbox(`sandbox:${candidate.id}`, board)
       if (!created.ok) return messageOf(created, '')
-      const qa = engine.validateStoryboard({
-        availableCapabilities: Object.freeze([candidate.componentId, ...opportunity.requiredCapabilities]),
-        availableSourceIds: Object.freeze([candidate.source.assetId]),
-        requiredRatio: candidate.scene.supportedAspectRatios[0],
-        compositionBounds: Object.freeze({ width: candidate.renderContext.composition.width, height: candidate.renderContext.composition.height }),
-      })
+      const qa = engine.validateStoryboard(storyboardQaContext())
       return messageOf(qa, 'Storyboard structural QA passed; owner approval remains required for this exact revision.')
     },
     reviseStoryboardOpacity: (opacity, expectedSandboxRevision) => {
@@ -315,12 +390,7 @@ export const createCreativeSceneWorkflowV1 = (input: Readonly<{
         })]),
       }))
       if (!revised.ok) return messageOf(revised, '')
-      const qa = engine.validateStoryboard({
-        availableCapabilities: Object.freeze([candidate.componentId, ...opportunity.requiredCapabilities]),
-        availableSourceIds: Object.freeze([candidate.source.assetId]),
-        requiredRatio: candidate.scene.supportedAspectRatios[0],
-        compositionBounds: Object.freeze({ width: candidate.renderContext.composition.width, height: candidate.renderContext.composition.height }),
-      })
+      const qa = engine.validateStoryboard(storyboardQaContext())
       return messageOf(qa, `Storyboard revised to sandbox revision ${revised.value.sandboxRevision}; prior approval no longer applies.`)
     },
     reviseStoryboardContent: ({ text, fontSize, expectedSandboxRevision }) => {
@@ -338,8 +408,71 @@ export const createCreativeSceneWorkflowV1 = (input: Readonly<{
       if (hasFontSize) operations.push(Object.freeze({ operationId: `scene-font-size:${textNode.id}:r${expectedSandboxRevision}`, type: 'set-property' as const, target: Object.freeze({ nodeId: textNode.id, property: 'text.fontSize' as const }), value: Object.freeze({ kind: 'constant' as const, value: fontSize! }) }))
       const revised = engine.reviseStoryboard(Object.freeze({ transactionId: `scene-content:${candidate.id}:r${expectedSandboxRevision}`, expectedSandboxRevision, stateId: state.id, operations: Object.freeze(operations) }) as never)
       if (!revised.ok) return messageOf(revised, '')
-      const qa = engine.validateStoryboard({ availableCapabilities: Object.freeze([candidate.componentId, ...opportunity.requiredCapabilities]), availableSourceIds: Object.freeze([candidate.source.assetId]), requiredRatio: candidate.scene.supportedAspectRatios[0], compositionBounds: Object.freeze({ width: candidate.renderContext.composition.width, height: candidate.renderContext.composition.height }) })
+      const qa = engine.validateStoryboard(storyboardQaContext())
       return messageOf(qa, `Storyboard content revised to sandbox revision ${revised.value.sandboxRevision}; prior approval no longer applies.`)
+    },
+    inspectStoryboard: () => {
+      const state = engine.getState()
+      const sandbox = state.storyboardSandbox
+      if (!sandbox) return Object.freeze({ ok: false, message: 'Storyboard sandbox is not initialized.' })
+      return Object.freeze({ ok: true, message: 'Canonical Storyboard authoring state.', value: Object.freeze({
+        sceneId: candidate.id,
+        sandboxId: sandbox.id,
+        sandboxRevision: sandbox.sandboxRevision,
+        locked: sandbox.locks.storyboard,
+        styleConstraint: candidate.authoringMetadata.styleConstraint,
+        defaultContentFingerprints: candidate.authoringMetadata.defaultContentFingerprints,
+        storyboard: Object.freeze({ id: sandbox.storyboard.id, revision: sandbox.storyboard.revision, status: sandbox.storyboard.status, setup: sandbox.storyboard.setup, states: Object.freeze(sandbox.storyboard.states.map((item) => Object.freeze({ id: item.id, semanticPurpose: item.semanticPurpose, approximateTick: item.approximateTick, presentationMode: item.presentationMode, sourceTreatment: item.sourceTreatment, backgroundTreatment: item.backgroundTreatment, focusNodeIds: item.focusNodeIds, graphState: item.graphState }))) }),
+        qa: state.storyboardQa,
+      }) })
+    },
+    applyStoryboardGraphOperations: ({ transactionId, expectedSandboxRevision, targets, operations }) => {
+      const sandbox = engine.getState().storyboardSandbox
+      if (!sandbox) return Object.freeze({ ok: false, message: 'Storyboard sandbox is not initialized.' })
+      let states = sandbox.storyboard.states
+      if (targets.mode === 'state') states = states.filter((item) => targets.stateIds.includes(item.id))
+      else if (targets.mode === 'all-states-containing-node') states = states.filter((item) => Boolean(item.graphState.nodes[targets.nodeId]))
+      if (states.length === 0) return Object.freeze({ ok: false, message: 'No Storyboard states matched the requested graph target.' })
+      const revised = engine.reviseStoryboardGraphs(Object.freeze({ transactionId, expectedSandboxRevision, edits: Object.freeze(states.map((item) => Object.freeze({ stateId: item.id, operations }))) }))
+      if (!revised.ok) return messageOf(revised, '')
+      const qa = engine.validateStoryboard(storyboardQaContext())
+      const inspection = workflow.inspectStoryboard()
+      const affectedNodeIds = Object.freeze([...new Set(operations.flatMap((operation) => {
+        const raw = operation as unknown as Record<string, unknown>
+        const ids: string[] = []
+        const add = (value: unknown): void => { if (typeof value === 'string' && value.trim()) ids.push(value) }
+        add(raw.nodeId); add(raw.parentId); add(raw.rootNodeId); add(raw.duplicateId)
+        if (raw.target && typeof raw.target === 'object' && !Array.isArray(raw.target)) add((raw.target as Record<string, unknown>).nodeId)
+        if (raw.node && typeof raw.node === 'object' && !Array.isArray(raw.node)) add((raw.node as Record<string, unknown>).id)
+        if (Array.isArray(raw.nodeIds)) raw.nodeIds.forEach(add)
+        return ids
+      }))].sort())
+      return Object.freeze({ ok: true, message: `Applied ${operations.length} canonical Motion Graph operation(s) across ${states.length} Storyboard state(s); sandbox revision is ${revised.value.sandboxRevision}.`, value: Object.freeze({ sandboxRevision: revised.value.sandboxRevision, storyboardRevision: revised.value.storyboard.revision, affectedStateIds: Object.freeze(states.map((state) => state.id)), affectedNodeIds, qa: qa.ok ? qa.value : null, storyboard: inspection.ok ? inspection.value : null }) })
+    },
+    applyStoryboardDesign: ({ transactionId, expectedSandboxRevision, graphEdits, sandboxOperations }) => {
+      const revised = engine.applyStoryboardDesign(Object.freeze({ transactionId, expectedSandboxRevision, ...(graphEdits ? { graphEdits } : {}), ...(sandboxOperations ? { sandboxOperations } : {}) }))
+      if (!revised.ok) return messageOf(revised, '')
+      const qa = engine.validateStoryboard(storyboardQaContext())
+      const inspection = workflow.inspectStoryboard()
+      const affectedStateIds = Object.freeze([...new Set([...(graphEdits ?? []).map((edit) => edit.stateId), ...(sandboxOperations ?? []).flatMap((operation) => operation.type === 'add-state' ? [operation.state.id] : 'stateId' in operation ? [operation.stateId] : [])])].sort())
+      const affectedNodeIds = Object.freeze([...new Set((graphEdits ?? []).flatMap((edit) => edit.operations.flatMap((operation) => {
+        const raw = operation as unknown as Record<string, unknown>
+        const ids: string[] = []
+        const add = (value: unknown): void => { if (typeof value === 'string' && value.trim()) ids.push(value) }
+        add(raw.nodeId); add(raw.parentId); add(raw.rootNodeId); add(raw.duplicateId)
+        if (raw.target && typeof raw.target === 'object' && !Array.isArray(raw.target)) add((raw.target as Record<string, unknown>).nodeId)
+        if (raw.node && typeof raw.node === 'object' && !Array.isArray(raw.node)) add((raw.node as Record<string, unknown>).id)
+        if (Array.isArray(raw.nodeIds)) raw.nodeIds.forEach(add)
+        return ids
+      })))].sort())
+      return Object.freeze({ ok: true, message: `Atomic Storyboard design transaction committed at sandbox revision ${revised.value.sandboxRevision}; prior approval no longer applies.`, value: Object.freeze({ sandboxRevision: revised.value.sandboxRevision, storyboardRevision: revised.value.storyboard.revision, affectedStateIds, affectedNodeIds, qa: qa.ok ? qa.value : null, storyboard: inspection.ok ? inspection.value : null }) })
+    },
+    reopenStoryboard: (expectedSandboxRevision) => {
+      const reopened = engine.reopenStoryboard(expectedSandboxRevision)
+      if (!reopened.ok) return messageOf(reopened, '')
+      const qa = engine.validateStoryboard(storyboardQaContext())
+      const inspection = workflow.inspectStoryboard()
+      return Object.freeze({ ok: true, message: `Storyboard reopened for authoring at sandbox revision ${reopened.value.sandboxRevision}; all downstream approval lineage was invalidated.`, value: Object.freeze({ sandboxRevision: reopened.value.sandboxRevision, storyboardRevision: reopened.value.storyboard.revision, qa: qa.ok ? qa.value : null, storyboard: inspection.ok ? inspection.value : null }) })
     },
     advanceAfterStoryboardApproval: () => {
       const state = engine.getState()
@@ -416,11 +549,15 @@ export const createCreativeSceneBatchV1 = (input: Readonly<{
   const workflows = new Map<string, CreativeSceneWorkflowV1>()
   const pending = new Map<string, HostApprovalRequestV1>((input.restored?.pendingApprovalRequests ?? []).map((request) => [request.requestRef, request]))
   const restoredBySceneId = new Map((input.restored?.workflows ?? []).map((item) => [item.sceneId, item]))
+  const styleConstraint = storyboardStyleConstraint(input.opportunityMap)
   for (const planned of input.opportunityMap.opportunities) {
-    const deterministic = buildGenericCreativeSceneCandidateV1({ project: input.project, planned, contentText: input.transcriptTextByOpportunityId?.[planned.opportunity.id] })
+    const deterministic = buildGenericCreativeSceneCandidateV1({ project: input.project, planned, styleConstraint, contentText: input.transcriptTextByOpportunityId?.[planned.opportunity.id] })
     if (!deterministic.ok) return Object.freeze({ ok: false as const, refusal: deterministic.refusal })
     const restored = restoredBySceneId.get(deterministic.value.id)
-    const candidate = restored?.candidate ?? deterministic.value
+    const restoredCandidate = restored?.candidate
+    const candidate: GenericCreativeSceneCandidateV1 = restoredCandidate
+      ? Object.freeze({ ...restoredCandidate, authoringMetadata: restoredCandidate.authoringMetadata ?? deterministic.value.authoringMetadata })
+      : deterministic.value
     if (restored && (candidate.id !== deterministic.value.id || candidate.opportunityId !== planned.opportunity.id || candidate.source.projectId !== input.project.projectId || candidate.source.projectRevision !== input.project.revision)) return Object.freeze({ ok: false as const, refusal: Object.freeze({ code: 'CREATIVE_RUN_REHYDRATION_FAILED', message: `Persisted scene ${restored.sceneId} does not match deterministic project/opportunity identity.` }) })
     const workflow = createCreativeSceneWorkflowV1({ planned, candidate, styleLockId: input.opportunityMap.styleLockId, creativeLanguageId: input.opportunityMap.creativeLanguage.id, ...(restored ? { restoredState: restored.engineState } : {}) })
     const initialized = workflow.initialize()
@@ -482,7 +619,8 @@ export const createCreativeSceneBatchV1 = (input: Readonly<{
         if (!packet.value.qaPassed) {
           const state = workflow.state()
           const findings = scope === 'storyboard' ? state.storyboardQa?.findings : scope === 'animatic' ? state.animaticQa?.findings : state.motionQa?.findings
-          const detail = findings?.[0] ? ` ${findings[0].code}: ${findings[0].message}` : ''
+          const blocking = findings?.find((item) => 'severity' in item ? item.severity === 'error' : true) ?? findings?.[0]
+          const detail = blocking ? ` ${blocking.code}: ${blocking.message}` : ''
           return Object.freeze({ ok: false, message: `${workflow.sceneId}: ${scope} QA has not passed for the exact revision.${detail}` })
         }
         if (scope === 'motion' && !packet.value.evidence) return Object.freeze({ ok: false, message: `${workflow.sceneId}: canonical motion review evidence is required before owner review.` })

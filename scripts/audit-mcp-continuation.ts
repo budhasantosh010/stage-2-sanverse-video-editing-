@@ -50,7 +50,7 @@ type ContinuationSnapshot = Readonly<{
 
 const snapshot = async (client: Client): Promise<ContinuationSnapshot> => {
   const tools = await client.listTools()
-  if (tools.tools.length !== 62) throw new Error(`Expected 62 Sanverse tools, received ${tools.tools.length}.`)
+  if (tools.tools.length !== 69) throw new Error(`Expected 69 Sanverse tools, received ${tools.tools.length}.`)
   valueOf(await client.callTool({ name: 'production.select_project', arguments: { projectId: PROJECT_ID } }), 'select project')
   const resumed = valueOf(await client.callTool({ name: 'creative.resume_run', arguments: { runId: RUN_ID } }), 'resume run')
   const stage = String(resumed.stage ?? '')

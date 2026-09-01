@@ -34,6 +34,35 @@ export interface CreativeReviewArtifactV1 {
   readonly safeUrl?: string
 }
 
+export interface CreativeReviewContextV1 {
+  readonly sceneId: string
+  readonly communicationGoal: string
+  readonly componentId: string
+  readonly componentVersion: number
+  readonly storyboardRevision?: number
+  readonly sandboxRevision?: number
+  readonly sourceStartTick: number
+  readonly sourceEndTick: number
+  readonly states: readonly Readonly<{
+    stateId: string
+    semanticPurpose: string
+    localTick: number
+    sourceFrameTick: number
+    presentationMode: string
+    sourceTreatment: string
+    backgroundTreatment: string
+    focusChanged: boolean
+    presentationModeChanged: boolean
+    sourceTreatmentChanged: boolean
+    backgroundTreatmentChanged: boolean
+    addedNodeIds: readonly string[]
+    removedNodeIds: readonly string[]
+    changedNodes: readonly Readonly<{ nodeId: string; changedProperties: readonly string[]; changes?: readonly Readonly<{ property: string; from: string; to: string }>[] }>[]
+  }>[]
+  readonly qaFindings: readonly Readonly<{ code: string; severity: string; message: string }>[]
+  readonly recentTransactions: readonly Readonly<{ transactionId: string; operationTypes: readonly string[] }>[]
+}
+
 export interface CreativeReviewV1 {
   readonly schemaVersion: typeof CREATIVE_REVIEW_SCHEMA_V1
   readonly reviewId: string
@@ -47,6 +76,7 @@ export interface CreativeReviewV1 {
   readonly status: CreativeReviewStatusV1
   readonly revisionNote?: string
   readonly approvalRef?: string
+  readonly context?: CreativeReviewContextV1
   readonly artifacts: readonly CreativeReviewArtifactV1[]
   readonly createdAt: string
   readonly updatedAt: string
@@ -115,6 +145,10 @@ export const validateCreativeRunV1 = (value: unknown): CreativeRunValidationResu
     const review = rawReview as unknown as CreativeReviewV1
     if (review.schemaVersion !== CREATIVE_REVIEW_SCHEMA_V1 || !reviewIdPattern.test(String(review.reviewId ?? '')) || review.runId !== run.runId || !sceneIdPattern.test(String(review.sceneId ?? '')) || !scopes.has(review.scope) || !bounded(review.subjectId, 240) || !Number.isSafeInteger(review.subjectRevision) || review.subjectRevision < 1 || !/^[a-f0-9]{64}$/u.test(String(review.evidenceHash ?? '')) || !statuses.has(review.status) || !Array.isArray(review.artifacts)) return Object.freeze({ ok: false, code: 'CREATIVE_RUN_REHYDRATION_FAILED', message: 'Creative Run contains an invalid review record.' })
     if (review.approvalRef !== undefined && !/^approvalref_[a-z0-9:_-]{8,180}$/u.test(review.approvalRef)) return Object.freeze({ ok: false, code: 'CREATIVE_RUN_REHYDRATION_FAILED', message: 'Creative Run contains an invalid approval reference.' })
+    if (review.context !== undefined) {
+      if (!record(review.context) || review.context.sceneId !== review.sceneId || !bounded(review.context.communicationGoal, 1000) || !bounded(review.context.componentId, 180) || !Number.isSafeInteger(review.context.componentVersion) || review.context.componentVersion < 1 || !Number.isSafeInteger(review.context.sourceStartTick) || !Number.isSafeInteger(review.context.sourceEndTick) || review.context.sourceStartTick < 0 || review.context.sourceEndTick < review.context.sourceStartTick || !Array.isArray(review.context.states) || !Array.isArray(review.context.qaFindings) || !Array.isArray(review.context.recentTransactions)) return Object.freeze({ ok: false, code: 'CREATIVE_RUN_REHYDRATION_FAILED', message: 'Creative Run contains invalid review context.' })
+      if (new TextEncoder().encode(JSON.stringify(review.context)).byteLength > 256 * 1024) return Object.freeze({ ok: false, code: 'CREATIVE_RUN_REHYDRATION_FAILED', message: 'Creative review context exceeds its bounded persistence contract.' })
+    }
     for (const rawArtifact of review.artifacts) {
       if (!record(rawArtifact)) return Object.freeze({ ok: false, code: 'CREATIVE_RUN_REHYDRATION_FAILED', message: 'Creative Run contains invalid review artifact metadata.' })
       const artifact = rawArtifact as unknown as CreativeReviewArtifactV1

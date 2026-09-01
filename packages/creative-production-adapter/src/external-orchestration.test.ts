@@ -41,7 +41,7 @@ describe('external raw-video orchestration session — batch 1', () => {
     })
     expect(session.activeProjectId()).toBeNull()
     const listed = session.registry.list().map((tool) => tool.id)
-    expect(listed).toHaveLength(62)
+    expect(listed).toHaveLength(69)
     expect(listed).toEqual(expect.arrayContaining([
       'production.list_projects',
       'production.select_project',
@@ -56,6 +56,13 @@ describe('external raw-video orchestration session — batch 1', () => {
       'creative.get_run',
       'creative.resume_run',
       'creative.cancel_run',
+      'creative.get_storyboard_authoring_schema',
+      'creative.inspect_storyboard',
+      'creative.apply_storyboard_graph_operations',
+      'creative.apply_storyboard_design',
+      'creative.manage_storyboard_kvs',
+      'creative.set_storyboard_presentation',
+      'creative.reopen_storyboard',
       'creative.prepare_review',
       'creative.get_review',
       'creative.decide_review',

@@ -78,6 +78,7 @@ export const buildCreativeSceneArtifactV1 = (workflow: CreativeSceneWorkflowV1):
 export const buildCreativeSceneReviewArtifactV1 = (
   workflow: CreativeSceneWorkflowV1,
   scope: 'storyboard' | 'animatic' | 'motion',
+  options: Readonly<{ storyboardStateId?: string }> = Object.freeze({}),
 ): CreativeArtifactResultV1<CreativeSceneArtifactV1> => {
   const state = workflow.state()
   const candidate = workflow.candidate
@@ -90,9 +91,13 @@ export const buildCreativeSceneReviewArtifactV1 = (
   if (!qaPassed) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'REVIEW_QA_REQUIRED', message: `Current ${scope} structural QA must pass before review evidence can be rendered.` }) })
   const target = scope === 'storyboard' ? storyboard : scope === 'animatic' ? animatic : motion
   if (!target) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'REVIEW_SUBJECT_REQUIRED', message: `Current ${scope} state is unavailable for review rendering.` }) })
+  const storyboardState = scope === 'storyboard'
+    ? (options.storyboardStateId ? storyboard?.states.find((item) => item.id === options.storyboardStateId) ?? null : storyboard?.states[0] ?? null)
+    : null
+  if (scope === 'storyboard' && !storyboardState) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'REVIEW_SUBJECT_REQUIRED', message: 'The requested Storyboard KVS is unavailable for review rendering.' }) })
   const reviewScene = scope === 'motion'
     ? motion!.scene
-    : storyboard?.states[0]?.graphState ?? candidate.scene
+    : storyboardState?.graphState ?? storyboard?.states[0]?.graphState ?? candidate.scene
   const graph = validateMotionScene(reviewScene)
   if (!graph.ok) return Object.freeze({ ok: false, refusal: Object.freeze({ code: 'CREATIVE_ARTIFACT_INVALID', message: 'The current review scene no longer validates against the canonical Motion Graph contract.' }) })
   const reviewRef = `review-only://${candidate.id}/${scope}/${target.id}/r${target.revision}`
@@ -115,11 +120,11 @@ export const buildCreativeSceneReviewArtifactV1 = (
       fpsDenominator: candidate.renderContext.composition.fpsDenominator,
     }),
     presentation: Object.freeze({
-      mode: planned.opportunity.recommendedPresentationMode,
-      sourceTreatment: planned.opportunity.recommendedSourceTreatment,
-      backgroundTreatment: planned.opportunity.recommendedBackgroundTreatment,
-      preserveSourceAudio: planned.opportunity.preserveSourceAudio,
-      preserveSourceVideo: planned.opportunity.preserveSourceVideo,
+      mode: storyboardState?.presentationMode ?? planned.opportunity.recommendedPresentationMode,
+      sourceTreatment: storyboardState?.sourceTreatment ?? planned.opportunity.recommendedSourceTreatment,
+      backgroundTreatment: storyboardState?.backgroundTreatment ?? planned.opportunity.recommendedBackgroundTreatment,
+      preserveSourceAudio: storyboard?.setup.preserveSourceAudio ?? planned.opportunity.preserveSourceAudio,
+      preserveSourceVideo: storyboard?.setup.preserveSourceVideo ?? planned.opportunity.preserveSourceVideo,
     }),
     component: Object.freeze({ props: candidate.props, style: candidate.style }),
     motion: Object.freeze({

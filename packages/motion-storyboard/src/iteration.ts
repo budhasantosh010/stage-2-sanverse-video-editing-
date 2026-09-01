@@ -8,6 +8,7 @@ import {
 } from '@sanverse/motion-contract'
 import {
   applyMotionOperations,
+  validateMotionAuthoringBudgetV1,
   validateMotionScene,
   type MotionGraphOperationV1,
   type MotionSceneV1,
@@ -16,6 +17,7 @@ import { validateOwnerApprovalV1, type KeyVisualStateV1, type OwnerApprovalV1, t
 import {
   applyStoryboardSandboxTransactionV1,
   type AppliedStoryboardSandboxTransactionV1,
+  type StoryboardSandboxOperationV1,
   type StoryboardSandboxV1,
 } from './sandbox.ts'
 
@@ -36,6 +38,36 @@ export interface ReviseStoryboardStateGraphInputV1 {
   readonly expectedSandboxRevision: number
   readonly stateId: string
   readonly operations: readonly MotionGraphOperationV1[]
+}
+
+export interface StoryboardGraphStateEditV1 {
+  readonly stateId: string
+  readonly operations: readonly MotionGraphOperationV1[]
+}
+
+export interface ReviseStoryboardGraphsInputV1 {
+  readonly transactionId: string
+  readonly expectedSandboxRevision: number
+  readonly edits: readonly StoryboardGraphStateEditV1[]
+}
+
+export type StoryboardStateTargetV1 =
+  | Readonly<{ mode: 'state'; stateIds: readonly string[] }>
+  | Readonly<{ mode: 'all-states' }>
+  | Readonly<{ mode: 'all-states-containing-node'; nodeId: string }>
+
+export interface ApplyStoryboardGraphOperationsInputV1 {
+  readonly transactionId: string
+  readonly expectedSandboxRevision: number
+  readonly targets: StoryboardStateTargetV1
+  readonly operations: readonly MotionGraphOperationV1[]
+}
+
+export interface ApplyStoryboardDesignTransactionInputV1 {
+  readonly transactionId: string
+  readonly expectedSandboxRevision: number
+  readonly graphEdits?: readonly StoryboardGraphStateEditV1[]
+  readonly sandboxOperations?: readonly StoryboardSandboxOperationV1[]
 }
 
 export interface RefineStoryboardTransitionInputV1 {
@@ -63,6 +95,9 @@ export type StoryboardQaCodeV1 =
   | 'INCONSISTENT_FOCUS_IDS'
   | 'BAD_GRAPH_SNAPSHOT'
   | 'INVALID_RATIO'
+  | 'STYLE_HARD_CONSTRAINT'
+  | 'STYLE_SOFT_DEVIATION'
+  | 'DEFAULT_CONTENT_UNBOUND'
 
 export interface StoryboardQaFindingV1 {
   readonly code: StoryboardQaCodeV1
@@ -72,12 +107,29 @@ export interface StoryboardQaFindingV1 {
   readonly nodeIds: readonly string[]
 }
 
+export interface StoryboardStyleConstraintV1 {
+  readonly schemaVersion: 'sanverse.storyboard-style-constraint/v1'
+  readonly styleLockId: string
+  readonly hard: Readonly<{
+    allowedColors?: readonly string[]
+    allowedFontFamilies?: readonly string[]
+  }>
+  readonly soft: Readonly<{
+    preferredPresentationModes?: readonly string[]
+    maximumRadius?: number
+    maximumNodesPerState?: number
+  }>
+}
+
 export interface StoryboardStructuralQaContextV1 {
   readonly availableCapabilities: readonly string[]
   readonly availableSourceIds?: readonly string[]
   readonly availableAssetRefs?: readonly string[]
   readonly requiredRatio?: MotionAspectRatio
   readonly compositionBounds?: Readonly<{ width: number; height: number }>
+  readonly styleConstraint?: StoryboardStyleConstraintV1
+  /** Component/default strings which must not survive into an authored Storyboard. */
+  readonly defaultContentFingerprints?: readonly string[]
 }
 
 export interface StoryboardStructuralQaReportV1 {
@@ -91,6 +143,12 @@ const constantNumber = (value: unknown): number | null => {
   const record = value as Record<string, unknown>
   return record.kind === 'constant' && typeof record.value === 'number' && Number.isFinite(record.value) ? record.value : null
 }
+const constantString = (value: unknown): string | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const record = value as Record<string, unknown>
+  return record.kind === 'constant' && typeof record.value === 'string' ? record.value : null
+}
+const normalizedStyleString = (value: string): string => value.trim().toLowerCase()
 
 export const inspectStoryboardTransitionV1 = (storyboard: StoryboardV1, fromStateId: string, toStateId: string): CreativeOperationResultV1<StoryboardTransitionInspectionV1> => {
   const fromIndex = storyboard.states.findIndex((state) => state.id === fromStateId)
@@ -115,20 +173,72 @@ export const inspectStoryboardTransitionV1 = (storyboard: StoryboardV1, fromStat
 }
 
 const applyGraphOperations = (scene: MotionSceneV1, operations: readonly MotionGraphOperationV1[]) => applyMotionOperations(scene, operations)
+const STORYBOARD_AUTHORING_MAX_STATES = 24
+const STORYBOARD_AUTHORING_MAX_OPERATIONS = 512
 
-export const reviseStoryboardStateGraphV1 = (sandbox: StoryboardSandboxV1, input: ReviseStoryboardStateGraphInputV1): CreativeOperationResultV1<AppliedStoryboardSandboxTransactionV1> => {
-  if (input.operations.length === 0) return creativeOperationRefusal('STORYBOARD_GRAPH_EDIT_EMPTY', 'At least one canonical Motion Graph operation is required.')
+export const reviseStoryboardGraphsV1 = (sandbox: StoryboardSandboxV1, input: ReviseStoryboardGraphsInputV1): CreativeOperationResultV1<AppliedStoryboardSandboxTransactionV1> => {
   if (input.expectedSandboxRevision !== sandbox.sandboxRevision) return creativeOperationRefusal('STALE_SANDBOX_REVISION', `Expected sandbox revision ${input.expectedSandboxRevision}; current revision is ${sandbox.sandboxRevision}.`)
-  const state = sandbox.storyboard.states.find((candidate) => candidate.id === input.stateId)
-  if (!state) return creativeOperationRefusal('STORYBOARD_STATE_NOT_FOUND', `Unknown state: ${input.stateId}`)
-  const result = applyGraphOperations(state.graphState, input.operations)
-  if (!result.ok) return creativeOperationRefusal('STORYBOARD_GRAPH_EDIT_REFUSED', result.error.message, result.error)
-  const nextState: KeyVisualStateV1 = Object.freeze({ ...state, graphState: result.scene })
-  return applyStoryboardSandboxTransactionV1(sandbox, Object.freeze({
-    transactionId: input.transactionId,
-    expectedSandboxRevision: input.expectedSandboxRevision,
-    operations: Object.freeze([{ type: 'replace-state' as const, stateId: state.id, state: nextState }]),
-  }))
+  if (sandbox.locks.storyboard) return creativeOperationRefusal('STORYBOARD_LOCKED', 'Storyboard is owner-approved and locked; reopen it before design mutation.')
+  if (input.edits.length === 0) return creativeOperationRefusal('STORYBOARD_GRAPH_EDIT_EMPTY', 'At least one Storyboard graph edit is required.')
+  if (input.edits.length > STORYBOARD_AUTHORING_MAX_STATES) return creativeOperationRefusal('AUTHORING_BUDGET_EXCEEDED', `A Storyboard authoring transaction may target at most ${STORYBOARD_AUTHORING_MAX_STATES} states.`)
+  const stateIds = input.edits.map((edit) => edit.stateId)
+  if (new Set(stateIds).size !== stateIds.length) return creativeOperationRefusal('STORYBOARD_GRAPH_EDIT_INVALID', 'Each Storyboard state may appear at most once in one graph transaction; combine its canonical operations first.')
+  const operationCount = input.edits.reduce((sum, edit) => sum + edit.operations.length, 0)
+  if (operationCount === 0) return creativeOperationRefusal('STORYBOARD_GRAPH_EDIT_EMPTY', 'At least one canonical Motion Graph operation is required.')
+  if (operationCount > STORYBOARD_AUTHORING_MAX_OPERATIONS) return creativeOperationRefusal('AUTHORING_BUDGET_EXCEEDED', `A Storyboard authoring transaction may contain at most ${STORYBOARD_AUTHORING_MAX_OPERATIONS} graph operations.`)
+  const replacements: StoryboardSandboxOperationV1[] = []
+  for (const edit of input.edits) {
+    if (edit.operations.length === 0) return creativeOperationRefusal('STORYBOARD_GRAPH_EDIT_EMPTY', `State ${edit.stateId} has no graph operations.`)
+    const state = sandbox.storyboard.states.find((candidate) => candidate.id === edit.stateId)
+    if (!state) return creativeOperationRefusal('STORYBOARD_STATE_NOT_FOUND', `Unknown state: ${edit.stateId}`)
+    const result = applyGraphOperations(state.graphState, edit.operations)
+    if (!result.ok) return creativeOperationRefusal('STORYBOARD_GRAPH_EDIT_REFUSED', `State ${state.id}: ${result.error.message}`, result.error)
+    const budget = validateMotionAuthoringBudgetV1(result.scene)
+    if (!budget.ok) return creativeOperationRefusal('AUTHORING_BUDGET_EXCEEDED', `State ${state.id}: ${budget.findings.join(' ')}`, budget)
+    replacements.push(Object.freeze({ type: 'replace-state' as const, stateId: state.id, state: Object.freeze({ ...state, graphState: result.scene }) }))
+  }
+  return applyStoryboardSandboxTransactionV1(sandbox, Object.freeze({ transactionId: input.transactionId, expectedSandboxRevision: input.expectedSandboxRevision, operations: Object.freeze(replacements) }))
+}
+
+export const reviseStoryboardStateGraphV1 = (sandbox: StoryboardSandboxV1, input: ReviseStoryboardStateGraphInputV1): CreativeOperationResultV1<AppliedStoryboardSandboxTransactionV1> => reviseStoryboardGraphsV1(sandbox, Object.freeze({
+  transactionId: input.transactionId,
+  expectedSandboxRevision: input.expectedSandboxRevision,
+  edits: Object.freeze([{ stateId: input.stateId, operations: input.operations }]),
+}))
+
+export const applyStoryboardGraphOperationsV1 = (sandbox: StoryboardSandboxV1, input: ApplyStoryboardGraphOperationsInputV1): CreativeOperationResultV1<AppliedStoryboardSandboxTransactionV1> => {
+  let states: readonly KeyVisualStateV1[]
+  if (input.targets.mode === 'state') {
+    if (input.targets.stateIds.length === 0 || new Set(input.targets.stateIds).size !== input.targets.stateIds.length) return creativeOperationRefusal('STORYBOARD_STATE_TARGET_INVALID', 'state target needs one or more unique stateIds.')
+    const requested = new Set(input.targets.stateIds)
+    states = sandbox.storyboard.states.filter((state) => requested.has(state.id))
+    if (states.length !== requested.size) return creativeOperationRefusal('STORYBOARD_STATE_NOT_FOUND', 'One or more requested Storyboard states do not exist.')
+  } else if (input.targets.mode === 'all-states') states = sandbox.storyboard.states
+  else {
+    const nodeId=input.targets.nodeId
+    if (!nodeId.trim()) return creativeOperationRefusal('STORYBOARD_STATE_TARGET_INVALID', 'all-states-containing-node requires nodeId.')
+    states = sandbox.storyboard.states.filter((state) => Boolean(state.graphState.nodes[nodeId]))
+    if (states.length === 0) return creativeOperationRefusal('STORYBOARD_STATE_NOT_FOUND', `No Storyboard state contains node ${nodeId}.`)
+  }
+  return reviseStoryboardGraphsV1(sandbox, Object.freeze({ transactionId: input.transactionId, expectedSandboxRevision: input.expectedSandboxRevision, edits: Object.freeze(states.map((state) => Object.freeze({ stateId: state.id, operations: input.operations }))) }))
+}
+
+export const applyStoryboardDesignTransactionV1 = (sandbox: StoryboardSandboxV1, input: ApplyStoryboardDesignTransactionInputV1): CreativeOperationResultV1<AppliedStoryboardSandboxTransactionV1> => {
+  if (input.expectedSandboxRevision !== sandbox.sandboxRevision) return creativeOperationRefusal('STALE_SANDBOX_REVISION', `Expected sandbox revision ${input.expectedSandboxRevision}; current revision is ${sandbox.sandboxRevision}.`)
+  if (sandbox.locks.storyboard) return creativeOperationRefusal('STORYBOARD_LOCKED', 'Storyboard is owner-approved and locked; reopen it before design mutation.')
+  const graphEdits = input.graphEdits ?? []
+  const sandboxOperations = input.sandboxOperations ?? []
+  if (graphEdits.length === 0 && sandboxOperations.length === 0) return creativeOperationRefusal('SANDBOX_TRANSACTION_INVALID', 'Design transaction requires graph and/or Storyboard sandbox operations.')
+  if (sandboxOperations.length > STORYBOARD_AUTHORING_MAX_OPERATIONS) return creativeOperationRefusal('AUTHORING_BUDGET_EXCEEDED', `A design transaction may contain at most ${STORYBOARD_AUTHORING_MAX_OPERATIONS} Storyboard operations.`)
+  const graphResult = graphEdits.length > 0 ? reviseStoryboardGraphsV1(sandbox, Object.freeze({ transactionId: `${input.transactionId}:graph-compile`, expectedSandboxRevision: input.expectedSandboxRevision, edits: graphEdits })) : null
+  if (graphResult && !graphResult.ok) return graphResult
+  const graphOperations = graphResult?.value.sandbox.storyboard.states.map((state) => {
+    const original = sandbox.storyboard.states.find((candidate) => candidate.id === state.id)
+    return original && original.graphState !== state.graphState ? Object.freeze({ type: 'replace-state' as const, stateId: state.id, state }) : null
+  }).filter((operation): operation is Extract<StoryboardSandboxOperationV1, { type: 'replace-state' }> => Boolean(operation)) ?? []
+  const touchedStateIds = new Set(graphOperations.map((operation) => operation.stateId))
+  for (const operation of sandboxOperations) if ((operation.type === 'replace-state' || operation.type === 'remove-state') && touchedStateIds.has(operation.stateId)) return creativeOperationRefusal('SANDBOX_TRANSACTION_INVALID', `State ${operation.stateId} cannot be graph-edited and separately replaced/removed in the same design transaction.`)
+  return applyStoryboardSandboxTransactionV1(sandbox, Object.freeze({ transactionId: input.transactionId, expectedSandboxRevision: input.expectedSandboxRevision, operations: Object.freeze([...graphOperations, ...sandboxOperations]) }))
 }
 
 export const refineStoryboardTransitionV1 = (sandbox: StoryboardSandboxV1, input: RefineStoryboardTransitionInputV1): CreativeOperationResultV1<AppliedStoryboardSandboxTransactionV1> => {
@@ -165,6 +275,11 @@ export const runStoryboardStructuralQaV1 = (storyboard: StoryboardV1, context: S
   let priorTick = -1
   const sourceIds = new Set(context.availableSourceIds ?? [])
   const assetRefs = new Set(context.availableAssetRefs ?? [])
+  const styleConstraint = context.styleConstraint
+  if (styleConstraint && storyboard.setup.styleLockId !== styleConstraint.styleLockId) findings.push(finding('STYLE_HARD_CONSTRAINT', `Storyboard styleLockId must remain ${styleConstraint.styleLockId}.`))
+  const allowedColors = new Set((styleConstraint?.hard.allowedColors ?? []).map(normalizedStyleString))
+  const allowedFonts = new Set((styleConstraint?.hard.allowedFontFamilies ?? []).map(normalizedStyleString))
+  const defaultFingerprints = new Set((context.defaultContentFingerprints ?? []).map((value) => value.trim()).filter(Boolean))
   for (const state of storyboard.states) {
     if (seen.has(state.id)) findings.push(finding('DUPLICATE_STATE_ID', `Duplicate state id: ${state.id}`, [state.id]))
     seen.add(state.id)
@@ -182,6 +297,27 @@ export const runStoryboardStructuralQaV1 = (storyboard: StoryboardV1, context: S
     const sourceTreatment = assessSourceTreatmentCapabilitiesV1(state.sourceTreatment, context.availableCapabilities)
     if (!sourceTreatment.supported) findings.push(finding('INVALID_SOURCE_TREATMENT', `${state.id} needs unsupported source-treatment capabilities: ${sourceTreatment.unsupportedCapabilities.join(', ')}.`, [state.id]))
     if (context.requiredRatio && !state.graphState.supportedAspectRatios.includes(context.requiredRatio)) findings.push(finding('INVALID_RATIO', `${state.id} does not support ${context.requiredRatio}.`, [state.id]))
+    if (styleConstraint?.soft.preferredPresentationModes?.length && !styleConstraint.soft.preferredPresentationModes.includes(state.presentationMode)) findings.push(finding('STYLE_SOFT_DEVIATION', `${state.id} uses presentation mode ${state.presentationMode}, outside the preferred style vocabulary.`, [state.id], [], 'warning'))
+    if (styleConstraint?.soft.maximumNodesPerState !== undefined && Object.keys(state.graphState.nodes).length > styleConstraint.soft.maximumNodesPerState) findings.push(finding('STYLE_SOFT_DEVIATION', `${state.id} exceeds the preferred node-density budget of ${styleConstraint.soft.maximumNodesPerState}.`, [state.id], [], 'warning'))
+    const hardStyleNodes: string[] = []
+    const defaultContentNodes: string[] = []
+    const softRadiusNodes: string[] = []
+    for (const node of Object.values(state.graphState.nodes)) {
+      if (node.type === 'text') {
+        if (allowedFonts.size > 0 && !allowedFonts.has(normalizedStyleString(node.fontFamily))) hardStyleNodes.push(node.id)
+        const textValue = constantString(node.text)
+        if (textValue !== null && defaultFingerprints.has(textValue.trim())) defaultContentNodes.push(node.id)
+      }
+      const colors = node.type === 'text' ? [constantString(node.fillColor)] : node.type === 'shape' || node.type === 'path' ? [constantString(node.fillColor), constantString(node.strokeColor)] : []
+      if (allowedColors.size > 0 && colors.some((color) => color !== null && normalizedStyleString(color) !== 'transparent' && !allowedColors.has(normalizedStyleString(color)))) hardStyleNodes.push(node.id)
+      if (node.type === 'shape' && styleConstraint?.soft.maximumRadius !== undefined) {
+        const radius = constantNumber(node.radius)
+        if (radius !== null && radius > styleConstraint.soft.maximumRadius) softRadiusNodes.push(node.id)
+      }
+    }
+    if (hardStyleNodes.length > 0) findings.push(finding('STYLE_HARD_CONSTRAINT', `${state.id} violates hard palette/type-family constraints from the active Style Lock.`, [state.id], [...new Set(hardStyleNodes)]))
+    if (softRadiusNodes.length > 0) findings.push(finding('STYLE_SOFT_DEVIATION', `${state.id} exceeds the preferred surface-radius guidance.`, [state.id], softRadiusNodes, 'warning'))
+    if (defaultContentNodes.length > 0) findings.push(finding('DEFAULT_CONTENT_UNBOUND', `${state.id} still contains component/demo default content instead of authored source-bound content.`, [state.id], defaultContentNodes))
     if (state.sourceFrameRef) {
       if (state.sourceFrameRef.exactTick < storyboard.setup.sourceRegion.startTick || state.sourceFrameRef.exactTick > storyboard.setup.sourceRegion.endTick) findings.push(finding('INVALID_SOURCE_FRAME', `${state.id} source frame is outside the storyboard source region.`, [state.id]))
       if ((context.availableSourceIds && !sourceIds.has(state.sourceFrameRef.sourceId)) || (state.sourceFrameRef.assetRef && context.availableAssetRefs && !assetRefs.has(state.sourceFrameRef.assetRef))) findings.push(finding('MISSING_MEDIA', `${state.id} references unavailable source media.`, [state.id]))

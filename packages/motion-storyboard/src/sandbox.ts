@@ -17,6 +17,7 @@ export type StoryboardSandboxOperationV1 =
   | Readonly<{type:'add-state';state:KeyVisualStateV1;index?:number}>
   | Readonly<{type:'replace-state';stateId:string;state:KeyVisualStateV1}>
   | Readonly<{type:'remove-state';stateId:string}>
+  | Readonly<{type:'reorder-state';stateId:string;index:number}>
   | Readonly<{type:'set-setup';setup:StoryboardPresentationSetupV1}>
   | Readonly<{type:'set-status';status:StoryboardStatusV1}>
 export interface StoryboardSandboxTransactionV1 { readonly transactionId:string; readonly expectedSandboxRevision:number; readonly operations:readonly StoryboardSandboxOperationV1[] }
@@ -50,6 +51,12 @@ const applyOne=(storyboard:StoryboardV1,operation:StoryboardSandboxOperationV1):
     const previous=storyboard.states[index]!; const states=storyboard.states.filter(state=>state.id!==operation.stateId)
     try{return{storyboard:changedStoryboard(storyboard,{states:Object.freeze(states)}),inverse:Object.freeze({type:'add-state',state:previous,index})}}catch(error){return{error:error instanceof Error?error.message:'remove-state failed.'}}
   }
+  if(operation.type==='reorder-state'){
+    const from=storyboard.states.findIndex(state=>state.id===operation.stateId); if(from<0)return{error:`Unknown state: ${operation.stateId}`}
+    if(!Number.isSafeInteger(operation.index)||operation.index<0||operation.index>=storyboard.states.length)return{error:'reorder-state index is invalid.'}
+    const states=[...storyboard.states]; const [moving]=states.splice(from,1); states.splice(operation.index,0,moving!)
+    try{return{storyboard:changedStoryboard(storyboard,{states:Object.freeze(states)}),inverse:Object.freeze({type:'reorder-state',stateId:operation.stateId,index:from})}}catch(error){return{error:error instanceof Error?error.message:'reorder-state failed.'}}
+  }
   if(operation.type==='set-setup'){
     const valid=validatePresentationSetupV1(operation.setup); if(!valid.ok)return{error:valid.refusal.message}; const previous=storyboard.setup
     try{return{storyboard:changedStoryboard(storyboard,{setup:valid.value}),inverse:Object.freeze({type:'set-setup',setup:previous})}}catch(error){return{error:error instanceof Error?error.message:'set-setup failed.'}}
@@ -65,6 +72,10 @@ export const applyStoryboardSandboxTransactionV1=(sandbox:StoryboardSandboxV1,tr
   if(sandbox.locks.storyboard)return creativeOperationRefusal('STORYBOARD_LOCKED','Storyboard is locked; unlock it before mutation.')
   let current=sandbox.storyboard; const inverse:StoryboardSandboxOperationV1[]=[]
   for(const operation of transaction.operations){ const result=applyOne(current,operation); if('error'in result)return creativeOperationRefusal('SANDBOX_TRANSACTION_FAILED',`Atomic storyboard transaction refused: ${result.error}`); current=result.storyboard; inverse.unshift(result.inverse) }
+  // One user-facing sandbox transaction owns one Storyboard revision even when it
+  // contains several state/setup operations. Internal applyOne revisions are
+  // temporary validation checkpoints and must not leak as multiple design revisions.
+  current=Object.freeze({...current,revision:sandbox.storyboard.revision+1,ownerApprovalId:undefined})
   const valid=validateStoryboardV1(current); if(!valid.ok)return creativeOperationRefusal('SANDBOX_TRANSACTION_FAILED',`Atomic storyboard transaction produced invalid state: ${valid.refusal.message}`)
   const nextRevision=sandbox.sandboxRevision+1
   const next:StoryboardSandboxV1=Object.freeze({...sandbox,sandboxRevision:nextRevision,storyboard:valid.value,approvals:Object.freeze(sandbox.approvals.filter(approval=>approval.scope!=='storyboard')),transactions:Object.freeze([...sandbox.transactions,Object.freeze({transactionId:transaction.transactionId,fromRevision:sandbox.sandboxRevision,toRevision:nextRevision,operationTypes:Object.freeze(transaction.operations.map(operation=>operation.type))})])})

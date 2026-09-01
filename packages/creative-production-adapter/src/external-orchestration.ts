@@ -5,7 +5,8 @@ import { creativeOperationOk, creativeOperationRefusal, creativeValidationOk, ty
 import { CREATIVE_SCENE_PRIMITIVE_ID, emptyExtensions, type ChangeSet, type EditProject } from '@sanverse/edit-domain'
 import type { MotionOpportunityV1 } from '@sanverse/creative-direction'
 import { PROJECT_TIMESCALE, mediaTime } from '@sanverse/edit-domain/time'
-import type { OwnerApprovalV1 } from '@sanverse/motion-storyboard'
+import { MOTION_GRAPH_OPERATION_TYPES, type MotionGraphOperationV1 } from '@sanverse/motion-graph'
+import { diffStoryboardStatesV1, type OwnerApprovalV1, type StoryboardSandboxOperationV1, type StoryboardStateTargetV1 } from '@sanverse/motion-storyboard'
 import {
   DeterministicTranscriptSemanticAnalyzer,
   analyzeVideoUnderstanding,
@@ -189,6 +190,33 @@ const tail = (value: string): string => {
 }
 const schema = (properties: Record<string, unknown> = {}, required: readonly string[] = []) => Object.freeze({ type: 'object', additionalProperties: false, properties: Object.freeze(properties), required: Object.freeze([...required]) })
 const stringSchema = Object.freeze({ type: 'string' })
+const integerSchema = Object.freeze({ type: 'integer' })
+const objectSchema = Object.freeze({ type: 'object', additionalProperties: true })
+const arrayOf = (items: unknown) => Object.freeze({ type: 'array', items })
+const operationRequiredFields: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  'set-property':['target','value'],'reset-property':['target','value'],'set-node-static-property':['nodeId','change'],'set-node-enabled':['nodeId','enabled'],
+  'add-keyframe':['target','keyframeId','tick','interpolation'],'remove-keyframe':['target','keyframeId'],'move-keyframe':['target','keyframeId','tick'],'set-keyframe-value':['target','keyframeId','value'],'set-keyframe-interpolation':['target','keyframeId','interpolation'],'set-keyframe-bezier':['target','keyframeId','bezier'],'clear-keyframes':['target','fallbackValue'],
+  'add-node':['node','parentId'],'remove-node':['nodeId','mode'],'duplicate-node':['nodeId','duplicateId'],'rename-node':['nodeId','name'],'reparent-node':['nodeId','parentId'],'reorder-node':['nodeId','index'],'group-nodes':['nodeIds','groupId','groupName'],'ungroup-nodes':['groupId'],'replace-node':['nodeId','replacement','identityPolicy'],'replace-subtree':['rootNodeId','replacement'],
+  'add-semantic-part':['part'],'remove-semantic-part':['partId'],'rename-semantic-part':['partId','label'],'set-semantic-part-role':['partId','role'],'add-node-to-semantic-part':['partId','nodeId'],'remove-node-from-semantic-part':['partId','nodeId'],
+  'set-layout-mode':['mode'],'set-layout-owner':['ownership'],'remove-layout-owner':['target'],'set-format-override':['override'],'remove-format-override':['ratio','target'],
+  'add-effect':['nodeId','effect'],'remove-effect':['nodeId','effectId'],'duplicate-effect':['nodeId','effectId','duplicateId'],'reorder-effect':['nodeId','effectId','index'],'set-effect-property':['nodeId','effectId','parameter','value'],'set-effect-enabled':['nodeId','effectId','enabled'],
+  'add-mask':['nodeId','mask'],'remove-mask':['nodeId','maskId'],'reorder-mask':['nodeId','maskId','index'],'set-mask-property':['nodeId','maskId','property','value'],'set-matte':['relationship'],'remove-matte':['matteId'],'set-blend-mode':['nodeId','blendMode'],
+})
+const genericOperationProperties = Object.freeze({ operationId:stringSchema, type:stringSchema, target:objectSchema, value:objectSchema, nodeId:stringSchema, enabled:Object.freeze({type:'boolean'}), change:objectSchema, keyframeId:stringSchema, tick:integerSchema, interpolation:stringSchema, bezier:objectSchema, fallbackValue:Object.freeze({}), node:objectSchema, parentId:stringSchema, index:integerSchema, mode:stringSchema, duplicateId:stringSchema, name:stringSchema, nodeIds:arrayOf(stringSchema), groupId:stringSchema, groupName:stringSchema, replacement:objectSchema, identityPolicy:stringSchema, childPolicy:stringSchema, rootNodeId:stringSchema, semanticMapping:arrayOf(objectSchema), part:objectSchema, partId:stringSchema, label:stringSchema, role:stringSchema, ownership:objectSchema, override:objectSchema, ratio:stringSchema, effect:objectSchema, effectId:stringSchema, parameter:stringSchema, mask:objectSchema, maskId:stringSchema, property:stringSchema, relationship:objectSchema, matteId:stringSchema, blendMode:stringSchema })
+const motionGraphOperationSchema = Object.freeze({ oneOf: Object.freeze(MOTION_GRAPH_OPERATION_TYPES.map((type) => Object.freeze({ type:'object', additionalProperties:false, properties:Object.freeze({ ...genericOperationProperties, type:Object.freeze({ const:type }) }), required:Object.freeze(['operationId','type',...(operationRequiredFields[type] ?? [])]) }))) })
+const storyboardTargetSchema = Object.freeze({ oneOf:Object.freeze([
+  schema({mode:Object.freeze({const:'state'}),stateIds:arrayOf(stringSchema)},['mode','stateIds']),
+  schema({mode:Object.freeze({const:'all-states'})},['mode']),
+  schema({mode:Object.freeze({const:'all-states-containing-node'}),nodeId:stringSchema},['mode','nodeId']),
+]) })
+const storyboardSandboxOperationSchema = Object.freeze({ oneOf:Object.freeze([
+  schema({type:Object.freeze({const:'add-state'}),state:objectSchema,index:integerSchema},['type','state']),
+  schema({type:Object.freeze({const:'replace-state'}),stateId:stringSchema,state:objectSchema},['type','stateId','state']),
+  schema({type:Object.freeze({const:'remove-state'}),stateId:stringSchema},['type','stateId']),
+  schema({type:Object.freeze({const:'reorder-state'}),stateId:stringSchema,index:integerSchema},['type','stateId','index']),
+  schema({type:Object.freeze({const:'set-setup'}),setup:objectSchema},['type','setup']),
+  schema({type:Object.freeze({const:'set-status'}),status:stringSchema},['type','status']),
+]) })
 const emptySchema = schema()
 const outputRecordSchema = Object.freeze({ type: 'object', additionalProperties: true })
 const passRecord = (input: unknown): CreativeValidationResultV1<Record<string, unknown>> => record(input)
@@ -692,11 +720,91 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
     const batch = sceneBatches.get(run.sceneBatch.id)
     return batch ? Object.freeze({ run, batch }) : null
   }
+  const requireAuthoringWorkflow = (batchId: unknown, sceneId: unknown): Readonly<{ batch: CreativeSceneBatchV1; workflow: NonNullable<ReturnType<CreativeSceneBatchV1['getWorkflow']>> }> | null => {
+    if (!boundedText(batchId, 96) || !sceneBatchRefPattern.test(batchId) || !boundedText(sceneId, 96)) return null
+    const batch = sceneBatches.get(batchId)
+    const workflow = batch?.getWorkflow(sceneId) ?? null
+    return batch && workflow ? Object.freeze({ batch, workflow }) : null
+  }
+  const persistAuthoringBatch = async (batch: CreativeSceneBatchV1): Promise<void> => {
+    const run = activeRun()
+    if (run && run.projectId === batch.projectId) await updateActiveRun({ sceneBatch: batch.serialize(), sceneIds: batch.sceneIds, stage: 'storyboard' })
+  }
   const reviewStage = (scope: CreativeReviewScopeV1): CreativeRunV1['stage'] => scope === 'storyboard' ? 'storyboard-review' : scope === 'animatic' ? 'animatic-review' : 'motion-review'
   const replaceReview = (reviews: readonly CreativeReviewV1[], next: CreativeReviewV1): readonly CreativeReviewV1[] => Object.freeze([...reviews.filter((review) => review.reviewId !== next.reviewId), next])
   const latestReviewByScene = (run: CreativeRunV1, scope: CreativeReviewScopeV1, sceneIds: readonly string[]): readonly CreativeReviewV1[] => Object.freeze(sceneIds.map((sceneId) => run.reviews
     .filter((review) => review.scope === scope && review.sceneId === sceneId)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.subjectRevision - a.subjectRevision)[0]).filter((review): review is CreativeReviewV1 => Boolean(review)))
+
+  const compactAuthoringDiffValue = (value: unknown): string => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const item = value as Record<string, unknown>
+      if (item.kind === 'constant' && Object.prototype.hasOwnProperty.call(item, 'value')) return JSON.stringify(item.value)
+      if (item.kind === 'keyframed') return `[keyframed:${Array.isArray(item.keyframes) ? item.keyframes.length : '?'}]`
+    }
+    const serialized = JSON.stringify(value)
+    if (serialized === undefined) return 'undefined'
+    return serialized.length <= 160 ? serialized : `${serialized.slice(0, 157)}...`
+  }
+
+  const reviewContextFor = (batch: CreativeSceneBatchV1, sceneId: string, scope: CreativeReviewScopeV1): CreativeReviewV1['context'] | null => {
+    const workflow = batch.getWorkflow(sceneId)
+    if (!workflow) return null
+    const state = workflow.state()
+    const sandbox = state.storyboardSandbox
+    const storyboard = sandbox?.storyboard
+    const qaFindings = scope === 'storyboard' ? state.storyboardQa?.findings ?? [] : scope === 'animatic' ? state.animaticQa?.findings ?? [] : state.motionQa?.findings ?? []
+    const states = storyboard?.states.map((item) => {
+      const baseline = Object.freeze({
+        ...item,
+        presentationMode: workflow.planned.opportunity.recommendedPresentationMode,
+        sourceTreatment: workflow.planned.opportunity.recommendedSourceTreatment,
+        backgroundTreatment: workflow.planned.opportunity.recommendedBackgroundTreatment,
+        focusNodeIds: Object.freeze([workflow.candidate.selectedNodeId]),
+        graphState: workflow.candidate.scene,
+      })
+      const diff = diffStoryboardStatesV1(baseline, item)
+      const localTick = item.sourceFrameRef?.exactTick ?? item.approximateTick
+      return Object.freeze({
+        stateId: item.id,
+        semanticPurpose: item.semanticPurpose,
+        localTick,
+        sourceFrameTick: workflow.candidate.source.sourceStartTicks + localTick,
+        presentationMode: item.presentationMode,
+        sourceTreatment: item.sourceTreatment,
+        backgroundTreatment: item.backgroundTreatment,
+        focusChanged: diff.focusChanged,
+        presentationModeChanged: diff.presentationModeChanged,
+        sourceTreatmentChanged: diff.sourceTreatmentChanged,
+        backgroundTreatmentChanged: diff.backgroundTreatmentChanged,
+        addedNodeIds: diff.addedNodeIds,
+        removedNodeIds: diff.removedNodeIds,
+        changedNodes: Object.freeze(diff.changedNodes.map((changed) => {
+          const beforeNode = baseline.graphState.nodes[changed.nodeId] as unknown as Record<string, unknown> | undefined
+          const afterNode = item.graphState.nodes[changed.nodeId] as unknown as Record<string, unknown> | undefined
+          const changes = Object.freeze(changed.changedProperties.map((property) => Object.freeze({
+            property,
+            from: compactAuthoringDiffValue(beforeNode?.[property]),
+            to: compactAuthoringDiffValue(afterNode?.[property]),
+          })))
+          return Object.freeze({ ...changed, changes })
+        })),
+      })
+    }) ?? []
+    return Object.freeze({
+      sceneId,
+      communicationGoal: storyboard?.setup.communicationGoal ?? workflow.planned.opportunity.communicationGoal,
+      componentId: workflow.candidate.componentId,
+      componentVersion: workflow.candidate.componentVersion,
+      ...(storyboard ? { storyboardRevision: storyboard.revision } : {}),
+      ...(sandbox ? { sandboxRevision: sandbox.sandboxRevision } : {}),
+      sourceStartTick: workflow.candidate.source.sourceStartTicks,
+      sourceEndTick: workflow.candidate.source.sourceEndTicks,
+      states: Object.freeze(states),
+      qaFindings: Object.freeze(qaFindings.map((finding) => Object.freeze({ code: finding.code, severity: finding.severity, message: finding.message }))),
+      recentTransactions: Object.freeze((sandbox?.transactions ?? []).slice(-5).map((transaction) => Object.freeze({ transactionId: transaction.transactionId, operationTypes: Object.freeze([...transaction.operationTypes]) }))),
+    })
+  }
 
   const prepareRunReviews = async (scope: CreativeReviewScopeV1): Promise<Readonly<{ ok: true; run: CreativeRunV1; reviews: readonly CreativeReviewV1[] }> | Readonly<{ ok: false; code: string; message: string }>> => {
     const active = requireActiveRunBatch()
@@ -712,6 +820,8 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
       const now = new Date().toISOString()
       const reviewId = `review_${tail(`${active.run.runId}:${request.requestRef}:${request.subjectId}:${request.subjectRevision}`)}`
       const seedHash = await options.sha256Text(JSON.stringify({ runId: active.run.runId, reviewId, requestRef: request.requestRef, subjectId: request.subjectId, subjectRevision: request.subjectRevision }))
+      const context = reviewContextFor(active.batch, request.sceneId, scope)
+      if (!context) return Object.freeze({ ok: false as const, code: 'CREATIVE_REVIEW_INVALID', message: 'The requested scene is unavailable while preparing review context.' })
       const draft: CreativeReviewV1 = Object.freeze({
         schemaVersion: CREATIVE_REVIEW_SCHEMA_V1,
         reviewId,
@@ -723,6 +833,7 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
         subjectRevision: request.subjectRevision,
         evidenceHash: seedHash,
         status: 'pending',
+        context,
         artifacts: Object.freeze([]),
         createdAt: now,
         updatedAt: now,
@@ -792,6 +903,108 @@ export async function createCreativeProductionExternalOrchestrationSessionV1(opt
       if (!batch) return creativeOperationRefusal('SCENE_SESSION_NOT_FOUND', 'The scene batch is unknown in this MCP session.')
       if (batch.projectId !== current.value.projectId || batch.projectRevision !== current.value.revision) return creativeOperationRefusal('SCENE_SOURCE_STALE', 'The scene batch no longer matches the current production revision.')
       return creativeOperationOk(batch.snapshot(), current.value.revision)
+    },
+  }))
+
+  register(Object.freeze({
+    id: 'creative.get_storyboard_authoring_schema', version: 1 as const, level: 'T0' as const, requiresSandbox: false,
+    inputSchema: emptySchema, outputSchema: outputRecordSchema, validateInput: passRecord,
+    execute: async () => creativeOperationOk(Object.freeze({
+      schemaVersion: 'sanverse.storyboard-authoring-schema/v1',
+      operationTypes: MOTION_GRAPH_OPERATION_TYPES,
+      motionGraphOperationSchema,
+      storyboardTargetSchema,
+      storyboardSandboxOperationSchema,
+      budgets: Object.freeze({ maximumStatesPerGraphTransaction: 24, maximumOperationsPerTransaction: 512 }),
+      rules: Object.freeze({ canonicalGraphOnly: true, noJsonPatch: true, noCodeExecution: true, ownerApprovalRemainsHostOnly: true, productionMutation: false }),
+    }), 1),
+  }))
+
+  register(Object.freeze({
+    id: 'creative.inspect_storyboard', version: 1 as const, level: 'T0' as const, requiresSandbox: false,
+    inputSchema: schema({ batchId:stringSchema, sceneId:stringSchema }, ['batchId','sceneId']), outputSchema: outputRecordSchema, validateInput: passRecord,
+    execute: async (input: Record<string, unknown>) => {
+      const current = await requireProject(); if (!current.ok) return current
+      const target = requireAuthoringWorkflow(input.batchId, input.sceneId)
+      if (!target) return creativeOperationRefusal('SCENE_SESSION_NOT_FOUND', 'A valid scene batch and sceneId are required for Storyboard inspection.')
+      if (target.batch.projectRevision !== current.value.revision) return creativeOperationRefusal('SCENE_SOURCE_STALE', 'The Storyboard sandbox no longer matches the current production revision.')
+      const inspected = target.workflow.inspectStoryboard()
+      return inspected.ok ? creativeOperationOk(inspected.value, current.value.revision) : creativeOperationRefusal('STORYBOARD_SANDBOX_REQUIRED', inspected.message)
+    },
+  }))
+
+  register(Object.freeze({
+    id: 'creative.apply_storyboard_graph_operations', version: 1 as const, level: 'T2' as const, requiresSandbox: false,
+    inputSchema: schema({ batchId:stringSchema, sceneId:stringSchema, transactionId:stringSchema, expectedSandboxRevision:integerSchema, targets:storyboardTargetSchema, operations:arrayOf(motionGraphOperationSchema) }, ['batchId','sceneId','transactionId','expectedSandboxRevision','targets','operations']), outputSchema: outputRecordSchema, validateInput: passRecord,
+    execute: async (input: Record<string, unknown>) => {
+      const current = await requireProject(); if (!current.ok) return current
+      const target = requireAuthoringWorkflow(input.batchId, input.sceneId)
+      if (!target) return creativeOperationRefusal('SCENE_SESSION_NOT_FOUND', 'A valid scene batch and sceneId are required for Storyboard graph authoring.')
+      if (!boundedText(input.transactionId,128) || !transactionIdPattern.test(input.transactionId) || !Number.isSafeInteger(input.expectedSandboxRevision) || !record(input.targets) || !Array.isArray(input.operations)) return creativeOperationRefusal('INVALID_TOOL_INPUT', 'Graph authoring requires a stable transactionId, expectedSandboxRevision, typed targets, and operations.')
+      const result = target.workflow.applyStoryboardGraphOperations({ transactionId: input.transactionId, expectedSandboxRevision: Number(input.expectedSandboxRevision), targets: input.targets as unknown as StoryboardStateTargetV1, operations: input.operations as MotionGraphOperationV1[] })
+      if (!result.ok) return creativeOperationRefusal('STORYBOARD_GRAPH_EDIT_REFUSED', result.message)
+      await persistAuthoringBatch(target.batch)
+      return creativeOperationOk(result.value, current.value.revision)
+    },
+  }))
+
+  register(Object.freeze({
+    id: 'creative.apply_storyboard_design', version: 1 as const, level: 'T2' as const, requiresSandbox: false,
+    inputSchema: schema({ batchId:stringSchema, sceneId:stringSchema, transactionId:stringSchema, expectedSandboxRevision:integerSchema, graphEdits:arrayOf(schema({stateId:stringSchema,operations:arrayOf(motionGraphOperationSchema)},['stateId','operations'])), sandboxOperations:arrayOf(storyboardSandboxOperationSchema) }, ['batchId','sceneId','transactionId','expectedSandboxRevision']), outputSchema: outputRecordSchema, validateInput: passRecord,
+    execute: async (input: Record<string, unknown>) => {
+      const current = await requireProject(); if (!current.ok) return current
+      const target = requireAuthoringWorkflow(input.batchId, input.sceneId)
+      if (!target) return creativeOperationRefusal('SCENE_SESSION_NOT_FOUND', 'A valid scene batch and sceneId are required for Storyboard design.')
+      if (!boundedText(input.transactionId,128) || !transactionIdPattern.test(input.transactionId) || !Number.isSafeInteger(input.expectedSandboxRevision) || (input.graphEdits !== undefined && !Array.isArray(input.graphEdits)) || (input.sandboxOperations !== undefined && !Array.isArray(input.sandboxOperations))) return creativeOperationRefusal('INVALID_TOOL_INPUT', 'Design authoring requires a stable transactionId, expectedSandboxRevision and optional typed graph/sandbox operations.')
+      const graphEdits = (input.graphEdits as Array<Record<string, unknown>> | undefined)?.map((edit) => Object.freeze({ stateId:String(edit.stateId ?? ''), operations:(edit.operations ?? []) as MotionGraphOperationV1[] }))
+      const result = target.workflow.applyStoryboardDesign({ transactionId:input.transactionId, expectedSandboxRevision:Number(input.expectedSandboxRevision), ...(graphEdits ? { graphEdits } : {}), ...(input.sandboxOperations ? { sandboxOperations:input.sandboxOperations as StoryboardSandboxOperationV1[] } : {}) })
+      if (!result.ok) return creativeOperationRefusal('STORYBOARD_DESIGN_REFUSED', result.message)
+      await persistAuthoringBatch(target.batch)
+      return creativeOperationOk(result.value, current.value.revision)
+    },
+  }))
+
+  register(Object.freeze({
+    id: 'creative.manage_storyboard_kvs', version: 1 as const, level: 'T2' as const, requiresSandbox: false,
+    inputSchema: schema({ batchId:stringSchema, sceneId:stringSchema, transactionId:stringSchema, expectedSandboxRevision:integerSchema, action:Object.freeze({enum:['add','replace','remove','reorder']}), state:objectSchema, stateId:stringSchema, index:integerSchema }, ['batchId','sceneId','transactionId','expectedSandboxRevision','action']), outputSchema: outputRecordSchema, validateInput: passRecord,
+    execute: async (input: Record<string, unknown>) => {
+      const current = await requireProject(); if (!current.ok) return current
+      const target = requireAuthoringWorkflow(input.batchId,input.sceneId)
+      if (!target || !boundedText(input.transactionId,128) || !transactionIdPattern.test(input.transactionId) || !Number.isSafeInteger(input.expectedSandboxRevision)) return creativeOperationRefusal('INVALID_TOOL_INPUT','Valid batch/scene/transaction/revision are required.')
+      let operation: StoryboardSandboxOperationV1 | null = null
+      if (input.action === 'add' && record(input.state)) operation = Object.freeze({type:'add-state',state:input.state as never,...(Number.isSafeInteger(input.index)?{index:Number(input.index)}:{})})
+      if (input.action === 'replace' && boundedText(input.stateId,240) && record(input.state)) operation = Object.freeze({type:'replace-state',stateId:input.stateId,state:input.state as never})
+      if (input.action === 'remove' && boundedText(input.stateId,240)) operation = Object.freeze({type:'remove-state',stateId:input.stateId})
+      if (input.action === 'reorder' && boundedText(input.stateId,240) && Number.isSafeInteger(input.index)) operation = Object.freeze({type:'reorder-state',stateId:input.stateId,index:Number(input.index)})
+      if (!operation) return creativeOperationRefusal('INVALID_TOOL_INPUT','KVS action fields are incomplete for the requested add/replace/remove/reorder operation.')
+      const result=target.workflow.applyStoryboardDesign({transactionId:input.transactionId,expectedSandboxRevision:Number(input.expectedSandboxRevision),sandboxOperations:Object.freeze([operation])})
+      if(!result.ok)return creativeOperationRefusal('STORYBOARD_KVS_EDIT_REFUSED',result.message)
+      await persistAuthoringBatch(target.batch); return creativeOperationOk(result.value,current.value.revision)
+    },
+  }))
+
+  register(Object.freeze({
+    id: 'creative.set_storyboard_presentation', version: 1 as const, level: 'T2' as const, requiresSandbox: false,
+    inputSchema: schema({ batchId:stringSchema, sceneId:stringSchema, transactionId:stringSchema, expectedSandboxRevision:integerSchema, presentationMode:stringSchema, sourceTreatment:stringSchema, backgroundTreatment:stringSchema, preserveSourceAudio:Object.freeze({type:'boolean'}), preserveSourceVideo:Object.freeze({type:'boolean'}) }, ['batchId','sceneId','transactionId','expectedSandboxRevision']), outputSchema: outputRecordSchema, validateInput: passRecord,
+    execute: async (input: Record<string, unknown>) => {
+      const current=await requireProject();if(!current.ok)return current
+      const target=requireAuthoringWorkflow(input.batchId,input.sceneId);if(!target||!boundedText(input.transactionId,128)||!transactionIdPattern.test(input.transactionId)||!Number.isSafeInteger(input.expectedSandboxRevision))return creativeOperationRefusal('INVALID_TOOL_INPUT','Valid batch/scene/transaction/revision are required.')
+      const sandbox=target.workflow.state().storyboardSandbox;if(!sandbox)return creativeOperationRefusal('STORYBOARD_SANDBOX_REQUIRED','Storyboard sandbox is not initialized.')
+      const setup=Object.freeze({...sandbox.storyboard.setup,...(typeof input.presentationMode==='string'?{presentationMode:input.presentationMode}:{}),...(typeof input.sourceTreatment==='string'?{sourceTreatment:input.sourceTreatment}:{}),...(typeof input.backgroundTreatment==='string'?{backgroundTreatment:input.backgroundTreatment}:{}),...(typeof input.preserveSourceAudio==='boolean'?{preserveSourceAudio:input.preserveSourceAudio}:{}),...(typeof input.preserveSourceVideo==='boolean'?{preserveSourceVideo:input.preserveSourceVideo}:{})})
+      const result=target.workflow.applyStoryboardDesign({transactionId:input.transactionId,expectedSandboxRevision:Number(input.expectedSandboxRevision),sandboxOperations:Object.freeze([{type:'set-setup',setup:setup as never}])})
+      if(!result.ok)return creativeOperationRefusal('STORYBOARD_PRESENTATION_REFUSED',result.message)
+      await persistAuthoringBatch(target.batch);return creativeOperationOk(result.value,current.value.revision)
+    },
+  }))
+
+  register(Object.freeze({
+    id: 'creative.reopen_storyboard', version: 1 as const, level: 'T2' as const, requiresSandbox: false,
+    inputSchema: schema({ batchId:stringSchema, sceneId:stringSchema, expectedSandboxRevision:integerSchema }, ['batchId','sceneId','expectedSandboxRevision']), outputSchema: outputRecordSchema, validateInput: passRecord,
+    execute: async (input: Record<string, unknown>) => {
+      const current=await requireProject();if(!current.ok)return current
+      const target=requireAuthoringWorkflow(input.batchId,input.sceneId);if(!target||!Number.isSafeInteger(input.expectedSandboxRevision))return creativeOperationRefusal('INVALID_TOOL_INPUT','Valid batch/scene/revision are required.')
+      const result=target.workflow.reopenStoryboard(Number(input.expectedSandboxRevision));if(!result.ok)return creativeOperationRefusal('STORYBOARD_REOPEN_REFUSED',result.message)
+      await persistAuthoringBatch(target.batch);return creativeOperationOk(result.value,current.value.revision)
     },
   }))
 

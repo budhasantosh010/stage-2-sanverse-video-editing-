@@ -234,6 +234,16 @@ export const validateMotionScene = (input: unknown): MotionValidationResultV1<Mo
     if (node.enabled !== undefined && typeof node.enabled !== 'boolean') issues.push(issue(`$.nodes.${key}.enabled`, 'Node enabled switch must be boolean when present.'))
     if (!MOTION_BLEND_MODES.includes(node.blendMode)) issues.push(issue(`$.nodes.${key}.blendMode`, 'Unsupported blend mode.'))
     nodeAnimatables(node).forEach(([property, value]) => validateAnimatable(value, `$.nodes.${key}.${property}`, issues, nodeAnimatableConstraint(property)))
+    if (node.type === 'text') {
+      if (typeof node.fontFamily !== 'string' || !node.fontFamily.trim() || node.fontFamily.length > 512) issues.push(issue(`$.nodes.${key}.fontFamily`, 'Text fontFamily must be a bounded non-empty string.'))
+      if (!['left','center','right'].includes(node.textAlign)) issues.push(issue(`$.nodes.${key}.textAlign`, 'Text textAlign is unsupported.'))
+    }
+    if (node.type === 'shape' && !['rectangle','rounded-rectangle','ellipse'].includes(node.shape)) issues.push(issue(`$.nodes.${key}.shape`, 'Shape kind is unsupported.'))
+    if (node.type === 'path' && (typeof node.pathData !== 'string' || !node.pathData.trim() || node.pathData.length > 131_072)) issues.push(issue(`$.nodes.${key}.pathData`, 'Path geometry must be a bounded non-empty string.'))
+    if (node.type === 'image') {
+      if (typeof node.source !== 'string' || !node.source.trim() || node.source.length > 4096) issues.push(issue(`$.nodes.${key}.source`, 'Image source must be a bounded non-empty opaque reference.'))
+      if (!['contain','cover','fill'].includes(node.fit)) issues.push(issue(`$.nodes.${key}.fit`, 'Image fit is unsupported.'))
+    }
     if (node.type === 'expert') validateExpertSpec(node.expert, `$.nodes.${key}.expert`, issues)
     if (node.type === 'group') {
       const childIds = new Set<string>()

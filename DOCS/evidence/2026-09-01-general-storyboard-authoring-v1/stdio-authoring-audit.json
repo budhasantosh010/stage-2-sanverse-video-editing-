@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "sanverse.storyboard-authoring-stdio-audit/v1",
+  "generatedAt": "2026-09-01T13:21:24.087Z",
+  "projectId": "project_21c01709e413d034d4cec25dcb4b1ca4",
+  "productionRevision": 0,
+  "runId": "run_01m4j3e8",
+  "batchId": "scenebatch_00wmhk75",
+  "sceneId": "creative_scene_017p2yj9",
+  "toolCount": 69,
+  "authoring": {
+    "currency": "£29",
+    "shape": "ellipse",
+    "duplicatedNodeId": "agent-proof-mtip3zvt",
+    "semanticPartId": "part:agent-proof-mtip3zvt",
+    "finalSandboxRevision": 4
+  },
+  "review": {
+    "reviewId": "review_00airejh",
+    "kvsCount": 2,
+    "artifactCount": 2,
+    "chatImageCount": 6,
+    "sourceComposite": true,
+    "contextHash": "2c95a561ea20d17ffb58fc20c1dd9fea3b0c8a15d422b67598dd65d69d907879"
+  },
+  "productionMutation": false
+}

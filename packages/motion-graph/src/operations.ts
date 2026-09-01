@@ -1,3 +1,4 @@
+import { MOTION_ASPECT_RATIOS } from '@sanverse/motion-contract'
 import { MOTION_BLEND_MODES, MOTION_EFFECT_REGISTRY, MOTION_EFFECT_TYPES } from './effects.ts'
 import type { MotionBlendModeV1, MotionEffectInstanceV1, MotionEffectParameterDefinitionV1 } from './effects.ts'
 import { MOTION_MASK_TYPES } from './masks.ts'
@@ -6,12 +7,14 @@ import { removeMotionMatteRelationshipV1, setMotionMatteRelationshipV1, validate
 import type { MotionMatteRelationshipV1 } from './compositing.ts'
 import { nodeBase } from './nodes.ts'
 import type { MotionGroupNodeV1, MotionNodeV1 } from './nodes.ts'
+import { MOTION_SEMANTIC_ROLES } from './parts.ts'
+import type { MotionSemanticPartV1, MotionSemanticRoleV1 } from './parts.ts'
 import { evaluateKeyframedValue, motionBezierHandleIssue } from './animation.ts'
 import { readMotionAnimatableTarget, replaceMotionAnimatableTarget, validateMotionTargetInterpolation, validateMotionTargetLiteral } from './animatable-targets.ts'
 import { applyMotionGraphPatch } from './patches.ts'
 import type { MotionGraphPatchV1 } from './patches.ts'
 import { constant, keyframed } from './properties.ts'
-import type { Animatable, MotionBezierHandlesV1, MotionKeyframeInterpolationV1, MotionKeyframeTargetV1, MotionNodePropertyNameV1, MotionNodePropertyPathV1, MotionPropertyPrimitiveV1 } from './properties.ts'
+import type { Animatable, MotionBezierHandlesV1, MotionFormatOverrideV1, MotionKeyframeInterpolationV1, MotionKeyframeTargetV1, MotionLayoutOwnershipV1, MotionNodePropertyNameV1, MotionNodePropertyPathV1, MotionPropertyPathV1, MotionPropertyPrimitiveV1 } from './properties.ts'
 import type { MotionSceneV1 } from './scene.ts'
 import type { MotionAuthoringMetadataV1 } from './authoring.ts'
 import { motionNodeLockState } from './authoring.ts'
@@ -23,9 +26,28 @@ interface MotionOperationBaseV1 {
   readonly operationId: string
 }
 
+export type MotionNodeStaticPropertyChangeV1 =
+  | Readonly<{ property: 'text.fontFamily'; value: string }>
+  | Readonly<{ property: 'text.textAlign'; value: 'left' | 'center' | 'right' }>
+  | Readonly<{ property: 'shape.shape'; value: 'rectangle' | 'rounded-rectangle' | 'ellipse' }>
+  | Readonly<{ property: 'path.pathData'; value: string }>
+  | Readonly<{ property: 'image.source'; value: string }>
+  | Readonly<{ property: 'image.fit'; value: 'contain' | 'cover' | 'fill' }>
+
+export interface MotionSubtreeReplacementV1 {
+  readonly rootNodeId: string
+  readonly nodes: Readonly<Record<string, MotionNodeV1>>
+}
+
+export interface MotionSemanticNodeMappingV1 {
+  readonly previousNodeId: string
+  readonly nextNodeId: string
+}
+
 export type MotionGraphOperationV1 =
   | (MotionOperationBaseV1 & Readonly<{ type: 'set-property'; target: MotionNodePropertyPathV1; value: Animatable<MotionPropertyPrimitiveV1> }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'reset-property'; target: MotionNodePropertyPathV1; value: Animatable<MotionPropertyPrimitiveV1> }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'set-node-static-property'; nodeId: string; change: MotionNodeStaticPropertyChangeV1 }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'set-node-enabled'; nodeId: string; enabled: boolean }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'add-keyframe'; target: MotionKeyframeTargetV1; keyframeId: string; tick: number; value?: MotionPropertyPrimitiveV1; interpolation: MotionKeyframeInterpolationV1; bezier?: MotionBezierHandlesV1 }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'remove-keyframe'; target: MotionKeyframeTargetV1; keyframeId: string }>)
@@ -42,6 +64,19 @@ export type MotionGraphOperationV1 =
   | (MotionOperationBaseV1 & Readonly<{ type: 'reorder-node'; nodeId: string; index: number }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'group-nodes'; nodeIds: readonly string[]; groupId: string; groupName: string; index?: number }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'ungroup-nodes'; groupId: string }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'replace-node'; nodeId: string; replacement: MotionNodeV1; identityPolicy: 'preserve-target-id'; childPolicy?: 'preserve-existing-children' | 'replacement-defines-children' }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'replace-subtree'; rootNodeId: string; replacement: MotionSubtreeReplacementV1; semanticMapping?: readonly MotionSemanticNodeMappingV1[] }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'add-semantic-part'; part: MotionSemanticPartV1 }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'remove-semantic-part'; partId: string }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'rename-semantic-part'; partId: string; label: string }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'set-semantic-part-role'; partId: string; role: MotionSemanticRoleV1 }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'add-node-to-semantic-part'; partId: string; nodeId: string }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'remove-node-from-semantic-part'; partId: string; nodeId: string }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'set-layout-mode'; mode: 'responsive' | 'manual' }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'set-layout-owner'; ownership: MotionLayoutOwnershipV1 }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'remove-layout-owner'; target: MotionNodePropertyPathV1 }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'set-format-override'; override: MotionFormatOverrideV1 }>)
+  | (MotionOperationBaseV1 & Readonly<{ type: 'remove-format-override'; ratio: MotionFormatOverrideV1['ratio']; target: MotionNodePropertyPathV1 }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'add-effect'; nodeId: string; effect: MotionEffectInstanceV1; index?: number }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'remove-effect'; nodeId: string; effectId: string }>)
   | (MotionOperationBaseV1 & Readonly<{ type: 'duplicate-effect'; nodeId: string; effectId: string; duplicateId: string; index?: number }>)
@@ -57,9 +92,11 @@ export type MotionGraphOperationV1 =
   | (MotionOperationBaseV1 & Readonly<{ type: 'set-blend-mode'; nodeId: string; blendMode: MotionBlendModeV1 }>)
 
 export const MOTION_GRAPH_OPERATION_TYPES = Object.freeze([
-  'set-property', 'reset-property', 'set-node-enabled',
+  'set-property', 'reset-property', 'set-node-static-property', 'set-node-enabled',
   'add-keyframe', 'remove-keyframe', 'move-keyframe', 'set-keyframe-value', 'set-keyframe-interpolation', 'set-keyframe-bezier', 'clear-keyframes',
-  'add-node', 'remove-node', 'duplicate-node', 'rename-node', 'reparent-node', 'reorder-node', 'group-nodes', 'ungroup-nodes',
+  'add-node', 'remove-node', 'duplicate-node', 'rename-node', 'reparent-node', 'reorder-node', 'group-nodes', 'ungroup-nodes', 'replace-node', 'replace-subtree',
+  'add-semantic-part', 'remove-semantic-part', 'rename-semantic-part', 'set-semantic-part-role', 'add-node-to-semantic-part', 'remove-node-from-semantic-part',
+  'set-layout-mode', 'set-layout-owner', 'remove-layout-owner', 'set-format-override', 'remove-format-override',
   'add-effect', 'remove-effect', 'duplicate-effect', 'reorder-effect', 'set-effect-property', 'set-effect-enabled',
   'add-mask', 'remove-mask', 'reorder-mask', 'set-mask-property',
   'set-matte', 'remove-matte', 'set-blend-mode',
@@ -81,6 +118,8 @@ export type MotionOperationErrorCodeV1 =
   | 'ROOT_PROTECTED'
   | 'LOCKED'
   | 'GROUP_INVALID'
+  | 'SEMANTIC_INVALID'
+  | 'LAYOUT_INVALID'
   | 'EFFECT_INVALID'
   | 'EFFECT_PARAMETER_INVALID'
   | 'MASK_INVALID'
@@ -142,6 +181,19 @@ const validKeyframeTargetSyntax = (value: unknown): value is MotionKeyframeTarge
 }
 const validInterpolation = (value: unknown): value is MotionKeyframeInterpolationV1 => ['hold', 'linear', 'bezier'].includes(String(value))
 const validBezierSyntax = (value: unknown): value is MotionBezierHandlesV1 => isRecord(value) && ['inX', 'inY', 'outX', 'outY'].every((key) => typeof value[key] === 'number')
+const validNodePropertyPathSyntax = (value: unknown): value is MotionNodePropertyPathV1 => isRecord(value) && boundedId(value.nodeId) && typeof value.property === 'string'
+const validStaticChangeSyntax = (value: unknown): value is MotionNodeStaticPropertyChangeV1 => {
+  if (!isRecord(value) || typeof value.property !== 'string') return false
+  if (value.property === 'text.fontFamily') return typeof value.value === 'string' && value.value.trim().length > 0 && value.value.length <= 512
+  if (value.property === 'text.textAlign') return ['left', 'center', 'right'].includes(String(value.value))
+  if (value.property === 'shape.shape') return ['rectangle', 'rounded-rectangle', 'ellipse'].includes(String(value.value))
+  if (value.property === 'path.pathData') return typeof value.value === 'string' && value.value.trim().length > 0 && value.value.length <= 131_072
+  if (value.property === 'image.source') return typeof value.value === 'string' && value.value.trim().length > 0 && value.value.length <= 4096
+  if (value.property === 'image.fit') return ['contain', 'cover', 'fill'].includes(String(value.value))
+  return false
+}
+const validSemanticPartSyntax = (value: unknown): value is MotionSemanticPartV1 => isRecord(value) && boundedId(value.id) && boundedName(value.label) && MOTION_SEMANTIC_ROLES.includes(value.role as MotionSemanticRoleV1) && Array.isArray(value.nodeIds) && value.nodeIds.length > 0 && value.nodeIds.every(boundedId)
+const sameTarget = (a: MotionNodePropertyPathV1, b: MotionNodePropertyPathV1): boolean => a.nodeId === b.nodeId && a.property === b.property
 
 const fail = (
   operationId: string,
@@ -177,8 +229,9 @@ export const validateMotionGraphOperation = (input: unknown): MotionOperationErr
     if (input.type === 'set-keyframe-bezier' && input.bezier !== null && !validBezierSyntax(input.bezier)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.bezier', message: 'Keyframe Bezier handles are invalid.' })
     if (input.type === 'clear-keyframes' && !primitive(input.fallbackValue)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.fallbackValue', message: 'clear-keyframes requires an explicit finite fallbackValue.' })
   }
-  const needsNodeId = ['set-node-enabled', 'remove-node', 'duplicate-node', 'rename-node', 'reparent-node', 'reorder-node', 'add-effect', 'remove-effect', 'duplicate-effect', 'reorder-effect', 'set-effect-property', 'set-effect-enabled', 'add-mask', 'remove-mask', 'reorder-mask', 'set-mask-property', 'set-blend-mode']
+  const needsNodeId = ['set-node-static-property', 'set-node-enabled', 'remove-node', 'duplicate-node', 'rename-node', 'reparent-node', 'reorder-node', 'replace-node', 'add-node-to-semantic-part', 'remove-node-from-semantic-part', 'add-effect', 'remove-effect', 'duplicate-effect', 'reorder-effect', 'set-effect-property', 'set-effect-enabled', 'add-mask', 'remove-mask', 'reorder-mask', 'set-mask-property', 'set-blend-mode']
   if (needsNodeId.includes(input.type) && !boundedId(input.nodeId)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.nodeId', message: 'nodeId must be a bounded non-empty string.' })
+  if (input.type === 'set-node-static-property' && !validStaticChangeSyntax(input.change)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.change', message: 'Static node property change is invalid or unbounded.' })
   if (input.type === 'set-node-enabled' && typeof input.enabled !== 'boolean') return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.enabled', message: 'Node enabled state must be boolean.' })
   if ((input.type === 'set-property' || input.type === 'reset-property') && (!isRecord(input.target) || !boundedId(input.target.nodeId) || typeof input.target.property !== 'string' || !isRecord(input.value))) return Object.freeze({ code: 'OPERATION_INVALID', operationId, message: 'Property operation needs a typed target and animatable value.' })
   if (input.type === 'add-node' && (!isRecord(input.node) || !boundedId(input.node.id) || !boundedId(input.parentId))) return Object.freeze({ code: 'OPERATION_INVALID', operationId, message: 'add-node needs a node and parentId.' })
@@ -189,6 +242,20 @@ export const validateMotionGraphOperation = (input: unknown): MotionOperationErr
   if ((input.type === 'reorder-node' || input.type === 'reorder-effect' || input.type === 'reorder-mask') && !validIndex(input.index)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.index', message: 'Reorder index must be a non-negative safe integer.' })
   if (input.type === 'group-nodes' && (!Array.isArray(input.nodeIds) || input.nodeIds.length === 0 || !input.nodeIds.every(boundedId) || !boundedId(input.groupId) || !boundedName(input.groupName))) return Object.freeze({ code: 'OPERATION_INVALID', operationId, message: 'group-nodes needs nodeIds, groupId and groupName.' })
   if (input.type === 'ungroup-nodes' && !boundedId(input.groupId)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.groupId', message: 'ungroup-nodes needs groupId.' })
+  if (input.type === 'replace-node' && (!isRecord(input.replacement) || input.identityPolicy !== 'preserve-target-id' || (input.childPolicy !== undefined && !['preserve-existing-children', 'replacement-defines-children'].includes(String(input.childPolicy))))) return Object.freeze({ code: 'OPERATION_INVALID', operationId, message: 'replace-node needs a typed replacement, preserve-target-id identityPolicy and optional explicit childPolicy.' })
+  if (input.type === 'replace-subtree') {
+    if (!boundedId(input.rootNodeId) || !isRecord(input.replacement) || !boundedId(input.replacement.rootNodeId) || !isRecord(input.replacement.nodes)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, message: 'replace-subtree needs rootNodeId and a normalized replacement subtree.' })
+    if (input.semanticMapping !== undefined && (!Array.isArray(input.semanticMapping) || !input.semanticMapping.every((entry) => isRecord(entry) && boundedId(entry.previousNodeId) && boundedId(entry.nextNodeId)))) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.semanticMapping', message: 'replace-subtree semanticMapping is invalid.' })
+  }
+  if (input.type === 'add-semantic-part' && !validSemanticPartSyntax(input.part)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.part', message: 'add-semantic-part needs a bounded typed semantic part.' })
+  if (['remove-semantic-part', 'rename-semantic-part', 'set-semantic-part-role', 'add-node-to-semantic-part', 'remove-node-from-semantic-part'].includes(input.type) && !boundedId(input.partId)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.partId', message: 'Semantic-part operation needs partId.' })
+  if (input.type === 'rename-semantic-part' && !boundedName(input.label)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.label', message: 'Semantic-part label must be bounded and non-empty.' })
+  if (input.type === 'set-semantic-part-role' && !MOTION_SEMANTIC_ROLES.includes(input.role as MotionSemanticRoleV1)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.role', message: 'Semantic-part role is unsupported.' })
+  if (input.type === 'set-layout-mode' && !['responsive', 'manual'].includes(String(input.mode))) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.mode', message: 'Layout mode must be responsive or manual.' })
+  if (input.type === 'set-layout-owner' && (!isRecord(input.ownership) || !validNodePropertyPathSyntax(input.ownership.target) || !['layout', 'manual'].includes(String(input.ownership.owner)) || (input.ownership.reason !== undefined && typeof input.ownership.reason !== 'string'))) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.ownership', message: 'set-layout-owner needs a typed ownership record.' })
+  if (input.type === 'remove-layout-owner' && !validNodePropertyPathSyntax(input.target)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.target', message: 'remove-layout-owner needs a typed target.' })
+  if (input.type === 'set-format-override' && (!isRecord(input.override) || !MOTION_ASPECT_RATIOS.includes(input.override.ratio as never) || !validNodePropertyPathSyntax(input.override.target) || !primitive(input.override.value))) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.override', message: 'set-format-override needs ratio, typed target and finite primitive value.' })
+  if (input.type === 'remove-format-override' && (!MOTION_ASPECT_RATIOS.includes(input.ratio as never) || !validNodePropertyPathSyntax(input.target))) return Object.freeze({ code: 'OPERATION_INVALID', operationId, message: 'remove-format-override needs ratio and typed target.' })
   if (input.type === 'add-effect' && !isRecord(input.effect)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.effect', message: 'add-effect needs an effect definition.' })
   if (['remove-effect', 'duplicate-effect', 'reorder-effect', 'set-effect-property', 'set-effect-enabled'].includes(input.type) && !boundedId(input.effectId)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.effectId', message: 'Effect operation needs effectId.' })
   if (input.type === 'duplicate-effect' && !boundedId(input.duplicateId)) return Object.freeze({ code: 'OPERATION_INVALID', operationId, path: '$.duplicateId', message: 'duplicate-effect needs duplicateId.' })
@@ -243,6 +310,61 @@ const nodeProperty = (node: MotionNodeV1, property: MotionNodePropertyNameV1): A
     if (property === 'image.opacity') return node.imageOpacity
   }
   throw new RangeError(`Property ${property} is not supported by node ${node.id}.`)
+}
+
+const nodeSupportsStaticChange = (node: MotionNodeV1, change: MotionNodeStaticPropertyChangeV1): boolean =>
+  (node.type === 'text' && (change.property === 'text.fontFamily' || change.property === 'text.textAlign')) ||
+  (node.type === 'shape' && change.property === 'shape.shape') ||
+  (node.type === 'path' && change.property === 'path.pathData') ||
+  (node.type === 'image' && (change.property === 'image.source' || change.property === 'image.fit'))
+
+const staticNodeChange = (node: MotionNodeV1, change: MotionNodeStaticPropertyChangeV1): MotionNodeV1 => {
+  if (!nodeSupportsStaticChange(node, change)) throw new RangeError(`Static property ${change.property} is not supported by ${node.type} node ${node.id}.`)
+  if (node.type === 'text' && change.property === 'text.fontFamily') return Object.freeze({ ...node, fontFamily: change.value })
+  if (node.type === 'text' && change.property === 'text.textAlign') return Object.freeze({ ...node, textAlign: change.value })
+  if (node.type === 'shape' && change.property === 'shape.shape') return Object.freeze({ ...node, shape: change.value })
+  if (node.type === 'path' && change.property === 'path.pathData') return Object.freeze({ ...node, pathData: change.value })
+  if (node.type === 'image' && change.property === 'image.source') return Object.freeze({ ...node, source: change.value })
+  if (node.type === 'image' && change.property === 'image.fit') return Object.freeze({ ...node, fit: change.value })
+  throw new RangeError(`Static property ${change.property} is not supported by ${node.type} node ${node.id}.`)
+}
+
+const staticNodeInverseChange = (node: MotionNodeV1, change: MotionNodeStaticPropertyChangeV1): MotionNodeStaticPropertyChangeV1 => {
+  if (node.type === 'text' && change.property === 'text.fontFamily') return Object.freeze({ property: 'text.fontFamily', value: node.fontFamily })
+  if (node.type === 'text' && change.property === 'text.textAlign') return Object.freeze({ property: 'text.textAlign', value: node.textAlign })
+  if (node.type === 'shape' && change.property === 'shape.shape') return Object.freeze({ property: 'shape.shape', value: node.shape })
+  if (node.type === 'path' && change.property === 'path.pathData') return Object.freeze({ property: 'path.pathData', value: node.pathData })
+  if (node.type === 'image' && change.property === 'image.source') return Object.freeze({ property: 'image.source', value: node.source })
+  if (node.type === 'image' && change.property === 'image.fit') return Object.freeze({ property: 'image.fit', value: node.fit })
+  throw new RangeError(`Static property ${change.property} is not supported by ${node.type} node ${node.id}.`)
+}
+
+const replaceNodeRecord = (scene: MotionSceneV1, node: MotionNodeV1): MotionSceneV1 => Object.freeze({ ...scene, nodes: Object.freeze({ ...scene.nodes, [node.id]: node }) })
+
+const remapNodeId = (nodeId: string, mapping: ReadonlyMap<string, string>): string => mapping.get(nodeId) ?? nodeId
+const remapNodeTarget = (target: MotionNodePropertyPathV1, mapping: ReadonlyMap<string, string>): MotionNodePropertyPathV1 => Object.freeze({ ...target, nodeId: remapNodeId(target.nodeId, mapping) })
+const remapPropertyPath = (target: MotionPropertyPathV1, mapping: ReadonlyMap<string, string>): MotionPropertyPathV1 => {
+  if (target.kind === 'component' || target.kind === 'part') return target
+  return Object.freeze({ ...target, nodeId: remapNodeId(target.nodeId, mapping) })
+}
+
+const remapSceneReferences = (scene: MotionSceneV1, mapping: ReadonlyMap<string, string>): MotionSceneV1 => {
+  if (mapping.size === 0) return scene
+  const semanticParts = Object.freeze(scene.semanticParts.map((part) => Object.freeze({ ...part, nodeIds: Object.freeze([...new Set(part.nodeIds.map((id) => remapNodeId(id, mapping)))]) })))
+  const exposures = Object.freeze(scene.exposures.map((exposure) => Object.freeze({ ...exposure, target: remapPropertyPath(exposure.target, mapping) })))
+  const ownership = Object.freeze(scene.layout.ownership.map((item) => Object.freeze({ ...item, target: remapNodeTarget(item.target, mapping) })))
+  const formatOverrides = Object.freeze(scene.layout.formatOverrides.map((item) => Object.freeze({ ...item, target: remapNodeTarget(item.target, mapping) })))
+  const mattes = scene.compositing?.mattes.map((matte) => Object.freeze({ ...matte, sourceNodeId: remapNodeId(matte.sourceNodeId, mapping), targetNodeId: remapNodeId(matte.targetNodeId, mapping) }))
+  const nodes = Object.freeze(Object.fromEntries(Object.entries(scene.nodes).map(([id, node]) => {
+    const mapAnimatable = <T,>(value: Animatable<T>): Animatable<T> => value.kind === 'binding' ? Object.freeze({ ...value, binding: Object.freeze({ ...value.binding, source: remapNodeTarget(value.binding.source, mapping) }) }) : value
+    const base = Object.freeze({ ...node, visible: mapAnimatable(node.visible), opacity: mapAnimatable(node.opacity), transform: Object.freeze(Object.fromEntries(Object.entries(node.transform).map(([key, value]) => [key, mapAnimatable(value as Animatable<unknown>)])) as unknown as MotionNodeV1['transform']) })
+    if (node.type === 'text') return [id, Object.freeze({ ...base, type: 'text' as const, text: mapAnimatable(node.text), fillColor: mapAnimatable(node.fillColor), fontFamily: node.fontFamily, fontSize: mapAnimatable(node.fontSize), fontWeight: mapAnimatable(node.fontWeight), textAlign: node.textAlign })]
+    if (node.type === 'shape') return [id, Object.freeze({ ...base, type: 'shape' as const, shape: node.shape, width: mapAnimatable(node.width), height: mapAnimatable(node.height), fillColor: mapAnimatable(node.fillColor), strokeColor: mapAnimatable(node.strokeColor), strokeWidth: mapAnimatable(node.strokeWidth), radius: mapAnimatable(node.radius) })]
+    if (node.type === 'path') return [id, Object.freeze({ ...base, type: 'path' as const, pathData: node.pathData, fillColor: mapAnimatable(node.fillColor), strokeColor: mapAnimatable(node.strokeColor), strokeWidth: mapAnimatable(node.strokeWidth), trimProgress: mapAnimatable(node.trimProgress) })]
+    if (node.type === 'image') return [id, Object.freeze({ ...base, type: 'image' as const, source: node.source, width: mapAnimatable(node.width), height: mapAnimatable(node.height), fit: node.fit, imageOpacity: mapAnimatable(node.imageOpacity) })]
+    return [id, node]
+  })))
+  return Object.freeze({ ...scene, nodes, semanticParts, exposures, layout: Object.freeze({ ...scene.layout, ownership, formatOverrides }), ...(scene.compositing && mattes ? { compositing: Object.freeze({ ...scene.compositing, mattes: Object.freeze(mattes) }) } : {}) })
 }
 
 const animatableLiteralValues = (value: Animatable<number | string>): readonly (number | string)[] => {
@@ -363,9 +485,14 @@ const mapThrownError = (operationId: string, error: unknown): MotionOperationFai
 const operationInverseId = (operationId: string, suffix = 'inverse'): string => `${operationId}:${suffix}`
 
 const operationLockTargets = (scene: MotionSceneV1, operation: MotionGraphOperationV1): readonly string[] => {
-  if (operation.type === 'set-node-enabled') return Object.freeze([])
+  if (operation.type === 'set-node-enabled' || operation.type === 'set-layout-mode' || operation.type === 'add-semantic-part' || operation.type === 'remove-semantic-part' || operation.type === 'rename-semantic-part' || operation.type === 'set-semantic-part-role') return Object.freeze([])
   if (operation.type === 'add-keyframe' || operation.type === 'remove-keyframe' || operation.type === 'move-keyframe' || operation.type === 'set-keyframe-value' || operation.type === 'set-keyframe-interpolation' || operation.type === 'set-keyframe-bezier' || operation.type === 'clear-keyframes') return Object.freeze([operation.target.nodeId])
   if (operation.type === 'set-property' || operation.type === 'reset-property') return Object.freeze([operation.target.nodeId])
+  if (operation.type === 'set-node-static-property' || operation.type === 'replace-node' || operation.type === 'add-node-to-semantic-part' || operation.type === 'remove-node-from-semantic-part') return Object.freeze([operation.nodeId])
+  if (operation.type === 'replace-subtree') return Object.freeze(subtreeNodeIds(scene, operation.rootNodeId))
+  if (operation.type === 'set-layout-owner') return Object.freeze([operation.ownership.target.nodeId])
+  if (operation.type === 'remove-layout-owner' || operation.type === 'remove-format-override') return Object.freeze([operation.target.nodeId])
+  if (operation.type === 'set-format-override') return Object.freeze([operation.override.target.nodeId])
   if (operation.type === 'remove-node') return Object.freeze(subtreeNodeIds(scene, operation.nodeId))
   if (operation.type === 'add-node') return Object.freeze([operation.parentId])
   if (operation.type === 'reparent-node') return Object.freeze([operation.nodeId, operation.parentId])
@@ -549,6 +676,17 @@ export const applyMotionOperation = (
       return success(candidate, [node.id], [Object.freeze({ operationId: operationInverseId(operationId), type: 'set-property', target: operation.target, value: oldValue })])
     }
 
+    if (operation.type === 'set-node-static-property') {
+      const node = findNode(scene, operation.nodeId)
+      if (!node) return fail(operationId, 'TARGET_NOT_FOUND', `Unknown node: ${operation.nodeId}`, { path: '$.nodeId' })
+      if (!nodeSupportsStaticChange(node, operation.change)) return fail(operationId, 'PROPERTY_INVALID', `Static property ${operation.change.property} is not supported by ${node.type} node ${node.id}.`, { path: '$.change.property' })
+      const inverseChange = staticNodeInverseChange(node, operation.change)
+      const candidate = replaceNodeRecord(scene, staticNodeChange(node, operation.change))
+      const resultIssue = ensureValidResult(operationId, candidate)
+      if (resultIssue) return resultIssue
+      return success(candidate, [node.id], [Object.freeze({ operationId: operationInverseId(operationId), type: 'set-node-static-property', nodeId: node.id, change: inverseChange })])
+    }
+
     if (operation.type === 'add-node') {
       const parent = findNode(scene, operation.parentId)
       if (!parent || parent.type !== 'group') return fail(operationId, 'PARENT_INVALID', `Parent ${operation.parentId} must be an existing group.`)
@@ -687,6 +825,148 @@ export const applyMotionOperation = (
       for (const [index, childId] of children.entries()) candidate = applyMotionGraphPatch(candidate, { op: 'reparent-node', nodeId: childId, parentId: parent.id, index: insertionIndex + index })
       candidate = applyMotionGraphPatch(candidate, { op: 'remove-node', nodeId: group.id })
       return success(candidate, [group.id, parent.id, ...children], null)
+    }
+
+    if (operation.type === 'replace-node') {
+      const target = findNode(scene, operation.nodeId)
+      if (!target) return fail(operationId, 'TARGET_NOT_FOUND', `Unknown node: ${operation.nodeId}`)
+      if (operation.replacement.id !== target.id) return fail(operationId, 'OPERATION_INVALID', 'replace-node replacement must preserve the target node ID.', { path: '$.replacement.id' })
+      if (operation.replacement.parentId !== target.parentId) return fail(operationId, 'PARENT_INVALID', 'replace-node replacement must preserve the target parent slot.', { path: '$.replacement.parentId' })
+      let replacement = operation.replacement
+      if (target.type === 'group' && target.childIds.length > 0) {
+        if (!operation.childPolicy) return fail(operationId, 'GROUP_INVALID', 'Replacing a populated group requires an explicit childPolicy.')
+        if (replacement.type !== 'group') return fail(operationId, 'GROUP_INVALID', 'A populated group cannot become a leaf node; use replace-subtree for structural replacement.')
+        if (operation.childPolicy === 'preserve-existing-children') replacement = Object.freeze({ ...replacement, childIds: target.childIds })
+        else {
+          const before = [...target.childIds].sort()
+          const after = [...replacement.childIds].sort()
+          if (JSON.stringify(before) !== JSON.stringify(after)) return fail(operationId, 'GROUP_INVALID', 'replacement-defines-children may reorder existing children but cannot orphan or invent children. Use replace-subtree for that redesign.')
+        }
+      } else if (replacement.type === 'group' && replacement.childIds.length > 0) return fail(operationId, 'GROUP_INVALID', 'replace-node cannot introduce a populated group from a leaf; use replace-subtree.')
+      const common = Object.freeze({ id: target.id, name: target.name, parentId: target.parentId, enabled: target.enabled, visible: target.visible, opacity: target.opacity, transform: target.transform, blendMode: target.blendMode, effects: target.effects, masks: target.masks })
+      replacement = Object.freeze({ ...replacement, ...common }) as MotionNodeV1
+      const candidate = replaceNodeRecord(scene, replacement)
+      const resultIssue = ensureValidResult(operationId, candidate)
+      if (resultIssue) return resultIssue
+      const inverse: MotionGraphOperationV1 = Object.freeze({ operationId: operationInverseId(operationId), type: 'replace-node', nodeId: target.id, replacement: target, identityPolicy: 'preserve-target-id', ...(target.type === 'group' && target.childIds.length > 0 ? { childPolicy: 'replacement-defines-children' as const } : {}) })
+      return success(candidate, [target.id], [inverse])
+    }
+
+    if (operation.type === 'replace-subtree') {
+      const target = findNode(scene, operation.rootNodeId)
+      if (!target) return fail(operationId, 'TARGET_NOT_FOUND', `Unknown subtree root: ${operation.rootNodeId}`)
+      if (operation.replacement.rootNodeId !== target.id) return fail(operationId, 'OPERATION_INVALID', 'replace-subtree V1 requires the replacement root to preserve the target root ID.', { path: '$.replacement.rootNodeId' })
+      const replacementEntries = Object.entries(operation.replacement.nodes)
+      if (replacementEntries.length === 0 || !operation.replacement.nodes[target.id]) return fail(operationId, 'OPERATION_INVALID', 'Replacement subtree must contain its declared root node.')
+      for (const [key, node] of replacementEntries) {
+        if (key !== node.id || !boundedId(node.id)) return fail(operationId, 'DUPLICATE_ID', `Replacement subtree has a non-normalized node entry: ${key}.`)
+        if (node.id === target.id) {
+          if (node.parentId !== target.parentId) return fail(operationId, 'PARENT_INVALID', 'Replacement subtree root must preserve the existing parent slot.')
+        } else {
+          if (!node.parentId || !operation.replacement.nodes[node.parentId] || operation.replacement.nodes[node.parentId]?.type !== 'group') return fail(operationId, 'PARENT_INVALID', `Replacement node ${node.id} must have a parent group inside the replacement subtree.`)
+        }
+        if (node.type === 'group') for (const childId of node.childIds) {
+          const child = operation.replacement.nodes[childId]
+          if (!child || child.parentId !== node.id) return fail(operationId, 'PARENT_INVALID', `Replacement group ${node.id} has a broken child reference ${childId}.`)
+        }
+      }
+      const oldIds = new Set(subtreeNodeIds(scene, target.id))
+      const outsideIds = new Set(Object.keys(scene.nodes).filter((id) => !oldIds.has(id)))
+      for (const [id] of replacementEntries) if (outsideIds.has(id)) return fail(operationId, 'DUPLICATE_ID', `Replacement node collides with an existing node outside the replaced subtree: ${id}.`)
+      const mapping = new Map<string, string>()
+      const reverseMapping = new Map<string, string>()
+      for (const item of operation.semanticMapping ?? []) {
+        if (!oldIds.has(item.previousNodeId) || !operation.replacement.nodes[item.nextNodeId]) return fail(operationId, 'SEMANTIC_INVALID', `Semantic mapping ${item.previousNodeId} → ${item.nextNodeId} is outside the replaced/replacement subtrees.`)
+        if (mapping.has(item.previousNodeId) || reverseMapping.has(item.nextNodeId)) return fail(operationId, 'SEMANTIC_INVALID', 'Semantic mapping must be one-to-one.')
+        mapping.set(item.previousNodeId, item.nextNodeId)
+        reverseMapping.set(item.nextNodeId, item.previousNodeId)
+      }
+      const oldSubtree = Object.freeze(Object.fromEntries([...oldIds].map((id) => [id, scene.nodes[id]!])) as Readonly<Record<string, MotionNodeV1>>)
+      const nodes = Object.freeze({ ...Object.fromEntries(Object.entries(scene.nodes).filter(([id]) => !oldIds.has(id))), ...operation.replacement.nodes })
+      let candidate: MotionSceneV1 = Object.freeze({ ...scene, nodes })
+      candidate = remapSceneReferences(candidate, mapping)
+      const semanticParts = Object.freeze(candidate.semanticParts.map((part) => Object.freeze({ ...part, nodeIds: Object.freeze(part.nodeIds.filter((id) => Boolean(candidate.nodes[id]))) })).filter((part) => part.nodeIds.length > 0))
+      candidate = Object.freeze({ ...candidate, semanticParts })
+      const resultIssue = ensureValidResult(operationId, candidate)
+      if (resultIssue) return resultIssue
+      const reverse = [...reverseMapping.entries()].map(([previousNodeId, nextNodeId]) => Object.freeze({ previousNodeId, nextNodeId }))
+      const inverse: MotionGraphOperationV1 = Object.freeze({ operationId: operationInverseId(operationId), type: 'replace-subtree', rootNodeId: target.id, replacement: Object.freeze({ rootNodeId: target.id, nodes: oldSubtree }), ...(reverse.length > 0 ? { semanticMapping: Object.freeze(reverse) } : {}) })
+      return success(candidate, [...oldIds, ...Object.keys(operation.replacement.nodes)], [inverse])
+    }
+
+    if (operation.type === 'add-semantic-part') {
+      if (scene.semanticParts.some((part) => part.id === operation.part.id)) return fail(operationId, 'DUPLICATE_ID', `Semantic part already exists: ${operation.part.id}`)
+      const missing = operation.part.nodeIds.filter((id) => !scene.nodes[id])
+      if (missing.length > 0) return fail(operationId, 'SEMANTIC_INVALID', `Semantic part references missing nodes: ${missing.join(', ')}.`)
+      const candidate = Object.freeze({ ...scene, semanticParts: Object.freeze([...scene.semanticParts, Object.freeze({ ...operation.part, nodeIds: Object.freeze([...new Set(operation.part.nodeIds)]) })]) })
+      return success(candidate, operation.part.nodeIds, [Object.freeze({ operationId: operationInverseId(operationId), type: 'remove-semantic-part', partId: operation.part.id })])
+    }
+
+    if (operation.type === 'remove-semantic-part' || operation.type === 'rename-semantic-part' || operation.type === 'set-semantic-part-role' || operation.type === 'add-node-to-semantic-part' || operation.type === 'remove-node-from-semantic-part') {
+      const index = scene.semanticParts.findIndex((part) => part.id === operation.partId)
+      if (index < 0) return fail(operationId, 'SEMANTIC_INVALID', `Unknown semantic part: ${operation.partId}`)
+      const part = scene.semanticParts[index]!
+      if (operation.type === 'remove-semantic-part') {
+        const candidate = Object.freeze({ ...scene, semanticParts: Object.freeze(scene.semanticParts.filter((item) => item.id !== part.id)) })
+        return success(candidate, part.nodeIds, [Object.freeze({ operationId: operationInverseId(operationId), type: 'add-semantic-part', part })])
+      }
+      if (operation.type === 'rename-semantic-part') {
+        const candidate = Object.freeze({ ...scene, semanticParts: Object.freeze(scene.semanticParts.map((item) => item.id === part.id ? Object.freeze({ ...item, label: operation.label }) : item)) })
+        return success(candidate, part.nodeIds, [Object.freeze({ operationId: operationInverseId(operationId), type: 'rename-semantic-part', partId: part.id, label: part.label })])
+      }
+      if (operation.type === 'set-semantic-part-role') {
+        const candidate = Object.freeze({ ...scene, semanticParts: Object.freeze(scene.semanticParts.map((item) => item.id === part.id ? Object.freeze({ ...item, role: operation.role }) : item)) })
+        return success(candidate, part.nodeIds, [Object.freeze({ operationId: operationInverseId(operationId), type: 'set-semantic-part-role', partId: part.id, role: part.role })])
+      }
+      const node = findNode(scene, operation.nodeId)
+      if (!node) return fail(operationId, 'TARGET_NOT_FOUND', `Unknown node: ${operation.nodeId}`)
+      if (operation.type === 'add-node-to-semantic-part') {
+        if (part.nodeIds.includes(node.id)) return fail(operationId, 'SEMANTIC_INVALID', `Node ${node.id} is already in semantic part ${part.id}.`)
+        const candidate = Object.freeze({ ...scene, semanticParts: Object.freeze(scene.semanticParts.map((item) => item.id === part.id ? Object.freeze({ ...item, nodeIds: Object.freeze([...item.nodeIds, node.id]) }) : item)) })
+        return success(candidate, [node.id], [Object.freeze({ operationId: operationInverseId(operationId), type: 'remove-node-from-semantic-part', partId: part.id, nodeId: node.id })])
+      }
+      if (!part.nodeIds.includes(node.id)) return fail(operationId, 'SEMANTIC_INVALID', `Node ${node.id} is not in semantic part ${part.id}.`)
+      const remaining = part.nodeIds.filter((id) => id !== node.id)
+      if (remaining.length === 0) return fail(operationId, 'SEMANTIC_INVALID', 'Removing the final node from a semantic part is ambiguous; remove the semantic part explicitly.')
+      const candidate = Object.freeze({ ...scene, semanticParts: Object.freeze(scene.semanticParts.map((item) => item.id === part.id ? Object.freeze({ ...item, nodeIds: Object.freeze(remaining) }) : item)) })
+      return success(candidate, [node.id], [Object.freeze({ operationId: operationInverseId(operationId), type: 'add-node-to-semantic-part', partId: part.id, nodeId: node.id })])
+    }
+
+    if (operation.type === 'set-layout-mode') {
+      const previous = scene.layout.mode
+      const candidate = Object.freeze({ ...scene, layout: Object.freeze({ ...scene.layout, mode: operation.mode }) })
+      return success(candidate, [], [Object.freeze({ operationId: operationInverseId(operationId), type: 'set-layout-mode', mode: previous })])
+    }
+
+    if (operation.type === 'set-layout-owner' || operation.type === 'remove-layout-owner' || operation.type === 'set-format-override' || operation.type === 'remove-format-override') {
+      const target = operation.type === 'set-layout-owner' ? operation.ownership.target : operation.type === 'set-format-override' ? operation.override.target : operation.target
+      const node = findNode(scene, target.nodeId)
+      if (!node) return fail(operationId, 'TARGET_NOT_FOUND', `Unknown layout target node: ${target.nodeId}`)
+      if (!nodeSupportsProperty(node, target.property)) return fail(operationId, 'LAYOUT_INVALID', `Layout target property ${target.property} is not supported by ${node.type} node ${node.id}.`)
+      if (operation.type === 'set-layout-owner') {
+        const previous = scene.layout.ownership.find((item) => sameTarget(item.target, target))
+        const next = [...scene.layout.ownership.filter((item) => !sameTarget(item.target, target)), Object.freeze({ ...operation.ownership })]
+        const candidate = Object.freeze({ ...scene, layout: Object.freeze({ ...scene.layout, ownership: Object.freeze(next) }) })
+        const inverse: MotionGraphOperationV1 = previous ? Object.freeze({ operationId: operationInverseId(operationId), type: 'set-layout-owner', ownership: previous }) : Object.freeze({ operationId: operationInverseId(operationId), type: 'remove-layout-owner', target })
+        return success(candidate, [node.id], [inverse])
+      }
+      if (operation.type === 'remove-layout-owner') {
+        const previous = scene.layout.ownership.find((item) => sameTarget(item.target, target))
+        if (!previous) return fail(operationId, 'LAYOUT_INVALID', 'Layout ownership entry does not exist.')
+        const candidate = Object.freeze({ ...scene, layout: Object.freeze({ ...scene.layout, ownership: Object.freeze(scene.layout.ownership.filter((item) => !sameTarget(item.target, target))) }) })
+        return success(candidate, [node.id], [Object.freeze({ operationId: operationInverseId(operationId), type: 'set-layout-owner', ownership: previous })])
+      }
+      const ratio = operation.type === 'set-format-override' ? operation.override.ratio : operation.ratio
+      const previous = scene.layout.formatOverrides.find((item) => item.ratio === ratio && sameTarget(item.target, target))
+      if (operation.type === 'set-format-override') {
+        const overrides = [...scene.layout.formatOverrides.filter((item) => item.ratio !== ratio || !sameTarget(item.target, target)), Object.freeze({ ...operation.override })]
+        const candidate = Object.freeze({ ...scene, layout: Object.freeze({ ...scene.layout, formatOverrides: Object.freeze(overrides) }) })
+        const inverse: MotionGraphOperationV1 = previous ? Object.freeze({ operationId: operationInverseId(operationId), type: 'set-format-override', override: previous }) : Object.freeze({ operationId: operationInverseId(operationId), type: 'remove-format-override', ratio, target })
+        return success(candidate, [node.id], [inverse])
+      }
+      if (!previous) return fail(operationId, 'LAYOUT_INVALID', 'Format override does not exist.')
+      const candidate = Object.freeze({ ...scene, layout: Object.freeze({ ...scene.layout, formatOverrides: Object.freeze(scene.layout.formatOverrides.filter((item) => item.ratio !== ratio || !sameTarget(item.target, target))) }) })
+      return success(candidate, [node.id], [Object.freeze({ operationId: operationInverseId(operationId), type: 'set-format-override', override: previous })])
     }
 
     if (operation.type === 'add-effect') {

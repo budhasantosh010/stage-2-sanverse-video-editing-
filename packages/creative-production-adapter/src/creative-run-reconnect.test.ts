@@ -99,6 +99,10 @@ describe('durable Creative Run reconnect + localized review decisions', () => {
     expect(prepared.ok).toBe(true)
     expect(prepared.value.reviews).toHaveLength(2)
     const review = prepared.value.reviews[0] as CreativeReviewV1
+    expect(review.context).toBeDefined()
+    expect(review.context?.states.length).toBeGreaterThanOrEqual(2)
+    expect(review.context?.states.every((state) => state.sourceFrameTick === review.context!.sourceStartTick + state.localTick)).toBe(true)
+    expect(review.context?.states.every((state) => state.backgroundTreatment.length > 0 && state.presentationMode.length > 0)).toBe(true)
     const persistedBeforeReconnect = structuredClone(runs.get(runId)!)
 
     const second = await createCreativeProductionExternalOrchestrationSessionV1({ sessionLabel: 'creative-run-second', ...ports(current, runs) })

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "sanverse.codex-storyboard-authoring-acceptance/v1",
+  "generatedAt": "2026-09-01",
+  "client": "codex-cli 0.144.1",
+  "sessionId": "01a05d19-7211-7412-86a3-cf1cf05ad7e4",
+  "projectId": "project_21c01709e413d034d4cec25dcb4b1ca4",
+  "result": "pass",
+  "finalMarker": "SANVERSE_CODEX_AUTHORING_OK run_id=run_01ehbqzl scene_id=creative_scene_01srm0io review_id=review_00nry3ss image_count=2",
+  "runId": "run_01ehbqzl",
+  "sceneId": "creative_scene_01srm0io",
+  "reviewId": "review_00nry3ss",
+  "imageCount": 2,
+  "inspectedSandboxRevision": 1,
+  "finalSandboxRevision": 3,
+  "selectedTextNodeId": "values.item:0",
+  "selectedShapeNodeId": "component.background",
+  "verified": {
+    "unicodePoundCodePoint": 163,
+    "poundImmediatelyBefore29": true,
+    "shape": "ellipse",
+    "allRelevantKvsStates": true,
+    "sourceCompositeReviewImages": true,
+    "productionRevisionUnchanged": true,
+    "sourceCodeEditedByCodex": false,
+    "productionApplyCalled": false,
+    "exportCalled": false
+  },
+  "typedRefusalRecoveredWithinSuccessfulSession": true,
+  "notes": "The real client made one refused graph call after inspection, then corrected its arguments and completed two revision-fenced canonical graph transactions. Validation was not weakened. Earlier bounded client attempts are documented in FAILURES.md."
+}
