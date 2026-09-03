@@ -192,6 +192,7 @@ export function TimelineItem({
    * reaches the project: see `timeline-item-drag-session.ts` for why.
    */
   const dragRef = useRef<Readonly<{ pointerId: number; originClientX: number; moved: boolean }> | null>(null)
+  const selectedOnPointerDownRef = useRef(false)
   const [dragOffsetTicks, setDragOffsetTicks] = useState<number | null>(null)
   const [dragSnappingBypassed, setDragSnappingBypassed] = useState(false)
   const canonicalLeftPx = ticksToPixels(item.startTicks, timescale, pixelsPerSecond)
@@ -267,7 +268,30 @@ export function TimelineItem({
    * was ever done.
    */
   const beginBodyDrag = (event: PointerEvent<HTMLButtonElement>) => {
-    if (!canDragBody || event.button !== 0) return
+    selectedOnPointerDownRef.current = false
+    if (event.button !== 0) return
+    /*
+     * Main-footage clips are not draggable. Pick and seek them on the press,
+     * before a late filmstrip or waveform can replace content under the
+     * pointer and make the browser cancel the following click. That exact
+     * race made the first real click after opening Studio appear dead while
+     * Enter still worked.
+     */
+    if (!canDragBody && !canRazorSplit) {
+      const modifiers = {
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+      }
+      onSelect(item.id, modifiers)
+      if (!modifiers.ctrlKey && !modifiers.metaKey && !modifiers.shiftKey) {
+        onSeek(pointerTicks(event.clientX))
+      }
+      if (item.state === 'proposed') onOpenProposal()
+      selectedOnPointerDownRef.current = true
+      return
+    }
+    if (!canDragBody) return
     dragRef.current = Object.freeze({ pointerId: event.pointerId, originClientX: event.clientX, moved: false })
     event.currentTarget.setPointerCapture(event.pointerId)
   }
@@ -351,6 +375,10 @@ export function TimelineItem({
         data-kind={item.kind}
         data-lane-kind={laneKind}
         onClick={(event) => {
+          if (selectedOnPointerDownRef.current) {
+            selectedOnPointerDownRef.current = false
+            return
+          }
           // A drag that moved is not also a click. Selecting AND moving from
           // one gesture would put the Inspector on something that just moved.
           if (dragOffsetTicks !== null) return
@@ -369,7 +397,10 @@ export function TimelineItem({
         onPointerDown={beginBodyDrag}
         onPointerMove={moveBodyDrag}
         onPointerUp={(event) => endBodyDrag(event, true)}
-        onPointerCancel={(event) => endBodyDrag(event, false)}
+        onPointerCancel={(event) => {
+          selectedOnPointerDownRef.current = false
+          endBodyDrag(event, false)
+        }}
         onContextMenu={(event) => {
           event.preventDefault()
           onSelect(item.id)

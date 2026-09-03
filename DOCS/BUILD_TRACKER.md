@@ -1,6 +1,6 @@
 # Build Tracker
 
-Last updated: 2026-08-10
+Last updated: 2026-09-03
 
 | ID | Goal | Deliverable | Status | Evidence |
 |---|---|---|---|---|
@@ -195,6 +195,12 @@ Last updated: 2026-08-10
 - [x] Final real Microsoft Edge 151 T5.5 pass: real Razor/select/Escape, Inspector draft/reset, sustained playback, 1440/1280/1024/390 no-overflow evidence, one video, zero browser/network failures
 - [x] Real revision-2 export: 1280×720 H.264/AAC 30 s; downloaded/server SHA-256 parity `27689ec…`
 - [x] Local Git-only policy recorded by owner request; no GitHub push until explicitly re-authorized after CI/CD minutes reset
+- [x] Owner-reported confidence rejection converted into a bounded T5.5 live-repair pass; T6/T7 and Motion remain untouched
+- [x] Main-footage first pointer press now selects/seeks before late filmstrip or waveform content can swallow the following click
+- [x] Linked footage plus its automatically selected dialogue now remains one deliberate choice for normal Delete routing
+- [x] Move Earlier/Later are disabled with truthful reasons at the first/last sequence boundaries; locked contextual edits are disabled consistently
+- [x] Focused Timeline suite **22/22** and web production build PASS after repair
+- [x] Correct-branch real-browser proof on isolated 30-second media: first-press select, split, valid reorder both ways, delete-with-gap, Undo, Redo
 - [ ] Owner 15–20 minute unscripted edit + same-task OpenCut benchmark/scorecard
 - [ ] Final `[verified]` T5.5 closure — blocked on owner confidence acceptance by contract
 - [ ] Gate T6 — not started; requires explicit owner authorization after T5.5 closes

@@ -33,6 +33,7 @@ const viewport = (overrides: Partial<TimelineViewportState> = {}): TimelineViewp
 const renderTimeline = (input: Readonly<{
   model?: ReturnType<typeof buildTimelineViewModel>
   selectedItemId?: string | null
+  selection?: TimelineSelectionV2
   playheadTicks?: number
   currentViewport?: TimelineViewportState
   onViewportChange?: (value: TimelineViewportState) => void
@@ -57,7 +58,11 @@ const renderTimeline = (input: Readonly<{
   freezeUnavailableReason?: string | null
   onFreezeApply?: (durationTicks: number) => void
 }> = {}) => {
-  const selectedIds = input.selectedItemId ? [input.selectedItemId] : []
+  const selection = input.selection ?? {
+    itemIds: input.selectedItemId ? [input.selectedItemId] : [],
+    anchorItemId: input.selectedItemId ?? null,
+  }
+  const selectedIds = selection.itemIds
   const model = input.model ?? buildTimelineViewModel({
     project: projectWithAllTimelineFamilies(),
     selectedItemIds: selectedIds,
@@ -67,10 +72,7 @@ const renderTimeline = (input: Readonly<{
     model,
     playheadTicks: input.playheadTicks ?? 0,
     viewport: input.currentViewport ?? viewport(),
-    selection: {
-      itemIds: selectedIds,
-      anchorItemId: input.selectedItemId ?? null,
-    },
+    selection,
     groups: [],
     markers: [],
     selectedMarkerId: null,
@@ -179,6 +181,30 @@ describe('Timeline V1', () => {
     expect(onGesture).toHaveBeenCalledWith({ type: 'split', atTicks: ticks(5) })
   })
 
+  it('selects a main-video clip on pointer down so a loading filmstrip cannot swallow the first click', () => {
+    const base = projectWithAllTimelineFamilies()
+    const firstClipId = base.composition.tracks[0].clips[0].clipId
+    const selectedItemId = `clip:${firstClipId}`
+    const model = buildTimelineViewModel({ project: base, selectedItemIds: [], pending: null })
+    const onSelect = vi.fn()
+    renderTimeline({ model, onSelect })
+
+    const pointerDown = new Event('pointerdown', { bubbles: true, cancelable: true })
+    Object.defineProperties(pointerDown, {
+      button: { configurable: true, value: 0 },
+      pointerId: { configurable: true, value: 7 },
+      clientX: { configurable: true, value: 200 },
+      ctrlKey: { configurable: true, value: false },
+      metaKey: { configurable: true, value: false },
+      shiftKey: { configurable: true, value: false },
+    })
+    fireEvent(screen.getByRole('button', { name: /clip, video/i }), pointerDown)
+
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ anchorItemId: selectedItemId }),
+    )
+  })
+
   it('leaves plain S for snapping, and never splits with it', () => {
     const base = projectWithAllTimelineFamilies()
     const firstClipId = base.composition.tracks[0].clips[0].clipId
@@ -256,6 +282,57 @@ describe('Timeline V1', () => {
 
     fireEvent.keyDown(timeline, { key: 'Escape' })
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ itemIds: [] }))
+  })
+
+  it('deletes one footage section when its automatically linked dialogue is also selected', () => {
+    const project = projectWithAllTimelineFamilies()
+    const unselected = buildTimelineViewModel({ project, selectedItemIds: [], pending: null })
+    const video = unselected.lanes.find((lane) => lane.kind === 'video')?.items.find((item) => item.kind === 'clip')
+    const dialogue = unselected.lanes.find((lane) => lane.kind === 'dialogue')?.items.find((item) => item.linkedClipId === video?.clipId)
+    if (!video || !dialogue) throw new Error('linked footage fixture missing')
+    const selection: TimelineSelectionV2 = Object.freeze({
+      itemIds: Object.freeze([video.id, dialogue.id]),
+      anchorItemId: video.id,
+    })
+    const model = buildTimelineViewModel({ project, selectedItemIds: selection.itemIds, pending: null })
+    const onGesture = vi.fn()
+    const onAction = vi.fn()
+    renderTimeline({ model, selection, onGesture, onAction, playheadTicks: ticks(5) })
+
+    fireEvent.click(screen.getByRole('button', { name: /^Delete$/ }))
+
+    expect(onGesture).toHaveBeenCalledWith(expect.objectContaining({ type: 'remove-gap' }))
+    expect(onAction).not.toHaveBeenCalledWith('lift')
+  })
+
+  it('disables impossible clip reorders instead of exposing dead enabled controls', () => {
+    const project = splitProject(projectWithAllTimelineFamilies(), 10, createIds(100))
+    const unselectedModel = buildTimelineViewModel({ project, selectedItemIds: [], pending: null })
+    const videoItems = unselectedModel.lanes
+      .find((lane) => lane.kind === 'video')
+      ?.items.filter((item) => item.kind === 'clip') ?? []
+    expect(videoItems).toHaveLength(2)
+
+    const firstId = videoItems[0].id
+    const firstModel = buildTimelineViewModel({ project, selectedItemIds: [firstId], pending: null })
+    const first = renderTimeline({ model: firstModel, selectedItemId: firstId })
+    expect(screen.getByRole('button', { name: 'Move earlier' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Move earlier' })).toHaveAttribute(
+      'title',
+      'This is already the first section.',
+    )
+    expect(screen.getByRole('button', { name: 'Move later' })).toBeEnabled()
+    first.unmount()
+
+    const lastId = videoItems[1].id
+    const lastModel = buildTimelineViewModel({ project, selectedItemIds: [lastId], pending: null })
+    renderTimeline({ model: lastModel, selectedItemId: lastId })
+    expect(screen.getByRole('button', { name: 'Move earlier' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Move later' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Move later' })).toHaveAttribute(
+      'title',
+      'This is already the last section.',
+    )
   })
 
   it('moves the playhead by one tenth of a second from the keyboard', () => {

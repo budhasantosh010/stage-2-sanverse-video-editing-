@@ -17,6 +17,7 @@ import {
   applyMarquee,
   beginDynamicTrim,
   beginMarquee,
+  boundPartners,
   cancelMarquee,
   extendSelection,
   frameDeltaToTicks,
@@ -876,6 +877,39 @@ export function Timeline({
     : null
   const grouped = selection.itemIds.some((itemId) =>
     groups.some((group) => group.memberItemIds.includes(itemId)))
+  /*
+   * Clicking footage automatically includes its recorded dialogue. That is
+   * one user choice, not a multi-selection. Only an item outside that implicit
+   * pair should send Delete through the true multi-item planner.
+   */
+  const automaticSelectionPartners = new Set(
+    selectedItem ? boundPartners(model, selectedItem.id, []) : [],
+  )
+  const hasSeveralDeliberateItems = selection.itemIds.some(
+    (itemId) => !automaticSelectionPartners.has(itemId),
+  )
+  const selectedClipId = selectedItem?.clipId ?? selectedItem?.linkedClipId ?? null
+  const orderedPrimaryClipIds = model.lanes
+    .find((lane) => lane.trackRole === 'primary-video')
+    ?.items
+    .filter((item) => item.kind === 'clip' && item.state === 'committed' && item.clipId !== null)
+    .sort((left, right) => left.startTicks - right.startTicks)
+    .map((item) => item.clipId as string) ?? []
+  const selectedClipOrder = selectedClipId === null ? -1 : orderedPrimaryClipIds.indexOf(selectedClipId)
+  const moveEarlierDisabledReason = lockedReason ?? (
+    selectedClipOrder < 0
+      ? 'This section cannot be reordered.'
+      : selectedClipOrder === 0
+        ? 'This is already the first section.'
+        : null
+  )
+  const moveLaterDisabledReason = lockedReason ?? (
+    selectedClipOrder < 0
+      ? 'This section cannot be reordered.'
+      : selectedClipOrder === orderedPrimaryClipIds.length - 1
+        ? 'This is already the last section.'
+        : null
+  )
 
   const disabledReasons: Readonly<Record<TimelineToolbarAction, string | null>> = {
     split: !selectedItem
@@ -968,7 +1002,7 @@ export function Timeline({
       onAction(action)
       return
     }
-    if (action === 'lift' && selection.itemIds.length > 1) {
+    if (action === 'lift' && hasSeveralDeliberateItems) {
       // Several things deleted together is one change set, planned upstairs.
       onAction('lift')
       return
@@ -2001,6 +2035,9 @@ export function Timeline({
         onOpenProposal={onOpenProposal}
         onCloseGap={() => runToolbarAction('close-gap')}
         closeGapDisabledReason={disabledReasons['close-gap']}
+        editDisabledReason={lockedReason}
+        moveEarlierDisabledReason={moveEarlierDisabledReason}
+        moveLaterDisabledReason={moveLaterDisabledReason}
         onOpenAdvancedControls={() => {
           if (!advancedDetailsRef.current) return
           advancedDetailsRef.current.open = true

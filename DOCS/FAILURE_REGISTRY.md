@@ -49,6 +49,9 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | FAIL-037 | P1 | Interaction routing | Selecting a proposed Timeline item forced the AI tab instead of revealing authoritative Inspector actions | RESOLVED | P1-F.0.1 |
 | [x] | FAIL-038 | P0 | Layout authority | AI toggle state could say collapsed while Reset left the panel physically expanded | RESOLVED | P1-F.0.2.1 |
 | [x] | FAIL-039 | P0 | Responsive layout | Nested Preview and Timeline panels inherited zero-height ancestors at tablet/mobile breakpoints | RESOLVED | P1-F.0.2.1 |
+| [x] | FAIL-057 | P0 | Timeline interaction | Late filmstrip content could swallow the first pointer selection after Studio opened | RESOLVED | T5.5 confidence repair |
+| [x] | FAIL-058 | P0 | Timeline edit routing | Normal Delete did nothing when footage and its automatic dialogue partner were selected | RESOLVED | T5.5 confidence repair |
+| [x] | FAIL-059 | P1 | Timeline affordance | Move Earlier/Later stayed enabled at sequence boundaries | RESOLVED | T5.5 confidence repair |
 
 ## P1-F.0.1 validation-found issue details
 
@@ -106,6 +109,44 @@ No unresolved T3 P0/P1 blocker remains. Browser automation limitations encounter
 - **Evidence:** focused evaluator tests prove raw easing can overshoot while evaluated opacity/scale/crop remain safe; final repository gate is 2,419/2,419; real revision-7 Graph/Bezier export succeeds and decoded frames are valid.
 
 No unresolved T4 P0/P1 blocker remains. The first broad regression sweep also found two mistakes in the newly written T4 long-form test harness (an off-window diamond query and a jsdom-only missing `URL.createObjectURL` spy target); both were corrected without production changes. Four `ERR_ABORTED` requests in final browser reporting were canceled by the deliberate forced reload and had no HTTP error response.
+
+## T5.5 owner-confidence repair issue details
+
+### FAIL-057 — late filmstrip content swallowed the first footage pointer selection
+
+- **What failed:** the first real mouse press on main footage after opening Studio could appear dead even though keyboard selection worked.
+- **Where:** the non-draggable main-footage body in `TimelineItem`.
+- **When/how:** filmstrip or waveform content could arrive between pointer down and click, replace content under the pointer, and prevent the browser from delivering the later click handler.
+- **Why:** non-draggable clips postponed selection until `click`; that was too late for a target whose children can change asynchronously.
+- **Impact:** the primary Timeline interaction looked unreliable on first use.
+- **Attempted/evidence:** reproduced in the active-branch browser; a focused regression dispatched pointer down before late content and initially observed zero selections.
+- **Fix:** non-draggable, non-Razor items select and seek on primary pointer down; the following click is de-duplicated while keyboard click behavior remains unchanged.
+- **Acceptance:** focused Timeline suite passes and the first live pointer press changes `aria-selected` from false to true.
+- **One-line solution:** commit non-drag footage selection on pointer down before asynchronous visual children can replace the click target.
+
+### FAIL-058 — normal Delete misrouted one linked footage/dialogue choice
+
+- **What failed:** clicking enabled Delete reported that nothing deletable was picked and left the revision unchanged.
+- **Where:** Timeline toolbar routing between primary-clip removal and the true multi-item removal planner.
+- **When/how:** selecting footage automatically selected its recorded dialogue partner, producing two selected item IDs; Delete interpreted the count as two deliberate user selections and invoked the overlay-oriented planner.
+- **Why:** transport linkage was confused with user intent.
+- **Impact:** the most basic editing action was a dead enabled control on normal talking-head footage.
+- **Attempted/evidence:** reproduced live after splitting real media; the pre-fix revision and clip count did not change. The regression test failed before the route was corrected.
+- **Fix:** derive the item's automatic bound-partner set and route to multi-item deletion only when selection contains an item outside that implicit set.
+- **Acceptance:** live Delete changes two clips to one plus a real gap; Undo restores two clips; Redo restores the deletion.
+- **One-line solution:** count deliberate selections, not automatically linked picture/sound rows, when choosing the Delete planner.
+
+### FAIL-059 — impossible sequence reorders looked available
+
+- **What failed:** Move Earlier on the first section and Move Later on the last section were enabled but could not change the project.
+- **Where:** contextual Timeline actions.
+- **When/how:** the buttons used only the generic busy state and ignored canonical clip position.
+- **Why:** capability availability was not derived from the ordered primary sequence.
+- **Impact:** visible no-op controls reduced trust even when valid reorder operations worked.
+- **Attempted/evidence:** a two-section focused test initially found the boundary action enabled; live use then proved each valid opposite direction.
+- **Fix:** derive selected primary-clip order, disable each impossible boundary action with a truthful title, and consistently apply track-lock reasons to contextual edits.
+- **Acceptance:** first section exposes only Move Later; last exposes only Move Earlier; after a valid reorder the states reverse.
+- **One-line solution:** derive reorder affordances from canonical sequence position and explain every disabled boundary.
 
 ## Legacy risk and failure summary
 

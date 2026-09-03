@@ -17,6 +17,10 @@ export type TimelineContextActionsProps = Readonly<{
   onOpenProposal(): void
   /** Closing a hole. Null when it can be done; otherwise the reason it cannot. */
   closeGapDisabledReason: string | null
+  /** Null when ordinary changes to the selected clip are allowed. */
+  editDisabledReason: string | null
+  moveEarlierDisabledReason: string | null
+  moveLaterDisabledReason: string | null
   onCloseGap(): void
   onOpenAdvancedControls(): void
 }>
@@ -34,6 +38,9 @@ export function TimelineContextActions({
   onSeek,
   onOpenProposal,
   closeGapDisabledReason,
+  editDisabledReason,
+  moveEarlierDisabledReason,
+  moveLaterDisabledReason,
   onCloseGap,
   onOpenAdvancedControls,
 }: TimelineContextActionsProps) {
@@ -51,6 +58,7 @@ export function TimelineContextActions({
     if (!selectedItem) return 'No timeline item selected.'
     return `${selectedItem.label} · ${formatTimelineTime(selectedItem.startTicks, timescale, true)} · ${formatTimelineTime(selectedItem.durationTicks, timescale, true)}`
   }, [selectedItem, timescale])
+  const editDisabled = busy || editDisabledReason !== null
 
   return (
     <div
@@ -98,21 +106,21 @@ export function TimelineContextActions({
           {isVideoClip ? (
             <button
               type="button"
-              disabled={busy || !playheadInsideSelected}
-              title={playheadInsideSelected ? undefined : 'Move the playhead inside this section before splitting.'}
+              disabled={editDisabled || !playheadInsideSelected}
+              title={editDisabledReason ?? (playheadInsideSelected ? undefined : 'Move the playhead inside this section before splitting.')}
               onClick={() => onGesture({ type: 'split', atTicks: playheadTicks })}
             >
               Split at playhead
             </button>
           ) : null}
-          <button type="button" disabled={busy} onClick={() => onGesture({ type: 'trim-start', clipId, deltaTicks: trimAmountTicks })}>Trim start</button>
-          <button type="button" disabled={busy} onClick={() => onGesture({ type: 'trim-end', clipId, deltaTicks: trimAmountTicks })}>Trim end</button>
-          <button ref={firstRemovalButtonRef} data-timeline-removal-action type="button" disabled={busy} onClick={() => onGesture({ type: 'remove-ripple', atTicks: selectedItem.startTicks })}>Remove + close gap</button>
-          <button type="button" disabled={busy} onClick={() => onGesture({ type: 'remove-gap', atTicks: selectedItem.startTicks })}>Remove + leave gap</button>
-          <button type="button" disabled={busy} onClick={() => onGesture({ type: 'set-enabled', clipId, enabled: !selectedItem.enabled })}>{selectedItem.enabled ? 'Hide section' : 'Show section'}</button>
-          <button type="button" disabled={busy} onClick={() => onGesture({ type: 'move-earlier', clipId })}>Move earlier</button>
-          <button type="button" disabled={busy} onClick={() => onGesture({ type: 'move-later', clipId })}>Move later</button>
-          <button type="button" disabled={busy} onClick={() => onGesture({ type: 'set-audio', clipId, gainDb, fadeInTicks, fadeOutTicks })}>Audio settings</button>
+          <button type="button" disabled={editDisabled} title={editDisabledReason ?? undefined} onClick={() => onGesture({ type: 'trim-start', clipId, deltaTicks: trimAmountTicks })}>Trim start</button>
+          <button type="button" disabled={editDisabled} title={editDisabledReason ?? undefined} onClick={() => onGesture({ type: 'trim-end', clipId, deltaTicks: trimAmountTicks })}>Trim end</button>
+          <button ref={firstRemovalButtonRef} data-timeline-removal-action type="button" disabled={editDisabled} title={editDisabledReason ?? undefined} onClick={() => onGesture({ type: 'remove-ripple', atTicks: selectedItem.startTicks })}>Remove + close gap</button>
+          <button type="button" disabled={editDisabled} title={editDisabledReason ?? undefined} onClick={() => onGesture({ type: 'remove-gap', atTicks: selectedItem.startTicks })}>Remove + leave gap</button>
+          <button type="button" disabled={editDisabled} title={editDisabledReason ?? undefined} onClick={() => onGesture({ type: 'set-enabled', clipId, enabled: !selectedItem.enabled })}>{selectedItem.enabled ? 'Hide section' : 'Show section'}</button>
+          <button type="button" disabled={busy || moveEarlierDisabledReason !== null} title={moveEarlierDisabledReason ?? undefined} onClick={() => onGesture({ type: 'move-earlier', clipId })}>Move earlier</button>
+          <button type="button" disabled={busy || moveLaterDisabledReason !== null} title={moveLaterDisabledReason ?? undefined} onClick={() => onGesture({ type: 'move-later', clipId })}>Move later</button>
+          <button type="button" disabled={editDisabled} title={editDisabledReason ?? undefined} onClick={() => onGesture({ type: 'set-audio', clipId, gainDb, fadeInTicks, fadeOutTicks })}>Audio settings</button>
         </div>
       ) : (
         <div className="timeline-v1__context-actions">

@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-09-03 — T5.5 live confidence repair after owner rejection
+
+- Kept work on the dedicated `timeline-t55-editor-confidence` branch and inside the existing Timeline selection/gesture authorities; no T6/T7, Motion Graphics, renderer, domain-operation or project-model work was started.
+- Found that ports 2000/2001 were initially serving an unrelated `external-mcp-raw-video-v1` worktree, stopped only those stale listeners, and relaunched this branch before accepting any browser evidence.
+- Reproduced and repaired three real confidence failures: the first pointer press on main footage could be swallowed by late filmstrip/waveform rendering; linked footage/dialogue made ordinary Delete take the multi-item overlay route and do nothing; boundary reorders remained visibly enabled despite having no legal result.
+- Preserved one Timeline selection, one proposal/history authority and the existing typed operation path. The fix interprets the automatic footage/dialogue pair as one user choice and derives reorder availability from the canonical primary sequence.
+- Focused Timeline verification passes **22/22** and the web production build passes. A correct-branch browser walkthrough on isolated real 30-second media proved first-press selection, split, valid move earlier/later, delete-with-gap, Undo and Redo. Console inspection found no runtime error.
+- This focused pass does not claim OpenCut parity or replace the earlier full 2,510-test regression. T5.5 still requires the owner's unscripted same-task comparison. The branch remains local-only and unpushed by contract.
+
 ## 2026-08-11 — T5.5 Editor Confidence machine/browser implementation
 
 - Inserted T5.5 before T6 on dedicated Editor branch `timeline-t55-editor-confidence`, based exactly on verified T5 `a89483deea214927bf44b6d82229ca6ffa72650c`; T6/T7 remain not started.
