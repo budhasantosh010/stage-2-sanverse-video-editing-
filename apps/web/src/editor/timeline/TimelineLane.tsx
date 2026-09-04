@@ -192,6 +192,15 @@ export function TimelineLane({
   // row that vanished could not be found again to unfold it.
   const rowHeightPx = heightPx ?? laneHeightPx(lane.kind, layoutWidthPx)
   const decorationPx = decorationHeightPx(lane.kind, layoutWidthPx)
+  const orderedPrimaryClips = lane.trackRole === 'primary-video'
+    ? lane.items
+        .filter((item) => item.kind === 'clip' && item.state === 'committed' && item.clipId !== null)
+        .slice()
+        .sort((left, right) => left.startTicks - right.startTicks || left.id.localeCompare(right.id))
+    : []
+  const primaryTrackIsGapless = orderedPrimaryClips[0]?.startTicks === 0
+    && orderedPrimaryClips.every((item, index, running) =>
+      index === 0 || running[index - 1].startTicks + running[index - 1].durationTicks === item.startTicks)
 
   const mediaFor = (item: TimelineItemView): ClipDerivedMedia => {
     const clip = derivedMediaClipFor(item, lane.kind, assetFacts)
@@ -279,6 +288,14 @@ export function TimelineLane({
           busy={busy}
           activeTool={activeTool}
           primarySelected={primarySelectedItemId === item.id}
+          primaryReorder={primaryTrackIsGapless && orderedPrimaryClips.length > 1 && item.kind === 'clip'
+            ? Object.freeze({
+                currentIndex: orderedPrimaryClips.findIndex((candidate) => candidate.id === item.id),
+                otherClipCenterTicks: Object.freeze(orderedPrimaryClips
+                  .filter((candidate) => candidate.id !== item.id)
+                  .map((candidate) => candidate.startTicks + Math.floor(candidate.durationTicks / 2))),
+              })
+            : null}
           laneLabel={lane.label}
           rateStretchActive={rateStretchActive}
           frameTicks={frameTicks}

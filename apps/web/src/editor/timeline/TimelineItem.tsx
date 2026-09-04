@@ -36,6 +36,8 @@ export type TimelineItemProps = Readonly<{
   busy: boolean
   activeTool: TimelineTool
   primarySelected?: boolean
+  /** Gapless primary footage may be reordered directly without inventing free-position timing. */
+  primaryReorder?: Readonly<{ currentIndex: number; otherClipCenterTicks: readonly number[] }> | null
   laneLabel: string
   rateStretchActive: boolean
   frameTicks: number
@@ -138,6 +140,7 @@ export function TimelineItem({
   busy,
   activeTool,
   primarySelected = false,
+  primaryReorder = null,
   laneLabel,
   rateStretchActive,
   frameTicks,
@@ -191,7 +194,12 @@ export function TimelineItem({
    * times a second; only the part that is DRAWN lives in state. Neither ever
    * reaches the project: see `timeline-item-drag-session.ts` for why.
    */
-  const dragRef = useRef<Readonly<{ pointerId: number; originClientX: number; moved: boolean }> | null>(null)
+  const dragRef = useRef<Readonly<{
+    pointerId: number
+    originClientX: number
+    moved: boolean
+    offsetTicks: number | null
+  }> | null>(null)
   const selectedOnPointerDownRef = useRef(false)
   const [dragOffsetTicks, setDragOffsetTicks] = useState<number | null>(null)
   const [dragSnappingBypassed, setDragSnappingBypassed] = useState(false)
@@ -234,7 +242,16 @@ export function TimelineItem({
     && item.fadeInTicks !== null
     && item.fadeOutTicks !== null
     && (laneKind === 'music' || item.pan !== null)
-  const canDragBody = activeTool === 'select' && isOverlayFamily && item.state === 'committed' && !busy
+  const canReorderPrimary = activeTool === 'select'
+    && primaryReorder !== null
+    && item.kind === 'clip'
+    && laneKind === 'video'
+    && item.state === 'committed'
+    && !busy
+  const canDragBody = activeTool === 'select'
+    && (isOverlayFamily || canReorderPrimary)
+    && item.state === 'committed'
+    && !busy
   const canRazorSplit = activeTool === 'razor'
     && item.state === 'committed'
     && item.kind !== 'gap'
@@ -292,7 +309,24 @@ export function TimelineItem({
       return
     }
     if (!canDragBody) return
-    dragRef.current = Object.freeze({ pointerId: event.pointerId, originClientX: event.clientX, moved: false })
+    if (canReorderPrimary) {
+      const modifiers = {
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+      }
+      onSelect(item.id, modifiers)
+      if (!modifiers.ctrlKey && !modifiers.metaKey && !modifiers.shiftKey) {
+        onSeek(pointerTicks(event.clientX))
+      }
+      selectedOnPointerDownRef.current = true
+    }
+    dragRef.current = Object.freeze({
+      pointerId: event.pointerId,
+      originClientX: event.clientX,
+      moved: false,
+      offsetTicks: null,
+    })
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
@@ -305,13 +339,17 @@ export function TimelineItem({
     // Shift asks for the exact position under the pointer, ignoring snapping
     // for this one gesture. Per-gesture on purpose: a modifier that stayed on
     // would be a setting nobody remembers changing.
-    const snapped = pointerTime(
-      event.clientX,
-      [item.startTicks, item.startTicks + item.durationTicks],
-      event.shiftKey,
-    )
+    const snapped = canReorderPrimary
+      ? Object.freeze({ ticks: pointerTicks(event.clientX), snappedToTicks: null })
+      : pointerTime(
+          event.clientX,
+          [item.startTicks, item.startTicks + item.durationTicks],
+          event.shiftKey,
+        )
     const nextStart = Math.max(0, snapped.ticks - Math.floor(item.durationTicks / 2))
-    setDragOffsetTicks(nextStart - item.startTicks)
+    const offsetTicks = nextStart - item.startTicks
+    dragRef.current = Object.freeze({ ...(dragRef.current ?? drag), moved: true, offsetTicks })
+    setDragOffsetTicks(offsetTicks)
     setDragSnappingBypassed(event.shiftKey)
     onSnapGuide(snapped.snappedToTicks)
   }
@@ -321,7 +359,7 @@ export function TimelineItem({
     if (!drag || drag.pointerId !== event.pointerId) return
     dragRef.current = null
     onSnapGuide(null)
-    const offset = dragOffsetTicks
+    const offset = drag.offsetTicks
     setDragOffsetTicks(null)
     setDragSnappingBypassed(false)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -331,6 +369,16 @@ export function TimelineItem({
     // change set that changes nothing still takes a revision and a slot in
     // Undo, which reads to the user as a broken button.
     if (!commit || !drag.moved || offset === null || offset === 0) return
+    if (canReorderPrimary && primaryReorder && item.clipId) {
+      const draggedCenterTicks = item.startTicks + Math.floor(item.durationTicks / 2) + offset
+      const toIndex = primaryReorder.otherClipCenterTicks
+        .filter((centerTicks) => centerTicks < draggedCenterTicks)
+        .length
+      if (toIndex !== primaryReorder.currentIndex) {
+        onGesture({ type: 'move-to-index', clipId: item.clipId, toIndex })
+      }
+      return
+    }
     onItemAction(item.id, { type: 'move', toStartTicks: item.startTicks + offset })
   }
 
@@ -351,6 +399,7 @@ export function TimelineItem({
       data-item-id={item.id}
       data-primary-selected={primarySelected ? 'yes' : 'no'}
       data-active-tool={activeTool}
+      data-primary-reorder={canReorderPrimary ? 'yes' : 'no'}
       data-canonical-left={canonicalLeftPx}
       data-canonical-width={canonicalWidthPx}
     >

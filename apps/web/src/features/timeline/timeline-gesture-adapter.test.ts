@@ -93,6 +93,22 @@ describe('timeline gesture adapter', () => {
     expect(later.ok && later.value.kind === 'reorder-clip' ? later.value.toIndex : null).toBe(1)
   })
 
+  it('emits one existing reorder operation for a direct clip drag destination', () => {
+    const twiceSplit = splitProject(splitProject(testProject(), 10, createIds(100)), 20, createIds(200))
+    const clips = effectiveComposition(twiceSplit).tracks[0].clips
+      .slice()
+      .sort((left, right) => left.compositionStart.ticks - right.compositionStart.ticks)
+
+    const result = adapt(twiceSplit, {
+      type: 'move-to-index',
+      clipId: clips[2].clipId,
+      toIndex: 0,
+    })
+
+    expect(result.ok && result.value.kind === 'reorder-clip' ? result.value.toIndex : null).toBe(0)
+    expect(result.ok && result.value.kind === 'reorder-clip' ? result.value.clipId : null).toBe(clips[2].clipId)
+  })
+
   it('refuses moving the first earlier or the last later', () => {
     const project = splitProject(testProject(), 10, createIds())
     const clips = effectiveComposition(project).tracks[0].clips

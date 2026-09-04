@@ -7,6 +7,9 @@
 - Reproduced and repaired three real confidence failures: the first pointer press on main footage could be swallowed by late filmstrip/waveform rendering; linked footage/dialogue made ordinary Delete take the multi-item overlay route and do nothing; boundary reorders remained visibly enabled despite having no legal result.
 - Preserved one Timeline selection, one proposal/history authority and the existing typed operation path. The fix interprets the automatic footage/dialogue pair as one user choice and derives reorder availability from the canonical primary sequence.
 - Focused Timeline verification passes **22/22** and the web production build passes. A correct-branch browser walkthrough on isolated real 30-second media proved first-press selection, split, valid move earlier/later, delete-with-gap, Undo and Redo. Console inspection found no runtime error.
+- Continued the same bounded gate with direct primary-footage reordering for gapless sequences. Pointer movement remains detached presentation state until release, then compiles through the existing gesture adapter and `reorder-clip` operation as one project/history change.
+- Reduced default Timeline friction by collapsing detailed zoom controls behind a named disclosure and moving selected-item actions directly below the main toolbar, ahead of precision controls and track rows.
+- Focused adapter/edit/Timeline/decorations/creator suites pass **100/100** and the all-workspace production build passes. Live pointer drag reversed the two real-media sections at change 12; visible Undo and Redo restored and reapplied the exact order at changes 13/14.
 - This focused pass does not claim OpenCut parity or replace the earlier full 2,510-test regression. T5.5 still requires the owner's unscripted same-task comparison. The branch remains local-only and unpushed by contract.
 
 ## 2026-08-11 — T5.5 Editor Confidence machine/browser implementation

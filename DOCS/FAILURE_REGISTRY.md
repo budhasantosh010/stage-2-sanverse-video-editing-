@@ -52,6 +52,9 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | FAIL-057 | P0 | Timeline interaction | Late filmstrip content could swallow the first pointer selection after Studio opened | RESOLVED | T5.5 confidence repair |
 | [x] | FAIL-058 | P0 | Timeline edit routing | Normal Delete did nothing when footage and its automatic dialogue partner were selected | RESOLVED | T5.5 confidence repair |
 | [x] | FAIL-059 | P1 | Timeline affordance | Move Earlier/Later stayed enabled at sequence boundaries | RESOLVED | T5.5 confidence repair |
+| [x] | FAIL-060 | P0 | Timeline interaction | Primary footage could not be reordered with the direct drag interaction expected in a video editor | RESOLVED | T5.5 confidence repair |
+| [x] | FAIL-061 | P1 | Timeline hierarchy | Detailed zoom controls permanently occupied the primary toolbar | RESOLVED | T5.5 confidence repair |
+| [x] | FAIL-062 | P1 | Timeline discoverability | Selected-item actions appeared below all tracks instead of next to the selection workflow | RESOLVED | T5.5 confidence repair |
 
 ## P1-F.0.1 validation-found issue details
 
@@ -147,6 +150,42 @@ No unresolved T4 P0/P1 blocker remains. The first broad regression sweep also fo
 - **Fix:** derive selected primary-clip order, disable each impossible boundary action with a truthful title, and consistently apply track-lock reasons to contextual edits.
 - **Acceptance:** first section exposes only Move Later; last exposes only Move Earlier; after a valid reorder the states reverse.
 - **One-line solution:** derive reorder affordances from canonical sequence position and explain every disabled boundary.
+
+### FAIL-060 — primary footage had no direct reorder gesture
+
+- **What failed:** primary video sections could be moved only through contextual Earlier/Later buttons; dragging the clip body did not reorder it.
+- **Where:** primary-video `TimelineItem` body interaction and the Timeline gesture adapter.
+- **When/how:** in Select mode, pointer dragging was enabled only for overlays and music even when the primary sequence contained multiple gapless clips.
+- **Why:** the earlier drag implementation intentionally excluded primary clips, but the replacement interaction was never added after the domain gained a safe `reorder-clip` primitive.
+- **Impact:** the core timeline violated the normal direct-manipulation expectation established by OpenCut and other NLEs, reducing confidence even though the underlying operation existed.
+- **Attempted/evidence:** the new component test first observed zero gestures from a primary-clip drag; live pointer dragging also left the revision and order unchanged before implementation.
+- **Fix:** enable body dragging only for committed clips in a fully gapless primary track, keep movement detached until pointer release, calculate the destination index from canonical clip centers, and route one `move-to-index` gesture through the existing `reorder-clip` builder.
+- **Acceptance:** focused tests pass; a live real-media drag reversed two clips and saved change 12; visible Undo/Redo restored and reapplied the exact order at changes 13/14.
+- **One-line solution:** translate a gapless primary-clip drag into one existing authoritative `reorder-clip` operation on pointer release.
+
+### FAIL-061 — zoom detail crowded the default Timeline toolbar
+
+- **What failed:** horizontal and vertical zoom sliders were permanently expanded on desktop.
+- **Where:** `TimelineToolbar` Zoom disclosure and its CSS layout.
+- **When/how:** opening Studio at normal desktop widths forced the `<details>` element open regardless of user intent.
+- **Why:** the earlier responsive rule treated desktop width as evidence that detailed zoom controls should always be visible.
+- **Impact:** secondary presentation controls competed with Select, Razor, Delete and insertion modes, making the editor feel denser and less calm than the OpenCut reference.
+- **Attempted/evidence:** a focused UI test initially found the Zoom disclosure open before activation.
+- **Fix:** keep one always-visible, keyboard-accessible Timeline Zoom summary and show the detailed sliders in a bounded popover only while explicitly opened.
+- **Acceptance:** focused Timeline tests prove the disclosure starts closed and opens on request; live Studio shows one compact Zoom control.
+- **One-line solution:** keep detailed zoom controls opt-in behind one named disclosure at every viewport width.
+
+### FAIL-062 — selected actions were separated from selection
+
+- **What failed:** the selected-item action strip rendered after the entire track viewport and diagnostics.
+- **Where:** top-level `Timeline` composition order.
+- **When/how:** after selecting a clip or gap, the relevant action appeared below all lanes and could sit outside the immediate working view.
+- **Why:** contextual actions were appended after the track implementation instead of being treated as part of the primary toolbar hierarchy.
+- **Impact:** users had to hunt or scroll for the action that explained what the current selection could do.
+- **Attempted/evidence:** a focused DOM-order test initially proved the action group followed the track viewport.
+- **Fix:** render the existing single `TimelineContextActions` instance immediately after the toolbar, without duplicating its state or edit routes.
+- **Acceptance:** focused Timeline tests prove the action group precedes track content; live selection exposes its actions above the lanes.
+- **One-line solution:** place the one authoritative selected-item action strip directly beneath the main Timeline toolbar.
 
 ## Legacy risk and failure summary
 

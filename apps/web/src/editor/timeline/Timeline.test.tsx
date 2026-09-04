@@ -335,6 +335,52 @@ describe('Timeline V1', () => {
     )
   })
 
+  it('reorders primary footage by dragging it across another section', () => {
+    const project = splitProject(projectWithAllTimelineFamilies(), 10, createIds(300))
+    const unselectedModel = buildTimelineViewModel({ project, selectedItemIds: [], pending: null })
+    const videoItems = unselectedModel.lanes
+      .find((lane) => lane.kind === 'video')
+      ?.items.filter((item) => item.kind === 'clip') ?? []
+    const first = videoItems[0]
+    if (!first?.clipId) throw new Error('first primary clip fixture missing')
+    const onGesture = vi.fn()
+    const { container } = renderTimeline({ model: unselectedModel, onGesture })
+    const viewportElement = container.querySelector<HTMLElement>('[data-timeline-viewport]')
+    if (!viewportElement) throw new Error('timeline viewport missing')
+    vi.spyOn(viewportElement, 'getBoundingClientRect').mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 600, bottom: 300, width: 600, height: 300,
+      toJSON: () => ({}),
+    })
+    const clip = screen.getAllByRole('button', { name: /clip, video/i })[0]
+    Object.defineProperties(clip, {
+      setPointerCapture: { configurable: true, value: vi.fn() },
+      hasPointerCapture: { configurable: true, value: () => true },
+      releasePointerCapture: { configurable: true, value: vi.fn() },
+    })
+    const pointer = (type: string, clientX: number) => {
+      const event = new Event(type, { bubbles: true, cancelable: true })
+      Object.defineProperties(event, {
+        button: { configurable: true, value: 0 },
+        pointerId: { configurable: true, value: 11 },
+        clientX: { configurable: true, value: clientX },
+        ctrlKey: { configurable: true, value: false },
+        metaKey: { configurable: true, value: false },
+        shiftKey: { configurable: true, value: false },
+      })
+      fireEvent(clip, event)
+    }
+
+    pointer('pointerdown', 200)
+    pointer('pointermove', 2_500)
+    pointer('pointerup', 2_500)
+
+    expect(onGesture).toHaveBeenCalledWith({
+      type: 'move-to-index',
+      clipId: first.clipId,
+      toIndex: 1,
+    })
+  })
+
   it('moves the playhead by one tenth of a second from the keyboard', () => {
     const onSeek = vi.fn()
     renderTimeline({ playheadTicks: ticks(5), onSeek })
@@ -435,6 +481,30 @@ describe('Timeline V1', () => {
 
     expect(onViewportChange).toHaveBeenCalledTimes(2)
     expect(onGesture).not.toHaveBeenCalled()
+  })
+
+  it('keeps detailed zoom controls behind one compact button until requested', () => {
+    const { container } = renderTimeline()
+    const zoom = container.querySelector<HTMLDetailsElement>('.timeline-v1__zoom-controls')
+    if (!zoom) throw new Error('timeline zoom controls missing')
+
+    expect(zoom.open).toBe(false)
+    fireEvent.click(within(zoom).getByText('Timeline Zoom'))
+    expect(zoom.open).toBe(true)
+    expect(within(zoom).getByRole('slider', { name: 'Timeline horizontal zoom' })).toBeVisible()
+  })
+
+  it('places selected-item actions before the tracks so they do not disappear below the timeline', () => {
+    const base = projectWithAllTimelineFamilies()
+    const firstClipId = base.composition.tracks[0].clips[0].clipId
+    const selectedItemId = `clip:${firstClipId}`
+    const model = buildTimelineViewModel({ project: base, selectedItemIds: [selectedItemId], pending: null })
+    const { container } = renderTimeline({ model, selectedItemId })
+    const actions = container.querySelector('.timeline-v1__context-actions')
+    const tracks = container.querySelector('.timeline-v1__viewport-grid')
+    if (!actions || !tracks) throw new Error('timeline actions or tracks missing')
+
+    expect(Boolean(actions.compareDocumentPosition(tracks) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
   })
 
   it('makes the T3 precision-tool keyboard shortcuts change the real Trim tool mode', () => {

@@ -163,6 +163,35 @@ export const buildMoveAtPlayhead = (
   const toIndex = direction === 'earlier' ? index - 1 : index + 1
   if (toIndex < 0) return refuse('This section is already first.')
   if (toIndex >= ordered.length) return refuse('This section is already last.')
+  return buildMoveClipToIndex(composition, clip.clipId, toIndex, makeOperationId)
+}
+
+/**
+ * Put one primary section at an exact position in its existing track.
+ *
+ * Direct pointer reordering and the earlier/later buttons both end here, so
+ * they can never disagree about the operation shape or bounds. The edit-domain
+ * remains authoritative over whether the current track (for example, one with
+ * gaps) can actually be reordered.
+ */
+export const buildMoveClipToIndex = (
+  composition: Composition,
+  clipId: string,
+  toIndex: number,
+  makeOperationId: IdMaker,
+): TimelineEditResult => {
+  const track = composition.tracks.find((candidate) =>
+    candidate.clips.some((item) => item.clipId === clipId),
+  )
+  if (!track) return refuse('That section could not be found.')
+  const ordered = [...track.clips].sort(
+    (left, right) => left.compositionStart.ticks - right.compositionStart.ticks,
+  )
+  if (!Number.isSafeInteger(toIndex) || toIndex < 0 || toIndex >= ordered.length) {
+    return refuse('Choose a position inside this track.')
+  }
+  const currentIndex = ordered.findIndex((item) => item.clipId === clipId)
+  if (currentIndex === toIndex) return refuse('That section is already in this position.')
   return Object.freeze({
     ok: true,
     operation: Object.freeze({
@@ -170,7 +199,7 @@ export const buildMoveAtPlayhead = (
       operationId: makeOperationId(),
       kind: 'reorder-clip' as const,
       capabilityId: REORDER_PRIMITIVE_ID,
-      clipId: clip.clipId,
+      clipId,
       toIndex,
       extensions: Object.freeze({}),
     }) as TimelineOperation,

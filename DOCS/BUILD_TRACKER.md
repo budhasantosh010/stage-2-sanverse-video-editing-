@@ -201,6 +201,10 @@ Last updated: 2026-09-03
 - [x] Move Earlier/Later are disabled with truthful reasons at the first/last sequence boundaries; locked contextual edits are disabled consistently
 - [x] Focused Timeline suite **22/22** and web production build PASS after repair
 - [x] Correct-branch real-browser proof on isolated 30-second media: first-press select, split, valid reorder both ways, delete-with-gap, Undo, Redo
+- [x] Gapless primary footage can be reordered by direct pointer drag through the existing `reorder-clip` operation and one history transaction
+- [x] Timeline Zoom is collapsed by default and selected-item actions appear before the track viewport, reducing default chrome and hunting
+- [x] Focused related suites **100/100** and all-workspace production build PASS for the direct-manipulation repair
+- [x] Real-browser direct drag saved change 12; visible Undo and Redo restored and reapplied the exact clip order as changes 13/14
 - [ ] Owner 15–20 minute unscripted edit + same-task OpenCut benchmark/scorecard
 - [ ] Final `[verified]` T5.5 closure — blocked on owner confidence acceptance by contract
 - [ ] Gate T6 — not started; requires explicit owner authorization after T5.5 closes

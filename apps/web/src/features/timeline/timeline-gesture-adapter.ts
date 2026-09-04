@@ -13,6 +13,7 @@ import { err, ok } from '@sanverse/edit-domain/result'
 
 import {
   buildMoveAtPlayhead,
+  buildMoveClipToIndex,
   buildRemoveAtPlayhead,
   buildSetAudioAtPlayhead,
   buildSetEnabledAtPlayhead,
@@ -30,6 +31,7 @@ export type TimelineGesture =
   | Readonly<{ type: 'set-enabled'; clipId: string; enabled: boolean }>
   | Readonly<{ type: 'move-earlier'; clipId: string }>
   | Readonly<{ type: 'move-later'; clipId: string }>
+  | Readonly<{ type: 'move-to-index'; clipId: string; toIndex: number }>
   | Readonly<{
       type: 'set-audio'
       clipId: string
@@ -133,6 +135,7 @@ const validateBuiltOperation = (
  * set-enabled    -> buildSetEnabledAtPlayhead  -> set-clip-enabled
  * move earlier   -> buildMoveAtPlayhead        -> reorder-clip
  * move later     -> buildMoveAtPlayhead        -> reorder-clip
+ * direct reorder -> buildMoveClipToIndex       -> reorder-clip
  * set-audio      -> buildSetAudioAtPlayhead    -> set-clip-audio
  *
  * It never creates a change set and never applies the result. The application
@@ -223,6 +226,14 @@ export const adaptTimelineGesture = (
           composition,
           playheadTicks,
           gesture.type === 'move-earlier' ? 'earlier' : 'later',
+          input.createOperationId,
+        )
+        break
+      case 'move-to-index':
+        built = buildMoveClipToIndex(
+          composition,
+          gesture.clipId,
+          gesture.toIndex,
           input.createOperationId,
         )
         break

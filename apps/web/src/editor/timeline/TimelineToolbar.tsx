@@ -277,17 +277,8 @@ export function TimelineToolbar({
   const [moreOpen, setMoreOpen] = useState(false)
   const [trimOpen, setTrimOpen] = useState(false)
   const [zoomOpen, setZoomOpen] = useState(false)
-  const [compactZoom, setCompactZoom] = useState(() => typeof window !== 'undefined' && window.innerWidth < 600)
   const moreRef = useRef<HTMLDivElement>(null)
   const trimRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const update = () => setCompactZoom(window.innerWidth < 600)
-    update()
-    window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
-  }, [])
 
   /*
    * Closing More by clicking elsewhere, and by pressing Escape.
@@ -619,10 +610,8 @@ export function TimelineToolbar({
 
       <details
         className="timeline-v1__zoom-controls"
-        open={!compactZoom || zoomOpen}
-        onToggle={(event) => {
-          if (compactZoom) setZoomOpen(event.currentTarget.open)
-        }}
+        open={zoomOpen}
+        onToggle={(event) => setZoomOpen(event.currentTarget.open)}
       >
         <summary aria-label="Timeline Zoom" title="Timeline Zoom">
           <Icon path={ICONS.zoom} />

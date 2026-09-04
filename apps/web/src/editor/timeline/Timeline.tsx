@@ -1566,6 +1566,31 @@ export function Timeline({
         onResetVerticalZoom={() => changeVerticalZoom(DEFAULT_VERTICAL_ZOOM_BASIS_POINTS)}
       />
 
+      <TimelineContextActions
+        selectedItem={selectedItem}
+        playheadTicks={playheadTicks}
+        timescale={model.timescale}
+        busy={busy}
+        trimAmountTicks={trimAmountTicks}
+        gainDb={gainDb}
+        fadeInTicks={fadeInTicks}
+        fadeOutTicks={fadeOutTicks}
+        onGesture={onGesture}
+        onSeek={onSeek}
+        onOpenProposal={onOpenProposal}
+        onCloseGap={() => runToolbarAction('close-gap')}
+        closeGapDisabledReason={disabledReasons['close-gap']}
+        editDisabledReason={lockedReason}
+        moveEarlierDisabledReason={moveEarlierDisabledReason}
+        moveLaterDisabledReason={moveLaterDisabledReason}
+        onOpenAdvancedControls={() => {
+          if (!advancedDetailsRef.current) return
+          advancedDetailsRef.current.open = true
+          advancedDetailsRef.current.scrollIntoView({ block: 'nearest' })
+          advancedDetailsRef.current.querySelector<HTMLElement>('button, input, summary')?.focus()
+        }}
+      />
+
       <div className="timeline-v1__precision-status" role="group" aria-label="Precision trim playback">
         <button
           type="button"
@@ -2020,31 +2045,6 @@ export function Timeline({
           ))}
         </div>
       ) : null}
-
-      <TimelineContextActions
-        selectedItem={selectedItem}
-        playheadTicks={playheadTicks}
-        timescale={model.timescale}
-        busy={busy}
-        trimAmountTicks={trimAmountTicks}
-        gainDb={gainDb}
-        fadeInTicks={fadeInTicks}
-        fadeOutTicks={fadeOutTicks}
-        onGesture={onGesture}
-        onSeek={onSeek}
-        onOpenProposal={onOpenProposal}
-        onCloseGap={() => runToolbarAction('close-gap')}
-        closeGapDisabledReason={disabledReasons['close-gap']}
-        editDisabledReason={lockedReason}
-        moveEarlierDisabledReason={moveEarlierDisabledReason}
-        moveLaterDisabledReason={moveLaterDisabledReason}
-        onOpenAdvancedControls={() => {
-          if (!advancedDetailsRef.current) return
-          advancedDetailsRef.current.open = true
-          advancedDetailsRef.current.scrollIntoView({ block: 'nearest' })
-          advancedDetailsRef.current.querySelector<HTMLElement>('button, input, summary')?.focus()
-        }}
-      />
 
       <details ref={advancedDetailsRef} className="timeline-v1__advanced">
         <summary>Advanced direct controls</summary>
