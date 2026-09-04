@@ -572,21 +572,19 @@ export function TimelineToolbar({
         </button>
       </div>
 
-      <div className="timeline-v1__toolbar-group" role="group" aria-label="How a drop lands">
-        {PLACEMENT_MODES.map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            className="timeline-v1__toolbar-button"
-            aria-pressed={placementMode === mode}
-            data-placement-mode={mode}
-            title={MODE_HINTS[mode]}
-            onClick={() => onPlacementMode(mode)}
-          >
-            {MODE_LABELS[mode]}
-          </button>
-        ))}
-      </div>
+      <label className="timeline-v1__placement-control" title={MODE_HINTS[placementMode]}>
+        <span>Place</span>
+        <select
+          aria-label="How a drop lands"
+          data-placement-mode={placementMode}
+          value={placementMode}
+          onChange={(event) => onPlacementMode(event.currentTarget.value as PlacementMode)}
+        >
+          {PLACEMENT_MODES.map((mode) => (
+            <option key={mode} value={mode}>{MODE_LABELS[mode]}</option>
+          ))}
+        </select>
+      </label>
 
       <div className="timeline-v1__more" ref={moreRef}>
         <button

@@ -55,6 +55,8 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | FAIL-060 | P0 | Timeline interaction | Primary footage could not be reordered with the direct drag interaction expected in a video editor | RESOLVED | T5.5 confidence repair |
 | [x] | FAIL-061 | P1 | Timeline hierarchy | Detailed zoom controls permanently occupied the primary toolbar | RESOLVED | T5.5 confidence repair |
 | [x] | FAIL-062 | P1 | Timeline discoverability | Selected-item actions appeared below all tracks instead of next to the selection workflow | RESOLVED | T5.5 confidence repair |
+| [x] | FAIL-063 | P1 | Timeline hierarchy | Precision playback and track creation remained permanently visible during simple editing | RESOLVED | T5.5 recording comparison |
+| [x] | FAIL-064 | P1 | Timeline toolbar density | Four placement policies permanently consumed the primary toolbar | RESOLVED | T5.5 recording comparison |
 
 ## P1-F.0.1 validation-found issue details
 
@@ -186,6 +188,30 @@ No unresolved T4 P0/P1 blocker remains. The first broad regression sweep also fo
 - **Fix:** render the existing single `TimelineContextActions` instance immediately after the toolbar, without duplicating its state or edit routes.
 - **Acceptance:** focused Timeline tests prove the action group precedes track content; live selection exposes its actions above the lanes.
 - **One-line solution:** place the one authoritative selected-item action strip directly beneath the main Timeline toolbar.
+
+### FAIL-063 — specialist controls permanently occupied the simple editing path
+
+- **What failed:** precision playback, track creation and legacy direct controls occupied separate permanent bands around the Timeline.
+- **Where:** top-level `Timeline` presentation order.
+- **When/how:** every Studio session showed these controls before the user entered a precision or multitrack task.
+- **Why:** each capability was added as a visible milestone surface, but the completed surfaces were never recomposed into one progressive-disclosure hierarchy.
+- **Impact:** the supplied Sanverse recording visibly reflowed and presented more equal-weight controls than OpenCut during the same simple one-video task.
+- **Attempted/evidence:** full-stream analysis processed 1,183 Sanverse Timeline-region frames; its mean frame difference was about 2.4× OpenCut's comparable crop. The focused RED test proved the controls lived outside and after the existing advanced disclosure.
+- **Fix:** move precision playback, track creation and legacy direct controls into one existing, closed `Advanced timeline controls` disclosure positioned before tracks.
+- **Acceptance:** focused Timeline tests pass; live Studio reports exactly one closed advanced disclosure before the viewport with both control groups inside.
+- **One-line solution:** keep specialist controls available but collapse them into one advanced surface outside the default edit loop.
+
+### FAIL-064 — four placement policies dominated the primary toolbar
+
+- **What failed:** Normal, Insert, Overwrite and Append appeared as four permanent text buttons.
+- **Where:** `TimelineToolbar` placement-mode group.
+- **When/how:** the buttons consumed primary toolbar width in every edit even though only one policy can be active.
+- **Why:** explicit milestone visibility was preserved after the policies became stable, instead of being consolidated into one mutually exclusive control.
+- **Impact:** the toolbar looked denser than OpenCut, wrapped earlier and made a secondary drop policy compete with Select, Split and Delete.
+- **Attempted/evidence:** the focused RED test found no compact placement combobox; the owner recording shows the four-button group throughout the session.
+- **Fix:** render one native keyboard-accessible `Place` selector with all four unchanged options and the current policy's explanation.
+- **Acceptance:** focused toolbar tests pass and live Studio changes Normal → Overwrite → Normal through the selector without creating a project edit.
+- **One-line solution:** represent mutually exclusive placement policies with one compact selector instead of four permanent buttons.
 
 ## Legacy risk and failure summary
 

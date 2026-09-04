@@ -1,5 +1,14 @@
 # Project Log
 
+## 2026-09-04 — T5.5 frame-by-frame OpenCut confidence convergence
+
+- Decoded the owner's complete 59.7-second OpenCut and 47.4-second Sanverse recordings and analysed 1,421/1,183 bottom-Timeline frames, plus full-session and dense transition contact sheets.
+- The comparable Timeline crop showed directionally higher Sanverse visual volatility: 2.4× mean frame difference and 56% more frames above 1.0 per second. The recordings locate the problem in permanent control density and interface re-layout, not missing Timeline operations.
+- Froze feature growth at a bounded OpenCut-level contract. Sanverse's richer operations remain available, but no new Timeline capability is justified before owner confidence acceptance.
+- Moved precision playback, track creation and legacy specialist controls behind the one existing advanced disclosure before tracks. Replaced four permanent placement-policy buttons with one compact accessible selector while preserving all four policies.
+- Focused Timeline hierarchy/control suites pass **37/37** and the all-workspace production build passes. Live Studio proves the disclosure is closed by default and the selector changes modes without creating project history.
+- T5.5 remains open only for the owner's 15–20 minute same-task comparison. Motion Graphics remains untouched and must not be integrated until that acceptance.
+
 ## 2026-09-03 — T5.5 live confidence repair after owner rejection
 
 - Kept work on the dedicated `timeline-t55-editor-confidence` branch and inside the existing Timeline selection/gesture authorities; no T6/T7, Motion Graphics, renderer, domain-operation or project-model work was started.

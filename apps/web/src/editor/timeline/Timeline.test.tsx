@@ -507,6 +507,18 @@ describe('Timeline V1', () => {
     expect(Boolean(actions.compareDocumentPosition(tracks) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
   })
 
+  it('keeps precision playback and track creation behind one advanced disclosure before the tracks', () => {
+    const { container } = renderTimeline()
+    const advanced = container.querySelector<HTMLDetailsElement>('.timeline-v1__advanced')
+    const tracks = container.querySelector('.timeline-v1__viewport-grid')
+    if (!advanced || !tracks) throw new Error('advanced controls or tracks missing')
+
+    expect(advanced.open).toBe(false)
+    expect(Boolean(advanced.compareDocumentPosition(tracks) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+    expect(within(advanced).getByRole('group', { name: 'Precision trim playback' })).toBeInTheDocument()
+    expect(within(advanced).getByRole('group', { name: 'Add Timeline track' })).toBeInTheDocument()
+  })
+
   it('makes the T3 precision-tool keyboard shortcuts change the real Trim tool mode', () => {
     renderTimeline()
     const timeline = screen.getByRole('region', { name: 'Project timeline' })
@@ -554,11 +566,15 @@ describe('Timeline V1', () => {
       onPrecisionCommit,
     })
     const timeline = screen.getByRole('region', { name: 'Project timeline' })
+    const advanced = rendered.container.querySelector<HTMLDetailsElement>('.timeline-v1__advanced')
+    if (!advanced) throw new Error('advanced timeline controls missing')
 
     fireEvent.keyDown(timeline, { key: 'r' })
     fireEvent.click(screen.getByRole('button', { name: /Edit point at/i }))
+    expect(advanced.open).toBe(false)
     fireEvent.keyDown(timeline, { key: 'd' })
 
+    expect(advanced.open).toBe(true)
     expect(onSeek).toHaveBeenLastCalledWith(ticks(10))
     expect(onShuttleKey).toHaveBeenCalledWith('K')
     expect(onPrecisionCommit).not.toHaveBeenCalled()

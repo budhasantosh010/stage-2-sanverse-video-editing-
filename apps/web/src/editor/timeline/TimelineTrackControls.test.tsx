@@ -72,8 +72,12 @@ describe('the Timeline toolbar', () => {
   it('offers only actions that do something, and no placeholder', () => {
     renderTimeline()
     const timeline = screen.getByRole('region', { name: 'Project timeline' })
-    for (const label of ['Split', 'Ripple delete', 'Normal', 'Insert', 'Overwrite', 'Append', 'Snapping']) {
+    for (const label of ['Split', 'Ripple delete', 'Snapping']) {
       expect(within(timeline).getByRole('button', { name: new RegExp(label, 'i') })).toBeInTheDocument()
+    }
+    const placement = within(timeline).getByRole('combobox', { name: 'How a drop lands' })
+    for (const label of ['Normal', 'Insert', 'Overwrite', 'Append']) {
+      expect(within(placement).getByRole('option', { name: label })).toBeInTheDocument()
     }
     // Delete is matched by its own marker rather than by name, because
     // "Ripple delete" contains the word too.
@@ -114,13 +118,14 @@ describe('the Timeline toolbar', () => {
 
   it('shows which placement mode is chosen without relying on colour', () => {
     renderTimeline({ placementMode: 'insert' })
-    expect(screen.getByRole('button', { name: 'Insert' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Normal' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('combobox', { name: 'How a drop lands' })).toHaveValue('insert')
   })
 
   it('never lets a mode be chosen that would quietly behave like another', () => {
     const { props } = renderTimeline()
-    fireEvent.click(screen.getByRole('button', { name: 'Overwrite' }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'How a drop lands' }), {
+      target: { value: 'overwrite' },
+    })
     // The mode is reported upwards; the planner decides what Overwrite means
     // and refuses when it cannot do it. Nothing is silently downgraded here.
     expect(props.onPlacementMode).toHaveBeenCalledWith('overwrite')

@@ -726,6 +726,7 @@ export function Timeline({
     if (selectedEditPoints.length !== 1) return
     const point = selectedEditPoints[0]
     const key = `${point.trackId}:${point.leftItemId ?? ''}:${point.rightItemId ?? ''}:${point.compositionTicks}`
+    if (advancedDetailsRef.current) advancedDetailsRef.current.open = true
     onShuttleKey('K')
     onSeek(point.compositionTicks)
     setDynamicTrim(beginDynamicTrim(key, point.compositionTicks))
@@ -1461,6 +1462,7 @@ export function Timeline({
         toggleDynamicTrim()
         return
       case 'toggle-audio-scrubbing':
+        if (advancedDetailsRef.current) advancedDetailsRef.current.open = true
         onAudioScrubbingChange(!audioScrubbingEnabled)
         return
       case 'nudge-left':
@@ -1591,44 +1593,6 @@ export function Timeline({
         }}
       />
 
-      <div className="timeline-v1__precision-status" role="group" aria-label="Precision trim playback">
-        <button
-          type="button"
-          className="timeline-v1__precision-status-button"
-          aria-pressed={dynamicTrim.active}
-          disabled={!dynamicTrim.active && selectedEditPoints.length !== 1}
-          title={dynamicTrim.active ? 'Leave Dynamic Trim without changing the project.' : 'Select one Roll edit point, then enter Dynamic Trim.'}
-          onClick={toggleDynamicTrim}
-        >
-          Dynamic Trim
-        </button>
-        <button
-          type="button"
-          className="timeline-v1__precision-status-button"
-          aria-pressed={audioScrubbingEnabled}
-          onClick={() => onAudioScrubbingChange(!audioScrubbingEnabled)}
-        >
-          Audio Scrubbing
-        </button>
-        <TimelinePrecisionPopover
-          item={selectedItem}
-          editPoint={selectedEditPoints.length === 1 ? selectedEditPoints[0] : null}
-          precisionTool={precisionTool}
-          timescale={model.timescale}
-          durationTicks={model.durationTicks}
-          frameRate={frameRate}
-          busy={busy}
-          onApply={applyNumericPrecision}
-        />
-        <output className="timeline-v1__precision-status-output" aria-live="polite">
-          {dynamicTrim.active
-            ? `Dynamic Trim ${dynamicTrim.state}${dynamicTrim.message ? ` — ${dynamicTrim.message}` : ''}. Enter commits; Escape cancels.`
-            : shuttleState.direction === 0
-              ? 'Shuttle stopped'
-              : `Shuttle ${shuttleState.direction < 0 ? 'backwards' : 'forwards'} ${shuttleState.rate}x`}
-        </output>
-      </div>
-
       {precisionDraft?.ok ? (
         <TimelineTrimView
           frames={trimViewFrames}
@@ -1731,12 +1695,55 @@ export function Timeline({
       ) : null}
       {animationNotice ? <p className="timeline-animation__notice" role="status">{animationNotice}</p> : null}
 
-      <div className="timeline-v1__track-add" role="group" aria-label="Add Timeline track" data-t5-track-add>
-        <span>Add track</span>
-        <button type="button" disabled={busy} onClick={() => onAddTrack('video')}>+ Video</button>
-        <button type="button" disabled={busy} onClick={() => onAddTrack('audio')}>+ Audio</button>
-        <button type="button" disabled={busy} onClick={() => onAddTrack('caption')}>+ Captions</button>
-      </div>
+      <details ref={advancedDetailsRef} className="timeline-v1__advanced">
+        <summary>Advanced timeline controls</summary>
+        <div className="timeline-v1__advanced-body">
+          <div className="timeline-v1__precision-status" role="group" aria-label="Precision trim playback">
+            <button
+              type="button"
+              className="timeline-v1__precision-status-button"
+              aria-pressed={dynamicTrim.active}
+              disabled={!dynamicTrim.active && selectedEditPoints.length !== 1}
+              title={dynamicTrim.active ? 'Leave Dynamic Trim without changing the project.' : 'Select one Roll edit point, then enter Dynamic Trim.'}
+              onClick={toggleDynamicTrim}
+            >
+              Dynamic Trim
+            </button>
+            <button
+              type="button"
+              className="timeline-v1__precision-status-button"
+              aria-pressed={audioScrubbingEnabled}
+              onClick={() => onAudioScrubbingChange(!audioScrubbingEnabled)}
+            >
+              Audio Scrubbing
+            </button>
+            <TimelinePrecisionPopover
+              item={selectedItem}
+              editPoint={selectedEditPoints.length === 1 ? selectedEditPoints[0] : null}
+              precisionTool={precisionTool}
+              timescale={model.timescale}
+              durationTicks={model.durationTicks}
+              frameRate={frameRate}
+              busy={busy}
+              onApply={applyNumericPrecision}
+            />
+            <output className="timeline-v1__precision-status-output" aria-live="polite">
+              {dynamicTrim.active
+                ? `Dynamic Trim ${dynamicTrim.state}${dynamicTrim.message ? ` — ${dynamicTrim.message}` : ''}. Enter commits; Escape cancels.`
+                : shuttleState.direction === 0
+                  ? 'Shuttle stopped'
+                  : `Shuttle ${shuttleState.direction < 0 ? 'backwards' : 'forwards'} ${shuttleState.rate}x`}
+            </output>
+          </div>
+          <div className="timeline-v1__track-add" role="group" aria-label="Add Timeline track" data-t5-track-add>
+            <span>Add track</span>
+            <button type="button" disabled={busy} onClick={() => onAddTrack('video')}>+ Video</button>
+            <button type="button" disabled={busy} onClick={() => onAddTrack('audio')}>+ Audio</button>
+            <button type="button" disabled={busy} onClick={() => onAddTrack('caption')}>+ Captions</button>
+          </div>
+          {advancedControls}
+        </div>
+      </details>
 
       <div ref={viewportGridRef} className="timeline-v1__viewport-grid">
         {/*
@@ -2045,11 +2052,6 @@ export function Timeline({
           ))}
         </div>
       ) : null}
-
-      <details ref={advancedDetailsRef} className="timeline-v1__advanced">
-        <summary>Advanced direct controls</summary>
-        {advancedControls}
-      </details>
 
       {contextMenu && contextItem ? (
         <TimelineContextMenu

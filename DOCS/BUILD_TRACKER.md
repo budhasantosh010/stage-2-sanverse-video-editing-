@@ -1,6 +1,6 @@
 # Build Tracker
 
-Last updated: 2026-09-03
+Last updated: 2026-09-04
 
 | ID | Goal | Deliverable | Status | Evidence |
 |---|---|---|---|---|
@@ -205,6 +205,11 @@ Last updated: 2026-09-03
 - [x] Timeline Zoom is collapsed by default and selected-item actions appear before the track viewport, reducing default chrome and hunting
 - [x] Focused related suites **100/100** and all-workspace production build PASS for the direct-manipulation repair
 - [x] Real-browser direct drag saved change 12; visible Undo and Redo restored and reapplied the exact clip order as changes 13/14
+- [x] Complete owner-supplied OpenCut/Sanverse recordings decoded; 1,421/1,183 Timeline-region frames analysed with contact sheets and frame-difference evidence
+- [x] Capability scope frozen at the bounded OpenCut-level Timeline contract; richer Sanverse controls retained but no new Timeline feature growth before acceptance
+- [x] Precision playback, track creation and specialist controls grouped behind one closed advanced disclosure before tracks
+- [x] Four permanent placement-policy buttons replaced by one compact, keyboard-accessible Place selector
+- [x] Recording-driven focused suites **37/37** and all-workspace production build PASS
 - [ ] Owner 15–20 minute unscripted edit + same-task OpenCut benchmark/scorecard
 - [ ] Final `[verified]` T5.5 closure — blocked on owner confidence acceptance by contract
 - [ ] Gate T6 — not started; requires explicit owner authorization after T5.5 closes
