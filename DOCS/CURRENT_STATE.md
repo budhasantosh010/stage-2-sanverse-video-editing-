@@ -2,6 +2,8 @@
 
 Last updated: 2026-09-12
 
+**Implementation HEAD verified for handoff: 4c4b297333c6d80fe160930926d3f0c17b7a90cf, pushed on timeline-t55-editor-confidence.** Complete current resume instructions are at the top of DOCS/HANDOFF.md. This documentation-only checkpoint makes no new runtime claims. High-impact work is NOT all finished: independent extracted audio, continuous real-user workflow and owner confidence remain OPEN. Temporary actions were restored at saved change70; re-check actual project state before editing.
+
 ## Latest follow-up — decoder barrier and save feedback
 
 Resume baseline: pushed commit `cb857393c28034633ac4cfb549494ff3091f884d`, branch `timeline-t55-editor-confidence`. Two focused fixes now pass 100/100 affected web tests: all active picture decoders pause together while one loads/seeks, and accepted Inspector/motion edits update the saved revision label. Web production build PASS: JS 1,018.55 kB / gzip 283.83; CSS unchanged. Independent four-file review PASS; scoped ownership boundary PASS, no Motion changes. See the September 12 release report for remaining work. Independent extracted dialogue and the full matched owner workflow are still OPEN; no competitor-parity claim.

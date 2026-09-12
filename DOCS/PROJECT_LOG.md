@@ -1,5 +1,11 @@
 # Project Log
 
+## 2026-09-12 — Documentation-only next-agent handoff
+
+- Owner asked whether high-impact work is finished and requested documentation/push. Answer: not all finished; independent audio and real-user confidence gates remain open.
+- Consolidated completed work, implementation SHAs, successful/failed attempts, warnings, local-only evidence/media, restoration70, startup, rollback boundaries and ordered next work in HANDOFF.md.
+- Corrected START_HERE/HANDOVER entry points and obsolete FAIL-094 open listing; older T5 checkpoints labeled historical. No feature implementation, project mutation, full test rerun or Motion change.
+
 ## 2026-09-12 — Focused loading synchronization and save feedback
 
 - Reproduced two decoder failures before implementing a group readiness barrier. Ready layers now pause while a required sibling loads or corrects drift; stale play promises respect the barrier and disposal.

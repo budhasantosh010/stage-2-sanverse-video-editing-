@@ -44,7 +44,7 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 ### FAIL-094 — Motion save label may lag the persisted revision
 
 - What/where: Studio header Project save status after Apply motion, September 11 real browser test.
-- How/why: header still displayed change 59 while edit-project.json contained accepted motion at revision 60; next timeline action refreshed the label. Exact callback cause not investigated.
+- How/why: header displayed change59 while edit-project.json contained accepted motion revision60; the next timeline action refreshed it. Follow-up confirmed onCreateOverlay adopted the persisted project without notifying the save-state reducer.
 - Impact: confusing feedback, not observed data loss; reopened project and Undo/Redo retained the motion.
 - Attempts: confirmed the shared onCreateOverlay callback adopted the server project but omitted the persisted save notification. Inspector edit regression failed with the old label, then passed after the notification was added. No broad save-system changes.
 - Status: RESOLVED for the reproduced accepted Inspector/motion callback; no claim about every save lifecycle.

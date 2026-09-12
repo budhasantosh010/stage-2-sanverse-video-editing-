@@ -2,6 +2,8 @@
 
 Last updated: 2026-09-12
 
+- [x] September12 next-agent handoff consolidated, historical entry points labeled, implementation commits and remaining acceptance gates recorded in DOCS/HANDOFF.md.
+
 - [x] Follow-up: shared decoder readiness barrier prevents ready layers running ahead during sibling loading/seeking; RED/GREEN regression, 100/100 affected checks, production build and independent review PASS.
 - [x] FAIL-094 accepted Inspector/motion save callback updates the header revision.
 - [ ] Independent extracted dialogue and end-to-end independent audio editing.

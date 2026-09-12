@@ -43,7 +43,7 @@ UI Export showed `Export ready`, 1920 x 1080, Download MP4. Actual artifact:
 
 1. Typed independent extracted dialogue, with independent move/trim/gain and preview/export proof (remaining FAIL-069 scope).
 2. Sustained edge-hold and fresh independent-audio UI proof; measured playback/interaction budgets.
-3. FAIL-094: motion-save header can lag actual persisted revision; data survived reopen/Undo/Redo.
+3. FAIL-094 is now RESOLVED for the accepted Inspector/motion callback by follow-up4c4b2973; it is not an outstanding blocker. See follow-up evidence below.
 4. Same-task owner editing session and confidence judgment. No defensible OpenCut/CapCut/DaVinci completion percentage exists.
 
 ## Start the exact tested checkout

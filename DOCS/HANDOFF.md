@@ -1,6 +1,98 @@
 # HANDOFF — everything a new agent needs to continue Sanverse Stage 2
 
-## Current checkpoint
+## CURRENT HANDOFF — September 12 timeline confidence
+
+This section supersedes historical checkpoints below. Read it with CURRENT_STATE.md, plans/2026-09-08-layered-editor-engine.md, FAILURE_REGISTRY.md and evidence/2026-09-12-layered-timeline-release.md.
+
+### Completion truth
+
+**High-impact work is NOT all finished.** Layered preview/export and the latest decoder/save fixes are shipped. Independent extracted dialogue and the continuous real-user confidence gate remain OPEN. Historical T0–T5 feature completion does not establish present usability. There is no defensible competitor-parity percentage.
+
+### Exact repository and recovery
+
+- Remote: git@github.com:budhasantosh010/stage-2-sanverse-video-editing-.git
+- Branch: timeline-t55-editor-confidence; no merge into another lane is authorized here.
+- Latest implementation: 4c4b297333c6d80fe160930926d3f0c17b7a90cf — synchronized loading layers and saved revision feedback. Local and GitHub SHA matched after push.
+- Previous accumulated batch: cb857393c28034633ac4cfb549494ff3091f884d — dragging and layered preview/export.
+- This docs commit follows those implementation commits. Re-check HEAD/status/remote on resume.
+- Active tested checkout: C:\Users\Lenovo\.chatgpt-code-harness\worktrees\task-T-9525c3a99bec0971c5a7c902-2c59592c\timeline-t55-editor-confidence
+- Do not accidentally work in the original Stage 2 checkout or the Motion/2000 lane.
+- Raw media, exports and .sanverse-data are local/ignored, not available from a fresh GitHub clone.
+- Two historical JPGs under evidence/2026-09-06-t55-drag-reliability/ remain deliberately untracked: title-transfer-export.jpg and transfer-export-frames.jpg. Do not stage or delete them.
+- Rollback means a scoped revert of the relevant commit if approved; never reset a dirty worktree or delete project history.
+
+### Completed work
+
+| Work | Verified result and limits |
+|---|---|
+| Timeline gestures | Pointer targeting, grouped movement, outside-release cancellation, edge-scroll implementation, audio hit-area and control-density repairs shipped. Sustained edge-hold confidence proof remains open. |
+| Footage between tracks | Existing typed transfer/history supports cross-track overlapping pictures. Same-track collisions, locks and revision guards remain. Real pointer transfer/Undo/Redo observed. |
+| Shared layered engine | Transferred primary footage uses v10 picture manifest for Preview and FFmpeg export; legacy single-primary projects retain v9. Bounded muted decoders share the existing composition clock/audio mixer. |
+| Reverse/timing/selection | Reverse resource lifecycle, latest pending seek, source-retimed motion, gap transport and linked-audio Inspector focus repaired; detailed dated evidence is in the registry/report. |
+| FAIL-091 | Initial empty layered interval publishes readiness; regression passed. |
+| FAIL-092 | Mixed same-track overlay families use manifest ordering instead of incidental DOM order. Initial independent review rejected the defect; separate fix and re-review passed. |
+| FAIL-093 | Supported dip transition changes RGB while preserving the layer alpha footprint, matching export. |
+| FAIL-094 | Accepted Inspector/motion callback updates saved status after server persistence. Inspector regression reproduced stale status before the one-line fix. Not a certification of every save path. |
+| FAIL-095 | Active picture decoders pause together while a required sibling loads/seeks, preventing run-ahead against a frozen composition clock. Two failing regressions now pass; sustained performance remains unmeasured. |
+
+### Evidence ledger
+
+- Latest affected web selection: **100/100 PASS**, .sanverse-data/high-impact-followup-tests.json.
+- Earlier accumulated batch: web 107/107, domain/contract/drag 732/732, API render 140/140 including four actual synthetic FFmpeg exports. These overlap with other selections; never add them into an invented whole-suite total.
+- Latest web build PASS: 313 modules; JS 1,018.55 kB/gzip 283.83; CSS 145.14/gzip 24.42. JS increased 0.29 kB/gzip 0.11 versus cb857393. Earlier batch passed all-workspace build.
+- Independent four-file review PASS, no confirmed security/logic blockers; reviewer did not rerun tests. Ownership boundary and diff checks PASS; no Motion changes.
+- Local RED/GREEN files: .sanverse-data/decoder-barrier-red.json, decoder-barrier-green.json, save-feedback-test.json.
+- Accumulated local results: .sanverse-data/layered-final-web-tests.json, layer-release-tests.json, layered-render-tests.json.
+- Portable committed explanation: evidence/2026-09-12-layered-timeline-release.md. Local ignored artifacts may be absent on a fresh clone.
+- Actual revision-64 export: export_d2f609cb8b082b5050594791f8092f8e.mp4; 26.7s; 1920x1080 H.264 30fps/AAC stereo 48kHz; 13,906,623 bytes; SHA-256 7e3741f6bab4928b679c2cb3532dda06abb0c5b332db9dda0ec306c7d593532a. Full decode passed and 6.5s frame was inspected, showing scaled upper and lower footage. This was not full audio audition, pixel-identical parity or a smoothness benchmark.
+- These are recorded implementation-run results. No tests/builds rerun for this documentation-only handoff.
+
+### Failures, attempts and limitations
+
+- INFRA-020: wrong Vitest workspace caused DOM/alias failures; corrected --root apps/web without weakening assertions. Resolved.
+- INFRA-021: approval/reviewer usage exhaustion interrupted work; changes preserved, later resumed. Restricted Node-to-Git spawn blocked boundary check; identical approved check passed. Resolved for this batch.
+- Server absent on resume: restarted isolated 2010/2011 server. Historical launcher PID19884 must be freshly identified before stopping; do not assume it remains alive.
+- Temporary second Undo reported an input timeout, but the next authoritative save status confirmed change70. No blind repeat.
+- INFRA-007 screenshot crop/DPR limitation remains; exact responsive certification and subjective smoothness are not claimed.
+- Known font-runtime, >500kB bundle and line-ending warnings remain.
+- Nonblocking review suggestion: deferred-play regression covering suspension, recovery and late rejection of the earlier play promise. No confirmed current logic defect.
+- Stale T5-only handoff entry points and an obsolete open FAIL-094 report entry were found during documentation; corrected and historical sections explicitly labeled.
+
+### Local project restoration
+
+Saved test-30s.mp4 project project_e58e4bb1e9f088fa38801efbeb52b83b reopened at change68. The two temporary test actions were undone through69/70, restoring pre-test content. **Do not repeat those Undos.** Inspect current revision before any new test because the owner may have edited since. No project mutation occurred in the documentation-only turn.
+
+### Remaining high-impact work, in order
+
+1. **Independent extracted dialogue (remaining FAIL-069).** Implement explicit typed extraction/link state and stable source identity. Audio must move/trim/change gain independently of picture, with Undo/Redo, save/reopen, shared audio projection/mixer/export and no doubled sound. Do not disguise video assets as music. Inspect current contracts before selecting the smallest implementation; this is planned, not delivered.
+2. **One continuous real-user workflow.** One short video: split/cut, trim, drag sideways/between tracks, picture/timeline zoom, slow/fast/reverse, overlap, independent dialogue edit, Undo/Redo, save/reopen, export. Inspect frames AND listen to sound. Record exact action/time/expected/actual/cause if known/attempts/one-line solution. Fix high-impact blocking failures first.
+3. **Interaction confidence.** Sustained edge autoscroll, fresh independent-audio movement, waveform truth/readability and measured playback/interaction behavior. Compare the same task with OpenCut and the owner's CapCut/DaVinci references. Unmatched recordings or test totals cannot establish parity.
+4. **Owner acceptance, then Motion integration.** Owner completes a real edit and judges confidence. Do not modify separately owned Motion code or begin integration just because unit tests pass.
+
+### Architecture and scope
+
+Preserve one EditorShell, project/revision, proposal/repair state, history/Undo/Redo, playhead/composition clock and Preview/export authority. Multiple muted decoding resources are approved; the older literal one-video-element restriction is historical. Source media remains immutable, operations typed and UI derived. Protect Motion/2000 and competitors' isolated folders. Avoid unrelated dependencies, redesign and features.
+
+### Startup and focused checks
+
+```powershell
+cd "C:\Users\Lenovo\.chatgpt-code-harness\worktrees\task-T-9525c3a99bec0971c5a7c902-2c59592c\timeline-t55-editor-confidence"
+npm run dev:timeline
+```
+
+Open http://localhost:2010/; API2011. No repeated npm install for this existing checkout. Keep terminal open; Ctrl+C stops its launcher. Identify occupied ports rather than killing an unknown process.
+
+For changes affecting the latest fixes, the previous focused command was:
+
+```powershell
+npx vitest run --root apps/web src/app/App.test.tsx src/screens/studio/StudioScreen.test.tsx src/features/render-plan/layer-video-decoder.test.ts src/features/render-plan/layered-footage-preview.test.ts src/features/render-plan/LayeredFootageCanvases.test.tsx --pool=forks --poolOptions.forks.singleFork=true
+npm run build --workspace @sanverse/web
+node tools/program-ownership/check-editor-boundary.mjs --base 4c4b297333c6d80fe160930926d3f0c17b7a90cf
+```
+
+Choose domain/render tests for independent audio based on changed contracts, not only these web tests. Finish each scoped repair with evidence, registry/checklist/status updates and coherent commit. Do not mark the remaining gates complete without their named evidence.
+
+## Historical checkpoint — August T5, not the current resume point
 
 **P1-F.1E — Complete Timeline Experience is complete through Gate T5.**
 

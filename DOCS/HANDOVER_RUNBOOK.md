@@ -2,7 +2,11 @@
 
 Use this runbook when a new session, agent, or context window resumes the project.
 
-## Current handoff
+## Current handoff — September 12
+
+Use CURRENT HANDOFF at the top of DOCS/HANDOFF.md for the exact checkout, pushed implementation4c4b2973, evidence, failures, saved-project restoration70, startup and ordered next work. Independent extracted dialogue and owner confidence remain OPEN. Re-check Git/project state before acting; never repeat historical Undos. The literal one-video constraint below was superseded by bounded muted decoders under one composition clock.
+
+## Historical handoff — August T5
 
 **P1-F.1E is complete through Gate T5. T6 and T7 have not started.**
 

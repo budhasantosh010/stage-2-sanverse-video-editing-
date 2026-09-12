@@ -2,11 +2,13 @@
 
 This is the smallest authoritative resume point for a new or compacted session.
 
+**CURRENT TIMELINE RESUME — September 12:** Read the top of DOCS/HANDOFF.md first, then CURRENT_STATE.md and plans/2026-09-08-layered-editor-engine.md. Implementation is pushed through 4c4b2973 on timeline-t55-editor-confidence in the isolated timeline worktree. Layered preview/export and latest decoder/save fixes are shipped; independent extracted audio and full editing-confidence acceptance remain OPEN. Older T5 sections below are historical, not a declaration that the repair program is finished.
+
 ## Macro goal
 
 Take a cleaned talking-head video plus natural multimodal user intent—chat, pointing, drawing, and simple direct manipulation—and produce an editable, verified, polished export in minutes, without requiring the user to learn a professional video editor.
 
-## Current gate
+## Historical feature gate — see current resume above
 
 - **P1-F.1E Complete Timeline Experience is complete through Gate T5.** T0 through T5 are DONE; T6 and T7 are NOT STARTED.
 - The authoritative gate table and invariants live in `DOCS/evidence/2026-08-04-timeline-completion/PROGRAM_STATE.md`.
