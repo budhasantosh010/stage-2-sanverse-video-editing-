@@ -13,6 +13,171 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 
 ## Active issues
 
+### FAIL-091 — Initial layered gap never published readiness
+
+- What/where: LayeredFootageCanvases controller binding; first mount inside an empty composition interval.
+- When/who: September 11 integration tests, affecting layered transport users.
+- How/why: the controller's initial ready return value did not trigger a status change callback, so Studio retained loading and would not start its clock.
+- Attempts/evidence: failing initial-gap regression; explicitly publish update status. Focused regression passed.
+- Status: RESOLVED.
+- One-line solution: publish initial controller readiness as well as later asynchronous readiness changes.
+
+### FAIL-092 — Same-track preview stacking disagreed with export
+
+- What/where: pictureStackIndex in LayeredFootageCanvases; mixed title/media/callout families sharing one track.
+- When/who: September 12 independent pre-push review.
+- How/why: all overlays on one track received equal z-index, so fixed DOM family order replaced the compiler's explicit node order.
+- Impact: a title visible above B-roll in Preview could be covered in the exported video.
+- Attempts/evidence: RED reproduced equal ranks; independent fix uses unique integer ranks across the full manifest inside the existing content stacking context, below controls. Mixed-family and 360-node regressions pass; focused adjacent tests 25/25; independent re-review approved.
+- Status: RESOLVED.
+- One-line solution: use exact manifest node order for both within-track and cross-track browser stacking.
+
+### FAIL-093 — Layered dip transition faded alpha instead of picture color
+
+- What/where: layered-footage-preview transition compositing, September 11.
+- How/why: fading the layer itself reveals lower footage, whereas FFmpeg fades RGB to the chosen black/white color while preserving its alpha footprint.
+- Impact: preview/export disagreement during a layered dip.
+- Attempts/evidence: regression checks source-atop color fill with the expected half-transition alpha; focused controller checks pass.
+- Status: RESOLVED for supported dip transitions.
+- One-line solution: composite transition color within the transformed picture's existing alpha footprint.
+
+### FAIL-094 — Motion save label may lag the persisted revision
+
+- What/where: Studio header Project save status after Apply motion, September 11 real browser test.
+- How/why: header still displayed change 59 while edit-project.json contained accepted motion at revision 60; next timeline action refreshed the label. Exact callback cause not investigated.
+- Impact: confusing feedback, not observed data loss; reopened project and Undo/Redo retained the motion.
+- Attempts: checked canonical persisted revision and subsequent UI saves; no broad save-system changes made in this batch.
+- Status: OPEN, nonblocking UI feedback issue.
+- One-line solution: route accepted motion-save notifications through the same header save-status update as timeline operations.
+
+### INFRA-020 — Final web checks launched without the web workspace configuration
+
+- What/where: September 12 command invoked root Vitest with web test paths, omitting --root apps/web.
+- How/why: DOM environment and aliases were not loaded; document-is-not-defined failures and suite loading failures were test-runner configuration, not a product diagnosis.
+- Attempts: corrected the command to --root apps/web; no assertions weakened or production code changed to accommodate the wrong runner.
+- Status: RESOLVED for command configuration; corrected result is in the September 12 release report.
+- One-line solution: run browser unit tests with their web workspace root and keep the machine-readable result.
+
+### FAIL-088 — Reverse preview prepared only one active resource
+
+- What/where: StudioScreen used one reverse-proxy state slot selected by sequential segment index.
+- When/who: September 10 layered-engine work; affects source reuse and future overlapping reversed footage.
+- How/why: array position was part of resource identity and replacing one request discarded every other reverse source.
+- Impact: blocks reliable layered reverse video/audio; repeated reordering could unnecessarily restart preparation.
+- Attempts/evidence: six resource checks failed before implementation, then passed; a React binding check proves both prepared sources reach playback without restarting on playhead movement. Studio now uses the pool and its URL map. Capacity is bounded at eight, removal aborts, late completions are ignored, and project replacement/unmount revokes URLs.
+- Status: RESOLVED for resource ownership and live Studio binding. Simultaneous layered pictures are still NOT released; FAIL-069 remains OPEN.
+- One-line solution: prepare active reverse sources by canonical clip/source identity in a bounded disposable pool.
+
+### FAIL-089 — A seek made during reverse preparation was lost on media load
+
+- What/where: StudioScreen loadedmetadata/transport bridge; the requested timeline position could load proxy source zero instead.
+- When/who: September 10 real browser reverse/Undo/Redo walkthrough on test-30s.mp4.
+- How/why: seeking paused for proxy preparation, but no pending source seek survived to the metadata event; native zero was then treated as an authoritative playhead update.
+- Impact: the picture disagreed with the position selected during scrubbing.
+- Attempts/evidence: regression requested 5s then 7s before proxy resolution; failed with source time 0 instead of 7. Corrected bridge retains only the latest requested composition/source position, ignores premature native updates, and restores it on matching source metadata. Regression passes. Fresh browser change 57 sought composition tick 13,671,142; source was 7.816006 seconds, matching (13,671,142 - 2,416,093) / 1,440,000; readyState 4, no preview error.
+- Status: RESOLVED for the reproduced pending-reverse seek.
+- One-line solution: preserve the latest canonical seek until the matching prepared source has loaded, then synchronize source and playhead once.
+
+### INFRA-019 — Verification exposed stale control selectors and interrupted processes
+
+- What/where: StudioScreen.test.tsx and local tool/server verification, September 10.
+- How/why: expanded regression run initially reported 99 passed / 8 failed; legacy tests searched for old "Advanced direct controls" copy instead of the current accessible "Advanced timeline controls" label. An earlier run was interrupted and its process handle disappeared on a new user message; no result was inferred.
+- Attempts: updated the two stale query sites without changing production controls; rerunning the affected file with a machine-readable result. Initial hook test setup lacked jsdom object-URL methods, then its corrected setup established the intended RED failure. Several guessed source paths and one PowerShell wildcard read failed without modifying files; corrected using tracked-file discovery. Browser reopen/selection was retried only after inspecting changed workspace/server state. Server relaunched hidden on 2010/2011; historical launch PID 11740.
+- Result/status: RESOLVED for the stale test selectors (seven failures) and test setup. The eighth failure was a real Inspector-focus defect, separately fixed as FAIL-090. Final focused run 103/103. Machine-readable result: .sanverse-data/reverse-and-selection-tests.json. Server recovered and project reopened. Captured Vite websocket error at 19:17:44 UTC belongs to the interruption; no clean historical-console claim. Existing screenshot/DPR limitation remains INFRA-007; a rendered frame was visible but exact-size screenshot certification is not claimed.
+- One-line solution: query stable accessible labels, preserve test results on disk, and verify source readiness after server recovery.
+
+### FAIL-090 — Clicking selected linked dialogue did not focus its Inspector
+
+- What/where: TimelineItem.beginBodyDrag and click suppression; a linked audio member was already selected with its video.
+- When/who: September 10 full Studio regression exposed this actual editing interaction defect.
+- How/why: pointer-down deliberately preserved grouped dragging but marked selection as already handled even when it skipped onSelect. The subsequent click was swallowed, leaving the Inspector focused on video.
+- Impact: users could not reliably access audio settings or trigger the dirty-draft selection guard by clicking linked dialogue.
+- Attempts/evidence: existing dirty-Inspector test failed after stale selector repairs (60/61); only mark pointer-down as handled when it actually selects. A plain click now focuses the member while a moved drag still preserves its group. Regression passes in final 103/103 including creator gestures and selection tests. Real browser video selection, unapplied -9 dB draft, click linked dialogue, discard confirmation, then dialogue Inspector with original 0 dB all verified at unchanged revision 58.
+- Status: RESOLVED for this reproduced click/focus defect.
+- One-line solution: distinguish preserving a drag selection from actually handling a click selection.
+
+### FAIL-085 — Audio projection lost or misidentified simultaneous voices
+
+- What/where: composition-audio-preview.ts omitted overlapping linked voices, mismatched equal-start clip gain, changed J/L decoder identity, dropped secondary reverse audio, and substituted picture-only reverse sound for custom audio handles.
+- When/who: September 10 layered-engine continuation; affects overlapping and J/L-cut footage. Primary video overlap remains guarded in the live product.
+- How/why: positional indexing replaced clip identity; all picture-active auxiliary voices were skipped; primary/auxiliary IDs differed and reverse handling was split across paths.
+- Attempts/evidence: five explicit regression failures before repair. Projection now derives every linked voice by canonical identity, using stable IDs and exact reverse-window validation. Projection 13/13 in final 50/50 affected checks.
+- Status: RESOLVED for these projection cases, not a claim of released layered video or Studio multi-reverse preparation.
+- One-line solution: project all audible clips by stable identity at one composition tick, using reverse artifacts only for the exact source window they contain.
+
+### FAIL-086 — Loading audio replayed stale seeks and touched released resources
+
+- What/where: createCompositionAudioPreviewController registered a loadedmetadata callback for every scrub update.
+- When/who: September 10; editors rapidly seeking while audio loads.
+- How/why: callbacks captured old seconds and survived resource release, causing seek bursts and late writes to detached audio.
+- Attempts/evidence: RED wrote 1s, 2s, 3s instead of only 3s, plus a write after release. One resource listener now reads only the newest target and is removed on destruction. Lifecycle 3/3 in final 50/50.
+- Status: RESOLVED for the reproduced lifecycle.
+- One-line solution: coalesce pending audio seeks by resource and cancel listeners when that resource is released.
+
+### FAIL-087 — Decoder mute silenced the mixer; Play did not unlock browser audio
+
+- What/where: StudioScreen native volumechange synchronization and Play handler.
+- When/who: September 10 live monitor inspection and integration reproduction; normal preview users.
+- How/why: decoder mute was copied into user monitor state, including a synchronous event before mixer ownership was assigned; the AudioContext resume method had no Play caller.
+- Attempts/evidence: integration failed first at missing Mute, then zero resume calls. Studio assigns sound authority before muting the decoder, ignores its volume events when the mixer owns sound, and resumes from the Play gesture. Studio 9/9 in final 50/50. Fresh browser reopen showed Mute and Play changed to Pause at saved change 52; this is control/routing proof, not a listening benchmark.
+- Status: RESOLVED for reproduced mute/resume routes.
+- One-line solution: separate decoder state from mixer user intent and unlock browser audio from the playback gesture.
+
+### INFRA-018 — Verification contention and recovery notes
+
+- What/where/when/who: September 10 Studio continuity test timed out at its existing 10-second limit alongside a production build; local verification only.
+- How/why: CPU contention is the working explanation, not proven application latency.
+- Attempts/evidence: unchanged isolated rerun passed; final expanded run passed 50/50, Studio 9/9. A later build caught four test-only TS2769 errors from using Playwright's exact option in Testing Library; removed the unsupported option without changing matching semantics. One documentation patch had an invalid heading context and applied nothing; corrected the patch. Interrupted server sessions were restarted as a hidden paired process on 2010/2011, with logs in ignored .sanverse-data.
+- Status: MONITORING for contention/session persistence; final build result is in PROJECT_LOG.
+- One-line solution: keep CPU-heavy checks sequential, use the correct query API, and run the paired local server independently of interruptible tool sessions.
+
+### FAIL-083 — Source-anchored picture transforms ignored speed, reverse and held frames
+
+- What/where: FFmpeg motion sampling/splitting, the live footage-motion preview and Studio Inspector/draft projection used normal forward timeline offsets instead of source time.
+- When/who: September 9, reproduced while closing FAIL-069; affects editors retiming footage with transforms, crop or keyframes.
+- How/why: playback duration was reused as source duration; reverse pieces were assembled in ascending source order; held frames advanced the motion clock; slow-clip Inspector controls disappeared at the old source-length boundary.
+- Tried/evidence: 4 FFmpeg regressions and 3 live-preview regressions first failed; all pass after shared segmentSourceTicksAt mapping, composition-ordered reverse pieces and source-span draft projection. Real FFmpeg exports for reverse-boundary, fast-animation and held-animation all decode to the expected 60 frames with checked pixels. Inspector helper 3/3; Studio continuity 8/8. Browser temporary motion at revision 47, half-speed at 48, Undo 49, Redo 50; at 36 seconds the source is 3.794015 seconds, rate 0.5, transform canvas and manipulation controls remain visible.
+- Status: RESOLVED for these reproduced timing cases; this does not close layered integration or the overall confidence gate.
+- One-line solution: share canonical source-time mapping across preview, Inspector and export, and order retimed render pieces in composition time.
+
+### FAIL-084 — Playback loops or skips at reused-source clip boundaries
+
+- What/where: segment-playback.ts advancePlayback treated normal decoder overshoot as a source-file seek when another clip contained the same source time.
+- When/who: September 9 real browser walkthrough at the end of the retimed final test clip; affects repeated/reordered footage.
+- How/why: an unconditional source-range search ran before the composition boundary/next-clip decision, so the final clip jumped back to an earlier occurrence.
+- Tried/evidence: two focused cases failed (loop to earlier clip; skip into the middle of next clip). Playback now distinguishes explicit source-scrub from normal progression. Segment tests 17/17; Studio continuity 8/8. A fresh browser mount at saved revision 50 stopped at the 38.433-second composition end with Play visible and native video paused, rather than returning to the earlier source occurrence.
+- Status: RESOLVED for reproduced normal-playback boundaries. Hot-reload retains mounted effect closures, so browser verification required a fresh mount; old mounted behavior was not claimed as a pass.
+- One-line solution: let normal playback follow composition order and require an explicit source-scrub origin for source-range search.
+
+### INFRA-017 — Timeline web port pointed at a different checkout with no API
+
+- What/where: localhost:2010 rendered Home but could not load projects; 2011 had no listener.
+- When/who: September 9 resumed browser walkthrough; local development environment, no project corruption found.
+- How/why: identified PID 17216 as standalone Vite from the main Stage 2 checkout, not the active timeline worktree's paired server.
+- Tried/evidence: initial paired startup correctly refused occupied 2010; inspected process command line, stopped only that verified Vite process, started npm run dev:timeline in the active worktree. Browser project list recovered and saved revision 46 reopened. Motion server on 2000 untouched. One pre-restart Vite WebSocket error was captured; no claim of an empty historical console.
+- Status: RESOLVED for this restart.
+- One-line solution: start the dedicated timeline web/API pair from the active timeline worktree, not a standalone Vite process from another checkout.
+
+### FAIL-081 — New decoder's old Play rejection poisoned a later Play intent
+
+- What/where: layer-video-decoder.ts promise lifecycle treated an old rejected Play as the current playback failure.
+- When/who: found September 9 while implementing the approved layered engine; would affect an editor quickly pressing Play/Pause/Play before decoding finishes.
+- How/why: pause aborted an unresolved browser Play promise; its delayed rejection arrived after a new Play request because no intent generation was checked.
+- Tried/evidence: focused regression reproduced error instead of ready; playback epoch fencing corrected it. Decoder suite 13/13 PASS.
+- Status: RESOLVED in the new, not-yet-integrated resource controller.
+- One-line solution: fence asynchronous Play completions by playback intent epoch and ignore stale rejection.
+
+### FAIL-082 — New layered preview could blank or mix seek moments
+
+- What/where: layered-footage-preview.ts painted ready layers while another layer was still seeking and cleared that missing layer.
+- When/who: found September 9 in the new controller; would affect multi-layer scrubbing.
+- How/why: per-layer readiness was checked while drawing instead of before presenting a whole composition moment.
+- Tried/evidence: targeted regression showed clearRect during the pending seek; preflight now waits for every active frame and reports loading while retaining the last complete picture. Preview/decoder suites 19/19 PASS.
+- Status: RESOLVED in the new, not-yet-integrated resource controller; browser confidence remains unverified.
+- One-line solution: present complete composition moments atomically, clearing stale project/source identities separately.
+
+September 9: FAIL-069 remains OPEN. Opt-in v10 layer contract and synthetic layered export work; production remains v9 until preview/export agree. Decoder stale-Play rejection race found and fixed with an intent epoch (13/13 focused checks). Integration risk from code inspection: existing browser footage-motion sampling assumes normal forward speed, and FFmpeg motion expressions/splitting still need speed/reverse/held-frame parity verification. One-line solution: use shared source-time mapping for both renderers and verify the complete edit/export workflow before removing guards.
+
 | Done | ID | Severity | Type | One-line issue | Status | Target |
 |---|---|---:|---|---|---|---|
 | [x] | UX-001 | P1 | UX | Home composer occupies too much vertical space | RESOLVED | P0-D.1 |
@@ -23,7 +188,7 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | UX-006 | P2 | UX/A11Y | Pending and accepted changes need stronger visual distinction | RESOLVED | P0-D.1 |
 | [x] | UX-007 | P1 | UX | P0-E Studio layout required owner approval before P1-A | RESOLVED | P0-E |
 | [x] | UX-008 | P1 | UX | Timeline items display technical clip suffixes instead of human-readable media labels | RESOLVED | P1-C |
-| [ ] | UX-009 | P2 | UX | Dialogue lane uses a temporary visual pattern until waveform rendering exists | PLANNED | Audio waveform milestone |
+| [x] | UX-009 | P2 | UX | Dialogue lane uses a temporary visual pattern until waveform rendering exists | RESOLVED | Real waveform and T5.5 contrast evidence, FAIL-066 |
 | [x] | UX-010 | P1 | UX | Studio video preview collapsed below a usable Canvas height | RESOLVED | P1-D |
 | [x] | UX-011 | P2 | UX | Media, Timeline, Canvas, and Inspector use different display names for the same imported asset | RESOLVED | P1-E |
 | [x] | FAIL-032 | P1 | React lifecycle | Unstable optional media-name defaults retriggered source probing and caused an infinite Studio render loop | RESOLVED | P1-E |
@@ -57,6 +222,259 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 | [x] | FAIL-062 | P1 | Timeline discoverability | Selected-item actions appeared below all tracks instead of next to the selection workflow | RESOLVED | T5.5 confidence repair |
 | [x] | FAIL-063 | P1 | Timeline hierarchy | Precision playback and track creation remained permanently visible during simple editing | RESOLVED | T5.5 recording comparison |
 | [x] | FAIL-064 | P1 | Timeline toolbar density | Four placement policies permanently consumed the primary toolbar | RESOLVED | T5.5 recording comparison |
+| [x] | FAIL-065 | P0 | T5.5 repair | Body dragging jumped or did nothing on linked dialogue | RESOLVED | T5.5 confidence |
+| [x] | FAIL-066 | P1 | T5.5 repair | Waveform contrast and selection reflow obscured editing | RESOLVED | T5.5 confidence |
+| [x] | FAIL-067 | P0 | T5.5 repair | Incompatible tracks passed compatibility validation | RESOLVED | T5.5 confidence |
+| [x] | FAIL-068 | P1 | T5.5 repair | Saved-change label lagged behind a successfully persisted drag | RESOLVED | T5.5 confidence |
+| [ ] | FAIL-069 | P1 | T5.5 repair | Primary footage cannot move freely between video tracks | OPEN | T5.5 confidence |
+| [ ] | INFRA-006 | P2 | T5.5 repair | Fresh extra-audio browser test could not open filechooser | BLOCKED | T5.5 confidence |
+| [ ] | INFRA-007 | P2 | T5.5 repair | Viewport and screenshot evidence dimensions mismatched requested size | MONITORING | T5.5 confidence |
+| [ ] | FAIL-070 | P1 | T5.5 repair | Edge scrolling implemented; sustained edge-hold UI proof remains | MONITORING | T5.5 confidence |
+| [ ] | INFRA-008 | P2 | T5.5 repair | Independent review did not complete | BLOCKED | T5.5 confidence |
+| [x] | FAIL-071 | P2 | T5.5 repair | Recording statistics were interpreted as causal smoothness evidence | RESOLVED | T5.5 confidence |
+| [ ] | INFRA-009 | P2 | T5.5 repair | Timeline dev server unavailable after session interruption | MONITORING | T5.5 confidence |
+| [x] | FAIL-072 | P1 | Audio interaction | Audio-name drag could change gain instead of moving footage | RESOLVED | T5.5 confidence |
+| [x] | INFRA-010 | P2 | Local competitor setup | OpenCut startup failed on long paths, compiler mismatch and WASM | RESOLVED | Local comparison only |
+| [ ] | INFRA-011 | P2 | Browser tooling | OpenCut upload tool blocked for 564 seconds beyond requested timeout | MONITORING | Browser evidence |
+| [x] | FAIL-073 | P1 | Export discoverability | Export progress/result stayed hidden when AI was collapsed | RESOLVED | T5.5 confidence |
+| [x] | FAIL-074 | P1 | Preview authority | Primary source resolver checks V1 output rather than each clip's owning track | RESOLVED | Primary transfer |
+| [x] | INFRA-012 | P1 | Verification tooling | Automatic execution approval rejected the required preview regression because its service hit usage limit | RESOLVED | Approved execution resumed |
+| [x] | FAIL-075 | P1 | Drag routing | Dialogue-to-video drag incorrectly transferred its linked picture | RESOLVED | T5.5 confidence |
+| [ ] | INFRA-013 | P2 | Browser tooling | Browser interaction timeout can occur after an action actually completes | MONITORING | UI evidence |
+| [x] | FAIL-076 | P1 | Preview timing | Source resolver treats retimed clips as normal-speed source intervals | RESOLVED | Timeline confidence |
+| [x] | FAIL-077 | P1 | Layer-order guard | Transfer blocks safe above-footage visuals but misses lower nameplates | RESOLVED | Bounded rule; real title export verified |
+| [x] | INFRA-014 | P1 | Browser tooling | In-app browser webview does not attach | RESOLVED | Attached September 8 |
+| [x] | FAIL-078 | P1 | Monitor feedback | Deliberate opening gap says Loading frame forever | RESOLVED | Canonical gap precedes source readiness |
+| [x] | FAIL-079 | P1 | Gap transport | Play at opening gap calls an unloaded video | RESOLVED | Existing gap clock, pause and source-ready resume |
+| [ ] | INFRA-015 | P2 | Browser verification | Unexpected revision and stale development connection | MONITORING | Preserve project; use sole attached tab |
+| [x] | BUILD-008 | P2 | Focused test typing | Unsupported exact option in RTL getByRole | RESOLVED | Remove browser-only locator option |
+| [x] | FAIL-080 | P1 | Timeline drag | Safe gapless reorder refused against another track at raw pointer position | RESOLVED | Focused 10/10, build, real drag and Undo/Redo verified |
+| [x] | INFRA-016 | P1 | Test runner | Vitest worker module-fetch timeout before test execution | RESOLVED | Resumed single-fork run: 10/10; web production build passed |
+
+### FAIL-080 — Reorder collision checked the pointer interval, not the final landing
+
+- **What / where / who / when:** September 8 timeline continuation; planTimelineBodyDrag; an editor reordering a gapless row while another video row holds later footage.
+- **How / why:** Example: V1 contains [0,10) and [10,20); V2 contains [20,30). Dragging the first V1 clip with a raw requested start of 18 should reorder it to [10,20), leaving V2 untouched. The planner checked [18,28) against V2 before deciding this was a reorder, and refused the valid operation.
+- **Attempts / evidence:** Added an accepted-project Vitest regression. Worker loading failed twice before running tests (INFRA-016). Standalone bundled execution of the same real planner/domain reproduced the expected COLLISION assertion failure. Moved the raw-interval collision guard after gapless reorder resolution. Standalone GREEN proves actual landing at 10s, V2 unchanged at 20s, literal move to 21s still refused, one accepted revision, exact Undo and Redo. Reproducer: DOCS/evidence/2026-09-06-t55-drag-reliability/reorder-smoke.ts.
+- **Impact / status:** RESOLVED: focused Vitest 10/10 and web production build pass. Real browser project project_e58e4bb1e9f088fa38801efbeb52b83b: temporary split at 13.967s accepted at revision 41; drag [410,640] to [824,640] previewed Reorder linked video and audio at 14.378s, accepted at 42. V1 stayed at 28.412s. Undo 43 restored the previous order; Redo 44 restored the reorder and source-anchored title at 17.700s; linked A1 timing matched V2. One video element; captured warning/error log empty. Undo 45 and Undo 46 removed only the temporary reorder and split, restoring original V2 1.678s/24.989s, V1 28.412s/5.011s and title 5s/3s. No overlapping primary-layer support or canonical schema change. Screenshot capture remained distorted (INFRA-007); this is gesture/state proof, not frame-rate or competitor-parity proof.
+- **One-line solution:** Resolve gapless reorders before checking raw pointer collisions; keep collision refusal for literal moves.
+
+### INFRA-016 — Vitest module loading timed out before the regression could execute
+
+- **What / where / who / when:** September 8 local focused drag test; Vitest 3.2.7 worker loading timeline-body-drag-plan.test.ts and edit-domain/project.ts.
+- **How / why:** Both default and explicit single-fork runs timed out on worker fetch during module collection (110.15s and 71.99s); no tests executed. Root cause unproven, not classified as a product regression.
+- **Attempts / evidence:** Stopped the stalled scoped run, retried only that test with one fork, inspected process load. Used installed esbuild plus Node assertions to run the pure planner/domain directly; observed RED then GREEN without UI state injection or local project mutation. Did not kill unrelated processes, install packages, or alter Vitest configuration.
+- **Impact / status:** RESOLVED on resumed September 8 run: the existing file passed all 10 tests in 44.74s (127ms test execution), using a single fork without configuration changes. The earlier standalone proof remains separate evidence. Cause of the transient module-fetch stall remains unproven.
+- **One-line solution:** Restore worker module-loading health, then rerun the existing focused test file; do not hide this behind longer global timeouts.
+
+Build follow-up: the earlier interrupted build is superseded by the resumed successful `npm run build --workspace @sanverse/web`: TypeScript and Vite passed, 305 modules, Vite 22.17s. JS 1,003.35 kB / gzip 277.80; CSS 145.14 / gzip 24.42. Existing chunk-size and runtime-font warnings remain nonblocking.
+
+### FAIL-078 / FAIL-079 — Opening gaps looked stuck and could not start playback
+
+- **What / where / who / when:** September 8, resumed real-user timeline walkthrough on test-30s.mp4; StudioScreen transport and monitor-base-layer; affects editors reopening a sequence whose first clip starts after zero.
+- **How / why:** The source selector intentionally attaches no file during an empty interval. The monitor prioritized missing source over canonical gap, so it displayed Loading frame indefinitely. Play then called HTMLVideoElement.play() with no source rather than using the existing gap clock.
+- **Attempts / evidence:** One monitor RED test returned loading instead of gap; one integration RED test called the unloaded video's play method. Corrected monitor priority; reused holePlaybackRef with explicit resume intent, pause control and a pending source-load handoff. Affected four-file suite passed 45/45. Extended deterministic clock test proves 1s advancement, pause/restart, source attachment at 5s and playback only after loadedmetadata; final integration 8/8. Real browser reopen shows No media at this time, Play traverses the 1.678s opening and continues into readyState 4 footage, one video, revision unchanged at 40.
+- **Impact / status:** RESOLVED for reproduced opening-gap labeling and playback. Not a claim that every reverse/freeze/multi-source transition has been revalidated.
+- **One-line solution:** Let canonical empty intervals drive the existing composition clock, and resume the single video only when its next source is loaded.
+
+### INFRA-015 — Uncertain interaction and stale development connection
+
+- **What / where / who / when:** September 7–8 CUA walkthrough, multiple localhost:2010 tabs and the saved test project.
+- **How / why:** Revision advanced 36→37 with an add-video-track operation during a seek-only sequence; cause/actor is unproven. Range interactions in the old tab also produced inconsistent observations. Do not attribute this to a confirmed application seek bug. Browser logs additionally reported a Vite websocket connection failure after server interruption.
+- **Attempts / evidence:** Stopped uncertain mutations; inspected accepted operation rather than undoing it. Preserved the new track. Resumed through the sole attached tab, restarted only 2010/2011 after Vite spawn EPERM via approved execution, reloaded once, and used the exposed AX slider value action to seek. Title acceptance/Undo/Redo/export then completed at revisions 38/39/40. No new runtime error was inferred from the websocket warning.
+- **Impact / status:** MONITORING. Development HMR should not be treated as proof that a fix is loaded; intentional reload was used. No project reset or deletion.
+- **One-line solution:** Reconcile the active tab and accepted revision before edits, and reload deliberately after a disconnected development session.
+
+### BUILD-008 — Browser locator option copied into an RTL test
+
+- **What / where / who / when:** September 8 implementation by Codex, StudioWorkspaceIntegration.test.tsx, production TypeScript build.
+- **How / why:** Five getByRole calls included exact:true, supported by the browser tool but not Testing Library's ByRoleOptions. Vitest transpilation passed; tsc reported TS2769.
+- **Attempts / status:** Removed only the unsupported option; string role names already match exactly. Production build rerun recorded in CURRENT_STATE. RESOLVED at source; final build gate remains authoritative.
+- **One-line solution:** Use Testing Library's typed locator options rather than copying browser-tool options.
+
+### INFRA-014 — In-app browser cannot attach for the final visual-order check
+
+September 8 resolution: the owner-attached browser became available; the existing tab was reused. Same-track title over transferred footage, Undo/Redo and a fresh decoded export succeeded. Earlier failed attachment evidence below is historical, not a current blocker.
+
+- **What / who / where / when:** September 7 continuation; automated UI testing of localhost:2010; CUA in-app browser.
+- **How / why:** After session interruption, browser inventory is empty. Both hidden and visible createBrowserTab attempts timed out waiting for the browser webview to attach. Cause is unknown; this is not evidence that Sanverse refused a connection.
+- **Attempts / evidence:** Restarted the isolated dev:timeline process with current domain code. Direct HTTP GET localhost:2010 returned 200. Checked browser inventory after the first timeout before attempting visible mode. No native-browser bypass or repeated blind retries.
+- **Impact / status:** BLOCKED for the new title/B-roll-after-transfer real UI walkthrough, screenshot and visual export comparison. Earlier transfer/retiming UI and revision-30 real export evidence remain valid, but do not prove this later ordering adjustment.
+- **One-line solution:** Reopen the app browser on localhost:2010 so its view attaches, then run same-track title/B-roll → Undo/Redo → export.
+
+### FAIL-077 — Visual mixing guard was both too broad and incomplete
+
+September 8 resolution: actual title added at composition 5s over V2 footage (revision 38), Undo 39, Redo 40, fresh export_c91d80f74a0b92aa239a447306d9c5d8.mp4 rendered and fully decoded. Frame at 6s inspected and shows the title over the intended picture. RESOLVED for the bounded ordering rule; general overlap/lower interleaving stays OPEN under FAIL-069. Earlier blocked statement below is historical. B-roll/nameplate parity remains automated evidence, not a new B-roll UI claim.
+
+- **What / where / who / when:** September 7 transfer continuation; project replay and body-drag planner; timeline users adding visuals after a track move.
+- **How / why:** Guard rejected every folded title/callout/B-roll regardless of track order, but add-nameplate is a separate operation family and bypassed it. The sequential-primary-plus-overlays renderer safely supports visuals on/above footage, not visuals on lower tracks under higher primary footage.
+- **Attempts / evidence:** Two domain RED cases confirmed: same-track B-roll rejected; V2 nameplate under V3 footage incorrectly accepted. Planner RED confirmed the safe drag was refused. Shared primaryVisualOrderSupported now owns the rule in replay and planner. Final domain 568/568, planner 9/9, compiler/transfer 6/6 and all-workspace production build pass. Exact rendered segment and overlay nodes match before/after safe transfer for title, nameplate and B-roll.
+- **Impact / status:** MONITORING: code fixed and automated evidence passes; final real-UI proof blocked by INFRA-014. General primary overlap and lower-layer interleaving remain unsupported. Guard is conservative across the entire project, even for nonoverlapping time intervals.
+- **One-line solution:** Use one shared accepted-track-order rule for all authored visual identities in replay and drag preview; permit same/higher layers, refuse unsupported lower layering.
+
+### FAIL-076 — Retimed footage source/interval disagreement
+
+- **What / who / where / when:** September 7 timeline-confidence review; users applying speed/reverse/hold; primary-source.ts.
+- **How / why:** resolvePrimarySource still uses sourceRange.duration as on-screen duration and sourceStart+localTicks as source position. The domain already has clipCompositionDurationTicks and clipTimeToSource for those distinct clocks.
+- **Attempts / evidence:** Four accepted-speed/reverse regressions failed for the expected wrong interval/source values. Reused clipCompositionDurationTicks and clipTimeToSource; affected source/transfer/invariant/playback suites pass 57/57. Web production build passes. Real UI changed the last clip to 0.5x at revision 31: duration 5.011s became 10.021s; scrub to 36.318s showed footage (source 3.456s), not the former false gap. Undid the test speed change afterwards.
+- **Impact / status:** RESOLVED for this demonstrated source resolver defect. This is not a claim of complete reverse/proxy/hold playback coverage.
+- **One-line solution:** Use the existing domain duration and clip-time mapping authority, then prove normal/fast/slow/reverse agreement.
+
+### FAIL-075 — Dialogue-to-video drag could transfer its picture
+
+- **What / where / when / who:** September 7 primary-transfer implementation; timeline users; timeline-body-drag-plan.ts.
+- **How / why:** The guard compared item.kind to the nonexistent 'dialogue' kind instead of checking its linkedClipId. A dialogue item could enter the picture-transfer path; TypeScript also reported TS2367.
+- **Attempts / evidence:** New focused test failed with ok:true where TRACK_INCOMPATIBLE was required. Guard now uses linkedClipId. Planner 8/8, related preview tests 14/14, and all-workspace production build pass.
+- **Status / impact:** RESOLVED; prevents moving a picture to another track by dragging its linked sound into a video row.
+- **One-line solution:** Identify linked dialogue by its typed clip relationship, not an invented display-kind string.
+
+### INFRA-013 — Timed-out browser actions may already have succeeded
+
+- **What / where / when / who:** September 7 real-browser workflow; agent browser-control connection to localhost:2010.
+- **How / why:** Studio switch and Undo returned Input.dispatchMouseEvent timeouts, yet subsequent DOM/saved-revision inspection showed completion. One interrupted drag left a transient ghost; transport cause is unknown.
+- **Attempts / evidence:** Inspected state before repeating; cancelled the interrupted ghost with Escape without changing revision 22. Fresh vertical drag saved revision 23; Undo saved 24; Redo saved 25. A subsequent user-turn interruption closed the temporary tab and stopped the dev process; server restarted using dev:timeline.
+- **Status / impact:** MONITORING; tool latency is not evidence of application frame latency. Never retry an uncertain edit blindly.
+- **One-line solution:** Reconcile DOM and saved revision after a transport timeout, then retry only an action proven not to have completed.
+
+### FAIL-074 — Transferred-footage output could disagree between preview and export
+
+- **What / who / where / when:** September 7 primary-transfer candidate; editor users; apps/web/src/features/render-plan/primary-source.ts resolvePrimarySource.
+- **How / why:** Resolver iterates composition tracks but checks activeTrackOutputs(project).V1 for every clip. Compiler already uses each owning stable track's output. Thus transferred footage could disappear with empty V1 hidden or remain visible with its actual track hidden.
+- **Attempts / evidence:** Approved execution resumed. Two of three preview/compiler cases failed on the V1 lookup, then all three passed using the accepted owning track. Related primary-source 11/11 and planner 8/8 pass. Real V1-to-V2 transfer saved revision 23, Undo 24, Redo 25. At 4.39s, hiding V1 kept the transferred picture visible; hiding V2 showed the correct track-off message (revisions 26/27). One video element remained.
+- **Impact / status:** RESOLVED for track-output routing. Arbitrary overlapping picture layers are still outside the current supported compositor; FAIL-069 is not closed.
+- **One-line solution:** Resolve output from the clip's actual accepted video track and prove preview/export parity before exposing transfer.
+
+### INFRA-012 — Required test execution blocked by approval-service usage
+
+- **What / where / when / who:** September 7, agent execution approval for the focused primary-track-transfer preview regression in the isolated timeline worktree.
+- **How / why:** Restricted run previously reported spawn EPERM; approved external worker runs then passed domain 567 and planner 7. The next approval was rejected because the automatic review service hit usage limit; no tests executed for that command.
+- **Attempts:** No indirect execution or permission bypass. Saved candidate and restored only its source changes; earlier editor repairs remain. Read-only diff check passed after restore.
+- **Impact / status:** RESOLVED September 7 after fresh approved test execution. Preview/planner 22/22 and all-workspace build completed; the candidate is now active. This does not retroactively make the earlier blocked commands successful.
+- **One-line solution:** Obtain approved test execution when the approval service is available, resume the saved candidate at FAIL-074, then build and run the real transfer/export workflow.
+
+### FAIL-073 — Export result hidden behind collapsed AI
+
+- **Status / impact:** RESOLVED, P1; users could start export but not find progress or Download MP4.
+- **Who / where / when:** Timeline editor users; StudioScreen export feedback effect; discovered September 6, confirmed fixed September 7, 2026.
+- **What / how / why:** Header Export worked while AI was collapsed. Scrolling a hidden export region did not expand its containing panel.
+- **Attempted / evidence:** Reveal the existing panel for non-idle export, then scroll/focus feedback without saving a preset or remounting editor state. Red-first continuity test reproduced the defect; Studio integration 7/7 and App 13/13 pass; production build passes. Real revision-22 browser export opened the panel and displayed ready/Download MP4, one video, unchanged revision; no captured console warnings/errors.
+- **One-line solution:** Reveal the existing export-feedback container before scrolling/focusing its progress or result.
+
+## 2026-09-06 T5.5 repair and remaining failures
+
+Evidence: `DOCS/evidence/2026-09-06-t55-drag-reliability/T55_DRAG_RELIABILITY.md`.
+
+### FAIL-065 — Body dragging jumped or did nothing on linked dialogue
+
+- **Status / impact:** RESOLVED, P0; affects confidence or evidence for this repair.
+- **Where / when:** TimelineItem and StudioScreen; owner recordings Sep5 and browser Sep6.
+- **What / how / why:** Drag audio/video by its body. Old path only reordered eligible primary footage, sought on press, and used the wrong grab anchor.
+- **Attempted / evidence:** One planner previews and commits existing operations; linked pair shares a ghost; preserve pointer offset and playhead; focused tests and real paired drag passed.
+- **One-line solution:** Use one revision-aware body-drag planner for both preview and accepted release.
+
+### FAIL-066 — Waveform contrast and selection reflow obscured editing
+
+- **Status / impact:** RESOLVED, P1; affects confidence or evidence for this repair.
+- **Where / when:** TimelineWaveform, TimelineLane and Timeline; Sep6.
+- **What / how / why:** White peaks on a pale patterned lane looked like stripes; selecting footage inserted an animation-target row.
+- **Attempted / evidence:** Dark real peaks aggregated per pixel; memoized decorations; animation target moved into closed Controls; unit and visual checks passed.
+- **One-line solution:** Render actual high-contrast peaks without selection-dependent permanent layout bands.
+
+### FAIL-067 — Incompatible tracks passed compatibility validation
+
+- **Status / impact:** RESOLVED, P0; affects confidence or evidence for this repair.
+- **Where / when:** timeline-track-controls.ts; Sep6 focused RED test.
+- **What / how / why:** A Result object was tested as a boolean instead of its ok field, so an incompatible audio-to-video destination appeared accepted.
+- **Attempted / evidence:** Corrected .ok check; scoped move collision to stable destination track; seven body planner tests and fifteen track tests pass.
+- **One-line solution:** Test the Result discriminant and validate the actual destination track.
+
+### FAIL-068 — Saved-change label lagged behind a successfully persisted drag
+
+- **Status / impact:** RESOLVED, P1; affects confidence or evidence for this repair.
+- **Where / when:** App onApplyOperations; Sep6 browser revision inspection.
+- **What / how / why:** Generic change-set acceptance updated the project but did not advance save-state's persisted revision.
+- **Attempted / evidence:** Added persisted event after successful server response; new App regression failed first, then passed; current browser reports change 7.
+- **One-line solution:** Advance save-state only when the authoritative accepted revision is returned.
+
+### FAIL-069 — Primary footage cannot move freely between video tracks
+
+- **Status / impact:** OPEN, P1; affects confidence or evidence for this repair.
+- **Where / when:** Existing primary composition/track model; Sep6 browser.
+- **What / how / why:** The original blanket transfer refusal is now removed for supported non-overlapping picture moves. Remaining arbitrary overlap/lower visual interleaving cannot be represented by the sequential primary render path; independent extracted dialogue is also not represented.
+- **Attempted / evidence:** Typed optional destination, transactional replay, shared drag decision, real V1→V2/Undo/Redo/sideways move and fresh decoded revision-30 export verified. Owning-track visibility and source timing fixed. Same/higher authored visual ordering now passes automated checks (FAIL-077); final UI proof is blocked by INFRA-014.
+- **One-line solution:** Keep the proven bounded transfer; next design and implement shared layered picture/audio rendering before enabling overlapping primary layers or independent extracted dialogue.
+
+### INFRA-006 — Fresh extra-audio browser test could not open filechooser
+
+- **Status / impact:** BLOCKED, P2; affects confidence or evidence for this repair.
+- **Where / when:** In-app browser tab 2, localhost:2010; Sep6.
+- **What / how / why:** Two registered filechooser waits around the labelled import input timed out; no upload occurred.
+- **Attempted / evidence:** Tried semantic button and direct labelled input; stopped repeated retries. Pure compatible-track accepted-change-set test passes but browser music-drag evidence remains absent.
+- **One-line solution:** Repeat the authorized upload and music-drag test with a working filechooser-capable browser backend.
+
+### INFRA-007 — Viewport and screenshot evidence dimensions mismatched requested size
+
+- **Status / impact:** MONITORING, P2; affects confidence or evidence for this repair.
+- **Where / when:** In-app browser screenshot/viewport capability; Sep6.
+- **What / how / why:** 1280x800 override yielded DOM 1910x1194; native screenshot showed a cropped DPR artifact.
+- **Attempted / evidence:** Used fullPage screenshot for normal-layout inspection; reset override; did not claim exact responsive-size proof.
+- **One-line solution:** Verify actual CSS viewport and use a reliable screenshot backend before certifying breakpoints.
+
+### FAIL-070 — Dragging outside lanes and at scroll edges lacks final expected behavior
+
+- **Status / impact:** MONITORING, P1; outside release fixed, sustained edge-hold UI proof outstanding.
+- **Where / when:** TimelineItem.moveBodyDrag; Sep6 focused source review.
+- **What / how / why:** No hovered lane falls back to source track; no edge-autoscroll is added, limiting long or diagonal drag confidence.
+- **Attempted / evidence:** Added visible-lane hit testing, actual-release recomputation and bounded RAF edge scrolling. Regression first failed because pointerup used the last valid lane; now both outside-move and outside-release cases pass. Live outside drop left revision 15 unchanged. Geometry tests cover both axes, outside bounds and delayed-frame caps. A DOMRect.toJSON assumption caused a test error; replaced with explicit rectangle fields.
+- **One-line solution:** Keep release targeting authoritative and finish sustained edge-hold UI verification before closing the whole issue.
+
+### FAIL-072 — Audio-name drag changed volume
+
+- **Who / where / when:** Real Sanverse dialogue-row test, TimelineAudioDirectControls / Timeline.css, 2026-09-06.
+- **What / how / why:** Horizontal drag near the audio name hit a gain line crossing that strip; absolute vertical gain mapping changed gain to 3.4 dB without moving the clip. A click could also cause a gain jump.
+- **Impact / status:** P1, RESOLVED for this reproduced defect; unrelated free track transfer remains FAIL-069.
+- **Attempts / evidence:** Undo the unintended edit; RED regression reproduces horizontal gain change. Reserve a name/grab strip; bound gain hit area below it; use 0.5 dB per vertical pixel relative to the starting gain. Seven audio tests pass. Real revision 18 moves paired footage from 25.023s to 29.405s while gain remains 0 dB; Undo/Redo restore/reapply at revisions 19/20.
+- **One-line solution:** Separate moving a clip from changing its volume spatially and make volume drags relative, never click-to-jump.
+
+### INFRA-010 — OpenCut local comparison startup failures
+
+- **Who / where / when:** Agent starting the installed competitor under competitors/compeititor 1 opencut/opencut-classic, 2026-09-06.
+- **What / why / impact:** Windows long executable/chunk paths stopped esbuild/Turbopack; root CLI resolved Next 16.2.4 while the app uses 16.1.3; absent environment examples and disabled webpack WASM prevented editor compilation. This blocked comparison, not Sanverse editing.
+- **Attempts:** Long-path ESBUILD_BINARY_PATH fixed esbuild; webpack avoided Turbopack filenames; app-local CLI removed the version mismatch; --env-file failed when Next forwarded it through NODE_OPTIONS, so load only the provided example values into the process; asyncWebAssembly enabled in local next.config.ts.
+- **Result / status:** RESOLVED for local comparison. Real project loaded, split, moved to a new video layer, Undo/Redo and extracted-audio movement completed. Nonblocking root-inference/WASM-target build warnings remain. No dependency reinstall, provider keys, or competitor source outside its folder.
+- **One-line solution:** Use the competitor-local start-comparison.ps1 with its app-pinned compiler and Windows/WASM compatibility configuration.
+
+### INFRA-011 — Browser upload exceeded the requested timeout
+
+- **Who / where / when:** OpenCut Import filechooser/setFiles browser call, 2026-09-06.
+- **What / how / why:** Call returned after 564 seconds despite a requested 30-second tool timeout; test-30s.mp4 ultimately appeared in Assets. The internal cause is unverified.
+- **Impact / status:** MONITORING, P2; wasted wall time and interrupted progress feedback, not proof of an editor performance defect.
+- **Attempts / result:** Used documented chooser flow; successful asset persisted and was reused on restart rather than uploading again.
+- **One-line solution:** Reuse persisted comparison media and investigate browser upload timeout enforcement separately from timeline performance.
+
+### INFRA-008 — Independent review did not complete
+
+- **Status / impact:** BLOCKED, P2; affects confidence or evidence for this repair.
+- **Where / when:** Review-agent attempt earlier in this continuation.
+- **What / how / why:** Agent usage failed before an independent result could be delivered.
+- **Attempted / evidence:** Did not retry with more agents; performed focused tests, production build and ownership checks; no independent-review pass or local commit claimed.
+- **One-line solution:** Run one bounded independent review when capacity is available.
+
+### FAIL-071 — Recording statistics were interpreted as causal smoothness evidence
+
+- **Status / impact:** RESOLVED, P2; affects confidence or evidence for this repair.
+- **Where / when:** Sep4 report/current-state/log; corrected Sep6.
+- **What / how / why:** Different recording actions, rates and crops confound frame-to-frame luma statistics.
+- **Attempted / evidence:** Added explicit correction; measurements retained only as descriptive data, not latency/relayout proof.
+- **One-line solution:** Use matched tasks and event-to-frame timing for comparative smoothness claims.
+
+### INFRA-009 — Timeline dev server unavailable after session interruption
+
+- **Status / impact:** MONITORING, P2; affects confidence or evidence for this repair.
+- **Where / when:** Dedicated dev:timeline startup on 2010/2011; Sep6.
+- **What / how / why:** Browser initially refused connection; a later duplicate start found 2011 already occupied after the first startup completed.
+- **Attempted / evidence:** Relaunched only the dedicated timeline entry point; eventually verified Home, saved project and real export; left Motion/MCP ports untouched.
+- **One-line solution:** Start one dev:timeline instance, wait for its ready log, and reopen 2010 without duplicating listeners.
 
 ## P1-F.0.1 validation-found issue details
 

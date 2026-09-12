@@ -3,15 +3,16 @@ import {
   mediaTime,
   type EvaluatedFootageMotion,
 } from '@sanverse/edit-domain'
-import type { RenderPlan, SourceSegmentNode } from '@sanverse/render-contract'
+import type { RenderPlan, PrimarySegmentNode } from '@sanverse/render-contract'
+import { segmentSourceTicksAt } from '@sanverse/render-contract/picture-layers'
 
 import { hasDecodableFrame } from './media-readiness'
 import { motionCanvasFrameToken } from './motion-frame-token'
 
 export type ActiveFootageMotion = Readonly<{
-  segment: SourceSegmentNode
+  segment: PrimarySegmentNode
   sourceTicks: number
-  motion: SourceSegmentNode['footageMotions'][number]
+  motion: PrimarySegmentNode['footageMotions'][number]
   evaluated: EvaluatedFootageMotion
 }>
 
@@ -26,7 +27,8 @@ export const footageMotionAtCompositionTime = (
     compositionTicks < candidate.interval.start.ticks + candidate.interval.duration.ticks,
   )
   if (!segment) return null
-  const sourceTicks = segment.sourceStartTicks + compositionTicks - segment.interval.start.ticks
+  const sourceTicks = segmentSourceTicksAt(segment, compositionTicks)
+  if (sourceTicks === null) return null
   const motion = segment.footageMotions.find((candidate) =>
     sourceTicks >= candidate.sourceInterval.start.ticks &&
     sourceTicks < candidate.sourceInterval.start.ticks + candidate.sourceInterval.duration.ticks,

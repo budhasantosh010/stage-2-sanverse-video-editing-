@@ -299,8 +299,13 @@ export type VisualPropertiesNode = VisualProperties & Readonly<{
   nodeIds: readonly string[]
 }>
 
+/** Bottom-to-top track order; node order within each track is explicit too. */
+export type PictureLayer = Readonly<{ trackId: string; nodeIds: readonly string[] }>
+
 export type RenderPlan = Readonly<{
-  schemaVersion: typeof RENDER_PLAN_SCHEMA_VERSION
+  schemaVersion: typeof RENDER_PLAN_SCHEMA_VERSION | typeof LAYERED_RENDER_PLAN_SCHEMA_VERSION
+  /** Required on v10, forbidden on v9. Validated before either renderer runs. */
+  pictureLayers?: readonly PictureLayer[]
   projectId: string
   /**
    * The revision this plan was compiled from. An export carries it, so a file
@@ -366,6 +371,8 @@ export type RenderPlanError = {
  * file from before the mute, and would have no way to tell.
  */
 export const RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v9'
+/** Opt-in until layered preview and export pass the release gate together. */
+export const LAYERED_RENDER_PLAN_SCHEMA_VERSION = 'sanverse.render-plan/v10'
 /**
  * Raised from 512 because captions produce one node per line of speech. A
  * ten-minute talk is roughly 200 cues before cutting, and a cut through a cue
@@ -509,7 +516,7 @@ const FREEZE_SEGMENT_KEYS = [
 ] as const
 const LINKED_AUDIO_KEYS = ['interval', 'sourceStartTicks', 'sourceDurationTicks'] as const
 
-const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]): void => {
+const validateSegments = (input: unknown, durationTicks: number, issues: Issue[], layers?: ReadonlyMap<string, string>): void => {
   if (!Array.isArray(input)) {
     issues.push({ path: 'segments', code: 'TYPE_INVALID' })
     return
@@ -523,7 +530,7 @@ const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]
     return
   }
 
-  const spans: { start: number; end: number }[] = []
+  const spans: { start: number; end: number; track: string }[] = []
   input.forEach((segment, index) => {
     const path = `segments[${index}]`
     if (!isRecord(segment)) {
@@ -573,7 +580,7 @@ const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]
         1,
         issues,
       )
-      spans.push({ start: interval.start, end: interval.start + interval.duration })
+      spans.push({ start: interval.start, end: interval.start + interval.duration, track: layers?.get(String(segment.nodeId)) ?? '' })
       return
     }
 
@@ -653,12 +660,12 @@ const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]
       Number.isSafeInteger(sourceDuration) ? sourceDuration as number : -1,
       issues,
     )
-    spans.push({ start: interval.start, end: interval.start + interval.duration })
+    spans.push({ start: interval.start, end: interval.start + interval.duration, track: layers?.get(String(segment.nodeId)) ?? '' })
   })
 
-  spans.sort((left, right) => left.start - right.start)
+  spans.sort((left, right) => left.track.localeCompare(right.track) || left.start - right.start)
   for (let index = 1; index < spans.length; index += 1) {
-    if (spans[index].start < spans[index - 1].end) {
+    if (spans[index].track === spans[index - 1].track && spans[index].start < spans[index - 1].end) {
       issues.push({ path: 'segments', code: 'SEGMENTS_OVERLAP' })
       break
     }
@@ -669,7 +676,7 @@ const TRANSITION_KEYS = [
   'nodeId', 'kind', 'fromSegmentId', 'toSegmentId', 'style', 'durationTicks', 'audio',
 ] as const
 
-const validateTransitions = (input: unknown, segments: unknown, issues: Issue[]): void => {
+const validateTransitions = (input: unknown, segments: unknown, issues: Issue[], layers?: ReadonlyMap<string, string>): void => {
   if (!Array.isArray(input)) {
     issues.push({ path: 'transitions', code: 'TYPE_INVALID' })
     return
@@ -679,7 +686,7 @@ const validateTransitions = (input: unknown, segments: unknown, issues: Issue[])
     .filter(isRecord)
     .map((segment) => ({ segment, interval: readInterval(segment.interval) }))
     .filter((entry): entry is { segment: Record<string, unknown>; interval: { start: number; duration: number } } => entry.interval !== null)
-    .sort((left, right) => left.interval.start - right.interval.start)
+    .sort((left, right) => (layers?.get(String(left.segment.nodeId)) ?? '').localeCompare(layers?.get(String(right.segment.nodeId)) ?? '') || left.interval.start - right.interval.start)
   const byId = new Map<string, { index: number; duration: number }>()
   orderedSegments.forEach((entry, index) => {
     if (typeof entry.segment.nodeId === 'string') byId.set(entry.segment.nodeId, { index, duration: entry.interval.duration })
@@ -710,7 +717,7 @@ const validateTransitions = (input: unknown, segments: unknown, issues: Issue[])
     const from = typeof transition.fromSegmentId === 'string' ? byId.get(transition.fromSegmentId) : undefined
     const to = typeof transition.toSegmentId === 'string' ? byId.get(transition.toSegmentId) : undefined
     const duration = transition.durationTicks
-    if (!from || !to || to.index !== from.index + 1) {
+    if (!from || !to || to.index !== from.index + 1 || (layers && layers.get(String(transition.fromSegmentId)) !== layers.get(String(transition.toSegmentId)))) {
       issues.push({ path: `${path}.fromSegmentId`, code: 'VALUE_OUT_OF_RANGE' })
     }
     if (
@@ -727,6 +734,40 @@ const validateTransitions = (input: unknown, segments: unknown, issues: Issue[])
   })
 }
 
+function validatePictureLayers(input: Record<string, unknown>, issues: Issue[]): ReadonlyMap<string, string> {
+  const owners = new Map<string, string>()
+  const nodes = new Set<string>()
+  for (const list of [input.segments, input.overlays]) {
+    if (!Array.isArray(list)) continue
+    for (const node of list) {
+      if (!isRecord(node) || typeof node.nodeId !== 'string') continue
+      if (nodes.has(node.nodeId)) issues.push({ path: 'pictureLayers', code: 'VALUE_OUT_OF_RANGE' })
+      nodes.add(node.nodeId)
+    }
+  }
+  if (!Array.isArray(input.pictureLayers)) {
+    issues.push({ path: 'pictureLayers', code: Object.hasOwn(input, 'pictureLayers') ? 'TYPE_INVALID' : 'FIELD_REQUIRED' })
+    return owners
+  }
+  const tracks = new Set<string>()
+  for (const [index, layer] of input.pictureLayers.entries()) {
+    const path = `pictureLayers[${index}]`
+    if (!isRecord(layer) || typeof layer.trackId !== 'string' || !layer.trackId.trim() || !Array.isArray(layer.nodeIds)) {
+      issues.push({ path, code: 'TYPE_INVALID' })
+      continue
+    }
+    if (Object.keys(layer).some(key => key !== 'trackId' && key !== 'nodeIds')) issues.push({ path, code: 'FIELD_UNKNOWN' })
+    if (tracks.has(layer.trackId)) issues.push({ path, code: 'VALUE_OUT_OF_RANGE' })
+    tracks.add(layer.trackId)
+    for (const id of layer.nodeIds) {
+      if (typeof id !== 'string' || !nodes.has(id) || owners.has(id)) issues.push({ path: `${path}.nodeIds`, code: 'VALUE_OUT_OF_RANGE' })
+      else owners.set(id, layer.trackId)
+    }
+  }
+  if (owners.size !== nodes.size) issues.push({ path: 'pictureLayers', code: 'FIELD_REQUIRED' })
+  return owners
+}
+
 /**
  * Validate a plan before a renderer acts on it.
  *
@@ -741,19 +782,21 @@ export const validateRenderPlan = (
   if (!isRecord(input)) {
     return { ok: false, error: { code: 'RENDER_PLAN_INVALID', issues: [{ path: '$', code: 'TYPE_INVALID' }] } }
   }
+  const layered = input.schemaVersion === LAYERED_RENDER_PLAN_SCHEMA_VERSION
   for (const key of PLAN_KEYS) {
     if (!Object.hasOwn(input, key)) issues.push({ path: key, code: 'FIELD_REQUIRED' })
   }
   for (const key of Object.keys(input)) {
     if (
       !(PLAN_KEYS as readonly string[]).includes(key) &&
-      !(OPTIONAL_PLAN_KEYS as readonly string[]).includes(key)
+      !(OPTIONAL_PLAN_KEYS as readonly string[]).includes(key) &&
+      !(layered && key === 'pictureLayers')
     ) issues.push({ path: key, code: 'FIELD_UNKNOWN' })
   }
   if (Object.hasOwn(input, 'framing') && !isVisualFitMode(input.framing)) {
     issues.push({ path: 'framing', code: 'VALUE_OUT_OF_RANGE' })
   }
-  if (input.schemaVersion !== RENDER_PLAN_SCHEMA_VERSION) {
+  if (input.schemaVersion !== RENDER_PLAN_SCHEMA_VERSION && !layered) {
     issues.push({ path: 'schemaVersion', code: 'VALUE_OUT_OF_RANGE' })
   }
   if (typeof input.projectId !== 'string' || input.projectId.length === 0) {
@@ -808,8 +851,9 @@ export const validateRenderPlan = (
   }
 
   const durationTicks = Number.isSafeInteger(input.durationTicks) ? (input.durationTicks as number) : -1
-  if (durationTicks > 0) validateSegments(input.segments, durationTicks, issues)
-  validateTransitions(input.transitions, input.segments, issues)
+  const layers = layered ? validatePictureLayers(input, issues) : undefined
+  if (durationTicks > 0) validateSegments(input.segments, durationTicks, issues, layers)
+  validateTransitions(input.transitions, input.segments, issues, layers)
   if (Array.isArray(input.segments)) {
     input.segments.forEach((segment, index) => {
       if (isRecord(segment) && typeof segment.assetId === 'string' && !sourceIds.has(segment.assetId)) {

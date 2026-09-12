@@ -85,12 +85,17 @@ export function EditorShell({
           </div>
         </div>
 
+        <div className="editor-shell__navigation">
         <SegmentedControl
           label="Editing workspace"
           value={workspace}
           options={WORKSPACES}
           onChange={onWorkspaceChange}
         />
+        {workspace === 'studio' ? (
+          <StudioWorkspaceTabs value={studioWorkspace} onChange={onStudioWorkspaceChange} />
+        ) : null}
+        </div>
 
         <div className="editor-shell__actions">
           <span
@@ -129,12 +134,6 @@ export function EditorShell({
           </DisabledAction>
         </div>
       </header>
-
-      {workspace === 'studio' ? (
-        <div className="editor-shell__studio-workspaces">
-          <StudioWorkspaceTabs value={studioWorkspace} onChange={onStudioWorkspaceChange} />
-        </div>
-      ) : null}
 
       <div className="editor-shell__workspace" aria-label={`${workspace === 'assist' ? 'Assist' : 'Studio'} workspace`}>
         {children}

@@ -1,10 +1,23 @@
 # P1-F.1E — Complete Timeline Experience — LIVE PROGRAM STATE
 
+**September 12 current checkpoint (supersedes historical notes below):** layered Studio/one-clock integration and automatic v10 preview/export compilation are live; typed cross-track overlaps are enabled while same-track guards remain. Pre-push mixed-overlay stacking defect corrected. Independent extracted dialogue and final owner confidence remain OPEN; no competitor-parity percentage is asserted. Latest report: `DOCS/evidence/2026-09-12-layered-timeline-release.md`. Owner has explicitly authorized pushing this batch to the timeline branch. Motion is unchanged.
+
+Latest September 10 checkpoint: reverse resource pool is now wired into Studio playback/audio; pending reverse seeks retain their requested position (FAIL-088/089). Clicking linked audio now focuses the Inspector and honors dirty drafts (FAIL-090). Final focused regression 103/103, real reverse playback/Undo/Redo/exact seek and draft guard verified; original test content restored at saved revision 58. Next: layered canvas + composition clock, matching preview/export before overlap-guard release, typed independent dialogue, full real-user workflow. Live compilation stays v9; no Motion changes or remote push. Server launcher PID 11740 is historical; verify before stopping. See active layered-engine plan for the unchecked gates.
+
+September 10 audio/clock follow-up: nine reproduced audio failure cases now pass (FAIL-085/086/087). Final focused run: 50/50 across six files, including Studio 9/9. Gap/held-frame RAF loops share one cancellable composition interval scheduler (5 checks); normal footage still uses the existing transport. This is NOT full layered Studio integration. Project remains saved at change 52; no content edits in this follow-up. Live compilation remains v9, overlap guards remain, independent extracted dialogue remains unimplemented. Next: layered Studio/clock and multi-reverse-resource integration, then enable overlap only with matching preview/export evidence; independent audio and final matched-user workflow follow. No Motion edits or remote push.
+
 **This file is the resume point. Read this first, before any other file, in every
 new session. It is updated at the end of every working block, not only at the end
 of a gate.**
 
-Last updated: 2026-08-11
+Last updated: 2026-09-10
+
+September 10 resume: FAIL-083 source-anchored speed/reverse/hold transform timing repaired in live preview, Inspector and FFmpeg; FAIL-084 reused-source end-of-clip loop repaired. Focused render checks 32/32, preview/decoder 29/29, Inspector/Studio 11/11, transport/Studio 25/25 (overlapping selections, not an additive full-suite total). Four real synthetic FFmpeg exports pass pixel/frame checks. Real UI motion 47, half-speed 48, Undo 49, Redo/reopen/export 50; original test edits restored and saved at 52. Actual MP4 38.500s, 1080p30 H.264/AAC stereo, 17,152,518 bytes, complete decode and 36s frame inspection PASS. API/web builds PASS; JS 1,005.71 kB/gzip 278.60; CSS unchanged. Boundary check PASS, 72 paths, no Motion edits. Layered browser resource controller exists (6 tests) but is NOT Studio-wired; live v9 and overlap guards remain. FAIL-069 and overall competitor-confidence gate stay OPEN. Next: simultaneous audio projection, one-clock layered Studio integration, independent audio, final real workflow. No commit/push.
+Latest checkpoint: FAIL-080 safe reorder correction verified by real drag, linked-audio/title continuity, Undo/Redo, focused 10/10 and web build. Test edits restored at revision 46. T5.5 remains OPEN for overlapping primary layers/independent extracted audio, sustained edge-hold proof and owner confidence. See CURRENT_STATE.md; do not repeat completed test setup.
+Current repair checkpoint: September 7, T5.5 remains OPEN. Bounded non-overlapping primary track transfer is active; focused preview/planner 22/22 and all-workspace build pass. Browser transfer/Undo/Redo/visibility passed at revisions 23–29; export verification and source-retiming regression are in progress. Historical suite totals below are not new runs. See CURRENT_STATE.md and FAILURE_REGISTRY.md.
+Later checkpoint: revision-30 fresh export decoded and sampled; source-retiming correction has 57/57 affected tests plus real slow-motion preview. Follow-up shared visual-order rule passes domain 568/568, planner 9/9, render parity 6/6 and build. Final title/B-roll-after-transfer browser test blocked by INFRA-014 webview attachment. Do not close T5.5 or start Motion integration.
+September 8: title transfer/Undo/Redo/export UI proof complete; opening-gap loading and Play defects repaired, focused 45/45 plus extended integration 8/8 and all-workspace build PASS. One video, revision 40 unchanged through playback. True overlap/independent dialogue and owner confidence remain OPEN; no Motion integration. See CURRENT_STATE and FAIL-078/079.
+
 Branch: `timeline-t55-editor-confidence`
 Program start commit: `45c0c981fb869afd236f10cbea829b1859d5beb6`
 Verified T5 base: `a89483deea214927bf44b6d82229ca6ffa72650c`
@@ -266,6 +279,8 @@ Final automated gate: **2,501 / 2,501**. All-workspace production build PASS. Re
 ### T5.5 — EDITOR CONFIDENCE & INTERACTION CONVERGENCE — **OWNER GATE OPEN**
 
 Local branch/worktree: `timeline-t55-editor-confidence` from exact verified T5 SHA `a89483deea214927bf44b6d82229ca6ffa72650c`.
+
+2026-09-06 focused repair: see `../2026-09-06-t55-drag-reliability/T55_DRAG_RELIABILITY.md` for the implemented drag/waveform/layout checklist, 135 focused passing tests, build/ownership proof and real revision-7 MP4 export. **T5.5 remains OPEN**: primary cross-track transfer, edge autoscroll/outside-lane behavior, remaining browser evidence and owner confidence gate are not complete. No Motion integration or remote push.
 
 - [x] interaction audit found/fixed a real dead-enabled Razor route
 - [x] Razor uses existing split authority and keeps acted clip selected

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PROJECT_TIMESCALE, acceptChangeSet, type EditProject } from '@sanverse/edit-domain'
-import { TRACK_OUTPUT_PRIMITIVE_ID } from '@sanverse/edit-domain/capabilities'
+import { TRACK_OUTPUT_PRIMITIVE_ID, CLIP_TIME_TRANSFORM_PRIMITIVE_ID } from '@sanverse/edit-domain/capabilities'
+import { changeSetOf } from '@sanverse/edit-domain/test-fixtures'
 import { DEFAULT_CLIP_TIME_TRANSFORM } from '@sanverse/edit-domain/clip-time'
 import { compileProjectToRenderPlan } from '@sanverse/render-contract/compile-project'
 import { compilePreviewPlan } from './render-plan-preview.ts'
@@ -14,6 +15,32 @@ import {
 import { TEST_ASSET_ID, TEST_CLIP_ID, testAsset, testProject } from '../../test-fixtures.ts'
 
 const seconds = (value: number): number => Math.round(value * PROJECT_TIMESCALE)
+
+describe('retimed footage source authority', () => {
+  const retime = (numerator: number, denominator: number, direction: 'forward' | 'reverse' = 'forward') => {
+    const project = testProject()
+    const accepted = acceptChangeSet(project, changeSetOf('changeset_sourcespeed', project.revision, [{
+      schemaVersion: 'sanverse.operation/v3', operationId: 'operation_sourcespeed',
+      capabilityId: CLIP_TIME_TRANSFORM_PRIMITIVE_ID, kind: 'set-clip-time-transform',
+      clipId: TEST_CLIP_ID, playbackRate: { numerator, denominator }, direction,
+      maintainAudioPitch: true, durationPolicy: 'preserve-start', extensions: {},
+    }]))
+    if (!accepted.ok) throw new Error(JSON.stringify(accepted.error))
+    return accepted.value
+  }
+  it('does not show a sped-up clip beyond its shortened timeline interval', () => {
+    expect(resolvePrimarySource(retime(2, 1), seconds(20))).toMatchObject({ kind: 'gap', reason: 'NO_CLIP_AT_TICK' })
+  })
+  it('keeps slow footage visible throughout its longer timeline interval', () => {
+    expect(resolvePrimarySource(retime(1, 2), seconds(40))).toMatchObject({ kind: 'active', sourceTicks: seconds(20) })
+  })
+  it('maps a sped-up playhead to the actual source time', () => {
+    expect(resolvePrimarySource(retime(2, 1), seconds(5))).toMatchObject({ kind: 'active', sourceTicks: seconds(10) })
+  })
+  it('maps a reversed playhead from the end of the source interval', () => {
+    expect(resolvePrimarySource(retime(1, 1, 'reverse'), seconds(5))).toMatchObject({ kind: 'active', sourceTicks: seconds(25) })
+  })
+})
 
 /**
  * A project holding one healthy 30-second recording plus a second clip whose

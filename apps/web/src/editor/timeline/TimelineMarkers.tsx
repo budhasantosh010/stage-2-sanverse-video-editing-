@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import { MARKER_COLORS, searchMarkers, type MarkerColor, type TimelineMarkerV1 } from '@sanverse/edit-domain'
 import { ticksToPixels } from '../../features/timeline'
@@ -28,6 +29,7 @@ import { formatTimelineTime } from './timeline-ruler-model'
  */
 
 export type TimelineMarkersProps = Readonly<{
+  controlsHost?: HTMLElement | null
   markers: readonly TimelineMarkerV1[]
   timescale: number
   pixelsPerSecond: number
@@ -53,6 +55,7 @@ const COLOR_LABELS: Readonly<Record<MarkerColor, string>> = Object.freeze({
 })
 
 export function TimelineMarkers({
+  controlsHost,
   markers,
   timescale,
   pixelsPerSecond,
@@ -72,85 +75,7 @@ export function TimelineMarkers({
   const found = searchMarkers(markers, query)
   const selected = markers.find((marker) => marker.markerId === selectedMarkerId) ?? null
 
-  return (
-    <>
-      <div
-        className="timeline-v1__marker-strip"
-        data-testid="timeline-marker-strip"
-        aria-label="Your notes"
-        role="group"
-      >
-        {markers.map((marker) => {
-          // A note past the end of the video is not drawn. It is not deleted
-          // either: the user trimmed the end off, and putting the footage back
-          // must bring their note back with it.
-          if (marker.startTicks > durationTicks) return null
-          const isDragging = dragging?.markerId === marker.markerId
-          const at = isDragging ? dragging.toTicks : marker.startTicks
-          const leftPx = ticksToPixels(at, timescale, pixelsPerSecond)
-          const widthPx = marker.durationTicks > 0
-            ? Math.max(2, ticksToPixels(marker.durationTicks, timescale, pixelsPerSecond))
-            : 0
-          return (
-            <button
-              key={marker.markerId}
-              type="button"
-              className="timeline-v1__marker"
-              data-marker-id={marker.markerId}
-              data-marker-color={marker.color}
-              data-marker-range={marker.durationTicks > 0 ? 'true' : 'false'}
-              aria-pressed={selectedMarkerId === marker.markerId}
-              style={{ left: `${leftPx}px`, width: widthPx > 0 ? `${widthPx}px` : undefined }}
-              title={`${marker.label || 'Note'} · ${formatTimelineTime(marker.startTicks, timescale)}${
-                marker.note ? ` — ${marker.note}` : ''
-              }`}
-              aria-label={`Note: ${marker.label || 'no name'}, at ${formatTimelineTime(marker.startTicks, timescale)}${
-                marker.durationTicks > 0 ? `, lasting ${(marker.durationTicks / timescale).toFixed(1)} seconds` : ''
-              }`}
-              onPointerDown={(event) => {
-                if (busy) return
-                onSelectMarker(marker.markerId)
-                onSeek(marker.startTicks)
-                // Holding on to the pointer is what lets a drag continue when
-                // the hand strays off the flag. It is not worth failing over:
-                // if the browser will not give it, the drag still works, it
-                // just stops when the pointer leaves. Without the guard, a
-                // press with no live pointer throws where the user sees nothing.
-                try {
-                  event.currentTarget.setPointerCapture(event.pointerId)
-                } catch {
-                  // Nothing to do. The drag below does not depend on it.
-                }
-                setDragging({ markerId: marker.markerId, toTicks: marker.startTicks })
-              }}
-              onPointerMove={(event) => {
-                // Moving the pointer is presentation only. No operation, no
-                // revision, no Undo entry — the flag simply follows the hand.
-                if (!isDragging) return
-                setDragging({ markerId: marker.markerId, toTicks: pointerTicks(event.clientX) })
-              }}
-              onPointerUp={(event) => {
-                if (!isDragging) return
-                try {
-                  event.currentTarget.releasePointerCapture(event.pointerId)
-                } catch {
-                  // It was never taken. See the note above.
-                }
-                const to = dragging.toTicks
-                setDragging(null)
-                // One whole gesture, decided on release. A request per pointer
-                // move would be a hundred edits and a hundred Undos for one drag.
-                if (to !== marker.startTicks) onMoveMarker(marker.markerId, to)
-              }}
-              onPointerCancel={() => setDragging(null)}
-            >
-              <span className="timeline-v1__marker-flag" aria-hidden="true" />
-              <span className="timeline-v1__marker-label">{marker.label}</span>
-            </button>
-          )
-        })}
-      </div>
-
+  const notes = (
       <details className="timeline-v1__marker-list">
         <summary>
           Your notes{markers.length > 0 ? ` (${markers.length})` : ''}
@@ -247,6 +172,88 @@ export function TimelineMarkers({
           </div>
         ) : null}
       </details>
+  )
+
+  return (
+    <>
+      <div
+        className="timeline-v1__marker-strip"
+        data-testid="timeline-marker-strip"
+        aria-label="Your notes"
+        role="group"
+      >
+        {markers.map((marker) => {
+          // A note past the end of the video is not drawn. It is not deleted
+          // either: the user trimmed the end off, and putting the footage back
+          // must bring their note back with it.
+          if (marker.startTicks > durationTicks) return null
+          const isDragging = dragging?.markerId === marker.markerId
+          const at = isDragging ? dragging.toTicks : marker.startTicks
+          const leftPx = ticksToPixels(at, timescale, pixelsPerSecond)
+          const widthPx = marker.durationTicks > 0
+            ? Math.max(2, ticksToPixels(marker.durationTicks, timescale, pixelsPerSecond))
+            : 0
+          return (
+            <button
+              key={marker.markerId}
+              type="button"
+              className="timeline-v1__marker"
+              data-marker-id={marker.markerId}
+              data-marker-color={marker.color}
+              data-marker-range={marker.durationTicks > 0 ? 'true' : 'false'}
+              aria-pressed={selectedMarkerId === marker.markerId}
+              style={{ left: `${leftPx}px`, width: widthPx > 0 ? `${widthPx}px` : undefined }}
+              title={`${marker.label || 'Note'} · ${formatTimelineTime(marker.startTicks, timescale)}${
+                marker.note ? ` — ${marker.note}` : ''
+              }`}
+              aria-label={`Note: ${marker.label || 'no name'}, at ${formatTimelineTime(marker.startTicks, timescale)}${
+                marker.durationTicks > 0 ? `, lasting ${(marker.durationTicks / timescale).toFixed(1)} seconds` : ''
+              }`}
+              onPointerDown={(event) => {
+                if (busy) return
+                onSelectMarker(marker.markerId)
+                onSeek(marker.startTicks)
+                // Holding on to the pointer is what lets a drag continue when
+                // the hand strays off the flag. It is not worth failing over:
+                // if the browser will not give it, the drag still works, it
+                // just stops when the pointer leaves. Without the guard, a
+                // press with no live pointer throws where the user sees nothing.
+                try {
+                  event.currentTarget.setPointerCapture(event.pointerId)
+                } catch {
+                  // Nothing to do. The drag below does not depend on it.
+                }
+                setDragging({ markerId: marker.markerId, toTicks: marker.startTicks })
+              }}
+              onPointerMove={(event) => {
+                // Moving the pointer is presentation only. No operation, no
+                // revision, no Undo entry — the flag simply follows the hand.
+                if (!isDragging) return
+                setDragging({ markerId: marker.markerId, toTicks: pointerTicks(event.clientX) })
+              }}
+              onPointerUp={(event) => {
+                if (!isDragging) return
+                try {
+                  event.currentTarget.releasePointerCapture(event.pointerId)
+                } catch {
+                  // It was never taken. See the note above.
+                }
+                const to = dragging.toTicks
+                setDragging(null)
+                // One whole gesture, decided on release. A request per pointer
+                // move would be a hundred edits and a hundred Undos for one drag.
+                if (to !== marker.startTicks) onMoveMarker(marker.markerId, to)
+              }}
+              onPointerCancel={() => setDragging(null)}
+            >
+              <span className="timeline-v1__marker-flag" aria-hidden="true" />
+              <span className="timeline-v1__marker-label">{marker.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {controlsHost ? createPortal(notes, controlsHost) : notes}
     </>
   )
 }

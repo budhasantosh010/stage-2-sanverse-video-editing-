@@ -540,7 +540,7 @@ describe('StudioScreen', () => {
     renderStudio()
 
     const timeline = screen.getByRole('region', { name: 'Timeline workspace' })
-    await user.click(within(timeline).getByText(/advanced direct controls/i))
+    await user.click(within(timeline).getByLabelText('Advanced timeline controls'))
     expect(within(timeline).getByRole('button', { name: /^cut here$/i })).toBeInTheDocument()
     expect(within(timeline).getByRole('button', { name: /remove this section/i })).toBeInTheDocument()
     expect(within(timeline).getByRole('button', { name: /hide this section/i })).toBeInTheDocument()
@@ -1031,7 +1031,7 @@ describe('StudioScreen', () => {
  */
 describe('StudioScreen production timeline', () => {
   async function openAdvancedControls(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(screen.getByText(/advanced direct controls/i))
+    await user.click(screen.getByLabelText('Advanced timeline controls'))
   }
 
   it('shows the whole video as one V1 clip before anything is cut', () => {
@@ -1122,7 +1122,7 @@ describe('StudioScreen production timeline', () => {
     })
   })
 
-  it('prepares a reverse proxy on demand, never shows the original forwards, and keeps one video element', async () => {
+  it('prepares a reverse proxy, preserves the latest pending seek, and keeps one video element', async () => {
     let release: ((response: Response) => void) | null = null
     const fetchMock = vi.fn((input: string) => {
       if (String(input).includes('/media-analysis/reverse?')) {
@@ -1145,6 +1145,9 @@ describe('StudioScreen production timeline', () => {
     expect(view.container.querySelector('video')?.getAttribute('src')).toBeNull()
     const reverseCalls = fetchMock.mock.calls.filter(([input]) => String(input).includes('/media-analysis/reverse?'))
     expect(reverseCalls).toHaveLength(1)
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+    fireEvent.change(screen.getByRole('slider', { name: 'Monitor playhead' }), { target: { value: ms(5000).ticks } })
+    fireEvent.change(screen.getByRole('slider', { name: 'Monitor playhead' }), { target: { value: ms(7000).ticks } })
 
     act(() => release?.(new Response(new Blob([new Uint8Array([0, 0, 0, 24])], { type: 'video/mp4' }), {
       status: 200,
@@ -1153,6 +1156,11 @@ describe('StudioScreen production timeline', () => {
     await waitFor(() => expect(view.container.querySelector('video')?.getAttribute('src')).toBe('blob:prepared-reverse'))
     expect(screen.queryByText('Preparing backwards preview…')).toBeNull()
     expect(view.container.querySelectorAll('video')).toHaveLength(1)
+    const video = view.container.querySelector('video')!
+    Object.defineProperty(video, 'currentTime', { configurable: true, writable: true, value: 0 })
+    fireEvent.loadedMetadata(video)
+    expect(video.currentTime).toBe(7)
+    expect(screen.getByRole('slider', { name: 'Monitor playhead' })).toHaveValue(String(ms(7000).ticks))
 
     view.unmount()
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:prepared-reverse')

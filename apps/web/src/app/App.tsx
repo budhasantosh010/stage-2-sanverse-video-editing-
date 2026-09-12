@@ -652,6 +652,7 @@ export function App() {
           setAppState((current) =>
             current.screen === 'studio' ? { ...current, editProject: next, editError: null } : current,
           )
+          setSaveState((current) => nextSaveState(current, { kind: 'persisted', revision: next.revision }))
           return null
         } catch (error) {
           return error instanceof Error && error.message ? error.message : 'That change could not be made.'

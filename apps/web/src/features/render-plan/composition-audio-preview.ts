@@ -2,7 +2,6 @@ import type { MovingSourceSegmentNode, RenderPlan, TransitionEdgeNode } from '@s
 import { PROJECT_TIMESCALE } from '@sanverse/edit-domain'
 
 import {
-  playbackRateAt,
   segmentIndexAt,
   sourceTimeFor,
   type PlaybackSegment,
@@ -140,55 +139,43 @@ export const compositionAudioStateAt = (
   compositionTicks: number,
 ): CompositionAudioPreviewStateV1 => {
   const canonical = [...plan.segments].sort(
-    (left, right) => left.interval.start.ticks - right.interval.start.ticks || left.nodeId.localeCompare(right.nodeId),
+    (left, right) => left.interval.start.ticks - right.interval.start.ticks,
   )
   const activeIndex = segmentIndexAt(browserSegments, compositionTicks)
   const browser = activeIndex >= 0 ? browserSegments[activeIndex] : null
-  const sourceTarget = sourceTimeFor(browserSegments, compositionTicks)
-  const canonicalActive = activeIndex >= 0 ? canonical[activeIndex] : null
+  const canonicalActive = browser?.nodeId
+    ? canonical.find((segment) => segment.nodeId === browser.nodeId)
+    : activeIndex >= 0 ? canonical[activeIndex] : null
+  const preparedById = new Map(browserSegments.map((segment, index) => [segment.nodeId ?? canonical[index]?.nodeId, segment]))
 
   let primary: PreviewAudioVoiceV1 | null = null
-  if (
-    browser !== null &&
-    browser.reversed !== true &&
-    sourceTarget !== null &&
-    canonicalActive?.kind === 'source-segment' &&
-    canonicalActive.audioEnabled &&
-    canonicalActive.linkedAudio !== null &&
-    within(
-      compositionTicks,
-      canonicalActive.linkedAudio.interval.start.ticks,
-      canonicalActive.linkedAudio.interval.duration.ticks,
-    )
-  ) {
-    primary = voiceForSourceSegment(
-      plan,
-      canonicalActive,
-      browser.assetId,
-      sourceTarget.sourceTicks,
-      compositionTicks,
-      `primary:${canonicalActive.nodeId}:${browser.assetId}`,
-      playbackRateAt(browserSegments, compositionTicks),
-    )
-  }
-
   const auxiliary: PreviewAudioVoiceV1[] = []
   for (const segment of canonical) {
     if (segment.kind !== 'source-segment' || !segment.audioEnabled || segment.linkedAudio === null) continue
     const window = segment.linkedAudio
     if (!within(compositionTicks, window.interval.start.ticks, window.interval.duration.ticks)) continue
-    if (within(compositionTicks, segment.interval.start.ticks, segment.interval.duration.ticks)) continue
-    const sourceTicks = linkedSourceTick(segment, compositionTicks)
+    const prepared = preparedById.get(segment.nodeId)
+    // Reverse artifacts contain the picture interval only, not custom J/L handles.
+    const reverseReady = segment.direction === 'reverse' && prepared?.reversed === false &&
+      prepared.assetId !== segment.assetId &&
+      window.interval.start.ticks === segment.interval.start.ticks &&
+      window.interval.duration.ticks === segment.interval.duration.ticks &&
+      window.sourceStartTicks === segment.sourceStartTicks
+    const sourceTicks = reverseReady
+      ? sourceTimeFor([prepared], compositionTicks)?.sourceTicks ?? null
+      : linkedSourceTick(segment, compositionTicks)
     if (sourceTicks === null) continue
-    auxiliary.push(voiceForSourceSegment(
+    const voice = voiceForSourceSegment(
       plan,
       segment,
-      segment.assetId,
+      reverseReady ? prepared.assetId : segment.assetId,
       sourceTicks,
       compositionTicks,
       `linked:${segment.nodeId}`,
       segment.playbackRateNumerator / segment.playbackRateDenominator,
-    ))
+    )
+    if (segment.nodeId === canonicalActive?.nodeId) primary = voice
+    else auxiliary.push(voice)
   }
 
   for (const music of plan.music) {
@@ -229,6 +216,8 @@ type ManagedVoice = {
   gain: GainNode
   pan: StereoPannerNode | null
   url: string
+  targetSeconds: number | null
+  onMetadata: () => void
 }
 
 /**
@@ -271,14 +260,14 @@ export const createCompositionAudioPreviewController = (
   master.connect(context.destination)
   const voices = new Map<string, ManagedVoice>()
   let disposed = false
-  // The visible player is now picture-only. Every audible source, including
-  // the same recording, goes through the one graph below so gain/pan/J/L/music
-  // cannot double with native element audio.
-  video.muted = true
+  // Studio assigns sound authority before muting its picture resource, so a
+  // synchronous volumechange cannot be mistaken for a user's Mute command.
 
   const destroy = (voiceId: string) => {
     const managed = voices.get(voiceId)
     if (!managed) return
+    managed.audio.removeEventListener('loadedmetadata', managed.onMetadata)
+    managed.targetSeconds = null
     managed.audio.pause()
     managed.audio.removeAttribute('src')
     managed.audio.load()
@@ -305,25 +294,25 @@ export const createCompositionAudioPreviewController = (
     } else {
       gain.connect(master)
     }
-    const managed = { audio, source, gain, pan, url: voice.url }
+    const managed: ManagedVoice = {
+      audio, source, gain, pan, url: voice.url, targetSeconds: null,
+      onMetadata: () => applyPendingSeek(managed),
+    }
+    audio.addEventListener('loadedmetadata', managed.onMetadata)
     voices.set(voice.voiceId, managed)
     return managed
   }
 
-  const seek = (audio: HTMLAudioElement, seconds: number) => {
-    const apply = () => {
-      if (!Number.isFinite(seconds) || seconds < 0) return
-      try {
-        if (!Number.isFinite(audio.currentTime) || Math.abs(audio.currentTime - seconds) > 0.08) {
-          audio.currentTime = seconds
-        }
-      } catch {
-        // Metadata may not exist yet. `loadedmetadata` retries the exact same
-        // composition-derived time; it never advances animation state.
+  function applyPendingSeek(managed: ManagedVoice) {
+    const { audio, targetSeconds: seconds } = managed
+    if (disposed || seconds === null || !Number.isFinite(seconds) || seconds < 0) return
+    try {
+      if (!Number.isFinite(audio.currentTime) || Math.abs(audio.currentTime - seconds) > 0.08) {
+        audio.currentTime = seconds
       }
+    } catch {
+      // One resource listener retries only the newest composition target.
     }
-    if (audio.readyState === 0) audio.addEventListener('loadedmetadata', apply, { once: true })
-    else apply()
   }
 
   return Object.freeze({
@@ -345,7 +334,8 @@ export const createCompositionAudioPreviewController = (
         const player = managed.audio as unknown as Record<string, unknown>
         if ('preservesPitch' in player) player.preservesPitch = voice.preservePitch
         else if ('webkitPreservesPitch' in player) player.webkitPreservesPitch = voice.preservePitch
-        seek(managed.audio, voice.sourceTicks / PROJECT_TIMESCALE)
+        managed.targetSeconds = voice.sourceTicks / PROJECT_TIMESCALE
+        if (managed.audio.readyState > 0) applyPendingSeek(managed)
         if (playing) void managed.audio.play().catch(() => undefined)
         else managed.audio.pause()
       }

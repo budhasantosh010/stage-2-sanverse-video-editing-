@@ -318,8 +318,10 @@ export const normalizationFilterSteps = (input: Readonly<{
   canvasWidth: number
   canvasHeight: number
   fitMode: VisualFitMode
+  transparent?: boolean
 }>): readonly string[] => {
   const { canvasWidth: width, canvasHeight: height, fitMode } = input
+  const background = input.transparent ? 'black@0' : 'black'
 
   const steps: string[] = [
     // Step 2 — square the pixels, then say so. Without `setsar=1` afterwards the
@@ -336,20 +338,22 @@ export const normalizationFilterSteps = (input: Readonly<{
 
   if (fitMode === 'fit') {
     // Step 5a — black bars, centred, filling out to exactly the canvas.
-    steps.push(`pad=w=${width}:h=${height}:x='(ow-iw)/2':y='(oh-ih)/2':color=black`)
+    if (input.transparent) steps.push('format=pix_fmts=rgba')
+    steps.push(`pad=w=${width}:h=${height}:x='(ow-iw)/2':y='(oh-ih)/2':color=${background}`)
   } else {
     // Step 5b — take the middle and throw the overhang away. `min` guards the
     // case where the picture is already smaller in one direction: cropping to
     // larger than the input is an error, and the pad below then finishes the job.
     steps.push(
       `crop=w='min(iw,${width})':h='min(ih,${height})':x='(iw-ow)/2':y='(ih-oh)/2'`,
-      `pad=w=${width}:h=${height}:x='(ow-iw)/2':y='(oh-ih)/2':color=black`,
+      ...(input.transparent ? ['format=pix_fmts=rgba'] : []),
+      `pad=w=${width}:h=${height}:x='(ow-iw)/2':y='(oh-ih)/2':color=${background}`,
     )
   }
 
   // Steps 6 and 7 — square pixels declared, and one colour storage for every
   // piece. `concat` compares all three of size, pixel shape and colour storage.
-  steps.push('setsar=1', 'format=pix_fmts=yuv420p')
+  steps.push('setsar=1', `format=pix_fmts=${input.transparent ? 'rgba' : 'yuv420p'}`)
   return Object.freeze(steps)
 }
 

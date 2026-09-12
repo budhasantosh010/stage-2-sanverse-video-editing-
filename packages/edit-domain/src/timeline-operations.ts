@@ -27,6 +27,7 @@ import {
 } from './clip-time.ts'
 import { emptyExtensions, validateExtensions, type Extensions } from './json.ts'
 import type { MediaAsset } from './assets.ts'
+import type { TimelineTrackStateV2 } from './timeline-tracks.ts'
 import {
   ZERO_TIME,
   mediaTime,
@@ -327,6 +328,8 @@ export type MovePrimaryClipOperation = Common &
     kind: 'move-primary-clip'
     clipId: string
     compositionStart: MediaTime
+    /** Omitted by historical moves; a transfer names an existing accepted video track. */
+    destinationTrackId?: string
   }>
 
 export type TimelineOperation =
@@ -421,6 +424,7 @@ const KEYS_BY_KIND: Readonly<Record<string, readonly string[]>> = Object.freeze(
  * operation was already in use. Everything else stays strictly closed.
  */
 const OPTIONAL_KEYS_BY_KIND: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  'move-primary-clip': Object.freeze(['destinationTrackId']),
   'set-clip-audio': Object.freeze(['pan']),
 })
 
@@ -648,7 +652,10 @@ export const validateTimelineOperation = (
     }
     case 'move-primary-clip': {
       const compositionStart = time(input.compositionStart, 'compositionStart')
-      extra = { compositionStart }
+      if (input.destinationTrackId !== undefined && (typeof input.destinationTrackId !== 'string' || !TRACK_ID_PATTERN.test(input.destinationTrackId))) {
+        issues.push({ path: `${path}.destinationTrackId`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      extra = { compositionStart, ...(input.destinationTrackId === undefined ? {} : { destinationTrackId: input.destinationTrackId }) }
       break
     }
     case 'set-clip-transition': {
@@ -791,6 +798,8 @@ export type TimelineApplyCode =
   | 'COMPOSITION_WOULD_BE_EMPTY'
   | 'TOO_MANY_CLIPS'
   | 'RESULT_INVALID'
+  | 'DESTINATION_TRACK_INVALID'
+  | 'PRIMARY_LAYER_OVERLAP_UNSUPPORTED'
 
 export type TimelineApplyError = {
   readonly code: 'TIMELINE_APPLY_FAILED'
@@ -873,6 +882,7 @@ export const applyTimelineOperation = (
   composition: Composition,
   operation: TimelineOperation,
   assets: readonly MediaAsset[],
+  trackState?: TimelineTrackStateV2,
 ): Result<Composition, TimelineApplyError> => {
   // Placing a NEW piece is the one operation whose clip does not exist yet, so
   // it is answered before the lookup that every other operation begins with.
@@ -1223,6 +1233,21 @@ export const applyTimelineOperation = (
     }
 
     case 'move-primary-clip': {
+      if (operation.destinationTrackId !== undefined && operation.destinationTrackId !== track.trackId) {
+        const destination = trackState?.tracks.find(candidate => candidate.trackId === operation.destinationTrackId)
+        if (!destination || destination.kind !== 'video') return err(fail('DESTINATION_TRACK_INVALID'))
+        const moved = { ...clip, compositionStart: operation.compositionStart }
+        // Cross-track overlap is explicit layered composition. The normal
+        // composition validator below still rejects overlap on the destination.
+        const target = composition.tracks.find(candidate => candidate.trackId === destination.trackId)
+        if (target && target.clips.length >= MAX_CLIPS_PER_TRACK) return err(fail('TOO_MANY_CLIPS'))
+        const tracks = composition.tracks.map(candidate => candidate.trackId === track.trackId
+          ? { ...candidate, clips: candidate.clips.filter(entry => entry.clipId !== clip.clipId) }
+          : candidate.trackId === destination.trackId ? { ...candidate, clips: [...candidate.clips, moved] } : candidate)
+        if (!target) tracks.push({ trackId: destination.trackId, kind: 'video', order: Math.max(...tracks.map(candidate => candidate.order)) + 1, clips: [moved] })
+        const rebuilt = validateComposition({ ...composition, tracks }, assets, 'composition')
+        return rebuilt.ok ? ok(rebuilt.value) : err(fail('RESULT_INVALID'))
+      }
       // Only this piece moves. Nothing else on the track is touched, because
       // "put this here" is not "make room for this" — the second is Insert, and
       // a user who wanted Insert would have chosen it.

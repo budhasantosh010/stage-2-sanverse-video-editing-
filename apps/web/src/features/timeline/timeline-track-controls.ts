@@ -231,7 +231,7 @@ export const planAssignTimelineItemTrack = (input: Readonly<{
   if (input.lockedTrackIds.includes(source.trackId) || input.lockedTrackIds.includes(destination.trackId)) {
     return refuse('TRACK_LOCKED', 'Unlock both tracks before moving an item between them.')
   }
-  if (!canTrackAcceptTimelineItem(destination, input.family)) {
+  if (!canTrackAcceptTimelineItem(destination, input.family).ok) {
     return refuse('TRACK_INCOMPATIBLE', `That item cannot be placed on ${destination.kind} tracks.`)
   }
   if (source.trackId === destination.trackId) return refuse('NO_CHANGE', 'That item is already on this track.')

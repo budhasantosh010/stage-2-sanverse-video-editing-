@@ -210,6 +210,26 @@ describe('real pictures inside the footage', () => {
 })
 
 describe('real sound shapes', () => {
+  it('reserves a separate name strip above the waveform', async () => {
+    await renderTimeline()
+    const waveform = canvasesIn(/A1 dialogue lane/i, 'timeline-waveform')[0]
+    expect(waveform.style.top).toBe('12px')
+    expect(Number.parseFloat(waveform.style.height)).toBeLessThan(28)
+  })
+  it('uses dark peaks on the pale timeline instead of white-on-white stripes', async () => {
+    const original = HTMLCanvasElement.prototype.getContext
+    const contexts: CanvasRenderingContext2D[] = []
+    const spy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement, ...args: unknown[]) {
+      const context = original.apply(this, args as never) as CanvasRenderingContext2D | null
+      if (context) contexts.push(context)
+      return context
+    } as typeof original)
+    await renderTimeline()
+    const shape = canvasesIn(/A1 dialogue lane/i, 'timeline-waveform')[0]
+    const context = contexts.filter((entry) => entry.canvas === shape).at(-1)
+    spy.mockRestore()
+    expect(context?.fillStyle).toBe('rgba(24, 24, 24, 0.8)')
+  })
   it('draws the shape of the dialogue that came with the footage', async () => {
     await renderTimeline()
     const shapes = canvasesIn(/A1 dialogue lane/i, 'timeline-waveform')

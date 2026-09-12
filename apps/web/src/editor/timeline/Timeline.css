@@ -151,6 +151,64 @@
   align-items: center;
 }
 
+/* One stable command row. Optional panels float above it, never push clips. */
+.timeline-v1__command-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.timeline-v1__command-bar > .timeline-v1__toolbar {
+  flex: 1;
+  min-width: 0;
+}
+
+.timeline-v1__command-bar > .timeline-v1__advanced {
+  position: relative;
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0;
+  z-index: 45;
+}
+
+.timeline-v1__command-bar .timeline-v1__advanced > summary {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 7px;
+  font-size: 0.7rem;
+}
+
+.timeline-v1__command-bar .timeline-v1__advanced-body {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(720px, calc(100vw - 48px));
+  max-height: min(60vh, 540px);
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+}
+
+.timeline-v1__advanced-body .timeline-v1__context {
+  grid-template-columns: minmax(0, 1fr);
+  border-top: 0;
+  padding-top: 0;
+}
+
+@media (min-width: 981px) {
+  .studio-screen--studio .timeline-v1__viewport-grid {
+    flex: 1 1 0;
+    grid-template-rows: minmax(0, 1fr);
+    max-height: none;
+  }
+}
+
 .timeline-v1__placement-control {
   display: flex;
   min-height: 32px;
@@ -759,13 +817,7 @@
 }
 
 .timeline-v1__item--lane-dialogue {
-  background: repeating-linear-gradient(
-    90deg,
-    var(--color-surface) 0,
-    var(--color-surface) 8px,
-    var(--color-track) 8px,
-    var(--color-track) 10px
-  );
+  background: var(--color-surface-subtle);
 }
 
 .timeline-v1__item--caption {
@@ -1233,6 +1285,29 @@
   color: var(--color-text);
 }
 
+/* Audio names have their own strip; they must not obscure speech transients. */
+.timeline-v1__item--lane-dialogue .timeline-v1__item-label,
+.timeline-v1__item--lane-music .timeline-v1__item-label {
+  position: absolute;
+  top: 0;
+  left: 5px;
+  right: 20px;
+  height: 12px;
+  line-height: 12px;
+  font-size: 9px;
+  font-weight: 500;
+  text-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+.timeline-v1__item[data-body-draggable='true'] {
+  touch-action: none;
+  cursor: grab;
+}
+.timeline-v1__item-shell--dragging .timeline-v1__item {
+  cursor: grabbing;
+}
+
 /* The state word, now shown only when it says something. It is deliberately
    still small and quiet: it is the exception, and exceptions earn attention by
    being rare rather than by being loud. */
@@ -1607,9 +1682,24 @@
    Not one of the five rows on purpose: a note has no sound, no picture and no
    place in the export, so it must not take a row that has real work to do. */
 .timeline-v1__marker-strip {
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 8;
   height: 20px;
   margin-bottom: 2px;
+  background: var(--color-surface-raised);
+}
+
+.timeline-v1__marker-strip:empty {
+  display: none;
+}
+
+.timeline-v1:has(.timeline-v1__marker-strip:not(:empty)) .timeline-v1__ruler-header {
+  height: 46px;
+}
+
+.timeline-v1:has(.timeline-v1__marker-strip:not(:empty)) .timeline-v1__ruler {
+  top: 22px;
 }
 
 .timeline-v1__marker {
@@ -1886,7 +1976,8 @@
 .timeline-audio-direct {
   position: absolute;
   z-index: 8;
-  inset: 2px;
+  /* The name strip is a dependable grab area, never a hidden gain target. */
+  inset: 14px 2px 2px;
   pointer-events: none;
 }
 
@@ -2029,6 +2120,49 @@
 
 .timeline-audio-direct__normalize-error {
   color: #ffb0a8;
+}
+
+.timeline-audio-direct__options {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  pointer-events: auto;
+  z-index: 11;
+}
+
+.timeline-audio-direct__options > summary {
+  padding: 0 5px;
+  min-height: 22px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 12px;
+}
+
+.timeline-audio-direct__options-panel {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+  width: 260px;
+  padding: 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 5px 16px rgb(0 0 0 / 18%);
+}
+
+.timeline-audio-direct__options-panel .timeline-audio-direct__readout,
+.timeline-audio-direct__options-panel .timeline-audio-direct__pan,
+.timeline-audio-direct__options-panel .timeline-audio-direct__normalize {
+  position: static;
+  max-width: none;
+  font-size: 11px;
+  flex-wrap: wrap;
 }
 
 .timeline-speed {
@@ -2666,6 +2800,27 @@
 
 .timeline-v1__item-shell--dragging {
   z-index: 14;
+  will-change: transform;
+  transition: none;
+}
+
+.timeline-v1__lane:has(.timeline-v1__item-shell--dragging) {
+  overflow: visible;
+  z-index: 20;
+}
+
+.timeline-v1__item-shell[data-drag-valid='false'] .timeline-v1__item {
+  outline-style: dashed;
+  cursor: not-allowed;
+}
+
+.timeline-v1__item-shell[data-drag-valid] .timeline-v1__item {
+  touch-action: none;
+}
+
+.timeline-v1__item--lane-dialogue,
+.timeline-v1__item--music {
+  background: var(--color-surface-subtle);
 }
 
 .timeline-v1__playhead {

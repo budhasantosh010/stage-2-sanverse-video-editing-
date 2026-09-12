@@ -1,0 +1,482 @@
+diff --git a/packages/edit-domain/src/project.ts b/packages/edit-domain/src/project.ts
+index 65c901ca..db9cf8a9 100644
+--- a/packages/edit-domain/src/project.ts
++++ b/packages/edit-domain/src/project.ts
+@@ -2,6 +2,7 @@ import { err, isRecord, ok, type Result } from './result.ts'
+ import { validateMediaAsset, validateVideoAsset, type AssetError, type MediaAsset, type VideoAsset } from './assets.ts'
+ import {
+   createSingleClipComposition,
++  clipCompositionEndTicks,
+   validateComposition,
+   type Composition,
+   type CompositionError,
+@@ -366,36 +367,10 @@ const evaluateRound = (
+   const contributes = (index: number): boolean =>
+     project.changeSets[index].active && !failures.has(index)
+ 
+-  // Pass one — what the finished video is MADE OF.
+-  //
+-  // Cuts are replayed in the order they were approved, each against the result
+-  // of the ones before it, because that is the order the user made them in.
++  // Replay tracks and footage together. A transfer can only name a track that
++  // exists at that operation; a compound create + transfer is one transaction.
+   let composition = project.composition
+-  project.changeSets.forEach((record, index) => {
+-    if (!contributes(index)) return
+-    let trial = composition
+-    let failure: ChangeSetFailure | null = null
+-    record.changeSet.operations.forEach((operation, position) => {
+-      if (failure !== null || !isTimelineOperation(operation)) return
+-      const applied = applyTimelineOperation(trial, operation, project.assets)
+-      if (!applied.ok) {
+-        failure = Object.freeze({ reason: applied.error.reason, operationIndex: position })
+-        return
+-      }
+-      trial = applied.value
+-    })
+-    if (failure !== null) {
+-      failures.set(index, failure)
+-      return
+-    }
+-    composition = trial
+-  })
+-
+-  // Pass 1.5 — which stable Editor tracks exist, how they are ordered, and
+-  // which ones reach Preview/export. The seed is the deterministic projection
+-  // of the pre-T5 five-row editor. T5 operations are replayed transactionally
+-  // per change set so a compound add-track + assignment/output edit is either
+-  // wholly accepted or contributes nothing.
++  let replayedOverlays: readonly OverlayOperation[] = []
+   const seed = createLegacyTimelineTrackState(project.composition)
+   let trackState: TimelineTrackStateV2 = seed.ok
+     ? seed.value
+@@ -407,10 +382,24 @@ const evaluateRound = (
+   project.changeSets.forEach((record, index) => {
+     if (!contributes(index)) return
+     let trial = trackState
++    let trialComposition = composition
+     let failure: ChangeSetFailure | null = null
+     record.changeSet.operations.forEach((operation, position) => {
+       if (failure !== null) return
++      if (isTimelineOperation(operation)) {
++        const applied = applyTimelineOperation(trialComposition, operation, project.assets, trial)
++        if (!applied.ok) {
++          failure = Object.freeze({ reason: applied.error.reason, operationIndex: position })
++          return
++        }
++        trialComposition = applied.value
++        return
++      }
+       if (isTimelineTrackOperation(operation)) {
++        if (operation.kind === 'remove-timeline-track' && trialComposition.tracks.some(track => track.trackId === operation.trackId && track.clips.length > 0)) {
++          failure = Object.freeze({ reason: 'TRACK_NOT_EMPTY', operationIndex: position })
++          return
++        }
+         const applied = applyTimelineTrackOperation(trial, operation)
+         if (!applied.ok) {
+           failure = Object.freeze({ reason: applied.error.code, operationIndex: position })
+@@ -428,11 +417,25 @@ const evaluateRound = (
+         trial = applied.value
+       }
+     })
++    const trialOverlays = [...replayedOverlays, ...record.changeSet.operations.filter(isOverlayFamilyOperation)]
++    const primaryId = trial.tracks.find(track => track.role === 'primary-video')?.trackId
++    const hasTransferredFootage = trialComposition.tracks.some(track => track.trackId !== primaryId && track.clips.length > 0)
++    if (failure === null && hasTransferredFootage) {
++      const clips = trialComposition.tracks.flatMap(track => track.clips).slice().sort((a, b) => a.compositionStart.ticks - b.compositionStart.ticks)
++      const overlapping = clips.some((clip, i) => i > 0 && clip.compositionStart.ticks < clipCompositionEndTicks(clips[i - 1]))
++      const mixedVisuals = foldOverlayOperations(trialOverlays).some(operation => operation.kind !== 'add-music')
++      if (overlapping || mixedVisuals) failure = Object.freeze({
++        reason: overlapping ? 'PRIMARY_LAYER_OVERLAP_UNSUPPORTED' : 'PRIMARY_LAYER_VISUAL_MIX_UNSUPPORTED',
++        operationIndex: Math.max(0, record.changeSet.operations.length - 1),
++      })
++    }
+     if (failure !== null) {
+       failures.set(index, failure)
+       return
+     }
++    replayedOverlays = trialOverlays
+     trackState = trial
++    composition = trialComposition
+   })
+ 
+   // Pass two — what is DRAWN on it.
+diff --git a/packages/edit-domain/src/timeline-operations.ts b/packages/edit-domain/src/timeline-operations.ts
+index 62a4ce70..670fab39 100644
+--- a/packages/edit-domain/src/timeline-operations.ts
++++ b/packages/edit-domain/src/timeline-operations.ts
+@@ -27,6 +27,7 @@ import {
+ } from './clip-time.ts'
+ import { emptyExtensions, validateExtensions, type Extensions } from './json.ts'
+ import type { MediaAsset } from './assets.ts'
++import type { TimelineTrackStateV2 } from './timeline-tracks.ts'
+ import {
+   ZERO_TIME,
+   mediaTime,
+@@ -327,6 +328,8 @@ export type MovePrimaryClipOperation = Common &
+     kind: 'move-primary-clip'
+     clipId: string
+     compositionStart: MediaTime
++    /** Omitted by historical moves; a transfer names an existing accepted video track. */
++    destinationTrackId?: string
+   }>
+ 
+ export type TimelineOperation =
+@@ -421,6 +424,7 @@ const KEYS_BY_KIND: Readonly<Record<string, readonly string[]>> = Object.freeze(
+  * operation was already in use. Everything else stays strictly closed.
+  */
+ const OPTIONAL_KEYS_BY_KIND: Readonly<Record<string, readonly string[]>> = Object.freeze({
++  'move-primary-clip': Object.freeze(['destinationTrackId']),
+   'set-clip-audio': Object.freeze(['pan']),
+ })
+ 
+@@ -648,7 +652,10 @@ export const validateTimelineOperation = (
+     }
+     case 'move-primary-clip': {
+       const compositionStart = time(input.compositionStart, 'compositionStart')
+-      extra = { compositionStart }
++      if (input.destinationTrackId !== undefined && (typeof input.destinationTrackId !== 'string' || !TRACK_ID_PATTERN.test(input.destinationTrackId))) {
++        issues.push({ path: `${path}.destinationTrackId`, code: 'VALUE_OUT_OF_RANGE' })
++      }
++      extra = { compositionStart, ...(input.destinationTrackId === undefined ? {} : { destinationTrackId: input.destinationTrackId }) }
+       break
+     }
+     case 'set-clip-transition': {
+@@ -791,6 +798,8 @@ export type TimelineApplyCode =
+   | 'COMPOSITION_WOULD_BE_EMPTY'
+   | 'TOO_MANY_CLIPS'
+   | 'RESULT_INVALID'
++  | 'DESTINATION_TRACK_INVALID'
++  | 'PRIMARY_LAYER_OVERLAP_UNSUPPORTED'
+ 
+ export type TimelineApplyError = {
+   readonly code: 'TIMELINE_APPLY_FAILED'
+@@ -873,6 +882,7 @@ export const applyTimelineOperation = (
+   composition: Composition,
+   operation: TimelineOperation,
+   assets: readonly MediaAsset[],
++  trackState?: TimelineTrackStateV2,
+ ): Result<Composition, TimelineApplyError> => {
+   // Placing a NEW piece is the one operation whose clip does not exist yet, so
+   // it is answered before the lookup that every other operation begins with.
+@@ -1223,6 +1233,26 @@ export const applyTimelineOperation = (
+     }
+ 
+     case 'move-primary-clip': {
++      if (operation.destinationTrackId !== undefined && operation.destinationTrackId !== track.trackId) {
++        const destination = trackState?.tracks.find(candidate => candidate.trackId === operation.destinationTrackId)
++        if (!destination || destination.kind !== 'video') return err(fail('DESTINATION_TRACK_INVALID'))
++        const moved = { ...clip, compositionStart: operation.compositionStart }
++        // The current primary renderer is sequential. Do not accept a layered
++        // picture that it would concatenate into a different finished video.
++        if (composition.tracks.flatMap(candidate => candidate.clips).some(other =>
++          other.clipId !== clip.clipId &&
++          moved.compositionStart.ticks < clipCompositionEndTicks(other) &&
++          other.compositionStart.ticks < clipCompositionEndTicks(moved),
++        )) return err(fail('PRIMARY_LAYER_OVERLAP_UNSUPPORTED'))
++        const target = composition.tracks.find(candidate => candidate.trackId === destination.trackId)
++        if (target && target.clips.length >= MAX_CLIPS_PER_TRACK) return err(fail('TOO_MANY_CLIPS'))
++        const tracks = composition.tracks.map(candidate => candidate.trackId === track.trackId
++          ? { ...candidate, clips: candidate.clips.filter(entry => entry.clipId !== clip.clipId) }
++          : candidate.trackId === destination.trackId ? { ...candidate, clips: [...candidate.clips, moved] } : candidate)
++        if (!target) tracks.push({ trackId: destination.trackId, kind: 'video', order: Math.max(...tracks.map(candidate => candidate.order)) + 1, clips: [moved] })
++        const rebuilt = validateComposition({ ...composition, tracks }, assets, 'composition')
++        return rebuilt.ok ? ok(rebuilt.value) : err(fail('RESULT_INVALID'))
++      }
+       // Only this piece moves. Nothing else on the track is touched, because
+       // "put this here" is not "make room for this" — the second is Insert, and
+       // a user who wanted Insert would have chosen it.
+
+# CANDIDATE FILE: apps/web/src/features/timeline/timeline-body-drag-plan.ts
+import { OPERATION_SCHEMA_VERSION, activeOverlayOperations, activeTimelineTrackState, applyTimelineOperation, effectiveComposition, findClip, mediaTime, validateOperation, type EditOperation, type EditProject, type IdFactory } from '@sanverse/edit-domain'
+import { MOVE_PRIMARY_CLIP_PRIMITIVE_ID } from '@sanverse/edit-domain/capabilities'
+import { clipCompositionDurationTicks } from '@sanverse/edit-domain/composition'
+import type { TimelineViewModel } from './timeline-contract'
+import { adaptTimelineGesture } from './timeline-gesture-adapter'
+import { planTimelineItemAction } from './timeline-item-operations'
+import { familyAndIdentityForTimelineItem, planAssignTimelineItemTrack } from './timeline-track-controls'
+
+export type TimelineBodyDragRequest = Readonly<{ itemId: string; destinationTrackId: string; toStartTicks: number; revision?: number }>
+export type TimelineBodyDragPlan =
+  | Readonly<{ ok: true; operations: readonly EditOperation[]; description: string; landingStartTicks: number }>
+  | Readonly<{ ok: false; refusal: Readonly<{ code: string; message: string }> }>
+export type TimelineBodyDragApi = Readonly<{
+  revision?: number
+  selectedItemIds?: readonly string[]
+  preview(request: TimelineBodyDragRequest): TimelineBodyDragPlan
+  commit(request: TimelineBodyDragRequest): void | Promise<void>
+}>
+export type TimelineBodyDragFeedback = Readonly<{
+  itemId: string; linkedClipId: string | null; deltaTicks: number; deltaY: number; plan: TimelineBodyDragPlan
+}>
+const refuse = (code: string, message: string): TimelineBodyDragPlan => ({ ok: false, refusal: { code, message } })
+const success = (operations: readonly EditOperation[], description: string, landingStartTicks: number): TimelineBodyDragPlan => ({ ok: true, operations, description, landingStartTicks })
+
+/** One pure decision for both the drag preview and its release. Never writes a project. */
+export function planTimelineBodyDrag(input: Readonly<{
+  project: EditProject; model: TimelineViewModel; request: TimelineBodyDragRequest
+  lockedTrackIds: readonly string[]; pendingProposalExists: boolean; exportInProgress: boolean
+  expectedRevision: number; ids: IdFactory
+}>): TimelineBodyDragPlan {
+  const { project, model, request, ids } = input
+  if (project.revision !== input.expectedRevision || (request.revision !== undefined && request.revision !== project.revision)) return refuse('PROJECT_STALE', 'The project changed. Start this drag again.')
+  if (input.pendingProposalExists) return refuse('PROPOSAL_PENDING', 'Finish the pending proposal first.')
+  if (input.exportInProgress) return refuse('EXPORT_IN_PROGRESS', 'Wait for the export to finish.')
+  const item = model.lanes.flatMap((lane) => lane.items).find((entry) => entry.id === request.itemId)
+  const source = model.lanes.find((lane) => lane.trackId === item?.trackId)
+  const destination = model.lanes.find((lane) => lane.trackId === request.destinationTrackId)
+  if (!item || !source || !destination || item.state !== 'committed') return refuse('ITEM_UNKNOWN', 'Choose an existing clip and track.')
+  const locked = (trackId: string) => input.lockedTrackIds.includes(trackId)
+  const clipId = item.clipId ?? item.linkedClipId
+  const linkedLocked = clipId !== null && model.lanes.some((lane) => locked(lane.trackId) && lane.items.some((entry) => (entry.clipId ?? entry.linkedClipId) === clipId))
+  if (locked(source.trackId) || locked(destination.trackId) || linkedLocked) return refuse('TRACK_LOCKED', 'Unlock the clip and its linked audio track before moving them.')
+  if (!Number.isSafeInteger(request.toStartTicks) || request.toStartTicks < 0) return refuse('OUT_OF_RANGE', 'Keep the clip inside the timeline.')
+
+  if (clipId !== null) {
+    const transferring = source.trackId !== destination.trackId
+    if (transferring && (item.kind === 'dialogue' || destination.trackKind !== 'video')) return refuse('TRACK_INCOMPATIBLE', 'Move the picture to another video track. Its linked sound stays on Dialogue.')
+    const composition = effectiveComposition(project)
+    const clip = findClip(composition, clipId)
+    if (!clip) return refuse('ITEM_UNKNOWN', 'This section is no longer in the project.')
+    const start = clip.compositionStart.ticks + request.toStartTicks - item.startTicks
+    if (start < 0) return refuse('OUT_OF_RANGE', 'The linked video would start before zero.')
+    if (start === clip.compositionStart.ticks && !transferring) return success([], 'No move', request.toStartTicks)
+    const peers = composition.tracks.find((track) => track.clips.some((entry) => entry.clipId === clipId))!.clips.slice().sort((a, b) => a.compositionStart.ticks - b.compositionStart.ticks)
+    const others = peers.filter((entry) => entry.clipId !== clipId)
+    const duration = clipCompositionDurationTicks(clip)
+    const otherLayersOverlap = composition.tracks.filter(track => !track.clips.some(entry => entry.clipId === clipId)).flatMap(track => track.clips).some(entry => start < entry.compositionStart.ticks + clipCompositionDurationTicks(entry) && entry.compositionStart.ticks < start + duration)
+    if (otherLayersOverlap) return refuse('COLLISION', 'Overlapping primary video layers are not supported yet. Drop into an empty time range.')
+    if (transferring && activeOverlayOperations(project).some(operation => operation.kind !== 'add-music')) return refuse('OPERATION_UNSUPPORTED', 'Track transfer with authored visual overlays is not supported yet. Keep this footage on its current track.')
+    const overlap = others.some((entry) => start < entry.compositionStart.ticks + clipCompositionDurationTicks(entry) && entry.compositionStart.ticks < start + duration)
+    const gapless = peers.every((entry, index) => index === 0 || peers[index - 1].compositionStart.ticks + clipCompositionDurationTicks(peers[index - 1]) === entry.compositionStart.ticks)
+    if (overlap && gapless && !transferring) {
+      const toIndex = others.filter((entry) => entry.compositionStart.ticks + clipCompositionDurationTicks(entry) / 2 < start + duration / 2).length
+      if (toIndex === peers.findIndex((entry) => entry.clipId === clipId)) return success([], 'Same sequence position', item.startTicks)
+      const result = adaptTimelineGesture({ project, gesture: { type: 'move-to-index', clipId, toIndex }, createOperationId: () => ids.operation(0), createClipId: () => ids.entity('clip', 0), pendingProposalExists: false, exportInProgress: false })
+      if (!result.ok) return refuse(result.error.code, result.error.message)
+      const landing = peers[0].compositionStart.ticks + others.slice(0, toIndex).reduce((total, entry) => total + clipCompositionDurationTicks(entry), 0)
+      return success([result.value], 'Reorder linked video and audio', landing + item.startTicks - clip.compositionStart.ticks)
+    }
+    if (overlap) return refuse('COLLISION', 'Another section is here. Drop into an empty gap or use the explicit placement controls.')
+    const result = validateOperation({ schemaVersion: OPERATION_SCHEMA_VERSION, operationId: ids.operation(0), capabilityId: MOVE_PRIMARY_CLIP_PRIMITIVE_ID, kind: 'move-primary-clip', clipId, compositionStart: mediaTime(start), ...(transferring ? { destinationTrackId: destination.trackId } : {}), extensions: {} })
+    if (!result.ok || result.value.kind !== 'move-primary-clip') return refuse('OUT_OF_RANGE', 'That position cannot be represented safely.')
+    const applied = applyTimelineOperation(composition, result.value, project.assets, activeTimelineTrackState(project))
+    if (!applied.ok) return refuse('DOMAIN_REFUSAL', `Cannot move here: ${applied.error.reason}.`)
+    return success([result.value], transferring ? 'Move footage to video track; keep linked sound' : 'Move linked video and audio', request.toStartTicks)
+  }
+
+  if (item.kind !== 'music' && item.kind !== 'media-overlay') return refuse('OPERATION_UNSUPPORTED', 'Use the Inspector to position this item.')
+  const family = familyAndIdentityForTimelineItem(item)
+  if (!family || family.family === 'primary' || family.family === 'dialogue') return refuse('ITEM_UNKNOWN', 'That clip has no editable identity.')
+  const movingTracks = source.trackId !== destination.trackId
+  const assignment = movingTracks ? planAssignTimelineItemTrack({ project, item, family: family.family, identity: family.identity, destinationTrackId: destination.trackId, lockedTrackIds: input.lockedTrackIds, ids: { ...ids, operation: (slot) => ids.operation(slot + 1) } }) : null
+  if (assignment && !assignment.ok) return assignment
+  const movingTime = request.toStartTicks !== item.startTicks
+  const move = movingTime ? planTimelineItemAction({ ...input, itemId: item.id, action: { type: 'move', toStartTicks: request.toStartTicks }, collisionTrackId: destination.trackId, lockedTrackIds: [] }) : null
+  if (move && !move.ok) return move
+  if (destination.items.some((other) => other.id !== item.id && other.state === 'committed' && other.kind === item.kind && request.toStartTicks < other.startTicks + other.durationTicks && other.startTicks < request.toStartTicks + item.durationTicks)) return refuse('COLLISION', 'Another clip occupies this space. Move it to an empty part of the track.')
+  return success([...(move?.ok ? move.operations : []), ...(assignment?.ok ? assignment.operations : [])], movingTracks ? 'Move clip to track' : 'Move clip', request.toStartTicks)
+}
+
+# CANDIDATE FILE: apps/web/src/features/timeline/timeline-body-drag-plan.test.ts
+import { describe, expect, it } from 'vitest'
+import { acceptChangeSet, createIdFactory, effectiveComposition } from '@sanverse/edit-domain'
+import { changeSetOf } from '@sanverse/edit-domain/test-fixtures'
+import { testProject } from '../../test-fixtures'
+import { buildTimelineViewModel } from './timeline-view-model'
+import { createIds, splitProject, ticks, projectWithAllTimelineFamilies } from './timeline-test-fixtures'
+import { planAddTimelineTrack } from './timeline-track-controls'
+import { planTimelineBodyDrag } from './timeline-body-drag-plan'
+
+const plan = (project: ReturnType<typeof testProject>, kind: 'video' | 'dialogue', start: number, destination?: string, lockedTrackIds: string[] = []) => {
+  const model = buildTimelineViewModel({ project, selectedItemIds: [], pending: null })
+  const lane = model.lanes.find((entry) => entry.kind === kind)!
+  const item = lane.items.find((entry) => entry.kind !== 'gap')!
+  return planTimelineBodyDrag({ project, model, request: { itemId: item.id, destinationTrackId: destination ?? lane.trackId, toStartTicks: ticks(start) }, lockedTrackIds, pendingProposalExists: false, exportInProgress: false, expectedRevision: project.revision, ids: createIdFactory('changeset_dragtest01') })
+}
+
+describe('timeline body drag authority', () => {
+  it('refuses music over a video track instead of accepting a truthy refusal object', () => {
+    const project = projectWithAllTimelineFamilies()
+    const model = buildTimelineViewModel({ project, selectedItemIds: [], pending: null })
+    const item = model.lanes.flatMap((lane) => lane.items).find((entry) => entry.kind === 'music')!
+    const destination = model.lanes.find((lane) => lane.kind === 'overlay')!
+    const result = planTimelineBodyDrag({ project, model, request: { itemId: item.id, destinationTrackId: destination.trackId, toStartTicks: item.startTicks }, lockedTrackIds: [], pendingProposalExists: false, exportInProgress: false, expectedRevision: project.revision, ids: createIdFactory('changeset_dragtest02') })
+    expect(result).toMatchObject({ ok: false, refusal: { code: 'TRACK_INCOMPATIBLE' } })
+  })
+  it('moves music in both axes as one accepted change set and keeps its stable identity', () => {
+    let project = projectWithAllTimelineFamilies()
+    const added = planAddTimelineTrack({ project, kind: 'audio', ids: createIdFactory('changeset_dragtrack01') })
+    if (!added.ok) throw new Error(added.refusal.message)
+    const accepted = acceptChangeSet(project, changeSetOf('changeset_dragtrack01', project.revision, added.operations))
+    if (!accepted.ok) throw new Error(JSON.stringify(accepted.error))
+    project = accepted.value
+    const model = buildTimelineViewModel({ project, selectedItemIds: [], pending: null })
+    const item = model.lanes.flatMap((lane) => lane.items).find((entry) => entry.kind === 'music')!
+    const destination = model.lanes.filter((lane) => lane.trackKind === 'audio' && lane.trackRole !== 'dialogue').at(-1)!
+    const result = planTimelineBodyDrag({ project, model, request: { itemId: item.id, destinationTrackId: destination.trackId, toStartTicks: item.startTicks + ticks(1) }, lockedTrackIds: [], pendingProposalExists: false, exportInProgress: false, expectedRevision: project.revision, ids: createIdFactory('changeset_dragmove01') })
+    if (!result.ok) throw new Error(result.refusal.message)
+    expect(result.operations).toHaveLength(2)
+    const moved = acceptChangeSet(project, changeSetOf('changeset_dragmove01', project.revision, result.operations))
+    if (!moved.ok) throw new Error(JSON.stringify(moved.error))
+    const after = buildTimelineViewModel({ project: moved.value, selectedItemIds: [], pending: null }).lanes.flatMap((lane) => lane.items).find((entry) => entry.id === item.id)
+    expect(after).toMatchObject({ startTicks: item.startTicks + ticks(1), trackId: destination.trackId })
+    expect(moved.value.revision).toBe(project.revision + 1)
+  })
+  it('moves a lone primary clip into empty space with the existing move operation', () => {
+    expect(plan(testProject(), 'video', 2)).toMatchObject({ ok: true, operations: [{ kind: 'move-primary-clip', compositionStart: { ticks: ticks(2) } }] })
+  })
+  it('dragging dialogue moves its linked footage once, not through multi-selection', () => {
+    const project = testProject()
+    expect(plan(project, 'dialogue', 2)).toEqual(plan(project, 'video', 2))
+  })
+  it('uses the established reorder operation over another gapless section', () => {
+    const project = splitProject(testProject(), 10, createIds())
+    expect(plan(project, 'video', 18)).toMatchObject({ ok: true, operations: [{ kind: 'reorder-clip', toIndex: 1 }] })
+  })
+  it('transfers primary footage to an empty video track without changing clip identity', () => {
+    const project = testProject()
+    const model = buildTimelineViewModel({ project, selectedItemIds: [], pending: null })
+    const track = model.lanes.find((lane) => lane.kind === 'overlay')!.trackId
+    const result = plan(project, 'video', 2, track)
+    expect(result).toMatchObject({ ok: true, operations: [{ kind: 'move-primary-clip', destinationTrackId: track }] })
+    if (!result.ok) return
+    const accepted = acceptChangeSet(project, changeSetOf('changeset_dragtest01', project.revision, result.operations))
+    if (!accepted.ok) throw new Error(JSON.stringify(accepted.error))
+    const original = effectiveComposition(project).tracks[0].clips[0]
+    const moved = effectiveComposition(accepted.value).tracks.find(entry => entry.trackId === track)!.clips[0]
+    expect(moved).toEqual({ ...original, compositionStart: { ...original.compositionStart, ticks: ticks(2) } })
+    expect(effectiveComposition(project).tracks[0].clips[0].compositionStart.ticks).toBe(0)
+  })
+  it('locking dialogue prevents moving its linked video', () => {
+    const project = testProject()
+    const model = buildTimelineViewModel({ project, selectedItemIds: [], pending: null })
+    const track = model.lanes.find((lane) => lane.kind === 'dialogue')!.trackId
+    expect(plan(project, 'video', 2, undefined, [track])).toMatchObject({ ok: false, refusal: { code: 'TRACK_LOCKED' } })
+  })
+})
+
+# CANDIDATE FILE: packages/edit-domain/src/primary-track-transfer.test.ts
+import { describe, expect, it } from 'vitest'
+import { MOVE_PRIMARY_CLIP_PRIMITIVE_ID, TIMELINE_TRACKS_PRIMITIVE_ID } from './capabilities.ts'
+import { acceptChangeSet, activeTimelineTrackState, effectiveComposition, redoChangeSet, undoChangeSet } from './project.ts'
+import { changeSetOf, ms, TEST_CLIP_ID, TEST_TRACK_ID, testMultiAssetProject, testSplit, testMediaOverlay } from './test-fixtures.ts'
+
+const project = () => testMultiAssetProject()
+const destination = () => activeTimelineTrackState(project()).tracks.find(t => t.role === 'overlay-video')!.trackId
+const move = (trackId = destination(), extra: Record<string, unknown> = {}) => ({
+  schemaVersion: 'sanverse.operation/v3', operationId: 'operation_transfer01',
+  kind: 'move-primary-clip', capabilityId: MOVE_PRIMARY_CLIP_PRIMITIVE_ID,
+  clipId: TEST_CLIP_ID, compositionStart: ms(0), destinationTrackId: trackId, extensions: {}, ...extra,
+})
+const transfer = () => acceptChangeSet(project(), changeSetOf('changeset_transfer01', project().revision, [move()] as never))
+
+describe('primary track transfer', () => {
+  it('moves the same clip to an existing video track as one reversible edit', () => {
+    const before = project()
+    const result = transfer()
+    if (!result.ok) throw new Error(JSON.stringify(result.error))
+    const composition = effectiveComposition(result.value)
+    expect(composition.tracks.find(t => t.trackId === TEST_TRACK_ID)!.clips).toHaveLength(0)
+    expect(composition.tracks.find(t => t.trackId === destination())!.clips).toEqual(before.composition.tracks[0].clips)
+    const undo = undoChangeSet(result.value)
+    expect(undo.ok).toBe(true)
+    if (!undo.ok) return
+    expect(effectiveComposition(undo.value)).toEqual(effectiveComposition(before))
+    const redo = redoChangeSet(undo.value)
+    expect(redo.ok).toBe(true)
+    if (redo.ok) expect(effectiveComposition(redo.value)).toEqual(composition)
+  })
+  it('refuses missing or audio destinations without changing the input', () => {
+    const before = project()
+    for (const id of ['track_missing001', activeTimelineTrackState(before).tracks.find(t => t.kind === 'audio')!.trackId]) {
+      expect(acceptChangeSet(before, changeSetOf('changeset_transfer01', before.revision, [move(id)] as never)).ok).toBe(false)
+    }
+    expect(effectiveComposition(before)).toEqual(before.composition)
+  })
+  it('refuses deleting a track that still owns primary footage', () => {
+    const moved = transfer()
+    if (!moved.ok) throw new Error(JSON.stringify(moved.error))
+    const result = acceptChangeSet(moved.value, changeSetOf('changeset_deletetrack1', moved.value.revision, [{
+      schemaVersion: 'sanverse.operation/v3', operationId: 'operation_deletetrack1',
+      kind: 'remove-timeline-track', capabilityId: TIMELINE_TRACKS_PRIMITIVE_ID,
+      trackId: destination(), extensions: {},
+    }] as never))
+    expect(result.ok).toBe(false)
+  })
+  it('refuses a later same-track move that would overlap footage on another layer', () => {
+    const before = project()
+    const split = acceptChangeSet(before, changeSetOf('changeset_splittransfer', before.revision, [testSplit({ atClipTime: ms(10_000), newClipId: 'clip_transferred02' })]))
+    if (!split.ok) throw new Error(JSON.stringify(split.error))
+    const moved = acceptChangeSet(split.value, changeSetOf('changeset_transfer01', split.value.revision, [move(destination(), { clipId: 'clip_transferred02', compositionStart: ms(10_000) })] as never))
+    if (!moved.ok) throw new Error(JSON.stringify(moved.error))
+    const result = acceptChangeSet(moved.value, changeSetOf('changeset_collision01', moved.value.revision, [{
+      ...move(TEST_TRACK_ID, { operationId: 'operation_collision01', compositionStart: ms(5_000) }),
+    }] as never))
+    expect(result.ok).toBe(false)
+  })
+  it('refuses mixing transferred primary footage with authored visuals until shared layer ordering exists', () => {
+    const moved = transfer()
+    if (!moved.ok) throw new Error(JSON.stringify(moved.error))
+    const result = acceptChangeSet(moved.value, changeSetOf('changeset_transferbroll', moved.value.revision, [testMediaOverlay()]))
+    expect(result.ok).toBe(false)
+  })
+})
+
+# CANDIDATE FILE: apps/web/src/features/render-plan/primary-track-transfer.test.ts
+import { describe, expect, it } from 'vitest'
+import { acceptChangeSet, activeTimelineTrackState, type EditProject } from '@sanverse/edit-domain'
+import { MOVE_PRIMARY_CLIP_PRIMITIVE_ID, TRACK_OUTPUT_PRIMITIVE_ID } from '@sanverse/edit-domain/capabilities'
+import { changeSetOf, ms, TEST_CLIP_ID, testMultiAssetProject } from '@sanverse/edit-domain/test-fixtures'
+import { compileProjectToRenderPlan } from '@sanverse/render-contract/compile-project'
+import { resolvePrimarySource } from './primary-source'
+
+const accept = (project: EditProject, id: string, operations: unknown[]) => {
+  const result = acceptChangeSet(project, changeSetOf(id, project.revision, operations as never))
+  if (!result.ok) throw new Error(JSON.stringify(result.error))
+  return result.value
+}
+const fixture = () => {
+  const original = testMultiAssetProject()
+  const state = activeTimelineTrackState(original)
+  const destination = state.tracks.find(t => t.role === 'overlay-video')!.trackId
+  const primary = state.tracks.find(t => t.role === 'primary-video')!.trackId
+  const moved = accept(original, 'changeset_transferpreview', [{
+    schemaVersion: 'sanverse.operation/v3', operationId: 'operation_transferpreview',
+    kind: 'move-primary-clip', capabilityId: MOVE_PRIMARY_CLIP_PRIMITIVE_ID,
+    clipId: TEST_CLIP_ID, compositionStart: ms(0), destinationTrackId: destination, extensions: {},
+  }])
+  return { original, moved, destination, primary }
+}
+const output = (project: EditProject, trackId: string) => accept(project, 'changeset_transferoutput', [{
+  schemaVersion: 'sanverse.operation/v3', operationId: 'operation_transferoutput',
+  kind: 'set-track-output', capabilityId: TRACK_OUTPUT_PRIMITIVE_ID, trackId, outputEnabled: false, extensions: {},
+}])
+const compile = (project: EditProject) => {
+  const result = compileProjectToRenderPlan(project)
+  if (!result.ok) throw new Error(JSON.stringify(result.error))
+  return result.value
+}
+
+describe('transferred primary preview/export agreement', () => {
+  it('preserves compiled source, timing, motion and linked audio after a vertical-only transfer', () => {
+    const { original, moved } = fixture()
+    expect(compile(moved).segments).toEqual(compile(original).segments)
+    expect(compile(moved).durationTicks).toBe(compile(original).durationTicks)
+    expect(resolvePrimarySource(moved, ms(1_000).ticks)).toEqual(resolvePrimarySource(original, ms(1_000).ticks))
+  })
+  it('does not hide transferred footage when the now-empty V1 output is disabled', () => {
+    const { moved, primary } = fixture()
+    const hidden = output(moved, primary)
+    expect(compile(hidden).segments[0].videoEnabled).toBe(true)
+    expect(resolvePrimarySource(hidden, ms(1_000).ticks).kind).toBe('active')
+  })
+  it('hides transferred footage when its actual destination output is disabled, retaining linked audio', () => {
+    const { moved, destination } = fixture()
+    const hidden = output(moved, destination)
+    expect(compile(hidden).segments[0]).toMatchObject({ videoEnabled: false, audioEnabled: true })
+    expect(resolvePrimarySource(hidden, ms(1_000).ticks).kind).toBe('gap')
+  })
+})
+
+

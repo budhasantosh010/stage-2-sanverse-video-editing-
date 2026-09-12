@@ -5,6 +5,7 @@ import {
   OVERLAY_REMOVE_PRIMITIVE_ID,
   PROJECT_TIMESCALE,
   activeOverlayOperations,
+  activeTimelineTrackState,
   clipAtCompositionTime,
   clipTimeToSource,
   compositionDuration,
@@ -19,6 +20,7 @@ import {
   type EditOperation,
   type EditProject,
 } from '@sanverse/edit-domain'
+import { resolvedTrackForTimelineItem, timelineTrackAssignmentKey } from '@sanverse/edit-domain/timeline-tracks'
 
 /**
  * Everything a user can do to something ALREADY on the timeline, as arithmetic.
@@ -106,6 +108,8 @@ export type TimelineItemPlanInput = Readonly<{
   action: TimelineItemAction
   /** Presentation-only padlocks. Never part of the project. */
   lockedTrackIds: readonly string[]
+  /** Body drags can change track and time atomically; collisions belong to the destination. */
+  collisionTrackId?: string
   pendingProposalExists: boolean
   exportInProgress: boolean
   expectedRevision: number
@@ -425,8 +429,11 @@ const planMusicAction = (
     return refuse('ITEM_UNKNOWN', 'That music is no longer in this project.')
   }
   const videoTicks = compositionDuration(effectiveComposition(project)).ticks
-  const spans = laneSpans(project, 'A2')
-  const mine = spans.find((span) => span.targetId === current.musicId)
+  const allSpans = laneSpans(project, 'A2')
+  const mine = allSpans.find((span) => span.targetId === current.musicId)
+  const tracks = activeTimelineTrackState(project)
+  const collisionTrack = input.collisionTrackId ?? resolvedTrackForTimelineItem(tracks, timelineTrackAssignmentKey('audio', current.musicId), 'audio')?.trackId
+  const spans = allSpans.filter((span) => resolvedTrackForTimelineItem(tracks, timelineTrackAssignmentKey('audio', span.targetId), 'audio')?.trackId === collisionTrack)
   if (!mine) return refuse('ITEM_UNKNOWN', 'That music is no longer on the timeline.')
 
   if (action.type === 'move') {
@@ -545,8 +552,11 @@ const planMediaOverlayAction = (
   const overlayAsset = findAsset(project.assets, current.overlayAssetId)
   if (!overlayAsset) return refuse('ITEM_UNKNOWN', 'That media is no longer in this project.')
   const isStill = overlayAsset.mediaKind === 'image'
-  const spans = laneSpans(project, 'V2')
-  const mine = spans.find((span) => span.targetId === current.overlayId)
+  const allSpans = laneSpans(project, 'V2')
+  const mine = allSpans.find((span) => span.targetId === current.overlayId)
+  const tracks = activeTimelineTrackState(project)
+  const collisionTrack = input.collisionTrackId ?? resolvedTrackForTimelineItem(tracks, timelineTrackAssignmentKey('visual', current.overlayId), 'visual')?.trackId
+  const spans = allSpans.filter((span) => resolvedTrackForTimelineItem(tracks, timelineTrackAssignmentKey('visual', span.targetId), 'visual')?.trackId === collisionTrack)
   if (!mine) return refuse('ITEM_UNKNOWN', 'That clip is no longer on the timeline.')
 
   const composition = effectiveComposition(project)

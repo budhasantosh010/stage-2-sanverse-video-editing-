@@ -79,6 +79,7 @@ describe('EditorShell', () => {
     )
     expect(screen.getByRole('textbox', { name: /preserved editor state/i })).toBe(editorInput)
     expect(editorInput).toHaveValue('playhead and proposal stay here')
+    expect(screen.getByRole('tablist', { name: 'Studio workspaces' }).closest('header')).not.toBeNull()
   })
 
   it('shows advanced workspace tabs only in Studio and remembers the last Studio workspace', async () => {

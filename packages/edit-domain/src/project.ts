@@ -2,6 +2,7 @@ import { err, isRecord, ok, type Result } from './result.ts'
 import { validateMediaAsset, validateVideoAsset, type AssetError, type MediaAsset, type VideoAsset } from './assets.ts'
 import {
   createSingleClipComposition,
+  clipCompositionEndTicks,
   validateComposition,
   type Composition,
   type CompositionError,
@@ -17,6 +18,7 @@ import {
   isCaptionOperation,
   isFootageMotionOperation,
   isOverlayFamilyOperation,
+  isNameplateOperation,
   isTimelineGroupsOperation,
   isTimelineMarkersOperation,
   isTimelineOperation,
@@ -38,6 +40,9 @@ import {
   createLegacyTimelineTrackState,
   legacyDisplayTrackId,
   setTimelineTrackOutput,
+  resolvedTrackForTimelineItem,
+  timelineTrackAssignmentKey,
+  tracksOfKind,
   TIMELINE_TRACK_MODEL_SCHEMA_VERSION,
   type TimelineTrackStateV2,
 } from './timeline-tracks.ts'
@@ -72,6 +77,25 @@ import {
  * has moved on since.
  */
 export const PROJECT_SCHEMA_VERSION = 'sanverse.project/v5'
+
+/** All visual identities must have a resolvable owner. Layer order itself is
+ * represented by the shared v10 picture manifest, including lower visuals.
+ */
+export function primaryVisualOrderSupported(
+  _composition: Composition,
+  trackState: TimelineTrackStateV2,
+  operations: readonly EditOperation[],
+): boolean {
+  const identities = operations.filter(isNameplateOperation).map(operation => operation.operationId)
+  for (const operation of foldOverlayOperations(operations.filter(isOverlayFamilyOperation))) {
+    if (operation.kind === 'add-music') continue
+    identities.push(operation.kind === 'add-title' ? operation.titleId : operation.kind === 'add-callout' ? operation.calloutId : operation.overlayId)
+  }
+  return identities.every(identity => {
+    const owner = resolvedTrackForTimelineItem(trackState, timelineTrackAssignmentKey('visual', identity), 'visual')
+    return owner !== null
+  })
+}
 
 export type EditProject = Readonly<{
   schemaVersion: typeof PROJECT_SCHEMA_VERSION
@@ -366,36 +390,10 @@ const evaluateRound = (
   const contributes = (index: number): boolean =>
     project.changeSets[index].active && !failures.has(index)
 
-  // Pass one — what the finished video is MADE OF.
-  //
-  // Cuts are replayed in the order they were approved, each against the result
-  // of the ones before it, because that is the order the user made them in.
+  // Replay tracks and footage together. A transfer can only name a track that
+  // exists at that operation; a compound create + transfer is one transaction.
   let composition = project.composition
-  project.changeSets.forEach((record, index) => {
-    if (!contributes(index)) return
-    let trial = composition
-    let failure: ChangeSetFailure | null = null
-    record.changeSet.operations.forEach((operation, position) => {
-      if (failure !== null || !isTimelineOperation(operation)) return
-      const applied = applyTimelineOperation(trial, operation, project.assets)
-      if (!applied.ok) {
-        failure = Object.freeze({ reason: applied.error.reason, operationIndex: position })
-        return
-      }
-      trial = applied.value
-    })
-    if (failure !== null) {
-      failures.set(index, failure)
-      return
-    }
-    composition = trial
-  })
-
-  // Pass 1.5 — which stable Editor tracks exist, how they are ordered, and
-  // which ones reach Preview/export. The seed is the deterministic projection
-  // of the pre-T5 five-row editor. T5 operations are replayed transactionally
-  // per change set so a compound add-track + assignment/output edit is either
-  // wholly accepted or contributes nothing.
+  let replayedVisualOperations: readonly EditOperation[] = []
   const seed = createLegacyTimelineTrackState(project.composition)
   let trackState: TimelineTrackStateV2 = seed.ok
     ? seed.value
@@ -407,10 +405,24 @@ const evaluateRound = (
   project.changeSets.forEach((record, index) => {
     if (!contributes(index)) return
     let trial = trackState
+    let trialComposition = composition
     let failure: ChangeSetFailure | null = null
     record.changeSet.operations.forEach((operation, position) => {
       if (failure !== null) return
+      if (isTimelineOperation(operation)) {
+        const applied = applyTimelineOperation(trialComposition, operation, project.assets, trial)
+        if (!applied.ok) {
+          failure = Object.freeze({ reason: applied.error.reason, operationIndex: position })
+          return
+        }
+        trialComposition = applied.value
+        return
+      }
       if (isTimelineTrackOperation(operation)) {
+        if (operation.kind === 'remove-timeline-track' && trialComposition.tracks.some(track => track.trackId === operation.trackId && track.clips.length > 0)) {
+          failure = Object.freeze({ reason: 'TRACK_NOT_EMPTY', operationIndex: position })
+          return
+        }
         const applied = applyTimelineTrackOperation(trial, operation)
         if (!applied.ok) {
           failure = Object.freeze({ reason: applied.error.code, operationIndex: position })
@@ -428,11 +440,23 @@ const evaluateRound = (
         trial = applied.value
       }
     })
+    const trialVisualOperations = [...replayedVisualOperations, ...record.changeSet.operations.filter(operation => isOverlayFamilyOperation(operation) || isNameplateOperation(operation))]
+    const primaryId = trial.tracks.find(track => track.role === 'primary-video')?.trackId
+    const hasTransferredFootage = trialComposition.tracks.some(track => track.trackId !== primaryId && track.clips.length > 0)
+    if (failure === null && hasTransferredFootage) {
+      const mixedVisuals = !primaryVisualOrderSupported(trialComposition, trial, trialVisualOperations)
+      if (mixedVisuals) failure = Object.freeze({
+        reason: 'PRIMARY_LAYER_VISUAL_MIX_UNSUPPORTED',
+        operationIndex: Math.max(0, record.changeSet.operations.length - 1),
+      })
+    }
     if (failure !== null) {
       failures.set(index, failure)
       return
     }
+    replayedVisualOperations = trialVisualOperations
     trackState = trial
+    composition = trialComposition
   })
 
   // Pass two — what is DRAWN on it.

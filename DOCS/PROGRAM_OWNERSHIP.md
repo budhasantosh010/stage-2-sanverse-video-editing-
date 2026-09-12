@@ -18,7 +18,7 @@ Owned editor scope includes:
 
 - `apps/web` production Studio and Timeline;
 - Timeline domain planners and editor presentation state;
-- the current Preview and one-video playback authority;
+- the current Preview and one playback-clock authority; the September 8 owner-approved layered-editor upgrade permits multiple synchronized, muted decoding resources, not multiple editor sessions or clocks;
 - current Canvas and Inspector behavior;
 - accepted project state and edit operations;
 - history, Undo/Redo and editor selection;

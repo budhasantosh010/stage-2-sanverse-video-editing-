@@ -38,7 +38,7 @@ The frame-difference values are directional evidence, not a universal performanc
 | Frames above 1.0 | 116 | 143 |
 | Frames above 1.0 per second | 1.94 | 3.02 |
 
-Sanverse's mean Timeline-region change is about 2.4× OpenCut's, and it produces about 56% more high-change Timeline frames per second despite the shorter recording. Visual inspection locates the clusters around Timeline re-layout, multiple permanent control bands, zoom/scroll changes and track/control expansion—not just pointer movement.
+Sanverse's mean Timeline-region change is about 2.4× OpenCut's, with about 56% more high-change frames per second in these recordings. Correction (2026-09-06): these are descriptive measurements of unequal sessions, not a smoothness or latency benchmark. Different actions, frame rates, playback, duration and crops confound the result. Visual samples show control density and layout changes, but the numerical ratio cannot establish their cause or magnitude of perceived clunkiness.
 
 ## What the recordings show
 

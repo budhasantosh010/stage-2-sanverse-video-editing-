@@ -1,9 +1,12 @@
 import {
-  activeTrackOutputs,
+  activeTimelineTrackState,
   effectiveComposition,
+  mediaTime,
   type EditProject,
 } from '@sanverse/edit-domain'
 import { findAsset } from '@sanverse/edit-domain/assets'
+import { clipCompositionDurationTicks, clipTimeToSource } from '@sanverse/edit-domain/composition'
+import { primaryTimelineTrack, trackById } from '@sanverse/edit-domain/timeline-tracks'
 
 /**
  * WHICH PIECE OF FOOTAGE IS UNDER THE PLAYHEAD, AND IF NONE, WHY NOT.
@@ -179,12 +182,14 @@ export const resolvePrimarySource = (
   for (const track of composition.tracks) {
     for (const clip of track.clips) {
       const start = clip.compositionStart.ticks
-      const end = start + clip.sourceRange.duration.ticks
+      const end = start + clipCompositionDurationTicks(clip)
       if (ticks < start || ticks >= end) continue
 
       const localTicks = ticks - start
 
-      if (!activeTrackOutputs(project).V1) return gap('V1_OUTPUT_DISABLED')
+      const trackState = activeTimelineTrackState(project)
+      const outputTrack = trackById(trackState, track.trackId) ?? primaryTimelineTrack(trackState)
+      if (outputTrack?.outputEnabled === false) return gap('V1_OUTPUT_DISABLED')
       if (!clip.enabled) return gap('CLIP_DISABLED')
       if (!findAsset(project.assets, clip.assetId)) return gap('ASSET_MISSING')
 
@@ -193,7 +198,7 @@ export const resolvePrimarySource = (
         clipId: clip.clipId,
         assetId: clip.assetId,
         compositionTicks: ticks,
-        sourceTicks: clip.sourceRange.start.ticks + localTicks,
+        sourceTicks: clipTimeToSource(clip, mediaTime(localTicks)).ticks,
         localTicks,
       })
     }

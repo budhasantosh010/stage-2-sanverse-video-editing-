@@ -7,6 +7,7 @@
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "dev:timeline": "node --experimental-strip-types scripts/dev-timeline.mjs",
     "test": "npm run test --workspaces --if-present --",
     "build": "npm run build --workspaces --if-present"
   }

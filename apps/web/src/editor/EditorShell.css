@@ -13,7 +13,7 @@
   z-index: 20;
   top: 0;
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto minmax(360px, 1fr);
+  grid-template-columns: minmax(160px, 1fr) auto minmax(260px, 1fr);
   gap: var(--space-4);
   align-items: center;
   min-height: 64px;
@@ -34,6 +34,41 @@
 .editor-shell__start {
   min-width: 0;
   gap: var(--space-3);
+}
+
+.editor-shell__navigation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.editor-shell__navigation .studio-workspace-tabs {
+  border-left: 1px solid var(--color-border-soft);
+  padding-left: 10px;
+}
+
+.editor-shell__navigation .studio-workspace-tabs button {
+  padding-inline: 10px;
+}
+
+@media (max-width: 1250px) and (min-width: 981px) {
+  .editor-shell__save {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .editor-shell__topbar {
+    grid-template-columns: minmax(140px, 1fr) auto auto;
+    gap: 10px;
+    padding-inline: 12px;
+  }
+}
+
+@media (max-width: 980px) {
+  .editor-shell__navigation { flex-wrap: wrap; }
 }
 
 .editor-shell__identity {
@@ -140,7 +175,7 @@
     grid-template-columns: 1fr;
   }
 
-  .editor-shell__topbar > .sv-segmented {
+  .editor-shell__navigation .sv-segmented {
     width: 100%;
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { AddNameplateOperation, EditProject, TimelineOperation } from '@sanverse/edit-domain'
 import {
   DEFAULT_CAPTION_STYLE_ID,
@@ -34,6 +34,10 @@ import {
 import { TRACK_OUTPUT_PRIMITIVE_ID } from '@sanverse/edit-domain/capabilities'
 import { trackById, tracksOfKind } from '@sanverse/edit-domain/timeline-tracks'
 import { proposalPlacement } from '../../app/app-state'
+import { selectedFootageSourceTime, withFootageMotionDraft } from '../../features/render-plan/footage-motion-plan'
+import { createCompositionIntervalClock } from '../../features/render-plan/composition-interval-clock'
+import { LayeredFootageCanvases, pictureStackIndex, type LayeredFootageSource } from '../../features/render-plan/LayeredFootageCanvases'
+import type { LayeredPreviewStatus } from '../../features/render-plan/layered-footage-preview'
 import type { ConversationState, PendingProposal, ProposalRepair, StudioState } from '../../app/app-state'
 import { ChatComposer } from '../../features/conversation/ChatComposer'
 import type { IntentContextInput } from '../../features/conversation/conversation-client'
@@ -147,9 +151,7 @@ import {
   playbackRateAt,
   playbackSegments,
   segmentIndexAt,
-  sourceSpanOf,
   sourceTimeFor,
-  withPreparedReversePreview,
   type PlaybackSegment,
 } from '../../features/render-plan/segment-playback'
 import {
@@ -290,24 +292,17 @@ import {
   createMediaAnalysisController,
   MediaAnalysisContext,
   type AssetFacts,
-  type ReversePreviewRequestV1,
 } from '../../features/media-analysis'
+import { useReversePreviewResources } from '../../features/render-plan/use-reverse-preview-resources'
 import {
   formatPointTargetTime,
   type CapturedPointTarget,
 } from '../../features/point-target/point-target'
 import './StudioScreen.css'
 import type { EditorWorkspace } from '../../editor/EditorShell'
+import { toggleDetailsPopover, syncPopoverDisclosure } from '../../editor/ui/details-popover'
 
 const EMPTY_ASSET_ORIGINAL_NAMES: Readonly<Record<string, string>> = Object.freeze({})
-
-type ReversePreviewState =
-  | Readonly<{ status: 'idle' }>
-  | Readonly<{ status: 'preparing'; key: string }>
-  | Readonly<{ status: 'ready'; key: string; segmentIndex: number; preparedAssetId: string; url: string }>
-  | Readonly<{ status: 'error'; key: string; message: string }>
-
-const IDLE_REVERSE_PREVIEW: ReversePreviewState = Object.freeze({ status: 'idle' })
 
 export type StudioScreenProps = {
   embedded?: boolean
@@ -439,9 +434,9 @@ function videoLayoutDimensions(video: HTMLVideoElement) {
     : { width: 16, height: 9 }
 }
 
-function monitorGeometry(video: HTMLVideoElement, fitMode: MonitorFitMode) {
+function monitorGeometry(video: HTMLVideoElement, fitMode: MonitorFitMode, canvas?: Readonly<{ width: number; height: number }>) {
   const elementBox = video.getBoundingClientRect()
-  const dimensions = videoLayoutDimensions(video)
+  const dimensions = canvas ?? videoLayoutDimensions(video)
   return resolveMonitorContentRect({
     stageRect: { left: elementBox.left, top: elementBox.top, width: elementBox.width, height: elementBox.height },
     sourceWidth: dimensions.width,
@@ -450,9 +445,9 @@ function monitorGeometry(video: HTMLVideoElement, fitMode: MonitorFitMode) {
   })
 }
 
-function projectPointOntoVideoElement(point: NormalizedPoint, video: HTMLVideoElement, fitMode: MonitorFitMode) {
+function projectPointOntoVideoElement(point: NormalizedPoint, video: HTMLVideoElement, fitMode: MonitorFitMode, canvas?: Readonly<{ width: number; height: number }>) {
   const elementBox = video.getBoundingClientRect()
-  const geometry = monitorGeometry(video, fitMode)
+  const geometry = monitorGeometry(video, fitMode, canvas)
   if (!geometry || elementBox.width <= 0 || elementBox.height <= 0) return null
   const contentBox = geometry.displayedContentRect
 
@@ -467,9 +462,9 @@ function projectPointOntoVideoElement(point: NormalizedPoint, video: HTMLVideoEl
   }
 }
 
-function getVideoContentLayerStyle(video: HTMLVideoElement, fitMode: MonitorFitMode) {
+function getVideoContentLayerStyle(video: HTMLVideoElement, fitMode: MonitorFitMode, canvas?: Readonly<{ width: number; height: number }>) {
   const elementBox = video.getBoundingClientRect()
-  const geometry = monitorGeometry(video, fitMode)
+  const geometry = monitorGeometry(video, fitMode, canvas)
   if (!geometry || elementBox.width <= 0 || elementBox.height <= 0) return null
   const contentBox = geometry.displayedContentRect
 
@@ -666,8 +661,9 @@ export function StudioScreen({
   const inHoleRef = useRef(false)
   const inFreezeRef = useRef(false)
   const playheadTicksRef = useRef(0)
+  const pendingGapResumeRef = useRef<Readonly<{ sourceTicks: number; resumePlaying: boolean }> | null>(null)
   const holePlaybackRef = useRef<Readonly<{
-    enter(fromTicks: number, untilTicks: number): void
+    enter(fromTicks: number, untilTicks: number, resumeAfter?: boolean): void
     leave(): void
   }> | null>(null)
   const freezePlaybackRef = useRef<Readonly<{
@@ -785,6 +781,9 @@ export function StudioScreen({
   const isAiPanelCollapsed = workspace === 'studio' && workspaceLayout.aiMode === 'collapsed'
   const videoRef = useRef<HTMLVideoElement>(null)
   const audioPreviewRef = useRef<CompositionAudioPreviewController | null>(null)
+  const pendingReverseSeekRef = useRef<{
+    key: string; url: string | null; sourceTicks: number | null; compositionTicks: number
+  } | null>(null)
   const footageMotionCanvasRef = useRef<HTMLCanvasElement>(null)
   const footagePlanRef = useRef<ReturnType<typeof compilePreviewPlan>>(null)
   const reducedMotionRef = useRef(false)
@@ -904,12 +903,17 @@ export function StudioScreen({
   // is brought to the user instead of the user having to go looking for it.
   useEffect(() => {
     if (exportState.status === 'idle') return
-    const target = exportResultRef.current
-    if (!target) return
-    target.scrollIntoView?.({ block: 'start' })
-    const panel = target.closest<HTMLElement>('.studio-screen__ai-panel-content')
-    if (panel) panel.scrollTop = Math.max(0, target.offsetTop - 8)
-    if (exportState.status === 'ready' || exportState.status === 'error') target.focus?.()
+    // The result lives in the existing conversation pane. Scrolling a hidden
+    // pane does nothing; reveal it without changing the user's saved preset.
+    updateWorkspaceLayout({ aiMode: 'expanded' })
+    const frame = requestAnimationFrame(() => {
+      const target = exportResultRef.current
+      if (!target) return
+      const panel = target.closest<HTMLElement>('.studio-screen__ai-panel-content')
+      if (panel) panel.scrollTop = Math.max(0, target.offsetTop - 8)
+      if (exportState.status === 'ready' || exportState.status === 'error') target.focus?.({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
   }, [exportState.status])
 
   useEffect(() => {
@@ -920,12 +924,22 @@ export function StudioScreen({
     playheadTicksRef.current = Math.max(0, millisecondsToTicks(playheadMs))
   }, [playheadMs])
 
+  const composition = effectiveComposition(editProject)
+  const footagePlan = useMemo(() => compilePreviewPlan(editProject), [editProject])
+  const layeredPlayback = footagePlan?.pictureLayers !== undefined
+  const layeredPlaybackRef = useRef(layeredPlayback)
+  layeredPlaybackRef.current = layeredPlayback
+  const [layerStatus, setLayerStatus] = useState<LayeredPreviewStatus>({ state: 'loading' })
+  const [layerSeekVersion, setLayerSeekVersion] = useState(0)
+  const layeredClockRef = useRef<ReturnType<typeof createCompositionIntervalClock> | null>(null)
+
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
     const refreshProjection = requestGeometryRefresh
     const drawFootageMotion = (compositionTicks: number) => {
+      if (layeredPlaybackRef.current) return
       const canvas = footageMotionCanvasRef.current
       const plan = footagePlanRef.current
       if (!canvas || !plan) return
@@ -954,17 +968,14 @@ export function StudioScreen({
       setDrawnFrameToken(null)
     }
 
-    let holeFrameId: number | null = null
-    let freezeFrameId: number | null = null
+    const intervalClock = createCompositionIntervalClock({ timescale: PROJECT_TIMESCALE })
     const leaveHole = () => {
-      if (holeFrameId !== null) cancelAnimationFrame(holeFrameId)
-      holeFrameId = null
+      if (inHoleRef.current) intervalClock.stop()
       inHoleRef.current = false
       setIsShowingHole(false)
     }
     const leaveFreeze = () => {
-      if (freezeFrameId !== null) cancelAnimationFrame(freezeFrameId)
-      freezeFrameId = null
+      if (inFreezeRef.current) intervalClock.stop()
       inFreezeRef.current = false
     }
 
@@ -977,34 +988,37 @@ export function StudioScreen({
      * is the preview disagreeing with the export — the exact failure this whole
      * design exists to prevent.
      */
-    const enterHole = (fromTicks: number, untilTicks: number) => {
+    const enterHole = (fromTicks: number, untilTicks: number, resumeAfter = !video.paused) => {
       if (inHoleRef.current) return
+      leaveFreeze()
       inHoleRef.current = true
       setIsShowingHole(true)
       hideFootageMotion()
-      const resumePlaying = !video.paused
+      const resumePlaying = resumeAfter
       video.pause()
-      const startedAt = performance.now()
-      const step = () => {
-        if (stopped) return
-        const nowTicks = fromTicks + (performance.now() - startedAt) * TICKS_PER_MS
-        if (nowTicks >= untilTicks) {
+      setMonitorPlaying(resumePlaying)
+      intervalClock.start({
+        fromTicks, untilTicks,
+        onTick: (ticks) => {
+          playheadTicksRef.current = ticks
+          setPlayheadMs(ticks / TICKS_PER_MS)
+        },
+        onEnd: () => {
           leaveHole()
           const target = sourceTimeFor(segmentsRef.current, untilTicks)
           if (!target) {
             setPlayheadMs(untilTicks / TICKS_PER_MS)
+            setMonitorPlaying(false)
             return
           }
           segmentIndexRef.current = target.segmentIndex
-          video.currentTime = target.sourceTicks / PROJECT_TIMESCALE
+          // The empty interval detached the file. Resume only after the next
+          // source has loaded, never by playing the now-unloaded video element.
+          pendingGapResumeRef.current = { sourceTicks: target.sourceTicks, resumePlaying }
           setPlayheadMs(untilTicks / TICKS_PER_MS)
-          if (resumePlaying) void video.play().catch(() => undefined)
           return
-        }
-        setPlayheadMs(nowTicks / TICKS_PER_MS)
-        holeFrameId = requestAnimationFrame(step)
-      }
-      holeFrameId = requestAnimationFrame(step)
+        },
+      })
     }
 
     /** Hold one exact source frame while the composition clock keeps moving. */
@@ -1016,6 +1030,7 @@ export function StudioScreen({
       resumeAfter = !video.paused,
     ) => {
       if (inFreezeRef.current) return
+      leaveHole()
       inFreezeRef.current = true
       setIsShowingHole(false)
       const resumePlaying = resumeAfter
@@ -1023,29 +1038,29 @@ export function StudioScreen({
       video.currentTime = sourceTicks / PROJECT_TIMESCALE
       video.pause()
       drawFootageMotion(fromTicks)
-      const startedAt = performance.now()
-      const step = () => {
-        if (stopped || !inFreezeRef.current) return
-        const nowTicks = fromTicks + (performance.now() - startedAt) * TICKS_PER_MS
-        if (nowTicks >= untilTicks) {
+      intervalClock.start({
+        fromTicks, untilTicks,
+        onTick: (ticks) => {
+          playheadTicksRef.current = ticks
+          setPlayheadMs(ticks / TICKS_PER_MS)
+          drawFootageMotion(ticks)
+        },
+        onEnd: () => {
           leaveFreeze()
           setPlayheadMs(untilTicks / TICKS_PER_MS)
           const target = sourceTimeFor(segmentsRef.current, untilTicks)
           if (!target) {
             const visible = nextVisibleTick(segmentsRef.current, untilTicks)
-            if (resumePlaying && visible !== null && visible > untilTicks) enterHole(untilTicks, visible)
+            if (resumePlaying && visible !== null && visible > untilTicks) enterHole(untilTicks, visible, true)
+            else setMonitorPlaying(false)
             return
           }
           segmentIndexRef.current = target.segmentIndex
           video.currentTime = target.sourceTicks / PROJECT_TIMESCALE
           if (resumePlaying) void video.play().catch(() => undefined)
           return
-        }
-        setPlayheadMs(nowTicks / TICKS_PER_MS)
-        drawFootageMotion(nowTicks)
-        freezeFrameId = requestAnimationFrame(step)
-      }
-      freezeFrameId = requestAnimationFrame(step)
+        },
+      })
     }
 
     /**
@@ -1055,6 +1070,9 @@ export function StudioScreen({
      * a cut they are not, and this is the only place that knows the difference.
      */
     const updatePlayhead = (currentTime: number) => {
+      if (layeredPlaybackRef.current) return
+      // A loading proxy's initial zero is not a new user seek.
+      if (pendingReverseSeekRef.current) return
       if (!Number.isFinite(currentTime) || currentTime < 0) {
         setPlayheadMs(-1)
         hideFootageMotion()
@@ -1067,7 +1085,7 @@ export function StudioScreen({
         drawFootageMotion(compositionTicks)
         return
       }
-      if (inHoleRef.current || inFreezeRef.current) return
+      if (inHoleRef.current || inFreezeRef.current || pendingGapResumeRef.current) return
 
       const action = advancePlayback(
         segments,
@@ -1131,6 +1149,16 @@ export function StudioScreen({
       }
     }
     const refreshPlayhead = () => updatePlayhead(video.currentTime)
+    const refreshLoadedPlayhead = () => {
+      if (layeredPlaybackRef.current) return
+      const pending = pendingReverseSeekRef.current
+      if (!pending) { refreshPlayhead(); return }
+      if (!pending.url || video.getAttribute('src') !== pending.url || pending.sourceTicks === null) return
+      video.currentTime = pending.sourceTicks / PROJECT_TIMESCALE
+      playheadTicksRef.current = pending.compositionTicks
+      setPlayheadMs(pending.compositionTicks / TICKS_PER_MS)
+      pendingReverseSeekRef.current = null
+    }
     const hasVideoFrameCallback = typeof video.requestVideoFrameCallback === 'function'
     let videoFrameCallbackId: number | null = null
     let stopped = false
@@ -1143,7 +1171,14 @@ export function StudioScreen({
       const untilTicks = nextVisibleTick(segmentsRef.current, fromTicks)
       if (untilTicks === null || untilTicks <= fromTicks) return
       inHoleRef.current = false
-      enterHole(fromTicks, untilTicks)
+      enterHole(fromTicks, untilTicks, true)
+    }
+    const resumeLoadedGapSource = () => {
+      const pending = pendingGapResumeRef.current
+      if (!pending) return
+      pendingGapResumeRef.current = null
+      video.currentTime = pending.sourceTicks / PROJECT_TIMESCALE
+      if (pending.resumePlaying) void video.play().catch(() => setMonitorPlaying(false))
     }
     const requestNextVideoFrame = () => {
       if (typeof video.requestVideoFrameCallback !== 'function') return
@@ -1167,12 +1202,18 @@ export function StudioScreen({
     // with no fallback the preview would silently show nothing at all while
     // looking perfectly healthy. Frame callbacks give exact timing when they
     // work; these events guarantee the preview is never simply blank.
-    video.addEventListener('loadedmetadata', refreshPlayhead)
+    video.addEventListener('loadedmetadata', refreshLoadedPlayhead)
+    video.addEventListener('loadedmetadata', resumeLoadedGapSource)
     video.addEventListener('timeupdate', refreshPlayhead)
     video.addEventListener('seeked', refreshPlayhead)
     video.addEventListener('play', resumeTimelineHole)
-    const syncPlayback = () => setMonitorPlaying(inFreezeRef.current ? true : !video.paused)
+    const syncPlayback = () => {
+      if (!layeredPlaybackRef.current) setMonitorPlaying(inFreezeRef.current || inHoleRef.current || pendingGapResumeRef.current?.resumePlaying ? true : !video.paused)
+    }
     const syncVolume = () => {
+      // The decoder is intentionally muted; only the mixer's monitor controls
+      // represent user intent once composition audio owns sound.
+      if (audioPreviewRef.current?.supported) return
       setMonitorMuted(video.muted)
       setMonitorVolume(video.volume)
     }
@@ -1214,6 +1255,7 @@ export function StudioScreen({
 
     return () => {
       stopped = true
+      intervalClock.stop()
       leaveHole()
       leaveFreeze()
       holePlaybackRef.current = null
@@ -1228,7 +1270,8 @@ export function StudioScreen({
       window.removeEventListener('scroll', refreshProjection)
       video.removeEventListener('loadedmetadata', refreshProjection)
       video.removeEventListener('resize', refreshProjection)
-      video.removeEventListener('loadedmetadata', refreshPlayhead)
+      video.removeEventListener('loadedmetadata', refreshLoadedPlayhead)
+      video.removeEventListener('loadedmetadata', resumeLoadedGapSource)
       video.removeEventListener('timeupdate', refreshPlayhead)
       video.removeEventListener('seeked', refreshPlayhead)
       video.removeEventListener('play', resumeTimelineHole)
@@ -1242,14 +1285,14 @@ export function StudioScreen({
   }, [])
 
   const video = videoRef.current
-  const markerPosition = pointTarget && video ? projectPointOntoVideoElement(pointTarget, video, monitorFitMode) : null
-  const draftPosition = isPointMode && video ? projectPointOntoVideoElement(draftPoint, video, monitorFitMode) : null
-  const videoContentLayerStyle = video ? getVideoContentLayerStyle(video, monitorFitMode) : null
+  const monitorCanvas = layeredPlayback ? composition : undefined
+  const markerPosition = pointTarget && video ? projectPointOntoVideoElement(pointTarget, video, monitorFitMode, monitorCanvas) : null
+  const draftPosition = isPointMode && video ? projectPointOntoVideoElement(draftPoint, video, monitorFitMode, monitorCanvas) : null
+  const videoContentLayerStyle = video ? getVideoContentLayerStyle(video, monitorFitMode, monitorCanvas) : null
 
   // The preview is compiled from the project by the same compiler the exporter
   // uses. A pending proposal is layered on top without touching saved state.
   // The footage as it now stands: what was imported, plus every accepted cut.
-  const composition = effectiveComposition(editProject)
 
   // One transport for all derived media. The timeline controller and the
   // on-demand reverse artifact share it, while retaining separate bounded
@@ -1260,97 +1303,30 @@ export function StudioScreen({
   // nameplate changes what is drawn, never which footage plays. Deriving the
   // stretches from the saved project alone keeps playback steady while the user
   // is still typing into a proposal.
-  const footagePlan = useMemo(() => compilePreviewPlan(editProject), [editProject])
   const previewSegments = useMemo(
     () => (footagePlan ? playbackSegments(footagePlan) : []),
     [footagePlan],
   )
   const reversePreviewTicks = Math.max(0, millisecondsToTicks(playheadMs))
-  const activeReverseTarget = useMemo<Readonly<{
-    key: string
-    segmentIndex: number
-    preparedAssetId: string
-    request: ReversePreviewRequestV1
-  }> | null>(() => {
-    const segmentIndex = segmentIndexAt(previewSegments, reversePreviewTicks)
-    if (segmentIndex < 0) return null
-    const segment = previewSegments[segmentIndex]
-    if (segment.reversed !== true) return null
-    const asset = editProject.assets.find((candidate) => candidate.assetId === segment.assetId)
-    if (!asset) return null
-    const assetVersion = assetVersionFromSha256(asset.sha256)
-    if (assetVersion.length === 0) return null
-    const request = Object.freeze({
-      assetId: segment.assetId,
-      assetVersion,
-      sourceStartTicks: segment.sourceStartTicks,
-      sourceEndTicks: segment.sourceStartTicks + sourceSpanOf(segment),
-    })
-    const key = `${segmentIndex}:${request.assetId}:${request.assetVersion}:${request.sourceStartTicks}:${request.sourceEndTicks}`
-    return Object.freeze({
-      key,
-      segmentIndex,
-      preparedAssetId: `reverse-preview:${key}`,
-      request,
-    })
-  }, [editProject.assets, previewSegments, reversePreviewTicks])
-  const [reversePreviewState, setReversePreviewState] = useState<ReversePreviewState>(IDLE_REVERSE_PREVIEW)
-  useEffect(() => {
-    const target = activeReverseTarget
-    if (target === null) {
-      setReversePreviewState(IDLE_REVERSE_PREVIEW)
-      return
-    }
-    const requestReversePreview = mediaAnalysisClient.reversePreview
-    if (!requestReversePreview || typeof URL.createObjectURL !== 'function') {
-      setReversePreviewState(Object.freeze({
-        status: 'error',
-        key: target.key,
-        message: 'Backwards preview is unavailable in this browser.',
-      }))
-      return
-    }
-    const controller = new AbortController()
-    let objectUrl: string | null = null
-    let stopped = false
-    setReversePreviewState(Object.freeze({ status: 'preparing', key: target.key }))
-    void requestReversePreview(editProject.projectId, target.request, controller.signal).then((blob) => {
-      if (stopped) return
-      objectUrl = URL.createObjectURL(blob)
-      setReversePreviewState(Object.freeze({
-        status: 'ready',
-        key: target.key,
-        segmentIndex: target.segmentIndex,
-        preparedAssetId: target.preparedAssetId,
-        url: objectUrl,
-      }))
-    }).catch((error: unknown) => {
-      if (stopped || controller.signal.aborted) return
-      setReversePreviewState(Object.freeze({
-        status: 'error',
-        key: target.key,
-        message: error instanceof Error ? error.message : 'Backwards preview could not be prepared.',
-      }))
-    })
-    return () => {
-      stopped = true
-      controller.abort()
-      if (objectUrl !== null) URL.revokeObjectURL(objectUrl)
-    }
-  }, [activeReverseTarget?.key, editProject.projectId, mediaAnalysisClient])
-  const preparedReverse = useMemo(() =>
-    reversePreviewState.status === 'ready' && activeReverseTarget?.key === reversePreviewState.key
-      ? Object.freeze({
-          segmentIndex: reversePreviewState.segmentIndex,
-          preparedAssetId: reversePreviewState.preparedAssetId,
-        })
-      : null,
-  [activeReverseTarget?.key, reversePreviewState])
-  const browserSegments = useMemo(
-    () => withPreparedReversePreview(previewSegments, preparedReverse),
-    [preparedReverse, previewSegments],
+  const reverseResources = useReversePreviewResources(
+    editProject.projectId, previewSegments, editProject.assets, reversePreviewTicks, mediaAnalysisClient.reversePreview,
   )
+  const canonicalActiveIndex = segmentIndexAt(previewSegments, reversePreviewTicks)
+  const activeReverseTarget = reverseResources.targets.find(target => target.segmentIndex === canonicalActiveIndex) ?? null
+  const preparedReverse = reverseResources.prepared.find(target => target.segmentIndex === canonicalActiveIndex) ?? null
+  const browserSegments = reverseResources.browserSegments
   const reversePreviewPending = activeReverseTarget !== null && preparedReverse === null
+  const layeredSources = useMemo(() => {
+    const sources = new Map<string, LayeredFootageSource>()
+    footagePlan?.segments.forEach((segment, index) => {
+      const prepared = reverseResources.prepared.find(resource => resource.segmentIndex === index)
+      const proxy = prepared ? reverseResources.urls.get(prepared.preparedAssetId) : null
+      sources.set(segment.nodeId, proxy
+        ? { url: proxy, reversePrepared: true }
+        : { url: segment.assetId === editProject.assets[0]?.assetId ? project.mediaUrl : assetUrl(segment.assetId) })
+    })
+    return sources
+  }, [footagePlan, reverseResources.prepared, reverseResources.urls, editProject.assets, project.mediaUrl, assetUrl])
 
   /**
    * Which file the ONE video element is currently pointed at.
@@ -1395,11 +1371,24 @@ export function StudioScreen({
   }, [playheadAssetId, loadedAssetId])
   const previewMediaUrl = loadedAssetId === null
     ? ''
-    : reversePreviewState.status === 'ready' && loadedAssetId === reversePreviewState.preparedAssetId
-      ? reversePreviewState.url
+    : reverseResources.urls.has(loadedAssetId)
+      ? reverseResources.urls.get(loadedAssetId)!
       : loadedAssetId !== editProject.assets[0]?.assetId
         ? assetUrl(loadedAssetId)
         : project.mediaUrl
+
+  useLayoutEffect(() => {
+    if (layeredPlayback || !activeReverseTarget) { pendingReverseSeekRef.current = null; return }
+    if (reversePreviewPending || loadedAssetId !== activeReverseTarget.preparedAssetId ||
+      pendingReverseSeekRef.current?.key === activeReverseTarget.key) {
+      pendingReverseSeekRef.current = {
+        key: activeReverseTarget.key,
+        url: reverseResources.urls.get(activeReverseTarget.preparedAssetId) ?? null,
+        sourceTicks: preparedReverse ? sourceTimeFor(browserSegments, reversePreviewTicks)?.sourceTicks ?? null : null,
+        compositionTicks: reversePreviewTicks,
+      }
+    }
+  }, [layeredPlayback, activeReverseTarget, reversePreviewPending, loadedAssetId, preparedReverse, browserSegments, reversePreviewTicks, reverseResources.urls])
 
   const previewProposalOperation = proposal && proposalCanvasPoint
     ? Object.freeze({
@@ -1419,23 +1408,22 @@ export function StudioScreen({
   )
   const browserAudioVoices = useMemo<readonly BrowserAudioPreviewVoiceV1[]>(() => {
     const resolveUrl = (assetId: string): string => {
-      if (
-        reversePreviewState.status === 'ready' &&
-        assetId === reversePreviewState.preparedAssetId
-      ) return reversePreviewState.url
+      const preparedUrl = reverseResources.urls.get(assetId)
+      if (preparedUrl) return preparedUrl
       return assetId === editProject.assets[0]?.assetId ? project.mediaUrl : assetUrl(assetId)
     }
     return Object.freeze([
       ...(compositionAudio.primary ? [compositionAudio.primary] : []),
       ...compositionAudio.auxiliary,
     ].map((voice) => Object.freeze({ ...voice, url: resolveUrl(voice.assetId) })))
-  }, [assetUrl, compositionAudio, editProject.assets, project.mediaUrl, reversePreviewState])
+  }, [assetUrl, compositionAudio, editProject.assets, project.mediaUrl, reverseResources.urls])
 
   useEffect(() => {
     const videoElement = videoRef.current
     if (!videoElement) return
     const controller = createCompositionAudioPreviewController(videoElement)
     audioPreviewRef.current = controller
+    if (controller.supported) videoElement.muted = true
     const scrubber = createAudioScrubScheduler(controller)
     audioScrubRef.current = scrubber
     controller.setMaster(monitorMuted, monitorVolume)
@@ -1453,8 +1441,10 @@ export function StudioScreen({
     const controller = audioPreviewRef.current
     if (!controller?.supported) return
     controller.setMaster(monitorMuted, monitorVolume)
-    controller.update(browserAudioVoices, monitorPlaying || isShowingHole)
-  }, [browserAudioVoices, isShowingHole, monitorMuted, monitorPlaying, monitorVolume])
+    controller.update(browserAudioVoices, layeredPlayback
+      ? monitorPlaying && layerStatus.state === 'ready'
+      : monitorPlaying || isShowingHole)
+  }, [browserAudioVoices, isShowingHole, monitorMuted, monitorPlaying, monitorVolume, layeredPlayback, layerStatus.state])
 
   useEffect(() => {
     try { globalThis.localStorage?.setItem('sanverse.timeline-audio-scrubbing', String(audioScrubbingEnabled)) } catch { /* preference only */ }
@@ -1508,7 +1498,7 @@ export function StudioScreen({
     client: mediaAnalysisClient,
   }), [mediaAnalysisClient])
   useEffect(() => () => mediaAnalysis.dispose(), [mediaAnalysis])
-  const contentBox = video ? monitorGeometry(video, monitorFitMode)?.displayedContentRect ?? null : null
+  const contentBox = video ? monitorGeometry(video, monitorFitMode, monitorCanvas)?.displayedContentRect ?? null : null
   const previewScale = contentBox && composition.width > 0 ? contentBox.width / composition.width : 0
   const reducedMotion =
     typeof window !== 'undefined' &&
@@ -1554,6 +1544,24 @@ export function StudioScreen({
   )
 
   const compositionDurationTicks = compositionDuration(composition).ticks
+
+  // Decoder events never advance this transport. Loading pauses the composition
+  // clock, so a slow layer cannot silently skip finished-video time or drift audio.
+  useEffect(() => {
+    if (!layeredPlayback) return
+    const clock = createCompositionIntervalClock({ timescale: PROJECT_TIMESCALE })
+    layeredClockRef.current = clock
+    videoRef.current?.pause()
+    holePlaybackRef.current?.leave()
+    freezePlaybackRef.current?.leave()
+    pendingGapResumeRef.current = null
+    if (monitorPlaying && layerStatus.state === 'ready') clock.start({
+      fromTicks: playheadTicksRef.current, untilTicks: compositionDurationTicks,
+      onTick: ticks => { playheadTicksRef.current = ticks; setPlayheadMs(ticks / TICKS_PER_MS) },
+      onEnd: () => setMonitorPlaying(false),
+    })
+    return () => { clock.stop(); layeredClockRef.current = null }
+  }, [layeredPlayback, monitorPlaying, layerStatus.state, compositionDurationTicks, layerSeekVersion])
 
   useEffect(() => {
     shuttleStateRef.current = shuttleState
@@ -1701,15 +1709,7 @@ export function StudioScreen({
     }
     return Object.freeze(ids)
   }, [acceptedFootageMotions, acceptedVisualPropertyOperations, timelineModel])
-  const selectedSourceTime = selectedVideoSelection &&
-    playheadTicks >= selectedVideoSelection.clip.compositionStart.ticks &&
-    playheadTicks < selectedVideoSelection.clip.compositionStart.ticks + selectedVideoSelection.clip.sourceRange.duration.ticks
-      ? mediaTime(
-          selectedVideoSelection.clip.sourceRange.start.ticks +
-          playheadTicks -
-          selectedVideoSelection.clip.compositionStart.ticks,
-        )
-      : null
+  const selectedSourceTime = selectedFootageSourceTime(footagePlan, selectedVideoSelection?.clip.clipId, playheadTicks)
   const acceptedFootageMotion = useMemo(() => {
     if (!selectedVideoSelection) return null
     const sourceStart = selectedVideoSelection.clip.sourceRange.start.ticks
@@ -1768,27 +1768,7 @@ export function StudioScreen({
       crop: previewDraft.crop,
       tracks: previewDraft.tracks,
     })
-    const draftStart = previewDraft.sourceInterval.start.ticks
-    const draftEnd = draftStart + previewDraft.sourceInterval.duration.ticks
-    return Object.freeze({
-      ...footagePlan,
-      segments: Object.freeze(footagePlan.segments.map((segment) => {
-        const segmentSourceStart = segment.sourceStartTicks
-        const segmentSourceEnd = segmentSourceStart + segment.interval.duration.ticks
-        const intersects =
-          segment.assetId === previewDraft.assetId &&
-          draftStart < segmentSourceEnd &&
-          draftEnd > segmentSourceStart
-        if (!intersects) return segment
-        return Object.freeze({
-          ...segment,
-          footageMotions: Object.freeze([
-            ...segment.footageMotions.filter((motion) => motion.motionId !== previewDraft.motionId),
-            draftNode,
-          ]),
-        })
-      })),
-    })
+    return withFootageMotionDraft(footagePlan, previewDraft.assetId, draftNode)
   }, [acceptedFootageMotion, footageKeyframePreviewState, footageMotionDirty, footageMotionDraft, footagePlan, selectedVideoSelection])
 
   const activeFootageMotion = footageDisplayPlan
@@ -1815,6 +1795,7 @@ export function StudioScreen({
   useEffect(() => {
     footagePlanRef.current = footageDisplayPlan
     reducedMotionRef.current = reducedMotion
+    if (layeredPlayback) return
     const canvas = footageMotionCanvasRef.current
     const videoElement = videoRef.current
     if (!canvas || !videoElement || !footageDisplayPlan) {
@@ -1833,7 +1814,7 @@ export function StudioScreen({
     const drawn = footageMotionDrawnToken(canvas)
     drawnFrameTokenRef.current = drawn
     setDrawnFrameToken(drawn)
-  }, [footageDisplayPlan, playheadPreviewTicks, reducedMotion, requestedFrameToken, videoLayoutRevision])
+  }, [layeredPlayback, footageDisplayPlan, playheadPreviewTicks, reducedMotion, requestedFrameToken, videoLayoutRevision])
 
   /**
    * One named answer for what the base picture is, and the ONLY thing allowed
@@ -1862,10 +1843,8 @@ export function StudioScreen({
   const primaryDecision = resolvePrimarySource(editProject, playheadTicks)
   const primaryGapReason = primaryDecision.kind === 'gap' ? primaryDecision.reason : null
   const primaryAssetMissing = primaryGapReason === 'ASSET_MISSING'
-  const reversePreviewError =
-    reversePreviewState.status === 'error' && activeReverseTarget?.key === reversePreviewState.key
-      ? reversePreviewState.message
-      : null
+  const reversePreviewError = reverseResources.capacityError ??
+    (activeReverseTarget ? reverseResources.errors.get(activeReverseTarget.key) ?? null : null)
   const reversePreviewPreparing = activeReverseTarget !== null && preparedReverse === null && reversePreviewError === null
 
   const baseLayer = resolveMonitorBaseLayer({
@@ -1893,7 +1872,7 @@ export function StudioScreen({
    * exactly how a monitor ends up saying "No media at this time" over a picture
    * that is playing.
    */
-  const baseFrameState: MonitorBaseFrameState =
+  const baseFrameState: MonitorBaseFrameState = layeredPlayback ? layerStatus.state :
     baseLayer.kind === 'error' ? 'error'
       : baseLayer.kind === 'gap' ? 'gap'
         : baseLayer.kind === 'loading' ? 'loading'
@@ -1928,7 +1907,11 @@ export function StudioScreen({
       })
     : null
 
-  const baseFrameMessage = reversePreviewPreparing
+  const baseFrameMessage = layeredPlayback
+    ? (reverseResources.capacityError ?? [...reverseResources.errors.values()][0] ?? (layerStatus.state === 'error'
+      ? `Layered preview unavailable (${layerStatus.reason ?? 'decode error'}).`
+      : layerStatus.state === 'loading' ? 'Preparing video layers…' : null))
+    : reversePreviewPreparing
     ? 'Preparing backwards preview…'
     : reversePreviewError
       ?? (baseLayer.kind === 'gap' && primaryGapReason !== null
@@ -2054,6 +2037,7 @@ export function StudioScreen({
   )
   const motionStyle = (node: Parameters<typeof visualCssStyleAt>[1]) => {
     if (!previewPlan) return undefined
+    const stacking = layeredPlayback ? { zIndex: pictureStackIndex(previewPlan, node.nodeId) } : {}
     if (
       canvasSelectionResult.kind === 'supported' &&
       canvasSelectionResult.selection.state === 'committed' &&
@@ -2068,7 +2052,7 @@ export function StudioScreen({
             tracks: visualKeyframePreviewState.tracks,
           })
         : visualDraftController.draft.value
-      return visualCssStyleFromPropertiesAt(
+      return { ...visualCssStyleFromPropertiesAt(
         Object.freeze({
           visualId: canvasSelectionResult.selection.visualId,
           nodeIds: Object.freeze([node.nodeId]),
@@ -2079,16 +2063,16 @@ export function StudioScreen({
         composition.width,
         composition.height,
         reducedMotion,
-      )
+      ), ...stacking }
     }
-    return visualCssStyleAt(
+    return { ...visualCssStyleAt(
       previewPlan,
       node,
       playheadPreviewTicks,
       composition.width,
       composition.height,
       reducedMotion,
-    )
+    ), ...stacking }
   }
 
   const selectionOfOne = (itemId: string | null): TimelineSelectionV2 =>
@@ -2202,12 +2186,20 @@ export function StudioScreen({
   }, [selectedMarkerId, timelineMarkers])
 
   function seekCompositionTicks(requestedTicks: number) {
+    pendingGapResumeRef.current = null
     const nextTicks = Math.min(
       compositionDurationTicks,
       Math.max(0, Number.isFinite(requestedTicks) ? Math.round(requestedTicks) : 0),
     )
     setPlayheadMs(nextTicks / TICKS_PER_MS)
     playheadTicksRef.current = nextTicks
+
+    if (layeredPlayback) {
+      layeredClockRef.current?.stop()
+      setLayerSeekVersion(version => version + 1)
+      if (nextTicks >= compositionDurationTicks) setMonitorPlaying(false)
+      return
+    }
 
     const videoElement = videoRef.current
     if (!videoElement) return
@@ -2266,6 +2258,33 @@ export function StudioScreen({
   function toggleMonitorPlayback() {
     const videoElement = videoRef.current
     if (!videoElement) return
+    if (!monitorPlaying) void audioPreviewRef.current?.resume()
+    if (layeredPlayback) {
+      if (!monitorPlaying && playheadTicksRef.current >= compositionDurationTicks) seekCompositionTicks(0)
+      if (monitorPlaying) layeredClockRef.current?.stop()
+      setMonitorPlaying(!monitorPlaying)
+      return
+    }
+    if (pendingGapResumeRef.current) {
+      pendingGapResumeRef.current = { ...pendingGapResumeRef.current, resumePlaying: !monitorPlaying }
+      setMonitorPlaying(!monitorPlaying)
+      return
+    }
+    if (inHoleRef.current && monitorPlaying) {
+      holePlaybackRef.current?.leave()
+      setMonitorPlaying(false)
+      return
+    }
+    const ticks = playheadTicksRef.current
+    const decision = resolvePrimarySource(editProject, ticks)
+    if (decision.kind === 'gap' && decision.reason !== 'ASSET_MISSING') {
+      const next = nextVisibleTick(browserSegments, ticks) ?? compositionDurationTicks
+      if (next > ticks) {
+        holePlaybackRef.current?.leave()
+        holePlaybackRef.current?.enter(ticks, next, true)
+      }
+      return
+    }
     if (inFreezeRef.current) {
       freezePlaybackRef.current?.leave()
       setMonitorPlaying(false)
@@ -2289,15 +2308,21 @@ export function StudioScreen({
   }
 
   function stepMonitorFrame(direction: -1 | 1) {
-    videoRef.current?.pause()
+    pauseMonitorPlayback()
     seekCompositionTicks(playheadTicksRef.current + direction * frameStepTicks(primaryVideoAsset?.frameRate ?? null))
   }
 
   function handleShuttleKey(key: ShuttleKeyV1) {
-    videoRef.current?.pause()
+    pauseMonitorPlayback()
     const next = advanceShuttle(shuttleStateRef.current, key)
     shuttleStateRef.current = next
     setShuttleState(next)
+  }
+
+  function pauseMonitorPlayback() {
+    layeredClockRef.current?.stop()
+    if (layeredPlayback) setMonitorPlaying(false)
+    videoRef.current?.pause()
   }
 
   function setMonitorMutedState(muted: boolean) {
@@ -2490,6 +2515,40 @@ export function StudioScreen({
    * up at different spacings from each other, which is the exact thing the user
    * picked several of them to preserve.
    */
+  function previewBodyDrag(request: TimelineBodyDragRequest, changeSetId = 'changeset_dragpreview01') {
+    const items = timelineModel.lanes.flatMap((lane) => lane.items)
+    const item = items.find((entry) => entry.id === request.itemId)
+    const clipId = item?.clipId ?? item?.linkedClipId ?? null
+    const extraSelection = timelineSelection.itemIds.includes(request.itemId) && timelineSelection.itemIds.some((id) => {
+      const other = items.find((entry) => entry.id === id)
+      return id !== request.itemId && (clipId === null || (other?.clipId ?? other?.linkedClipId) !== clipId)
+    })
+    if (item && extraSelection) {
+      if (request.destinationTrackId !== item.trackId) return { ok: false as const, refusal: { code: 'TRACK_INCOMPATIBLE', message: 'Move a multi-selection along its current tracks. Move between tracks one clip at a time.' } }
+      const plan = planMultiItemGesture({
+        project: editProject, itemIds: timelineSelection.itemIds,
+        gesture: { type: 'move', deltaTicks: request.toStartTicks - item.startTicks },
+        lockedTrackIds: plannerLockedTrackIds, pendingProposalExists: Boolean(proposal),
+        exportInProgress: isRendering, expectedRevision: request.revision ?? editProject.revision,
+        ids: createIdFactory(changeSetId),
+      })
+      return plan.ok ? { ...plan, landingStartTicks: request.toStartTicks } : plan
+    }
+    return planTimelineBodyDrag({
+      project: editProject, model: timelineModel, request,
+      lockedTrackIds: plannerLockedTrackIds, pendingProposalExists: Boolean(proposal),
+      exportInProgress: isRendering, expectedRevision: editProject.revision,
+      ids: createIdFactory(changeSetId),
+    })
+  }
+
+  async function commitBodyDrag(request: TimelineBodyDragRequest) {
+    const changeSetId = createChangeSetId()
+    const plan = previewBodyDrag(request, changeSetId)
+    if (plan.ok && plan.operations.length === 0) return
+    await applyPlanned(plan, changeSetId, true)
+  }
+
   function handleMultiGesture(gesture: MultiItemGesture) {
     const changeSetId = createChangeSetId()
     const plan = planMultiItemGesture({
@@ -2510,11 +2569,12 @@ export function StudioScreen({
   }
 
   /** Send one already-planned set of operations as one change set. */
-  function applyPlanned(
+  async function applyPlanned(
     plan:
       | Readonly<{ ok: true; operations: readonly unknown[] }>
       | Readonly<{ ok: false; refusal: Readonly<{ message: string }> }>,
     changeSetId: string,
+    awaitChangeSet = false,
   ) {
     if (!plan.ok) {
       setTimelineNotice(plan.refusal.message)
@@ -2544,14 +2604,12 @@ export function StudioScreen({
     // T5 uses the multi-operation path only when targeting/Sync Lock actually
     // adds work. This keeps the established direct cut/trim API contract while
     // still making compound T5 gestures one atomic change set.
-    if (operations.length === 1 && isTimelineOperation(operations[0])) {
+    if (!awaitChangeSet && operations.length === 1 && isTimelineOperation(operations[0])) {
       onTimelineEdit(operations[0])
       return
     }
-    void (async () => {
-      const failure = await onApplyOperations(operations, changeSetId)
-      if (failure) setTimelineNotice(failure)
-    })()
+    const failure = await onApplyOperations(operations, changeSetId)
+    if (failure) setTimelineNotice(failure)
   }
 
   /**
@@ -3381,7 +3439,7 @@ export function StudioScreen({
   }
 
   function enterPointMode() {
-    videoRef.current?.pause()
+    pauseMonitorPlayback()
     setDraftPoint({ x: 0.5, y: 0.5 })
     setPointError(null)
     setIsPointMode(true)
@@ -3420,8 +3478,8 @@ export function StudioScreen({
     const video = videoRef.current
     if (!video) return
 
-    const geometry = monitorGeometry(video, monitorFitMode)
-    if (!geometry || video.videoWidth <= 0 || video.videoHeight <= 0 || !Number.isFinite(video.currentTime)) {
+    const geometry = monitorGeometry(video, monitorFitMode, monitorCanvas)
+    if (!geometry || (layeredPlayback ? layerStatus.state !== 'ready' : video.videoWidth <= 0 || video.videoHeight <= 0 || !Number.isFinite(video.currentTime))) {
       setPointError('The video is not ready for pointing yet.')
       return
     }
@@ -3437,7 +3495,7 @@ export function StudioScreen({
     completePointCapture(Object.freeze({
       x: clampNormalized((clientX - content.left) / content.width),
       y: clampNormalized((clientY - content.top) / content.height),
-      timeMs: Math.max(0, Math.round(video.currentTime * 1_000)),
+      timeMs: layeredPlayback ? playheadTicksRef.current / TICKS_PER_MS : Math.max(0, Math.round(video.currentTime * 1_000)),
     }))
   }
 
@@ -3486,7 +3544,7 @@ export function StudioScreen({
 
     if (event.key === 'Enter') {
       event.preventDefault()
-      const currentTimeSeconds = videoRef.current?.currentTime
+      const currentTimeSeconds = layeredPlayback ? playheadTicksRef.current / PROJECT_TIMESCALE : videoRef.current?.currentTime
       if (
         currentTimeSeconds === undefined ||
         !Number.isFinite(currentTimeSeconds) ||
@@ -3893,34 +3951,11 @@ export function StudioScreen({
         </button>
       </header> : null}
 
-      {workspace === 'studio' ? (
-        <div className="studio-screen__workspace-toolbar" aria-label="Workspace layout controls">
-          <WorkspacePresetMenu value={workspaceLayout.preset} onApply={applyPreset} onReset={resetLayout} />
-          <div className="studio-screen__dock-visibility">
-            {!embedded ? (
-              <>
-                <button type="button" aria-label="Undo edit" disabled={Boolean(proposal) || acceptedCount === 0} onClick={onUndo}>Undo</button>
-                <button type="button" aria-label="Redo edit" disabled={Boolean(proposal) || editProject.redoStack.length === 0} onClick={onRedo}>Redo</button>
-              </>
-            ) : null}
-            <button
-              type="button"
-              aria-pressed={!workspaceLayout.mediaCollapsed}
-              aria-label={`${workspaceLayout.mediaCollapsed ? 'Show' : 'Hide'} ${leftDockLabel} dock`}
-              onClick={() => commitLayoutValue({ mediaCollapsed: !workspaceLayout.mediaCollapsed })}
-            >
-              {workspaceLayout.mediaCollapsed ? `Show ${leftDockLabel}` : `Hide ${leftDockLabel}`}
-            </button>
-            <button
-              type="button"
-              aria-pressed={!workspaceLayout.toolCollapsed}
-              aria-label={`${workspaceLayout.toolCollapsed ? 'Show' : 'Hide'} Tool dock`}
-              onClick={() => commitLayoutValue({ toolCollapsed: !workspaceLayout.toolCollapsed })}
-            >
-              {workspaceLayout.toolCollapsed ? 'Show Tool' : 'Hide Tool'}
-            </button>
-          </div>
-        </div>
+      {workspace === 'studio' && workspaceLayout.toolCollapsed ? (
+        <button className="studio-screen__restore-inspector" type="button" onClick={() => {
+          commitLayoutValue({ toolCollapsed: false })
+          setCompactSidePanel('inspector')
+        }}>Show Inspector</button>
       ) : null}
 
       <StudioLayoutV2
@@ -3990,9 +4025,9 @@ export function StudioScreen({
                 ref={videoRef}
                 className="studio-screen__video"
                 preload="metadata"
-                src={previewMediaUrl || undefined}
+                src={layeredPlayback ? undefined : previewMediaUrl || undefined}
                 aria-label={`Preview of ${project.name}`}
-                style={{ opacity: transitionOpacity }}
+                style={{ opacity: layeredPlayback ? 0 : transitionOpacity }}
                 onError={() => setHasPreviewError(true)}
               >
                 Your browser does not support video playback.
@@ -4008,7 +4043,7 @@ export function StudioScreen({
                 opaque black rectangle. That is the black preview the owner
                 recorded. See `monitor-base-layer.ts`.
               */}
-              {videoContentLayerStyle ? (
+              {videoContentLayerStyle && !layeredPlayback ? (
                 <canvas
                   ref={footageMotionCanvasRef}
                   className="studio-screen__footage-motion-canvas"
@@ -4029,7 +4064,7 @@ export function StudioScreen({
                 waiting canvas, a panel resize, or a loading source can never
                 paint this. If it is black here, the exported file is black too.
               */}
-              {showsGapLayer(baseLayer) ? (
+              {!layeredPlayback && showsGapLayer(baseLayer) ? (
                 <div className="studio-screen__video-hole" data-testid="video-hole" aria-hidden="true" />
               ) : null}
 
@@ -4080,6 +4115,14 @@ export function StudioScreen({
                   style={{ ...videoContentLayerStyle, ...nameplateVariables, ...captionVariables, ...titleVariables }}
                 >
                   <MonitorSafeAreas visible={monitorGuides} />
+                  {layeredPlayback && footageDisplayPlan ? <LayeredFootageCanvases
+                    plan={footageDisplayPlan}
+                    ticks={playheadPreviewTicks}
+                    playing={monitorPlaying}
+                    reducedMotion={reducedMotion}
+                    sources={layeredSources}
+                    onStatus={setLayerStatus}
+                  /> : null}
                   {previewMedia.map((node) => (
                     <MediaOverlay
                       key={node.nodeId}
@@ -4144,7 +4187,7 @@ export function StudioScreen({
                       cropMode={canvasCropMode}
                       onCropModeChange={setCanvasCropMode}
                       onCommit={commitFootageMotionGesture}
-                      onPausePlayback={() => videoRef.current?.pause()}
+                      onPausePlayback={pauseMonitorPlayback}
                       onFocusInspector={() => inspectorRegionRef.current?.focus()}
                     />
                   ) : null}
@@ -4165,7 +4208,7 @@ export function StudioScreen({
                         setProposalCanvasPoint(null)
                         if (proposal) onRepairProposal({ point })
                       }}
-                      onPausePlayback={() => videoRef.current?.pause()}
+                      onPausePlayback={pauseMonitorPlayback}
                       onFocusInspector={() => inspectorRegionRef.current?.focus()}
                     />
                   ) : null}
@@ -4270,6 +4313,40 @@ export function StudioScreen({
             <div className="studio-screen__workspace-tool-heading">
               <span className="studio-screen__section-index">03</span>
               <h2>{studioWorkspace === 'edit' ? 'Inspector' : studioWorkspace === 'effects' ? 'Effect controls' : studioWorkspace === 'color' ? 'Color controls' : 'Audio controls'}</h2>
+              {workspace === 'studio' ? (
+                <details className="studio-screen__layout-menu" onToggle={toggleDetailsPopover}>
+                  <summary aria-label="Workspace layout settings">Workspace</summary>
+                  <div className="studio-screen__layout-popover" popover="auto" onToggle={syncPopoverDisclosure}>
+        <div className="studio-screen__workspace-toolbar" aria-label="Workspace layout controls">
+          <WorkspacePresetMenu value={workspaceLayout.preset} onApply={applyPreset} onReset={resetLayout} />
+          <div className="studio-screen__dock-visibility">
+            {!embedded ? (
+              <>
+                <button type="button" aria-label="Undo edit" disabled={Boolean(proposal) || acceptedCount === 0} onClick={onUndo}>Undo</button>
+                <button type="button" aria-label="Redo edit" disabled={Boolean(proposal) || editProject.redoStack.length === 0} onClick={onRedo}>Redo</button>
+              </>
+            ) : null}
+            <button
+              type="button"
+              aria-pressed={!workspaceLayout.mediaCollapsed}
+              aria-label={`${workspaceLayout.mediaCollapsed ? 'Show' : 'Hide'} ${leftDockLabel} dock`}
+              onClick={() => commitLayoutValue({ mediaCollapsed: !workspaceLayout.mediaCollapsed })}
+            >
+              {workspaceLayout.mediaCollapsed ? `Show ${leftDockLabel}` : `Hide ${leftDockLabel}`}
+            </button>
+            <button
+              type="button"
+              aria-pressed={!workspaceLayout.toolCollapsed}
+              aria-label={`${workspaceLayout.toolCollapsed ? 'Show' : 'Hide'} Tool dock`}
+              onClick={() => commitLayoutValue({ toolCollapsed: !workspaceLayout.toolCollapsed })}
+            >
+              {workspaceLayout.toolCollapsed ? 'Show Tool' : 'Hide Tool'}
+            </button>
+          </div>
+        </div>
+                  </div>
+                </details>
+              ) : null}
             </div>
             {toolSupported ? <>
             {studioWorkspace !== 'color' && studioWorkspace !== 'audio' ? (
@@ -4416,6 +4493,7 @@ export function StudioScreen({
           onPlacementMode={setTimelinePlacementMode}
           onToggleSnapping={() => setSnappingEnabled((current) => !current)}
           onItemAction={handleTimelineItemAction}
+          bodyDrag={{ revision: editProject.revision, selectedItemIds: timelineSelection.itemIds, preview: previewBodyDrag, commit: commitBodyDrag }}
           onMultiGesture={handleMultiGesture}
           onViewportChange={handleTimelineViewportChange}
           onSeek={seekCompositionTicks}
@@ -4464,3 +4542,4 @@ export function StudioScreen({
     </main>
   )
 }
+import { planTimelineBodyDrag, type TimelineBodyDragRequest } from '../../features/timeline/timeline-body-drag-plan'

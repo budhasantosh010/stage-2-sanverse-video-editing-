@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 
 import {
   ticksToPixels,
@@ -20,6 +20,10 @@ import { TimelineRateStretchHandle, type RateStretchPreview } from './TimelineRa
 import type { TimelineTool } from './TimelineToolbar'
 import { TimelinePrecisionHandle } from './TimelinePrecisionHandle'
 import { TimelineAudioDirectControls, type TimelineAudioState } from './TimelineAudioDirectControls'
+import type { TimelineBodyDragApi, TimelineBodyDragFeedback, TimelineBodyDragRequest } from '../../features/timeline/timeline-body-drag-plan'
+import { dragEdgeScroll, dragTrackAt } from './timeline-drag-geometry'
+
+type BodyPointer = Pick<PointerEvent<HTMLButtonElement>, 'pointerId' | 'clientX' | 'clientY' | 'shiftKey' | 'currentTarget'>
 
 export type TimelineItemProps = Readonly<{
   item: TimelineItemView
@@ -65,6 +69,9 @@ export type TimelineItemProps = Readonly<{
   onGesture(gesture: TimelineGesture): void
   /** One whole gesture on something laid on top of the footage. */
   onItemAction(itemId: string, action: TimelineItemAction): void
+  bodyDrag?: TimelineBodyDragApi
+  bodyDragFeedback?: TimelineBodyDragFeedback | null
+  onBodyDragFeedback?(feedback: TimelineBodyDragFeedback | null): void
   onOpenProposal(): void
   onContextMenu(item: TimelineItemView, clientX: number, clientY: number): void
 }>
@@ -160,6 +167,9 @@ export function TimelineItem({
   onSeek,
   onGesture,
   onItemAction,
+  bodyDrag,
+  bodyDragFeedback,
+  onBodyDragFeedback,
   onOpenProposal,
   onContextMenu,
 }: TimelineItemProps) {
@@ -197,10 +207,47 @@ export function TimelineItem({
   const dragRef = useRef<Readonly<{
     pointerId: number
     originClientX: number
+    originClientY: number
+    revision?: number
+    grabOffsetTicks: number
     moved: boolean
     offsetTicks: number | null
+    request?: TimelineBodyDragRequest
   }> | null>(null)
   const selectedOnPointerDownRef = useRef(false)
+  const scrollFrameRef = useRef<number | null>(null)
+  const scrollPointerRef = useRef<BodyPointer | null>(null)
+  const scrollTimeRef = useRef<number | null>(null)
+  const updateDragRef = useRef<(event: BodyPointer, startScroll?: boolean) => void>(() => undefined)
+  const stopDragScroll = () => {
+    if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current)
+    scrollFrameRef.current = null
+    scrollPointerRef.current = null
+    scrollTimeRef.current = null
+  }
+  useEffect(() => () => {
+    if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current)
+  }, [])
+
+  const panDragFrame = (now: number) => {
+    scrollFrameRef.current = null
+    const pointer = scrollPointerRef.current
+    if (!pointer || !dragRef.current?.moved) return
+    const port = pointer.currentTarget.closest<HTMLElement>('[data-timeline-viewport]')
+    if (!port) return
+    const step = dragEdgeScroll({ x: pointer.clientX, y: pointer.clientY }, port.getBoundingClientRect(), scrollTimeRef.current === null ? 16 : now - scrollTimeRef.current)
+    scrollTimeRef.current = now
+    if (step.x === 0 && step.y === 0) return
+    const left = port.scrollLeft
+    const top = port.scrollTop
+    port.scrollLeft = Math.max(0, Math.min(port.scrollWidth - port.clientWidth, left + step.x))
+    port.scrollTop = Math.max(0, Math.min(port.scrollHeight - port.clientHeight, top + step.y))
+    if (left === port.scrollLeft && top === port.scrollTop) return
+    // Recompute from the same pointer after scroll: the grabbed point stays under it.
+    updateDragRef.current(pointer, false)
+    scrollFrameRef.current = requestAnimationFrame(panDragFrame)
+  }
+  const suppressClickRef = useRef(false)
   const [dragOffsetTicks, setDragOffsetTicks] = useState<number | null>(null)
   const [dragSnappingBypassed, setDragSnappingBypassed] = useState(false)
   const canonicalLeftPx = ticksToPixels(item.startTicks, timescale, pixelsPerSecond)
@@ -249,7 +296,7 @@ export function TimelineItem({
     && item.state === 'committed'
     && !busy
   const canDragBody = activeTool === 'select'
-    && (isOverlayFamily || canReorderPrimary)
+    && (isOverlayFamily || canReorderPrimary || (bodyDrag !== undefined && item.kind === 'clip'))
     && item.state === 'committed'
     && !busy
   const canRazorSplit = activeTool === 'razor'
@@ -286,9 +333,10 @@ export function TimelineItem({
    */
   const beginBodyDrag = (event: PointerEvent<HTMLButtonElement>) => {
     selectedOnPointerDownRef.current = false
+    suppressClickRef.current = false
     if (event.button !== 0) return
     /*
-     * Main-footage clips are not draggable. Pick and seek them on the press,
+     * Pick non-draggable items on the press,
      * before a late filmstrip or waveform can replace content under the
      * pointer and make the browser cancel the following click. That exact
      * race made the first real click after opening Studio appear dead while
@@ -300,75 +348,125 @@ export function TimelineItem({
         metaKey: event.metaKey,
         shiftKey: event.shiftKey,
       }
-      onSelect(item.id, modifiers)
+      const selectedOnPress = !item.selected || modifiers.ctrlKey || modifiers.metaKey || modifiers.shiftKey
+      if (selectedOnPress) onSelect(item.id, modifiers)
       if (!modifiers.ctrlKey && !modifiers.metaKey && !modifiers.shiftKey) {
         onSeek(pointerTicks(event.clientX))
       }
       if (item.state === 'proposed') onOpenProposal()
-      selectedOnPointerDownRef.current = true
+      selectedOnPointerDownRef.current = selectedOnPress
       return
     }
     if (!canDragBody) return
-    if (canReorderPrimary) {
+    if (canDragBody) {
       const modifiers = {
         ctrlKey: event.ctrlKey,
         metaKey: event.metaKey,
         shiftKey: event.shiftKey,
       }
-      onSelect(item.id, modifiers)
-      if (!modifiers.ctrlKey && !modifiers.metaKey && !modifiers.shiftKey) {
-        onSeek(pointerTicks(event.clientX))
-      }
-      selectedOnPointerDownRef.current = true
+      const selectedOnPress = !item.selected || modifiers.ctrlKey || modifiers.metaKey || modifiers.shiftKey
+      if (selectedOnPress) onSelect(item.id, modifiers)
+      // Preserve the group during a drag, but let a plain click focus the
+      // selected member (for example linked audio) in the Inspector.
+      selectedOnPointerDownRef.current = selectedOnPress
     }
     dragRef.current = Object.freeze({
       pointerId: event.pointerId,
       originClientX: event.clientX,
+      originClientY: event.clientY || 0,
+      revision: bodyDrag?.revision,
+      grabOffsetTicks: pointerTicks(event.clientX) - item.startTicks,
       moved: false,
       offsetTicks: null,
     })
-    event.currentTarget.setPointerCapture(event.pointerId)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
   }
 
-  const moveBodyDrag = (event: PointerEvent<HTMLButtonElement>) => {
+  const moveBodyDrag = (event: BodyPointer, startScroll = true) => {
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
-    const travelled = Math.abs(event.clientX - drag.originClientX)
+    const travelled = Math.hypot(event.clientX - drag.originClientX, (event.clientY || 0) - drag.originClientY)
     if (!drag.moved && travelled < DRAG_THRESHOLD_PX) return
     if (!drag.moved) dragRef.current = Object.freeze({ ...drag, moved: true })
     // Shift asks for the exact position under the pointer, ignoring snapping
     // for this one gesture. Per-gesture on purpose: a modifier that stayed on
     // would be a setting nobody remembers changing.
-    const snapped = canReorderPrimary
-      ? Object.freeze({ ticks: pointerTicks(event.clientX), snappedToTicks: null })
+    // Move the grabbed point with the pointer, not the clip's centre. Snap
+    // the resulting leading edge so the shown guide equals the landed edge.
+    const leadingEdgeClientX = event.clientX - ticksToPixels(drag.grabOffsetTicks, timescale, pixelsPerSecond)
+    const snapped = canReorderPrimary && !bodyDrag
+      ? Object.freeze({ ticks: pointerTicks(leadingEdgeClientX), snappedToTicks: null })
       : pointerTime(
-          event.clientX,
+          leadingEdgeClientX,
           [item.startTicks, item.startTicks + item.durationTicks],
           event.shiftKey,
         )
-    const nextStart = Math.max(0, snapped.ticks - Math.floor(item.durationTicks / 2))
+    const nextStart = Math.max(0, snapped.ticks)
     const offsetTicks = nextStart - item.startTicks
-    dragRef.current = Object.freeze({ ...(dragRef.current ?? drag), moved: true, offsetTicks })
+    let request: TimelineBodyDragRequest | undefined
+    if (bodyDrag) {
+      const viewport = event.currentTarget.closest('[data-timeline-viewport]')
+      const lanes = Array.from(viewport?.querySelectorAll<HTMLElement>('[data-body-track-id]') ?? [])
+      const destinationTrackId = viewport ? dragTrackAt(
+        { x: event.clientX, y: event.clientY },
+        viewport.getBoundingClientRect(),
+        lanes.map(lane => {
+          const { left, right, top, bottom } = lane.getBoundingClientRect()
+          return { left, right, top, bottom, trackId: lane.dataset.bodyTrackId! }
+        }),
+      ) : null
+      const hoveredLane = lanes.find(lane => lane.dataset.bodyTrackId === destinationTrackId)
+      request = { itemId: item.id, destinationTrackId: destinationTrackId ?? '', toStartTicks: nextStart, revision: drag.revision }
+      const plan = destinationTrackId ? bodyDrag.preview(request) : { ok: false as const, refusal: { code: 'DROP_OUTSIDE', message: 'Release over a timeline track, or release here to cancel.' } }
+      const sourceLane = event.currentTarget.closest('[data-body-track-id]')
+      const deltaY = hoveredLane && sourceLane ? hoveredLane.getBoundingClientRect().top - sourceLane.getBoundingClientRect().top : 0
+      onBodyDragFeedback?.({ itemId: item.id, linkedClipId: item.clipId ?? item.linkedClipId, deltaTicks: offsetTicks, deltaY, plan })
+    }
+    dragRef.current = Object.freeze({ ...(dragRef.current ?? drag), moved: true, offsetTicks, request })
     setDragOffsetTicks(offsetTicks)
     setDragSnappingBypassed(event.shiftKey)
     onSnapGuide(snapped.snappedToTicks)
+    if (startScroll && bodyDrag) {
+      scrollPointerRef.current = { currentTarget: event.currentTarget, pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, shiftKey: event.shiftKey }
+      if (scrollFrameRef.current === null) scrollFrameRef.current = requestAnimationFrame(panDragFrame)
+    }
   }
+  updateDragRef.current = moveBodyDrag
 
   const endBodyDrag = (event: PointerEvent<HTMLButtonElement>, commit: boolean) => {
+    stopDragScroll()
+    // A release can arrive beyond the last move event (including outside the
+    // viewport). Commit the actual release position, never a stale valid lane.
+    if (commit && bodyDrag && dragRef.current?.moved) moveBodyDrag(event, false)
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
     dragRef.current = null
     onSnapGuide(null)
     const offset = drag.offsetTicks
-    setDragOffsetTicks(null)
-    setDragSnappingBypassed(false)
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+    suppressClickRef.current = drag.moved
+    const clear = () => {
+      setDragOffsetTicks(null)
+      setDragSnappingBypassed(false)
+      onBodyDragFeedback?.(null)
+    }
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
     // No movement is a click, and a click selects. No change is not an edit: a
     // change set that changes nothing still takes a revision and a slot in
     // Undo, which reads to the user as a broken button.
-    if (!commit || !drag.moved || offset === null || offset === 0) return
+    if (!commit || !drag.moved || offset === null) {
+      if (commit && !drag.moved && !event.ctrlKey && !event.metaKey && !event.shiftKey) onSeek(pointerTicks(event.clientX))
+      clear()
+      return
+    }
+    if (bodyDrag && drag.request) {
+      if (!drag.request.destinationTrackId) { clear(); return }
+      void Promise.resolve(bodyDrag.commit(drag.request)).finally(clear)
+      return
+    }
+    clear()
+    if (offset === 0) return
     if (canReorderPrimary && primaryReorder && item.clipId) {
       const draggedCenterTicks = item.startTicks + Math.floor(item.durationTicks / 2) + offset
       const toIndex = primaryReorder.otherClipCenterTicks
@@ -385,6 +483,10 @@ export function TimelineItem({
   const ghostLeftPx = dragOffsetTicks === null
     ? leftPx
     : ticksToPixels(Math.max(0, item.startTicks + dragOffsetTicks), timescale, pixelsPerSecond)
+  const linkedId = item.clipId ?? item.linkedClipId
+  const sharedGhost = bodyDragFeedback && (bodyDragFeedback.itemId === item.id || (linkedId !== null && bodyDragFeedback.linkedClipId === linkedId) || (item.selected && bodyDrag?.selectedItemIds?.includes(bodyDragFeedback.itemId))) ? bodyDragFeedback : null
+  const ghostY = sharedGhost?.itemId === item.id ? sharedGhost.deltaY : 0
+  const ghostX = sharedGhost ? ticksToPixels(sharedGhost.deltaTicks, timescale, pixelsPerSecond) : 0
 
   return (
     <div
@@ -392,9 +494,10 @@ export function TimelineItem({
         'timeline-v1__item-shell',
         trimPreview ? 'timeline-v1__item-shell--trimming' : '',
         rateStretchDraft ? 'timeline-v1__item-shell--rate-stretching' : '',
-        dragOffsetTicks !== null ? 'timeline-v1__item-shell--dragging' : '',
+        dragOffsetTicks !== null || sharedGhost ? 'timeline-v1__item-shell--dragging' : '',
       ].filter(Boolean).join(' ')}
-      style={{ left: `${ghostLeftPx}px`, width: `${Math.max(2, widthPx)}px` }}
+      style={{ left: `${sharedGhost ? leftPx : ghostLeftPx}px`, width: `${Math.max(2, widthPx)}px`, transform: sharedGhost ? `translate3d(${ghostX}px, ${ghostY}px, 0)` : undefined }}
+      data-drag-valid={sharedGhost ? String(sharedGhost.plan.ok) : undefined}
       data-testid="timeline-item-shell"
       data-item-id={item.id}
       data-primary-selected={primarySelected ? 'yes' : 'no'}
@@ -423,7 +526,13 @@ export function TimelineItem({
         data-state={item.state}
         data-kind={item.kind}
         data-lane-kind={laneKind}
+        data-body-draggable={canDragBody ? 'true' : undefined}
         onClick={(event) => {
+          if (suppressClickRef.current) {
+            suppressClickRef.current = false
+            selectedOnPointerDownRef.current = false
+            return
+          }
           if (selectedOnPointerDownRef.current) {
             selectedOnPointerDownRef.current = false
             return
@@ -450,6 +559,9 @@ export function TimelineItem({
           selectedOnPointerDownRef.current = false
           endBodyDrag(event, false)
         }}
+        onLostPointerCapture={(event) => {
+          if (dragRef.current) endBodyDrag(event, false)
+        }}
         onContextMenu={(event) => {
           event.preventDefault()
           onSelect(item.id)
@@ -464,9 +576,12 @@ export function TimelineItem({
             // Escape during a drag cancels it and creates nothing.
             event.preventDefault()
             event.stopPropagation()
+            stopDragScroll()
             dragRef.current = null
             setDragOffsetTicks(null)
             setDragSnappingBypassed(false)
+            onBodyDragFeedback?.(null)
+            suppressClickRef.current = true
             onSnapGuide(null)
             return
           }
@@ -492,7 +607,7 @@ export function TimelineItem({
         <TimelineWaveform
           media={derivedMedia}
           widthPx={Math.max(2, widthPx)}
-          heightPx={decorationHeightPx}
+          heightPx={Math.max(2, decorationHeightPx - 12)}
           muted={muted}
           channelDisplayMode={waveformDisplayMode}
           selected={item.selected}
@@ -705,7 +820,7 @@ export function TimelineItem({
 
       {dragOffsetTicks !== null ? (
         <output className="timeline-v1__drag-tooltip" aria-live="polite" data-testid="timeline-drag-tooltip">
-          {laneLabel} · {formatTimelineTime(Math.max(0, item.startTicks + dragOffsetTicks), timescale, true)} · Move{dragSnappingBypassed ? ' · Snapping off' : ''}
+          {sharedGhost ? sharedGhost.plan.ok ? `${sharedGhost.plan.description} · ${formatTimelineTime(sharedGhost.plan.landingStartTicks, timescale, true)}` : sharedGhost.plan.refusal.message : `${laneLabel} · ${formatTimelineTime(Math.max(0, item.startTicks + dragOffsetTicks), timescale, true)} · Move`}{dragSnappingBypassed ? ' · Snapping off' : ''}
         </output>
       ) : null}
       {trimPreview ? (

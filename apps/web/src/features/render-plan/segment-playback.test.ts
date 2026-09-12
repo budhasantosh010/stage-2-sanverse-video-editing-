@@ -101,6 +101,22 @@ describe('deciding what to do next while playing', () => {
     })
   })
 
+  it('does not loop into an earlier reused source range when the final clip ends', () => {
+    const repeated: readonly PlaybackSegment[] = [
+      { startTicks: 0, durationTicks: 20 * S, sourceStartTicks: 0, assetId: 'asset_aaaaaaaa', videoEnabled: true, audioEnabled: true },
+      { startTicks: 25 * S, durationTicks: 5 * S, sourceStartTicks: 0, assetId: 'asset_aaaaaaaa', videoEnabled: true, audioEnabled: true },
+    ]
+    expect(advancePlayback(repeated, 1, 5 * S, 30 * S)).toEqual({ kind: 'ended', compositionTicks: 30 * S })
+  })
+
+  it('takes the next composition clip instead of treating decoder overshoot as a source seek', () => {
+    const repeated: readonly PlaybackSegment[] = [
+      { startTicks: 0, durationTicks: 5 * S, sourceStartTicks: 0, assetId: 'asset_aaaaaaaa', videoEnabled: true, audioEnabled: true },
+      { startTicks: 5 * S, durationTicks: 10 * S, sourceStartTicks: 0, assetId: 'asset_aaaaaaaa', videoEnabled: true, audioEnabled: true },
+    ]
+    expect(advancePlayback(repeated, 0, 5 * S, 15 * S)).toEqual({ kind: 'seek', sourceTicks: 0, compositionTicks: 5 * S, segmentIndex: 1 })
+  })
+
   it('shows the new beginning after a cut removed the footage under the playhead', () => {
     // Found in the browser, not by a test: removing the opening section leaves
     // the recording parked at a moment the finished video no longer contains.
@@ -119,7 +135,7 @@ describe('deciding what to do next while playing', () => {
   it('follows the user dragging the browser scrubber into another stretch', () => {
     // 22 s of the recording is inside the second stretch, which is 12 s of the
     // finished video — not the end of anything.
-    expect(advancePlayback(rippled, 0, 22 * S, 20 * S)).toEqual({
+    expect(advancePlayback(rippled, 0, 22 * S, 20 * S, 'source-scrub')).toEqual({
       kind: 'show',
       compositionTicks: 12 * S,
       segmentIndex: 1,

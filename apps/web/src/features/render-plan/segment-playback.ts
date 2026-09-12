@@ -17,6 +17,8 @@ import type { RenderPlan } from '@sanverse/render-contract'
  */
 
 export type PlaybackSegment = Readonly<{
+  /** Canonical clip identity, retained when a prepared proxy replaces its source. */
+  nodeId?: string
   /** Where this stretch begins in the finished video. */
   startTicks: number
   durationTicks: number
@@ -87,6 +89,7 @@ export const playbackSegments = (plan: RenderPlan): readonly PlaybackSegment[] =
     [...plan.segments]
       .sort((left, right) => left.interval.start.ticks - right.interval.start.ticks)
       .map((segment) => Object.freeze({
+        nodeId: segment.nodeId,
         startTicks: segment.interval.start.ticks,
         durationTicks: segment.interval.duration.ticks,
         sourceStartTicks: segment.sourceStartTicks,
@@ -314,6 +317,7 @@ export const advancePlayback = (
   expectedIndex: number,
   sourceTicks: number,
   totalTicks: number,
+  origin: 'playback' | 'source-scrub' = 'playback',
 ): PlaybackAction => {
   if (segments.length === 0) return Object.freeze({ kind: 'ended', compositionTicks: 0 })
 
@@ -344,15 +348,15 @@ export const advancePlayback = (
     if (offset >= 0 && offset < sourceSpanOf(expected)) return showing(expectedIndex)
   }
 
-  // The browser's own scrubber is on screen, so the user can drag the recording
-  // straight into a different stretch. That is not the end of anything; it is
-  // simply a different part of the finished video.
-  const scrubbedInto = segments.findIndex(
+  // Source seeking must be explicit. The same recording may appear repeatedly:
+  // a normal end/overshoot can also match an earlier clip's source interval.
+  // Inferring a seek from that match loops playback or skips the next clip.
+  const scrubbedInto = !expected || origin === 'source-scrub' ? segments.findIndex(
     (segment) =>
       segment.freeze !== true &&
       sourceTicks >= segment.sourceStartTicks &&
       sourceTicks < segment.sourceStartTicks + sourceSpanOf(segment),
-  )
+  ) : -1
   if (scrubbedInto !== -1) return showing(scrubbedInto)
 
   // The recording is parked BEFORE the stretch that should be playing. This is

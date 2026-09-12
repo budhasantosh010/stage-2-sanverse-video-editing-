@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 import {
+  computePeaks,
   slicePeaks,
   useMediaAnalysisController,
   useMediaAnalysisVersion,
@@ -95,10 +96,10 @@ export function TimelineWaveform({
     // A muted track is still readable — the user has to be able to find the
     // moment they want in a track they have silenced. Faint, not hidden.
     context.fillStyle = muted
-      ? 'rgba(255, 255, 255, 0.32)'
+      ? 'rgba(24, 24, 24, 0.38)'
       : selected
-        ? 'rgba(255, 255, 255, 0.92)'
-        : 'rgba(255, 255, 255, 0.72)'
+        ? 'rgba(24, 24, 24, 0.95)'
+        : 'rgba(24, 24, 24, 0.8)'
 
     const spanTicks = toTicks - fromTicks
     const middle = height / 2
@@ -127,13 +128,15 @@ export function TimelineWaveform({
       const sliceWidthPx = ((sliceTo - sliceFrom) / spanTicks) * width
 
       const drawPeaks = (source: readonly number[], centerY: number, availableHeight: number): void => {
-        const peaks = slicePeaks(source, {
+        const sliced = slicePeaks(source, {
           blockStartTicks: block.blockStartTicks,
           blockSpanTicks: block.blockSpanTicks,
           fromTicks: sliceFrom,
           toTicks: sliceTo,
         })
-        if (peaks.length === 0) return
+        if (sliced.length === 0) return
+        // Preserve transients without overdrawing translucent subpixel bars.
+        const peaks = computePeaks(sliced, Math.min(sliced.length, Math.max(1, Math.floor(sliceWidthPx))))
         const barWidth = sliceWidthPx / peaks.length
         for (let index = 0; index < peaks.length; index += 1) {
           const halfHeight = Math.max(0.5, (peaks[index] * availableHeight) / 2)
@@ -180,7 +183,7 @@ export function TimelineWaveform({
       data-channel-display-mode={channelDisplayMode}
       data-truncated={media.truncated ? 'true' : undefined}
       aria-hidden="true"
-      style={{ width: `${Math.max(1, widthPx)}px`, height: `${Math.max(1, heightPx)}px` }}
+      style={{ width: `${Math.max(1, widthPx)}px`, height: `${Math.max(1, heightPx)}px`, top: '12px', transform: 'none' }}
     />
   )
 }

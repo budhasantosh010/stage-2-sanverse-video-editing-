@@ -8,6 +8,7 @@
     "./nameplate-style": "./src/nameplate-style.ts",
     "./caption-style": "./src/caption-style.ts",
     "./compile-project": "./src/compile-project.ts",
+    "./picture-layers": "./src/picture-layers.ts",
     "./overlay-style": "./src/overlay-style.ts",
     "./visual-normalization": "./src/visual-normalization.ts"
   },

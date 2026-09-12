@@ -66,6 +66,46 @@ const plan = (overrides: Partial<RenderPlan> = {}): RenderPlan => ({
 }) as RenderPlan
 
 describe('composition audio preview projection', () => {
+  it('mixes every overlapping linked voice, including audio from a hidden picture', () => {
+    const p = plan({ schemaVersion: 'sanverse.render-plan/v10', segments: [
+      source('clip_aaaa0001', 0, 5 * S, 0),
+      source('clip_aaaa0002', S, 4 * S, 2 * S, { videoEnabled: false, gainDb: -6 }),
+    ] as never })
+    const state = compositionAudioStateAt(p, playbackSegments(p), 2 * S)
+    expect(state.primary?.assetId).toBe('asset_aaaa0001')
+    expect(state.auxiliary).toHaveLength(1)
+    expect(state.auxiliary[0]).toMatchObject({ assetId: 'asset_aaaa0002', sourceTicks: 3 * S })
+    expect(state.auxiliary[0].gain).toBeCloseTo(Math.pow(10, -6 / 20))
+  })
+
+  it('does not apply another clip gain to the selected source when starts are equal', () => {
+    const p = plan({ segments: [
+      source('clip_zzzz0001', 0, 5 * S, 0, { gainDb: -6 }),
+      source('clip_aaaa0002', 0, 5 * S, 2 * S, { gainDb: -20 }),
+    ] as never })
+    const state = compositionAudioStateAt(p, playbackSegments(p), S)
+    expect(state.primary).toMatchObject({ assetId: 'asset_zzzz0001', sourceTicks: S })
+    expect(state.primary?.gain).toBeCloseTo(Math.pow(10, -6 / 20))
+  })
+
+  it('keeps the same decoder voice across the J-cut picture boundary', () => {
+    const p = plan({ segments: [source('clip_aaaa0002', 5 * S, 5 * S, 5 * S, {
+      linkedAudio: { interval: { start: t(4 * S), duration: t(6 * S) }, sourceStartTicks: 4 * S, sourceDurationTicks: 6 * S },
+    })] as never })
+    const browser = playbackSegments(p)
+    const before = compositionAudioStateAt(p, browser, 4.5 * S).auxiliary[0]
+    const after = compositionAudioStateAt(p, browser, 5.5 * S).primary
+    expect(after?.voiceId).toBe(before.voiceId)
+  })
+
+  it('uses a prepared reverse proxy for an overlapping secondary picture voice', () => {
+    const p = plan({ segments: [source('clip_aaaa0001', 0, 5 * S, 0),
+      source('clip_aaaa0002', S, 4 * S, 2 * S, { direction: 'reverse' }),
+    ] as never })
+    const browser = withPreparedReversePreview(playbackSegments(p), { segmentIndex: 1, preparedAssetId: 'reverse-preview:clip_aaaa0002' })
+    expect(compositionAudioStateAt(p, browser, 2 * S).auxiliary[0]).toMatchObject({ assetId: 'reverse-preview:clip_aaaa0002', sourceTicks: S })
+  })
+
   it('uses exact project gain/pan/fades for the primary A1 voice', () => {
     const p = plan({
       segments: [
@@ -84,6 +124,25 @@ describe('composition audio preview projection', () => {
     expect(atHalfSecond.primary?.sourceTicks).toBe(S / 2)
     expect(atHalfSecond.primary?.pan).toBe(0.5)
     expect(atHalfSecond.primary?.gain ?? 0).toBeCloseTo(Math.pow(10, -6 / 20) * 0.5, 9)
+  })
+
+  it('does not substitute picture audio for an unsupported custom reverse audio window', () => {
+    const p = plan({ segments: [source('clip_aaaa0001', S, 4 * S, 2 * S, {
+      direction: 'reverse',
+      linkedAudio: { interval: { start: t(0), duration: t(5 * S) }, sourceStartTicks: S, sourceDurationTicks: 5 * S },
+    })] as never })
+    const browser = withPreparedReversePreview(playbackSegments(p), { segmentIndex: 0, preparedAssetId: 'reverse-preview:clip_aaaa0001' })
+    expect(compositionAudioStateAt(p, browser, 2 * S)).toEqual({ primary: null, auxiliary: [] })
+  })
+
+  it('retains canonical identity when playback resources arrive in another order', () => {
+    const p = plan({ segments: [source('clip_aaaa0001', 0, 5 * S, 0, { gainDb: -6 }),
+      source('clip_aaaa0002', 0, 5 * S, 2 * S, { gainDb: -20 }),
+    ] as never })
+    const state = compositionAudioStateAt(p, [...playbackSegments(p)].reverse(), S)
+    expect(state.primary).toMatchObject({ assetId: 'asset_aaaa0002', sourceTicks: 3 * S, gain: 0.1 })
+    expect(state.auxiliary).toHaveLength(1)
+    expect(state.auxiliary[0]).toMatchObject({ assetId: 'asset_aaaa0001', sourceTicks: S })
   })
 
   it('mixes a J-cut as an auxiliary voice while the previous picture remains primary', () => {

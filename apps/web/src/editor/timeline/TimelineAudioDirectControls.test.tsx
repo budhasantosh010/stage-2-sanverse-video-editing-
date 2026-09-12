@@ -80,6 +80,23 @@ afterEach(() => {
 })
 
 describe('TimelineAudioDirectControls', () => {
+  it('does not change gain on a click or a horizontal drag', () => {
+    const { onCommit } = renderControls({ normalization: null })
+    const gain = screen.getByRole('slider', { name: 'Clip gain' })
+    dispatchPointer(gain, 'pointerdown', { pointerId: 9, button: 0, clientX: 50, clientY: 60 })
+    dispatchPointer(gain, 'pointermove', { pointerId: 9, clientX: 150, clientY: 60 })
+    dispatchPointer(gain, 'pointerup', { pointerId: 9, clientX: 150, clientY: 60 })
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+  it('keeps pan and loudness behind Audio options without removing gain and fade handles', () => {
+    const { container } = renderControls()
+    const options = container.querySelector<HTMLDetailsElement>('details')
+    expect(options).not.toBeNull()
+    expect(options?.open).toBe(false)
+    expect(screen.getByRole('slider', { name: 'Clip gain' }).closest('details')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Fade in duration' }).closest('details')).toBeNull()
+    expect(container.querySelector('[aria-label="Clip pan"]')?.closest('details')).toBe(options)
+  })
   it('keeps pointer movement detached and commits the whole audio state once on release', () => {
     const { onCommit } = renderControls({ normalization: null })
     const gain = screen.getByRole('slider', { name: 'Clip gain' })

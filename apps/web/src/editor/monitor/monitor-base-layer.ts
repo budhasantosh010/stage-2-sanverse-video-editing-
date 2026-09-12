@@ -97,9 +97,9 @@ export type MonitorBaseLayerInput = Readonly<{
  *
  * 1. A real error outranks everything. Reporting `gap` over a decode failure
  *    would tell the user the black is intentional when it is not.
- * 2. No source at all is `loading`, not `gap`. A gap is a claim about a
- *    timeline that exists.
- * 3. The canonical gap outranks readiness: black there is the intended output.
+ * 2. A canonical gap outranks source attachment and readiness: empty intervals
+ *    intentionally have no file to load, including the opening frame.
+ * 3. Without a canonical gap, no attached source is `loading`.
  * 4. Nothing has ever been shown and no frame is decodable — genuinely no
  *    picture yet.
  * 5. Motion applies and the canvas holds exactly the frame being asked for —
@@ -115,8 +115,8 @@ export type MonitorBaseLayerInput = Readonly<{
  */
 export const resolveMonitorBaseLayer = (input: MonitorBaseLayerInput): MonitorBaseLayer => {
   if (input.mediaError !== null) return Object.freeze({ kind: 'error', reason: input.mediaError })
-  if (!input.hasSource) return Object.freeze({ kind: 'loading' })
   if (input.inCanonicalGap) return Object.freeze({ kind: 'gap' })
+  if (!input.hasSource) return Object.freeze({ kind: 'loading' })
   if (input.readyState < HAVE_CURRENT_DATA && !input.hasPresentedFrame) {
     return Object.freeze({ kind: 'loading' })
   }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { toggleDetailsPopover, syncPopoverDisclosure } from '../ui/details-popover'
 
 import {
   CENTRE_PAN,
@@ -23,7 +24,7 @@ export type TimelineAudioState = Readonly<{
 
 type DragKind = 'gain' | 'fade-in' | 'fade-out'
 
-type Drag = Readonly<{ pointerId: number; kind: DragKind; start: TimelineAudioState }>
+type Drag = Readonly<{ pointerId: number; kind: DragKind; start: TimelineAudioState; startClientY: number }>
 
 type NormalizationState =
   | Readonly<{ status: 'idle' }>
@@ -142,7 +143,7 @@ export function TimelineAudioDirectControls({
 
   const begin = (event: ReactPointerEvent<HTMLButtonElement>, kind: DragKind) => {
     if (disabled || event.button !== 0) return
-    dragRef.current = Object.freeze({ pointerId: event.pointerId, kind, start: accepted })
+    dragRef.current = Object.freeze({ pointerId: event.pointerId, kind, start: accepted, startClientY: event.clientY })
     event.currentTarget.setPointerCapture(event.pointerId)
     event.currentTarget.focus()
   }
@@ -152,8 +153,9 @@ export function TimelineAudioDirectControls({
     const rect = rootRef.current?.getBoundingClientRect()
     if (!drag || drag.pointerId !== event.pointerId || !rect || rect.width <= 0 || rect.height <= 0) return
     if (drag.kind === 'gain') {
-      const ratio = clamp((event.clientY - rect.top) / rect.height, 0, 1)
-      const gainDb = Math.round((MAX_CLIP_GAIN_DB - ratio * (MAX_CLIP_GAIN_DB - MIN_CLIP_GAIN_DB)) * 10) / 10
+      // Relative adjustment: clicking the hit area is not a gain change, and
+      // short audio rows must not turn one pixel into several decibels.
+      const gainDb = clamp(Math.round((drag.start.gainDb + (drag.startClientY - event.clientY) * 0.5) * 10) / 10, MIN_CLIP_GAIN_DB, MAX_CLIP_GAIN_DB)
       setDraftState((current) => Object.freeze({ ...current, gainDb }))
       return
     }
@@ -218,7 +220,7 @@ export function TimelineAudioDirectControls({
       <button
         type="button"
         className="timeline-audio-direct__gain"
-        style={{ top: `${gainTop}%` }}
+        style={{ top: `clamp(4.5px, ${gainTop}%, calc(100% - 4.5px))` }}
         role="slider"
         aria-label="Clip gain"
         aria-valuemin={MIN_CLIP_GAIN_DB}
@@ -261,6 +263,9 @@ export function TimelineAudioDirectControls({
         onPointerCancel={(event) => end(event, false)}
         onKeyDown={cancelOnEscape}
       />
+      <details className="timeline-audio-direct__options" onToggle={toggleDetailsPopover}>
+        <summary aria-label="Audio options" title="Audio options">•••</summary>
+        <div className="timeline-audio-direct__options-panel" popover="auto" onToggle={syncPopoverDisclosure}>
       <div className="timeline-audio-direct__readout" aria-live="polite">
         <span>{draft.gainDb.toFixed(1)} dB</span>
         <button
@@ -356,6 +361,8 @@ export function TimelineAudioDirectControls({
           ) : null}
         </div>
       ) : null}
+        </div>
+      </details>
     </div>
   )
 }

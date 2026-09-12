@@ -252,6 +252,33 @@ describe('App', () => {
     expect(api.current().redoStack).toHaveLength(1)
   })
 
+  it('persists one linked dialogue drag and updates the saved-change indicator', async () => {
+    const user = userEvent.setup()
+    const api = fakeApi()
+    fetchMock.mockImplementation((url: string, options?: RequestInit) => api.handle(url, options) ?? new Response('{}', { status: 404 }))
+    const { container } = render(<App />)
+    await user.click(await screen.findByRole('button', { name: /open cleaned\.mp4/i }))
+    await user.click(screen.getByRole('button', { name: /studio workspace/i }))
+    const audio = screen.getByRole('button', { name: /^clip, Dialogue/i })
+    const timeline = container.querySelector('[data-timeline-viewport]')!
+    vi.spyOn(timeline, 'getBoundingClientRect').mockReturnValue({ x: 0, y: 0, left: 0, top: 0, right: 600, bottom: 300, width: 600, height: 300, toJSON: () => ({}) })
+    vi.spyOn(audio.closest('[data-body-track-id]')!, 'getBoundingClientRect').mockReturnValue({ x: 0, y: 220, left: 0, top: 220, right: 600, bottom: 280, width: 600, height: 60, toJSON: () => ({}) })
+    const pointer = (type: string, clientX: number) => {
+      const event = new Event(type, { bubbles: true })
+      Object.defineProperties(event, Object.fromEntries(Object.entries({ button: 0, pointerId: 8, clientX, clientY: 250, ctrlKey: false, shiftKey: false, metaKey: false }).map(([key, value]) => [key, { value }])))
+      fireEvent(audio, event)
+    }
+    pointer('pointerdown', 200)
+    pointer('pointermove', 400)
+    expect(api.current().revision).toBe(0)
+    pointer('pointerup', 400)
+    await waitFor(() => expect(api.current().revision).toBe(1))
+    expect(api.current().changeSets[0].changeSet.operations).toHaveLength(1)
+    expect(api.current().changeSets[0].changeSet.operations[0]).toMatchObject({ kind: 'move-primary-clip' })
+    await waitFor(() => expect(screen.getByText(/up to change 1/)).toBeInTheDocument())
+    expect(container.querySelectorAll('video')).toHaveLength(1)
+  })
+
   it('uses the authoritative post-upload revision when immediately placing B-roll', async () => {
     const user = userEvent.setup()
     const api = fakeApi()
@@ -272,7 +299,7 @@ describe('App', () => {
 
     await user.click(await screen.findByRole('button', { name: /open cleaned\.mp4/i }))
     await user.click(screen.getByRole('button', { name: /studio workspace/i }))
-    await user.click(screen.getByText('Advanced direct controls'))
+    await user.click(screen.getByLabelText('Advanced timeline controls'))
     await user.click(screen.getByTestId('add-overlay-open'))
     await user.click(screen.getByTestId('add-overlay-choose-broll'))
     await user.upload(

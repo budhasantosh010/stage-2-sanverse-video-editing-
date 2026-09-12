@@ -54,6 +54,7 @@ export const projectFraming = (project: EditProject): VisualFitMode => {
 import {
   MAX_MUSIC_NODES,
   RENDER_PLAN_SCHEMA_VERSION,
+  LAYERED_RENDER_PLAN_SCHEMA_VERSION,
   validateRenderPlan,
   type MusicNode,
   type RenderNode,
@@ -81,7 +82,7 @@ export type CompileResult =
  * original footage and can only be positioned once it is known which parts of
  * that footage survived.
  */
-export const compileProjectToRenderPlan = (project: EditProject): CompileResult => {
+export const compileProjectToRenderPlan = (project: EditProject, options: Readonly<{ layered?: boolean }> = {}): CompileResult => {
   const composition = effectiveComposition(project)
   const duration = compositionDuration(composition)
   if (duration.ticks <= 0) {
@@ -91,6 +92,10 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
   const footageMotions = effectiveFootageMotions(project)
   const trackState = activeTimelineTrackState(project)
   const videoTracks = tracksOfKind(trackState, 'video')
+  // Transferred footage requires explicit stacking in BOTH preview and export.
+  // Legacy single-primary-track projects retain their established v9 path.
+  const layered = options.layered ?? composition.tracks.some(track =>
+    track.clips.length > 0 && track.trackId !== primaryTimelineTrack(trackState)?.trackId)
   const captionTracks = tracksOfKind(trackState, 'caption')
   const audioTracks = tracksOfKind(trackState, 'audio')
   const primaryTrack = primaryTimelineTrack(trackState)
@@ -154,6 +159,7 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
   if (primaryAsset) useSource(primaryAsset.assetId)
 
   const segments: PrimarySegmentNode[] = []
+  const segmentTrackIds = new Map<string, string>()
   for (const track of composition.tracks) {
     const timelineVideoTrack = trackById(trackState, track.trackId) ?? primaryTrack
     const videoEnabledForTrack = timelineVideoTrack?.outputEnabled ?? true
@@ -164,6 +170,7 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
       // A hidden piece leaves a hole rather than shifting everything after it,
       // so that switching it back on restores the exact video the user saw.
       if (!clip.enabled) continue
+      segmentTrackIds.set(clip.clipId, timelineVideoTrack?.trackId ?? track.trackId)
       if (!useSource(clip.assetId)) {
         return { ok: false, error: { code: 'COMPILE_FAILED', reason: 'A piece of footage is missing.' } }
       }
@@ -264,7 +271,12 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     if (operation.kind !== 'set-clip-transition' || operation.style === 'none') continue
     const fromIndex = segmentIndexById.get(operation.clipId)
     const toIndex = segmentIndexById.get(operation.nextClipId)
-    if (fromIndex === undefined || toIndex === undefined || toIndex !== fromIndex + 1) continue
+    if (fromIndex === undefined || toIndex === undefined) continue
+    const sameTrack = segments.filter(segment => segmentTrackIds.get(segment.nodeId) === segmentTrackIds.get(operation.clipId))
+    const adjacent = layered
+      ? sameTrack.findIndex(segment => segment.nodeId === operation.nextClipId) === sameTrack.findIndex(segment => segment.nodeId === operation.clipId) + 1
+      : toIndex === fromIndex + 1
+    if (!adjacent) continue
     transitions.push(Object.freeze({
       nodeId: `transition.${operation.clipId}.${operation.nextClipId}`,
       kind: 'transition-edge' as const,
@@ -491,8 +503,16 @@ export const compileProjectToRenderPlan = (project: EditProject): CompileResult 
     }))
   }
 
+  const pictureLayers = layered ? [...videoTracks, ...captionTracks].map((track, index) => ({
+    trackId: track.trackId,
+    nodeIds: [
+      ...segments.filter(segment => segmentTrackIds.get(segment.nodeId) === track.trackId).map(segment => segment.nodeId),
+      ...overlays.filter(node => nodeTrackOrder.get(node.nodeId) === index).map(node => node.nodeId),
+    ],
+  })).filter(layer => layer.nodeIds.length > 0) : undefined
   const plan = {
-    schemaVersion: RENDER_PLAN_SCHEMA_VERSION,
+    schemaVersion: layered ? LAYERED_RENDER_PLAN_SCHEMA_VERSION : RENDER_PLAN_SCHEMA_VERSION,
+    ...(pictureLayers ? { pictureLayers } : {}),
     projectId: project.projectId,
     projectRevision: project.revision,
     compositionId: composition.compositionId,

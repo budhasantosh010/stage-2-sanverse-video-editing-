@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import {
   itemIntersectsVisibleRange,
   type PrecisionTrimPlan,
@@ -25,6 +26,7 @@ import {
   type ClipDerivedMedia,
 } from '../../features/media-analysis'
 import { TimelineItem } from './TimelineItem'
+import type { TimelineBodyDragApi, TimelineBodyDragFeedback } from '../../features/timeline/timeline-body-drag-plan'
 import { TimelineEditPointHandle } from './TimelineEditPointHandle'
 import { decorationHeightPx, laneDensity, laneHeightPx } from './timeline-lane-metrics'
 import type { TimelineSnapResult } from './timeline-snap'
@@ -88,6 +90,9 @@ export type TimelineLaneProps = Readonly<{
   onSeek(ticks: number): void
   onGesture(gesture: TimelineGesture): void
   onItemAction(itemId: string, action: TimelineItemAction): void
+  bodyDrag?: TimelineBodyDragApi
+  bodyDragFeedback?: TimelineBodyDragFeedback | null
+  onBodyDragFeedback?(feedback: TimelineBodyDragFeedback | null): void
   onOpenProposal(): void
   onContextMenu(item: TimelineItemView, clientX: number, clientY: number): void
 }>
@@ -131,6 +136,9 @@ export function TimelineLane({
   onSeek,
   onGesture,
   onItemAction,
+  bodyDrag,
+  bodyDragFeedback,
+  onBodyDragFeedback,
   onOpenProposal,
   onContextMenu,
 }: TimelineLaneProps) {
@@ -191,7 +199,7 @@ export function TimelineLane({
   // the window width decides. A row folded away is a thin strip, not zero: a
   // row that vanished could not be found again to unfold it.
   const rowHeightPx = heightPx ?? laneHeightPx(lane.kind, layoutWidthPx)
-  const decorationPx = decorationHeightPx(lane.kind, layoutWidthPx)
+  const decorationPx = Math.max(1, decorationHeightPx(lane.kind, layoutWidthPx) * rowHeightPx / laneHeightPx(lane.kind, layoutWidthPx))
   const orderedPrimaryClips = lane.trackRole === 'primary-video'
     ? lane.items
         .filter((item) => item.kind === 'clip' && item.state === 'committed' && item.clipId !== null)
@@ -202,18 +210,19 @@ export function TimelineLane({
     && orderedPrimaryClips.every((item, index, running) =>
       index === 0 || running[index - 1].startTicks + running[index - 1].durationTicks === item.startTicks)
 
-  const mediaFor = (item: TimelineItemView): ClipDerivedMedia => {
+  const mediaByItem = useMemo(() => new Map(lane.items.map((item) => {
     const clip = derivedMediaClipFor(item, lane.kind, assetFacts)
-    if (clip === null) return NO_MEDIA
+    if (clip === null) return [item.id, NO_MEDIA] as const
     // The SAME pure function the timeline uses to build its shopping list. One
     // function, two callers: the list and the drawing can never disagree.
-    return clipDerivedMedia({
+    return [item.id, clipDerivedMedia({
       clip,
       timescale,
       pixelsPerSecond: viewport.pixelsPerSecond,
       density,
-    })
-  }
+    })] as const
+  })), [lane.items, lane.kind, assetFacts, timescale, viewport.pixelsPerSecond, density])
+  const mediaFor = (item: TimelineItemView): ClipDerivedMedia => mediaByItem.get(item.id) ?? NO_MEDIA
 
   const normalizationFor = (
     item: TimelineItemView,
@@ -244,6 +253,7 @@ export function TimelineLane({
       role="group"
       aria-label={`${lane.label} ${lane.kind} lane`}
       data-lane-id={lane.id}
+      data-body-track-id={lane.trackId}
       data-testid="timeline-lane"
       data-lane-density={density}
       data-track-selected={selectedTrack ? 'yes' : 'no'}
@@ -315,6 +325,9 @@ export function TimelineLane({
           onSeek={onSeek}
           onGesture={onGesture}
           onItemAction={onItemAction}
+          bodyDrag={bodyDrag}
+          bodyDragFeedback={bodyDragFeedback}
+          onBodyDragFeedback={onBodyDragFeedback}
           onOpenProposal={onOpenProposal}
           onContextMenu={onContextMenu}
         />

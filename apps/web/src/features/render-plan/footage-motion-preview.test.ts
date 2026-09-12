@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { acceptChangeSet } from '@sanverse/edit-domain'
 import { compileProjectToRenderPlan } from '@sanverse/render-contract/compile-project'
+import type { FreezeSegmentNode } from '@sanverse/render-contract'
 
 import { ms, testProject } from '../../test-fixtures'
 import {
@@ -79,6 +80,32 @@ const motionProject = () => {
 }
 
 describe('primary-footage browser projection', () => {
+  it('samples source-anchored motion at the retimed source tick', () => {
+    const plan = motionProject()
+    const segment = plan.segments[0]
+    if (segment.kind !== 'source-segment') throw new Error('Expected moving source')
+    const fast = { ...plan, segments: [{ ...segment, playbackRateNumerator: 2 }] }
+    expect(footageMotionAtCompositionTime(fast, ms(3500).ticks)?.sourceTicks).toBe(ms(7000).ticks)
+  })
+
+  it('samples reversed source motion from the last included source tick', () => {
+    const plan = motionProject()
+    const segment = plan.segments[0]
+    if (segment.kind !== 'source-segment') throw new Error('Expected moving source')
+    const reversed = { ...plan, segments: [{ ...segment, interval: { start: ms(0), duration: ms(10000) }, sourceDurationTicks: ms(10000).ticks, direction: 'reverse' as const }] }
+    expect(footageMotionAtCompositionTime(reversed, ms(3000).ticks)?.sourceTicks).toBe(ms(7000).ticks - 1)
+  })
+
+  it('does not advance source-anchored motion while holding a frame', () => {
+    const plan = motionProject()
+    const held: FreezeSegmentNode = { ...plan.segments[0], kind: 'freeze-segment',
+      interval: { start: ms(0), duration: ms(2000) }, sourceTimeTicks: ms(7000).ticks,
+      sourceStartTicks: ms(7000).ticks, sourceDurationTicks: 1, audioEnabled: false, linkedAudio: null,
+      gainDb: 0, fadeInTicks: 0, fadeOutTicks: 0, playbackRateNumerator: 1, playbackRateDenominator: 1,
+      direction: 'forward', maintainAudioPitch: true, pan: 0 }
+    expect(footageMotionAtCompositionTime({ ...plan, segments: [held] }, ms(1000).ticks)?.sourceTicks).toBe(ms(7000).ticks)
+  })
+
   it('resolves composition time to source-relative motion and defaults outside the interval', () => {
     const plan = motionProject()
     expect(footageMotionAtCompositionTime(plan, ms(4_999).ticks)).toBeNull()

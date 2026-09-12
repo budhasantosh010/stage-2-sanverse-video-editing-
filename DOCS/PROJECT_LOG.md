@@ -1,5 +1,114 @@
 # Project Log
 
+## 2026-09-12 — Layered timeline release candidate and requested push
+
+- Connected bounded layered canvases to the canonical Studio clock and the shared preview/export layer manifest. Transferred footage now automatically selects v10; existing single-primary projects retain v9.
+- Released only cross-track overlap refusal after domain/render checks and an actual overlapping pointer move; same-track collision validation stays. Existing accepted operations and Undo/Redo remain authoritative.
+- Fixed initial empty-gap readiness and transition color/alpha fidelity; independent pre-push review found same-track overlay DOM order could diverge from export. A separate fix context changed stacking to explicit manifest order and added failing-then-passing regression tests.
+- Owner explicitly requested GitHub push. No Motion files changed. Full editor confidence is not declared: independent extracted dialogue, sustained edge-hold evidence and owner acceptance remain open.
+- Exact verification, real export, restoration and startup are recorded in `DOCS/evidence/2026-09-12-layered-timeline-release.md`.
+
+## 2026-09-10 — Reverse resource binding, exact pending seeks and linked-audio focus
+
+- Final build PASS: 310 modules; JS 1,008.05 kB / gzip 279.64 (+1.80 / +0.74 versus prior 1,006.25 / 278.90); CSS unchanged 145.14 / gzip 24.42. Known font-runtime and >500kB chunk warnings remain. Ownership boundary PASS on 82 paths, zero protected Motion changes/imports. Scoped diff check PASS with line-ending warnings.
+
+- Studio now consumes bounded reverse resources by stable clip/source identity, with cancellation, URL cleanup and multiple prepared playback/audio sources. This completes a prerequisite, not live overlapping picture release.
+- Browser exposed a pending reverse seek loading proxy zero. RED expected 7s after successive 5s/7s requests and received 0; corrected metadata bridge passes. Real composition tick 13,671,142 minus clip start 2,416,093 maps to 7.816006s; observed decoded proxy time matches, readyState 4.
+- Temporary reverse accepted at 53, Undo 54, Redo 55, Undo 56; fresh-mount Redo 57 and final Undo 58 restored original content. Reverse playback and prepared resource replacement observed. No fresh export claimed in this preview/interaction-only batch.
+- Expanded regression first returned 99/107: seven stale control-label expectations and one genuine linked-audio focus defect. Updated stable accessible queries and repaired pointer-down click suppression while preserving grouped drag. Final targeted suites: 103/103, including full StudioScreen, Studio workspace continuity, creator interactions, selection, reverse pool and hook. Result: .sanverse-data/reverse-and-selection-tests.json.
+- Real pointer test: video selected, local -9dB draft, linked-dialogue click opens discard confirmation; discard switches Inspector to dialogue and keeps saved gain 0dB at revision 58. No draft was committed.
+- Infrastructure: interrupted test handle was not treated as a result; server restarted hidden on 2010/2011, launcher PID 11740. Prior screenshot/DPR limitation persists. One captured Vite websocket error corresponds to the server interruption.
+- Remaining critical path: live layered monitor/clock and preview/export parity; safe overlap release; independent extracted dialogue; sustained drag/edge evidence and matched complete editing workflow/owner review. No numerical competitor-confidence claim, no Motion edits, no commit/push.
+
+## 2026-09-10 — Audio identity, seek lifecycle and shared interval clock
+
+September 10 audio/clock follow-up: nine reproduced audio failure cases now pass (FAIL-085/086/087). Final focused run: 50/50 across six files, including Studio 9/9. Gap/held-frame RAF loops share one cancellable composition interval scheduler (5 checks); normal footage still uses the existing transport. This is NOT full layered Studio integration. Project remains saved at change 52; no content edits in this follow-up. Live compilation remains v9, overlap guards remain, independent extracted dialogue remains unimplemented. Next: layered Studio/clock and multi-reverse-resource integration, then enable overlap only with matching preview/export evidence; independent audio and final matched-user workflow follow. No Motion edits or remote push.
+
+- RED/GREEN: five audio projection defects, two resource lifecycle defects, accidental master mute and missing Play resume. The first clock run lacked its module; an interface stub established behavioral failures before implementation. Clock cases cover elapsed-time rather than frame-count progression, exact end clamp, stale callbacks, reentrant intervals and cancellation at a boundary.
+- Final production web build PASS after correcting test-only unsupported exact query options. 308 modules; JS 1,006.25 kB / gzip 278.90 (+0.54 / +0.30 versus the previous 1,005.71 / 278.60 checkpoint); CSS unchanged 145.14 / gzip 24.42. Existing runtime-font and >500 kB chunk warnings remain. Ownership boundary PASS, 77 paths, zero Motion edits/imports; diff whitespace check PASS with existing CRLF warnings.
+- UI reopened unchanged project at 52 and showed default Mute instead of unintended Unmute; Play entered Pause through the opening gap. No new export needed for this preview-only batch; the earlier verified revision-50 MP4 remains the latest export evidence.
+- Percentage statement: this batch repairs 9/9 explicitly reproduced audio failures in automated checks (100% of this bounded list), NOT 100% of all audio behavior or timeline readiness. No credible OpenCut/CapCut/DaVinci equivalence percentage exists yet.
+- Remaining release gates: live layered preview and synchronized reverse preparation; matching overlap preview/export and removal of only cross-track guards; independent extracted dialogue; fresh two-axis additional-audio drag and sustained edge-hold evidence; matching recorded user workflow and owner acceptance. Infrastructure screenshot/filechooser/review limitations remain separately recorded.
+
+## 2026-09-10 — Retimed picture fidelity and real playback-loop repair
+
+- September 10 resume: FAIL-083 source-anchored speed/reverse/hold transform timing repaired in live preview, Inspector and FFmpeg; FAIL-084 reused-source end-of-clip loop repaired. Focused render checks 32/32, preview/decoder 29/29, Inspector/Studio 11/11, transport/Studio 25/25 (overlapping selections, not an additive full-suite total). Four real synthetic FFmpeg exports pass pixel/frame checks. Real UI motion 47, half-speed 48, Undo 49, Redo/reopen/export 50; original test edits restored and saved at 52. Actual MP4 38.500s, 1080p30 H.264/AAC stereo, 17,152,518 bytes, complete decode and 36s frame inspection PASS. API/web builds PASS; JS 1,005.71 kB/gzip 278.60; CSS unchanged. Boundary check PASS, 72 paths, no Motion edits. Layered browser resource controller exists (6 tests) but is NOT Studio-wired; live v9 and overlap guards remain. FAIL-069 and overall competitor-confidence gate stay OPEN. Next: simultaneous audio projection, one-clock layered Studio integration, independent audio, final real workflow. No commit/push.
+- Real UI export: .sanverse-data/projects/project_e58e4bb1e9f088fa38801efbeb52b83b/exports/export_cf1533ceddc7a4a87343ef2bc35a51f7.mp4; SHA-256 4cbe8e1ca648127fdd2a9e2829266345a1bf045348ac10b80dbb686d5ec244cb. Inspected .sanverse-data/layer-engine-checks/real-revision50-at36s.png. Container is about 67 ms longer than the tick duration, within the existing 100 ms adapter tolerance; no frame-exact container-duration claim.
+- Synthetic exports and pixel evidence: .sanverse-data/layer-engine-checks/{render-atuqHA,reverse-boundary-oKBaGy,fast-animation-5xuByY,held-animation-imprMg}/. Generated artifacts remain ignored and local.
+- INFRA-017: standalone root-checkout Vite occupied 2010 without API. Verified process identity, stopped only that process and restored the worktree pair on 2010/2011. New-session cleanup stopped the child server once more; restarted it. Browser data-URL error page could not be reattached; a fresh normal localhost tab recovered. No security setting changed.
+- Browser screenshot still distorted/cropped (INFRA-007), so it is not evidence of full-page layout quality or subjective smoothness. Historical console has one pre-restart Vite WebSocket error; no fresh runtime failure observed in the completed edit/export path. Ownership check first omitted --base, then sandbox Git spawn failed; normal approved scoped run passed.
+
+## 2026-09-09 — Approved layered engine, still behind the release gate
+
+- Decoder pool: 13/13 focused checks. Resources stay muted; seeks coalesce; holds stay paused; stale Play promises cannot poison a later intent; release removes listeners and sources.
+- Opt-in v10 pictureLayers contract/compiler/scheduler and ordered FFmpeg surface composition implemented. Default live compilation remains v9. No primary-overlap guard removed.
+- 269/269 render/contract regressions pass. Real FFmpeg test renders 4 seconds / 120 frames at 160x90: blue upper footage scaled over red lower footage, transparent surrounding space, correct layer start/end. All frames decoded; representative PNG visually inspected. Evidence: .sanverse-data/layer-engine-checks/render-F69BrK/{layered.mp4,evidence.json,overlap.png}.
+- Layered preview resource controller: 6/6 focused tests, 19/19 with decoder tests. It owns no clock or project state. Readiness preflight prevents partial-moment painting and black seek flashes. Missing media and unprepared reverse have explicit states.
+- Corrected verification-only faults: fixture fractional ticks, widened fixture discriminants and widened mocked status. No production assertion weakened. Existing Vite font-runtime and large-chunk warnings remain.
+- API/contract builds pass; final preview-controller web build passed at JS 1,005.25 kB/gzip 278.43, CSS 145.14/gzip 24.42. Superseded by the verified next checkpoint above.
+- OPEN: Studio transport/overlay-stack integration, retimed/keyframed motion parity, independent dialogue extraction, real drag/Undo/Redo/reopen/export, sustained edge hold and owner competitor-confidence gate. Motion untouched; original project not mutated; no commit/push.
+
+## 2026-09-08 — Safe reorder collision correction
+
+- September 8 drag follow-up COMPLETE: FAIL-080 RESOLVED. Focused Vitest 10/10 and web production build PASS; JS 1,003.35 kB/gzip 277.80, CSS 145.14/gzip 24.42. Real pointer drag reordered V2 safely at revision 42; Undo 43 and Redo 44 verified linked audio and source-anchored title continuity, with V1 unchanged and one video element. Temporary reorder/split undone at 45/46, restoring the owner's original clip/title timings. Captured warnings/errors empty; screenshot distortion remains INFRA-007, so no smoothness/parity claim. INFRA-016 recovered. Next: shared overlapping-primary preview/export semantics and independent extracted dialogue (FAIL-069); sustained edge-hold proof and owner confidence remain open. No Motion changes, commit or push.
+- Source diff is limited to collision-check ordering in timeline-body-drag-plan.ts, with matching Vitest regression and standalone evidence script. No saved user project mutated during this follow-up. Preserve earlier dirty work; no commit or push.
+
+## 2026-09-08 — Title transfer proof and opening-gap repair
+
+- September 8 current checkpoint: FAIL-077 title-over-transferred-footage UI proof is complete (accept 38, Undo 39, Redo 40, fresh MP4/full decode and inspected frame). FAIL-078/079 opening-gap labeling and Play transport repaired with RED/GREEN proof; affected suites 45/45, extended integration 8/8, all-workspace production build PASS. JS 1,003.36 kB/gzip 277.80; CSS unchanged 145.14/gzip 24.42. Browser now plays through the opening gap into footage at unchanged revision 40 with one video. INFRA-014 recovered; uncertain prior multi-tab revision/HMR is INFRA-015 MONITORING. Next critical path: true overlapping primary layers and independently extracted dialogue (FAIL-069), then remaining live drag/edge-scroll and owner-confidence gates. Do not claim OpenCut/CapCut/DaVinci parity. Dedicated server 2010/2011; no Motion changes, commit or push.
+- Scoped files: monitor-base-layer.ts/test, StudioScreen.tsx and StudioWorkspaceIntegration.test.tsx. Existing timeline/domain/renderer authority preserved. Rollback is only this focused diff, never a worktree reset.
+- Actual title export: 33.5s, 14,957,626 bytes; full decode exit 0 and 6s frame inspected. Detailed hash, artifact and reproduction in PRIMARY_TRANSFER_VERIFICATION.md and FAILURE_REGISTRY.md.
+
+## 2026-09-07 — Retiming closure and shared visual-order guard
+
+- FAIL-076: four expected RED failures fixed by reusing domain duration and source-time conversion. Affected preview/invariant/playback 57/57 pass; real 0.5x UI extended the last clip to 10.021s and showed source at 36.318s correctly. Test speed change undone afterwards.
+- Revision-30 transferred-and-moved footage exported to export_f5921db65bd973985248d3b14d3ad67f.mp4: 14,813,036 bytes, 34.5s, 1080p H.264/AAC, full decode PASS; representative 0/2/30s frames inspected. Evidence in PRIMARY_TRANSFER_VERIFICATION.md.
+- Layer audit found FAIL-077: blanket title/B-roll refusal but missing lower-nameplate guard. Two domain and one planner RED cases reproduced it; one shared accepted-track-order rule now permits same/higher visuals and rejects unsupported lower layering. Domain 568/568, planner 9/9, render-node parity 6/6, all-workspace build PASS.
+- Browser follow-up blocked: hidden and visible webview attachment both timed out, inventory stayed empty, while app GET returned 200. Logged INFRA-014; do not claim final visual-order UI proof. No remote changes or commit.
+
+## 2026-09-07 — Primary transfer resumed and real-browser proof
+
+- Fresh approval permitted the parked candidate to resume. Two preview/output regression failures fixed by looking up the accepted owning track; three compiler/preview cases pass. Audio-to-video routing RED caught a mistaken item-kind guard; linkedClipId guard fixes it. Related 22/22 focused tests pass.
+- All-workspace production build passed: JS 1,002.37 kB (gzip 277.49), CSS 145.14 kB (gzip 24.42). Existing large-chunk and runtime-font warnings remain, not new blockers.
+- Real V1→V2 drag preserved picture identity/timing and A1 sound at revision 23. Undo 24 restored V1; Redo 25 restored V2. At 4.39s hide V1 retained picture; hide V2 correctly showed track-off. Restored both at revisions 28/29 and started export through the UI.
+- Browser transport timeout after successful actions is INFRA-013; inspect state before retrying. Session interruption required server restart; no project reset. Current export proof and retiming-source regressions remain in progress.
+- No Motion lane changes, no remote push, no full-parity claim.
+
+## 2026-09-07 — Primary transfer candidate, verification blocked
+
+- Traced vertical refusal through typed move, composition replay, track state and sequential FFmpeg layout. Built a bounded non-overlapping transfer candidate preserving clip identity and linked dialogue.
+- Corrected an initially stale test-fixture revision, reverted candidate to verify true RED (unknown transfer operation field), then passed transfer/Undo/Redo and safety regressions. Caught required-versus-optional operation-key regression before the final 567/567 domain and 7/7 planner passes.
+- Read-only trace found primary-source.ts still checks V1 output for clips on other tracks. Added destination-output preview/compiler regressions; their execution was blocked by automatic approval-service usage exhaustion, not by Vitest.
+- Parked source and tests in PENDING_PRIMARY_TRANSFER.txt and restored only this attempt's live-source changes. Existing earlier repairs are untouched. No real transferred-video export or production build claimed, no commit/push.
+- Candidate restrictions (no overlapping primary layers; no authored overlay mixing after transfer) are not full parity and must not be represented as such. Next work must close preview/output and shared layer composition instead of stacking UI-only workarounds.
+
+## 2026-09-07 — Restart and close export-feedback defect
+
+- Restarted timeline 2010/2011 and OpenCut 2012; reopened saved projects without installs or media imports.
+- Confirmed final export-visibility repair in the actual Studio UI: collapsed AI opened on Export, progress became visible, followed by ready/Download MP4. Existing revision 22 and one video preserved; no timeline edits performed.
+- Prior focused integration/App rerun 20/20 and final production build passed; recorded FAIL-073 RESOLVED and final bundle in Sep6 drag report. No redundant full-suite test.
+- OpenCut initial navigation timed out during compilation, then the same tab loaded the saved three-track comparison; no restart/reimport loop.
+- T5.5 remains OPEN for primary-track transfer and explicitly outstanding confidence evidence. No Motion work, commit or push.
+
+## 2026-09-06 — Resume, live OpenCut comparison, audio grab fix
+
+- Resumed the existing worktree after usage interruptions; restarted only 2010/2011 and competitor 2012. Imported OpenCut media persisted and was reused.
+- Added bounded two-axis edge scrolling and correct outside-pointerup cancellation. Fixed audio name/gain overlap found by real dragging; relative gain keeps clicks/horizontal gestures unchanged.
+- Five affected files pass 77 tests; web build and protected-lane check pass. Real paired audio drag, Undo/Redo and revision-20 34.47s H.264/AAC export/full decode pass.
+- Live local OpenCut classic: split, horizontal gap move, vertical transfer creating a track, Undo/Redo, Extract audio, independent audio movement. Its development instrumentation/viewport differences prevent comparative latency claims.
+- Recorded Windows/compiler/WASM startup failures and reusable competitor-local startup; filechooser call took 564 seconds, not a measured editor benchmark.
+- Found export feedback hidden behind collapsed AI; focused fix/continuity test in progress. Main-footage arbitrary track transfer and confidence acceptance remain open. Full details in Sep6 drag report; no push.
+
+## 2026-09-06 — T5.5 linked drag and waveform reliability
+
+- Fixed grab-offset/playhead jumps, linked dialogue drag, compatible-track validation and collision scoping, and saved-revision status; retained existing operations and one editor authority.
+- Moved workspace tabs beside the mode toggle, workspace controls into Inspector, and selected animation controls into closed Controls; real waveform uses dark pixel-bucket peaks.
+- Focused final evidence: 122 related tests plus 13 App tests after its relocated-selector correction; all-workspace build and ownership check PASS.
+- Real browser: paired drag both directions, split/reorder/Undo/Redo/reopen, invalid vertical refusal without revision, one-frame trim, playback/draft continuity, and successful revision-7 H.264/AAC export/full decode.
+- Extra audio filechooser timed out; exact viewport override mismatched DOM dimensions; independent review unavailable. No invented passes. Primary track transfer and edge-autoscroll remain open.
+- Correcting the earlier causal interpretation: unequal recording luma-difference statistics do not measure input latency or prove excess relayout.
+- Full evidence and remaining checklist: `DOCS/evidence/2026-09-06-t55-drag-reliability/T55_DRAG_RELIABILITY.md`. Local-only; no push or confidence-gate closure.
+
 ## 2026-09-04 — T5.5 frame-by-frame OpenCut confidence convergence
 
 - Decoded the owner's complete 59.7-second OpenCut and 47.4-second Sanverse recordings and analysed 1,421/1,183 bottom-Timeline frames, plus full-session and dense transition contact sheets.

@@ -20,6 +20,7 @@ import {
   ticks,
 } from '../../features/timeline/timeline-test-fixtures'
 import { Timeline } from './Timeline'
+import type { TimelineBodyDragApi } from '../../features/timeline/timeline-body-drag-plan'
 
 afterEach(cleanup)
 
@@ -40,6 +41,7 @@ const renderTimeline = (input: Readonly<{
   onSeek?: (value: number) => void
   onSelect?: (value: TimelineSelectionV2) => void
   onGesture?: (value: TimelineGesture) => void
+  bodyDrag?: TimelineBodyDragApi
   onOpenProposal?: () => void
   lockedTrackIds?: readonly string[]
   trackOutputs?: Readonly<Record<'V2' | 'V1' | 'C1' | 'A1' | 'A2', boolean>>
@@ -115,12 +117,31 @@ const renderTimeline = (input: Readonly<{
     onEditMarker: vi.fn(),
     onTrackPresentationChange: vi.fn(),
     onGesture: input.onGesture ?? vi.fn(),
+    bodyDrag: input.bodyDrag,
     onOpenProposal: input.onOpenProposal ?? vi.fn(),
   }
   return { ...render(<Timeline {...props} />), props }
 }
 
 describe('Timeline V1', () => {
+  it.each([100, 400])('cancels an outside drop after the last pointermove at y=%s', (lastMoveY) => {
+    const commit = vi.fn()
+    const { container } = renderTimeline({ bodyDrag: { preview: () => ({ ok: true, operations: [], description: 'Move', landingStartTicks: 0 }), commit } })
+    const viewportElement = container.querySelector<HTMLElement>('[data-timeline-viewport]')!
+    vi.spyOn(viewportElement, 'getBoundingClientRect').mockReturnValue({ left: 0, right: 600, top: 0, bottom: 300, width: 600, height: 300, x: 0, y: 0, toJSON: () => ({}) })
+    const clip = screen.getByRole('button', { name: /clip, video/i })
+    vi.spyOn(clip.closest('[data-body-track-id]')!, 'getBoundingClientRect').mockReturnValue({ left: 0, right: 600, top: 50, bottom: 150, width: 600, height: 100, x: 0, y: 50, toJSON: () => ({}) })
+    const send = (type: string, x: number, y: number) => {
+      const event = new Event(type, { bubbles: true })
+      Object.defineProperties(event, { button: { value: 0 }, pointerId: { value: 15 }, clientX: { value: x }, clientY: { value: y }, shiftKey: { value: false } })
+      fireEvent(clip, event)
+    }
+    send('pointerdown', 200, 100)
+    send('pointermove', 280, lastMoveY)
+    send('pointerup', 280, 400)
+    expect(commit).not.toHaveBeenCalled()
+    expect(container.querySelector('[data-drag-valid]')).toBeNull()
+  })
   it('renders the five semantic lanes and truthful committed families from the P1-A model', () => {
     renderTimeline()
 
@@ -259,6 +280,15 @@ describe('Timeline V1', () => {
     expect(onSelect).not.toHaveBeenCalledWith(expect.objectContaining({ itemIds: [] }))
   })
 
+  it('lets Escape dismiss an open controls popover before clearing selection', () => {
+    const onSelect = vi.fn()
+    const { container } = renderTimeline({ onSelect })
+    const details = container.querySelector<HTMLDetailsElement>('.timeline-v1__advanced')!
+    details.open = true
+    fireEvent.keyDown(details.querySelector('summary')!, { key: 'Escape' })
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
   it('deletes with Delete and closes the gap with Shift+Delete, as two distinct actions', () => {
     // The old design focused a confirmation button because "remove" and
     // "remove and close the gap" were one control with two outcomes. They are
@@ -344,7 +374,8 @@ describe('Timeline V1', () => {
     const first = videoItems[0]
     if (!first?.clipId) throw new Error('first primary clip fixture missing')
     const onGesture = vi.fn()
-    const { container } = renderTimeline({ model: unselectedModel, onGesture })
+    const onSeek = vi.fn()
+    const { container } = renderTimeline({ model: unselectedModel, onGesture, onSeek })
     const viewportElement = container.querySelector<HTMLElement>('[data-timeline-viewport]')
     if (!viewportElement) throw new Error('timeline viewport missing')
     vi.spyOn(viewportElement, 'getBoundingClientRect').mockReturnValue({
@@ -371,8 +402,15 @@ describe('Timeline V1', () => {
     }
 
     pointer('pointerdown', 200)
+    expect(onSeek).not.toHaveBeenCalled()
+    pointer('pointermove', 208)
+    // Grabbing near the beginning must not centre the entire clip under the cursor.
+    expect(clip.closest('[data-testid="timeline-item-shell"]')).toHaveStyle({ left: '8px' })
+    expect(onGesture).not.toHaveBeenCalled()
     pointer('pointermove', 2_500)
     pointer('pointerup', 2_500)
+    fireEvent.click(clip, { clientX: 2_500 })
+    expect(onSeek).not.toHaveBeenCalled()
 
     expect(onGesture).toHaveBeenCalledWith({
       type: 'move-to-index',
@@ -494,7 +532,7 @@ describe('Timeline V1', () => {
     expect(within(zoom).getByRole('slider', { name: 'Timeline horizontal zoom' })).toBeVisible()
   })
 
-  it('places selected-item actions before the tracks so they do not disappear below the timeline', () => {
+  it('keeps duplicate item commands in the on-demand controls menu, outside the track flow', () => {
     const base = projectWithAllTimelineFamilies()
     const firstClipId = base.composition.tracks[0].clips[0].clipId
     const selectedItemId = `clip:${firstClipId}`
@@ -503,7 +541,8 @@ describe('Timeline V1', () => {
     const actions = container.querySelector('.timeline-v1__context-actions')
     const tracks = container.querySelector('.timeline-v1__viewport-grid')
     if (!actions || !tracks) throw new Error('timeline actions or tracks missing')
-
+    expect(actions.closest('.timeline-v1__advanced')).not.toBeNull()
+    expect(container.querySelector('.timeline-v1__command-bar .timeline-v1__advanced')).not.toBeNull()
     expect(Boolean(actions.compareDocumentPosition(tracks) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
   })
 
@@ -620,6 +659,14 @@ describe('Timeline V1', () => {
     Object.defineProperty(viewportElement, 'scrollTop', { value: 96, writable: true, configurable: true })
     fireEvent.scroll(viewportElement)
     expect(headers.scrollTop).toBe(96)
+  })
+
+  it('keeps note editing out of the track flow so it cannot offset every lane from its header', () => {
+    const { container } = renderTimeline()
+    const notes = container.querySelector('.timeline-v1__marker-list')
+    expect(notes).not.toBeNull()
+    expect(notes?.closest('[data-timeline-viewport]')).toBeNull()
+    expect(notes?.closest('.timeline-v1__advanced-body')).not.toBeNull()
   })
 
   it('uses actionable copy instead of a dead Empty label', () => {

@@ -1,13 +1,14 @@
 import { useRef, useState } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EditOperation, EditProject } from '@sanverse/edit-domain'
+import { acceptChangeSet, activeTimelineTrackState, MOVE_PRIMARY_CLIP_PRIMITIVE_ID, type EditOperation, type EditProject } from '@sanverse/edit-domain'
+import { changeSetOf, testSplit } from '@sanverse/edit-domain/test-fixtures'
 
 import { StudioWorkspaceTabs, type StudioWorkspace } from '../../editor/workspace'
 import { STUDIO_LAYOUT_V2_STORAGE_KEY } from '../../editor/layout-v2'
 import { readTimelineZoomPresentation } from '../../features/timeline'
-import { testProject } from '../../test-fixtures'
+import { ms, testProject, TEST_CLIP_ID } from '../../test-fixtures'
 import { StudioScreen } from './StudioScreen'
 
 const createProps = (
@@ -126,6 +127,131 @@ afterEach(() => {
 })
 
 describe('Studio workspace integration', () => {
+  it('binds transferred footage to layered surfaces and ignores decoder time as transport authority', async () => {
+    const original = testProject()
+    const split = acceptChangeSet(original, changeSetOf('changeset_layersplit', 0, [testSplit({ atClipTime: ms(10_000), newClipId: 'clip_layersecond' })]))
+    if (!split.ok) throw new Error(JSON.stringify(split.error))
+    const destination = activeTimelineTrackState(split.value).tracks.find(track => track.role === 'overlay-video')!.trackId
+    const moved = acceptChangeSet(split.value, changeSetOf('changeset_layermove', split.value.revision, [{
+      schemaVersion: 'sanverse.operation/v3', operationId: 'operation_layermove',
+      capabilityId: MOVE_PRIMARY_CLIP_PRIMITIVE_ID, kind: 'move-primary-clip',
+      clipId: 'clip_layersecond', compositionStart: ms(10_000), destinationTrackId: destination, extensions: {},
+    }]))
+    if (!moved.ok) throw new Error(JSON.stringify(moved.error))
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
+    const props = createProps(moved.value, 'edit', vi.fn(), vi.fn(async () => null), vi.fn(async () => null))
+    const { container, rerender } = render(<StudioScreen {...props} />)
+    const video = prepareVideo(container)
+    await waitFor(() => expect(container.querySelectorAll('[data-layered-footage]')).toHaveLength(2))
+    const transport = screen.getByRole('slider', { name: 'Monitor playhead' })
+    fireEvent.change(transport, { target: { value: String(ms(12_000).ticks) } })
+    expect(transport).toHaveValue(String(ms(12_000).ticks))
+    video.currentTime = 2
+    fireEvent.timeUpdate(video)
+    expect(transport).toHaveValue(String(ms(12_000).ticks))
+    rerender(<StudioScreen {...props} workspace="assist" />)
+    expect(container.querySelector('video')).toBe(video)
+    expect(transport).toHaveValue(String(ms(12_000).ticks))
+    expect(props.onTimelineEdit).not.toHaveBeenCalled()
+  })
+  it('keeps the audio mixer unmuted when the picture decoder mutes itself', async () => {
+    const resume = vi.fn(async () => {})
+    const node = () => ({ connect() {}, disconnect() {}, gain: { setValueAtTime: vi.fn() }, pan: { setValueAtTime: vi.fn() } })
+    vi.stubGlobal('AudioContext', class {
+      currentTime = 0
+      state = 'suspended'
+      resume = resume
+      destination = {}
+      createGain = node
+      createStereoPanner = node
+      createMediaElementSource = node
+      close = async () => {}
+    })
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
+    const { container } = render(<Harness />)
+    const video = container.querySelector('video')!
+    expect(video.muted).toBe(true)
+    fireEvent.volumeChange(video)
+    expect(screen.getByRole('button', { name: 'Mute' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Mute' }))
+    expect(screen.getByRole('button', { name: 'Unmute' })).toBeInTheDocument()
+    expect(video.muted).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+    expect(resume).toHaveBeenCalledOnce()
+  })
+
+  it('starts and pauses an opening gap, then resumes only when the next source loads', async () => {
+    const frames = new Map<number, FrameRequestCallback>()
+    let nextFrameId = 0
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      frames.set(++nextFrameId, callback)
+      return nextFrameId
+    })
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(id => { frames.delete(id) })
+    const advanceClock = (time: number) => act(() => {
+      now = time
+      const pending = [...frames.values()]
+      frames.clear()
+      pending.forEach(callback => callback(now))
+    })
+    const base = testProject()
+    const moved = acceptChangeSet(base, {
+      schemaVersion: 'sanverse.change-set/v1', changeSetId: 'changeset_openinggap', baseRevision: base.revision,
+      operations: [{ schemaVersion: 'sanverse.operation/v3', operationId: 'operation_openinggap',
+        kind: 'move-primary-clip', capabilityId: MOVE_PRIMARY_CLIP_PRIMITIVE_ID,
+        clipId: TEST_CLIP_ID, compositionStart: ms(5000), extensions: {} }],
+      provenance: { source: 'direct', requestId: null }, extensions: {},
+    })
+    if (!moved.ok) throw new Error(JSON.stringify(moved.error))
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
+    const props = createProps(moved.value, 'edit', vi.fn(), vi.fn(async () => null), vi.fn(async () => null))
+    const { container } = render(<StudioScreen {...props} conversationDraft="" onConversationDraftChange={vi.fn()} />)
+    const video = container.querySelector('video')
+    expect(screen.getByRole('status', { name: 'Preview status' })).toHaveTextContent('No media at this time')
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+    expect(play).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+    advanceClock(1000)
+    expect(screen.getByRole('slider', { name: 'Monitor playhead' })).toHaveValue('1440000')
+    advanceClock(5001)
+    expect(video).toHaveAttribute('src', '/media/owner')
+    expect(play).not.toHaveBeenCalled()
+    fireEvent.loadedMetadata(video!)
+    expect(play).toHaveBeenCalledTimes(1)
+    expect(video?.currentTime).toBe(0)
+    expect(container.querySelector('video')).toBe(video)
+  })
+
+  it('reveals export feedback from a collapsed AI pane without remounting the editor', async () => {
+    const props = createProps(testProject(), 'edit', vi.fn(), vi.fn(async () => null), vi.fn(async () => null))
+    const { container, rerender } = render(<StudioScreen {...props} conversationDraft="keep this unsent" onConversationDraftChange={vi.fn()} />)
+    const video = container.querySelector('video')
+    const chat = container.querySelector('textarea')
+    expect(screen.getByRole('button', { name: 'Expand AI' })).toBeInTheDocument()
+    rerender(<StudioScreen {...props} conversationDraft="keep this unsent" onConversationDraftChange={vi.fn()} exportState={{ status: 'error', message: 'Test export failed. Retry is available.' }} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Collapse AI' })).toBeInTheDocument())
+    expect(screen.getByText('Test export failed. Retry is available.')).toBeVisible()
+    expect(container.querySelector('video')).toBe(video)
+    expect(container.querySelector('textarea')).toBe(chat)
+    expect(chat).toHaveValue('keep this unsent')
+  })
+  it('keeps layout settings in the Inspector and offers recovery when the Tool dock is hidden', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Harness onCreateOverlay={vi.fn(async () => null)} onTimelineEdit={vi.fn(async () => null)} />)
+    const preset = screen.getByRole('combobox', { name: 'Workspace preset' })
+    expect(preset.closest('#studio-inspector-region')).not.toBeNull()
+    const video = container.querySelector('video')
+    await user.click(screen.getByRole('button', { name: 'Hide Tool dock' }))
+    await user.click(screen.getByRole('button', { name: 'Show Inspector' }))
+    expect(container.querySelector('video')).toBe(video)
+    expect(container.querySelector('main')).toHaveAttribute('data-right-collapsed', 'false')
+  })
   it('preserves one video, playhead, selection, Timeline viewport and AI draft across every Studio workspace', async () => {
     const user = userEvent.setup()
     const create = vi.fn(async () => null)

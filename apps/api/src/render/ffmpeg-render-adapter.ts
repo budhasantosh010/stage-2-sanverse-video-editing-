@@ -17,6 +17,8 @@ import {
   type VisualPropertiesNode,
 } from '@sanverse/render-contract'
 import { normalizationFilterSteps } from '@sanverse/render-contract/visual-normalization'
+import { segmentSourceTicksAt } from '@sanverse/render-contract/picture-layers'
+import { compositePictureLayers, type PictureSurface } from './picture-layer-compositor.ts'
 import {
   audioSpeedSteps,
   panFilter,
@@ -505,7 +507,7 @@ const balancedStepExpression = (
 
 const motionExpression = (
   motion: FootageMotionNode,
-  sourceStartTicks: number,
+  segment: RenderPlan['segments'][number],
   durationTicks: number,
   frameRate: Readonly<{ numerator: number; denominator: number }>,
   select: (state: ReturnType<typeof motionStateAtSourceTick>) => number,
@@ -517,51 +519,52 @@ const motionExpression = (
   const sampleCount = Math.max(2, Math.min(MAX_FOOTAGE_MOTION_SAMPLES, frames + 1))
   const values: string[] = []
   for (let index = 0; index < sampleCount; index += 1) {
-    const offset = Math.round((durationTicks * index) / (sampleCount - 1))
-    values.push(compactNumber(select(motionStateAtSourceTick(motion, sourceStartTicks + offset))))
+    const offset = Math.min(durationTicks - 1, Math.round((durationTicks * index) / (sampleCount - 1)))
+    const sourceTicks = segmentSourceTicksAt(segment, segment.interval.start.ticks + offset)!
+    values.push(compactNumber(select(motionStateAtSourceTick(motion, sourceTicks))))
   }
   return balancedStepExpression(values, durationTicks / PROJECT_TIMESCALE, timeVariable)
 }
 
 const footageMotionExpressions = (
   motion: FootageMotionNode,
-  sourceStartTicks: number,
+  segment: RenderPlan['segments'][number],
   durationTicks: number,
   frameRate: Readonly<{ numerator: number; denominator: number }>,
 ) => Object.freeze({
   translateX: motionExpression(
-    motion, sourceStartTicks, durationTicks, frameRate,
+    motion, segment, durationTicks, frameRate,
     (state) => state.transform.translateX,
   ),
   translateY: motionExpression(
-    motion, sourceStartTicks, durationTicks, frameRate,
+    motion, segment, durationTicks, frameRate,
     (state) => state.transform.translateY,
   ),
   scale: motionExpression(
-    motion, sourceStartTicks, durationTicks, frameRate,
+    motion, segment, durationTicks, frameRate,
     (state) => state.transform.scale,
   ),
   rotation: motionExpression(
-    motion, sourceStartTicks, durationTicks, frameRate,
+    motion, segment, durationTicks, frameRate,
     (state) => state.transform.rotationDegrees,
   ),
   cropTop: motionExpression(
-    motion, sourceStartTicks, durationTicks, frameRate,
+    motion, segment, durationTicks, frameRate,
     (state) => state.crop.top,
     'T',
   ),
   cropRight: motionExpression(
-    motion, sourceStartTicks, durationTicks, frameRate,
+    motion, segment, durationTicks, frameRate,
     (state) => state.crop.right,
     'T',
   ),
   cropBottom: motionExpression(
-    motion, sourceStartTicks, durationTicks, frameRate,
+    motion, segment, durationTicks, frameRate,
     (state) => state.crop.bottom,
     'T',
   ),
   cropLeft: motionExpression(
-    motion, sourceStartTicks, durationTicks, frameRate,
+    motion, segment, durationTicks, frameRate,
     (state) => state.crop.left,
     'T',
   ),
@@ -577,13 +580,15 @@ const primaryFootageMotionFilters = (
   rate: string,
   frameRate: Readonly<{ numerator: number; denominator: number }>,
   durationTicks: number,
+  transparent = false,
 ): readonly string[] => {
   const motion = segment.footageMotions[0]
-  if (!motion) return Object.freeze([`[${inputLabel}]format=pix_fmts=yuv420p,setsar=1[${outputLabel}]`])
+  const pixelFormat = transparent ? 'rgba' : 'yuv420p'
+  if (!motion) return Object.freeze([`[${inputLabel}]format=pix_fmts=${pixelFormat},setsar=1[${outputLabel}]`])
 
   const expressions = footageMotionExpressions(
     motion,
-    segment.sourceStartTicks,
+    segment,
     durationTicks,
     frameRate,
   )
@@ -600,7 +605,7 @@ const primaryFootageMotionFilters = (
     expressions.cropLeft,
   ].some((expression) => expression !== '0')
   const hasRotation = expressions.rotation !== '0'
-  const needsAlpha = hasCrop || hasRotation
+  const needsAlpha = transparent || hasCrop || hasRotation
   const filters: string[] = []
   let current = inputLabel
 
@@ -632,13 +637,13 @@ const primaryFootageMotionFilters = (
   }
 
   filters.push(
-    `color=c=black:s=${width}x${height}:r=${rate}:d=${durationSeconds},` +
+    `color=c=${transparent ? 'black@0' : 'black'}:s=${width}x${height}:r=${rate}:d=${durationSeconds},` +
       `format=pix_fmts=${needsAlpha ? 'rgba' : 'yuv420p'}[${background}]`,
     `[${background}][${current}]overlay=` +
       `x='(W-w)/2+(${expressions.translateX})*W':` +
       `y='(H-h)/2+(${expressions.translateY})*H':` +
-      `eval=frame:shortest=1:eof_action=pass[${composited}]`,
-    `[${composited}]format=pix_fmts=yuv420p,setsar=1[${outputLabel}]`,
+      `eval=frame:shortest=1:eof_action=pass${transparent ? ':format=auto' : ''}[${composited}]`,
+    `[${composited}]format=pix_fmts=${pixelFormat},setsar=1[${outputLabel}]`,
   )
   return Object.freeze(filters)
 }
@@ -655,9 +660,10 @@ const splitSegmentForMotion = (
   const sourceStart = sourceSegment.sourceStartTicks
   const sourceEnd = sourceStart + segmentSourceDurationTicks(sourceSegment)
   const motionRate = segmentRate(sourceSegment)
+  const reverse = sourceSegment.direction === 'reverse'
   /** Where a point in the recording lands on screen, relative to this piece. */
   const onScreenOffset = (sourceTicks: number): number =>
-    Math.round(((sourceTicks - sourceStart) * motionRate.denominator) / motionRate.numerator)
+    Math.round(((reverse ? sourceEnd - sourceTicks : sourceTicks - sourceStart) * motionRate.denominator) / motionRate.numerator)
   const boundaries = new Set<number>([sourceStart, sourceEnd])
   for (const motion of sourceSegment.footageMotions) {
     const start = Math.max(sourceStart, motion.sourceInterval.start.ticks)
@@ -668,8 +674,9 @@ const splitSegmentForMotion = (
     }
   }
   const ordered = [...boundaries].sort((left, right) => left - right)
-  return Object.freeze(ordered.slice(0, -1).map((start, index) => {
-    const end = ordered[index + 1]
+  const ranges = ordered.slice(0, -1).map((start, index) => ({ start, end: ordered[index + 1] }))
+  if (reverse) ranges.reverse()
+  return Object.freeze(ranges.map(({ start, end }, index) => {
     const active = sourceSegment.footageMotions.filter((motion) =>
       motion.sourceInterval.start.ticks <= start &&
       start < motion.sourceInterval.start.ticks + motion.sourceInterval.duration.ticks,
@@ -681,11 +688,11 @@ const splitSegmentForMotion = (
       nodeId: `${sourceSegment.nodeId}.motion.${index}`,
       interval: Object.freeze({
         start: Object.freeze({
-          ticks: sourceSegment.interval.start.ticks + onScreenOffset(start),
+          ticks: sourceSegment.interval.start.ticks + onScreenOffset(reverse ? end : start),
           timescale: sourceSegment.interval.start.timescale,
         }),
         duration: Object.freeze({
-          ticks: Math.max(1, onScreenOffset(end) - onScreenOffset(start)),
+          ticks: Math.max(1, Math.abs(onScreenOffset(end) - onScreenOffset(start))),
           timescale: sourceSegment.interval.duration.timescale,
         }),
       }),
@@ -757,6 +764,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
   if (!plan.ok) {
     throw renderError('RENDER_INPUT_INVALID', 'The render plan is invalid.')
   }
+  const layered = plan.value.pictureLayers !== undefined
   if (plan.value.segments.some((segment) =>
     segment.direction === 'reverse' &&
     segmentSourceDurationTicks(segment) > MAX_REVERSE_SOURCE_DURATION_TICKS)) {
@@ -777,10 +785,13 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
 
   const { width, height } = plan.value
   const rate = `${input.frameRate.numerator}/${input.frameRate.denominator}`
-  const pieces = layOutTimeline(plan.value)
+  const pieces: readonly TimelinePiece[] = layered
+    ? plan.value.segments.filter(segment => segment.videoEnabled).flatMap(segment => splitSegmentForMotion(segment).map(piece => ({ kind: 'footage' as const, durationTicks: piece.interval.duration.ticks, segment: piece })))
+    : layOutTimeline(plan.value)
   const segmentInputIndex = new Map(planInputs(plan.value).map((source) => [source.assetId, source.index]))
   const graph: string[] = []
   const concatInputs: string[] = []
+  const pictureSurfaces: PictureSurface[] = []
   const hasOutputAudio = planHasAudio(plan.value, input.hasAudio)
 
   pieces.forEach((piece, index) => {
@@ -891,6 +902,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
             canvasWidth: width,
             canvasHeight: height,
             fitMode: plan.value.framing ?? 'fit',
+            transparent: layered,
           }).join(',')}[${normalizedLabel}]`,
         )
         graph.push(...primaryFootageMotionFilters(
@@ -903,6 +915,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
           rate,
           input.frameRate,
           piece.durationTicks,
+          layered,
         ))
         const videoSteps: string[] = []
         const fadeInTicks = incomingTransition?.durationTicks ?? 0
@@ -916,7 +929,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
               `:d=${ticksToSeconds(fadeOutTicks)}:color=${transitionColor}`,
           )
         }
-        videoSteps.push('format=pix_fmts=yuv420p', 'setsar=1')
+        videoSteps.push(`format=pix_fmts=${layered ? 'rgba' : 'yuv420p'}`, 'setsar=1')
         graph.push(`[${motionVideoLabel}]${videoSteps.join(',')}[${videoLabel}]`)
       }
 
@@ -924,7 +937,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
       // is mixed later from its own linked window, which is what allows a J-cut
       // to begin before its picture and an L-cut to continue after it without
       // creating a second clip identity.
-      if (hasOutputAudio) {
+      if (hasOutputAudio && !layered) {
         graph.push(
           `anullsrc=channel_layout=${AUDIO_CHANNEL_LAYOUT}:sample_rate=${AUDIO_SAMPLE_RATE}:d=${seconds}` +
             `,asetpts=PTS-STARTPTS[${audioLabel}]`,
@@ -932,12 +945,25 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
       }
     }
 
+    if (layered && piece.kind === 'footage') {
+      const start = ticksToSeconds(piece.segment.interval.start.ticks)
+      const end = ticksToSeconds(piece.segment.interval.start.ticks + piece.durationTicks)
+      const label = `layer_source_${index}`
+      graph.push(`[${videoLabel}]setpts=PTS-STARTPTS+${start}/TB[${label}]`)
+      pictureSurfaces.push({ nodeId: piece.segment.nodeId.split('.motion.')[0], label,
+        overlayFilter: `overlay=x=0:y=0:eof_action=pass:shortest=0:format=auto:enable='gte(t\\,${start})*lt(t\\,${end})'` })
+      return
+    }
     concatInputs.push(`[${videoLabel}]`)
     if (hasOutputAudio) concatInputs.push(`[${audioLabel}]`)
   })
 
   const audioStreams = hasOutputAudio ? 1 : 0
-  graph.push(
+  if (layered) {
+    const seconds = ticksToSeconds(plan.value.durationTicks)
+    graph.push(`color=c=black:s=${width}x${height}:r=${rate}:d=${seconds},format=pix_fmts=rgba,setsar=1[vcat]`)
+    if (hasOutputAudio) graph.push(`anullsrc=channel_layout=${AUDIO_CHANNEL_LAYOUT}:sample_rate=${AUDIO_SAMPLE_RATE}:d=${seconds},asetpts=PTS-STARTPTS[acat]`)
+  } else graph.push(
     `${concatInputs.join('')}concat=n=${pieces.length}:v=1:a=${audioStreams}` +
       `[vcat]${hasOutputAudio ? '[acat]' : ''}`,
   )
@@ -995,8 +1021,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
     // name with an equals sign, and only the options after it are separated by
     // colons. Getting this wrong produced a graph that read correctly to a
     // human and was rejected by FFmpeg with "No option name near…".
-    graph.push(
-      `[${videoLabel}][b${index}]overlay` +
+    const overlayFilter = 'overlay' +
         `=x='${mediaOverlayPosition(
           visual,
           'x',
@@ -1015,10 +1040,13 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
           boxHeight,
           height,
         )}'` +
-        `:eof_action=pass:shortest=0` +
-        `:enable='gte(t\\,${startSeconds})*lt(t\\,${endSeconds})'[${next}]`,
-    )
-    videoLabel = next
+        `:eof_action=pass:shortest=0${layered ? ':format=auto' : ''}` +
+        `:enable='gte(t\\,${startSeconds})*lt(t\\,${endSeconds})'`
+    if (layered) pictureSurfaces.push({ nodeId: node.nodeId, label: `b${index}`, overlayFilter })
+    else {
+      graph.push(`[${videoLabel}][b${index}]${overlayFilter}[${next}]`)
+      videoLabel = next
+    }
   })
 
   // ── Layer two: everything written on the picture ──────────────────────────
@@ -1080,8 +1108,7 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
     const next = `vw${writtenIndex}`
     const startSeconds = ticksToSeconds(node.interval.start.ticks)
     const endSeconds = ticksToSeconds(node.interval.start.ticks + node.interval.duration.ticks)
-    graph.push(
-      `[${videoLabel}][${styled}]overlay` +
+    const overlayFilter = 'overlay' +
         `=x='${mediaOverlayPosition(
           visual,
           'x',
@@ -1100,12 +1127,16 @@ export function buildFilterGraph(input: BuildArgumentsInput): string {
           height,
           height,
         )}'` +
-        ':eof_action=pass:shortest=0' +
-        `:enable='gte(t\\,${startSeconds})*lt(t\\,${endSeconds})'[${next}]`,
-    )
-    videoLabel = next
+        `:eof_action=pass:shortest=0${layered ? ':format=auto' : ''}` +
+        `:enable='gte(t\\,${startSeconds})*lt(t\\,${endSeconds})'`
+    if (layered) pictureSurfaces.push({ nodeId: node.nodeId, label: styled, overlayFilter })
+    else {
+      graph.push(`[${videoLabel}][${styled}]${overlayFilter}[${next}]`)
+      videoLabel = next
+    }
   })
-  graph.push(`[${videoLabel}]null[vout]`)
+  if (layered) graph.push(...compositePictureLayers(plan.value.pictureLayers!, pictureSurfaces))
+  else graph.push(`[${videoLabel}]null[vout]`)
 
   // ── Sound ─────────────────────────────────────────────────────────────────
   //

@@ -100,8 +100,10 @@ import {
 } from '../../features/media-analysis'
 import { currentWindowWidthPx, laneDensity, laneHeightPx } from './timeline-lane-metrics'
 import { TimelineContextActions } from './TimelineContextActions'
+import { toggleDetailsPopover, syncPopoverDisclosure } from '../ui/details-popover'
 import { TimelineContextMenu } from './TimelineContextMenu'
 import { TimelineLane } from './TimelineLane'
+import type { TimelineBodyDragApi, TimelineBodyDragFeedback } from '../../features/timeline/timeline-body-drag-plan'
 import { TimelineMarkers } from './TimelineMarkers'
 import { TimelinePlayhead } from './TimelinePlayhead'
 import { TimelineRuler } from './TimelineRuler'
@@ -184,6 +186,7 @@ export type TimelineProps = Readonly<{
   onPlacementMode(mode: PlacementMode): void
   onToggleSnapping(): void
   onItemAction(itemId: string, action: TimelineItemAction): void
+  bodyDrag?: TimelineBodyDragApi
   /** Everything picked, moved or trimmed together, as ONE change set. */
   onMultiGesture(gesture: MultiItemGesture): void
   onViewportChange(viewport: TimelineViewportState): void
@@ -326,6 +329,7 @@ export function Timeline({
   onPlacementMode,
   onToggleSnapping,
   onItemAction,
+  bodyDrag,
   onMultiGesture,
   onViewportChange,
   onSeek,
@@ -358,8 +362,10 @@ export function Timeline({
   onVerticalZoomChange = IGNORE_VERTICAL_ZOOM,
   onOpenProposal,
 }: TimelineProps) {
+  const [bodyDragFeedback, setBodyDragFeedback] = useState<TimelineBodyDragFeedback | null>(null)
   const timelineRef = useRef<HTMLElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
+  const [markerControlsHost, setMarkerControlsHost] = useState<HTMLDivElement | null>(null)
   const headersRef = useRef<HTMLDivElement>(null)
   const viewportGridRef = useRef<HTMLDivElement>(null)
   const horizontalZoomFrameRef = useRef<number | null>(null)
@@ -1329,6 +1335,8 @@ export function Timeline({
     if (isTypingTarget(event.target)) return
 
     if (event.key === 'Escape') {
+      // Native popover dismissal owns this Escape; keep the selected clip.
+      if (timelineRef.current?.querySelector('details[open] > [popover]')) return
       event.preventDefault()
       // In order: cancel what is happening, then close what is open, then let
       // go of what is chosen. Escape never creates anything and never undoes.
@@ -1533,6 +1541,7 @@ export function Timeline({
       data-timeline-tool={tool}
       data-testid="timeline-v1"
     >
+      <div className="timeline-v1__command-bar">
       <TimelineToolbar
         durationTicks={model.durationTicks}
         timescale={model.timescale}
@@ -1567,8 +1576,39 @@ export function Timeline({
         onFitTracks={fitTracks}
         onResetVerticalZoom={() => changeVerticalZoom(DEFAULT_VERTICAL_ZOOM_BASIS_POINTS)}
       />
-
-      <TimelineContextActions
+      <details ref={advancedDetailsRef} className="timeline-v1__advanced" onToggle={toggleDetailsPopover}>
+        <summary aria-label="Advanced timeline controls" title="Advanced timeline controls">Controls</summary>
+        <div className="timeline-v1__advanced-body" popover="auto" onToggle={syncPopoverDisclosure}>
+          <div ref={setMarkerControlsHost} />
+      {animationSubject ? (
+        <div className="timeline-animation__target-bar" role="group" aria-label="Selected item animation">
+          <button
+            type="button"
+            aria-pressed={animationTargetExpanded(animationPresentation, animationSubject.target)}
+            aria-label={animationTargetExpanded(animationPresentation, animationSubject.target) ? 'Collapse Animation' : 'Expand Animation'}
+            title={animationSubject.sourceAnchored ? 'Source animation — follows this footage wherever this source range is used.' : 'Show editor animation for this item.'}
+            onClick={() => changeAnimationPresentation(animationPresentationForTarget(
+              animationPresentation,
+              animationSubject.target,
+              !animationTargetExpanded(animationPresentation, animationSubject.target),
+            ))}
+          >
+            <span aria-hidden="true">◇</span>
+            {animationTargetExpanded(animationPresentation, animationSubject.target) ? 'Collapse Animation' : 'Expand Animation'}
+          </button>
+          <span>{animationSubject.label}</span>
+          {animationSubject.state.tracks.length > 0 ? <span>{animationSubject.state.tracks.length} animated propert{animationSubject.state.tracks.length === 1 ? 'y' : 'ies'}</span> : <span>No animation yet</span>}
+          <button
+            type="button"
+            aria-pressed={animationPresentation.graphOpen}
+            disabled={animationSubject.state.tracks.length === 0}
+            onClick={() => changeAnimationPresentation(Object.freeze({ ...animationPresentation, graphOpen: !animationPresentation.graphOpen }))}
+          >
+            {animationPresentation.graphOpen ? 'Close Graph' : 'Open Graph'}
+          </button>
+        </div>
+      ) : null}
+          <TimelineContextActions
         selectedItem={selectedItem}
         playheadTicks={playheadTicks}
         timescale={model.timescale}
@@ -1592,7 +1632,53 @@ export function Timeline({
           advancedDetailsRef.current.querySelector<HTMLElement>('button, input, summary')?.focus()
         }}
       />
-
+          <div className="timeline-v1__precision-status" role="group" aria-label="Precision trim playback">
+            <button
+              type="button"
+              className="timeline-v1__precision-status-button"
+              aria-pressed={dynamicTrim.active}
+              disabled={!dynamicTrim.active && selectedEditPoints.length !== 1}
+              title={dynamicTrim.active ? 'Leave Dynamic Trim without changing the project.' : 'Select one Roll edit point, then enter Dynamic Trim.'}
+              onClick={toggleDynamicTrim}
+            >
+              Dynamic Trim
+            </button>
+            <button
+              type="button"
+              className="timeline-v1__precision-status-button"
+              aria-pressed={audioScrubbingEnabled}
+              onClick={() => onAudioScrubbingChange(!audioScrubbingEnabled)}
+            >
+              Audio Scrubbing
+            </button>
+            <TimelinePrecisionPopover
+              item={selectedItem}
+              editPoint={selectedEditPoints.length === 1 ? selectedEditPoints[0] : null}
+              precisionTool={precisionTool}
+              timescale={model.timescale}
+              durationTicks={model.durationTicks}
+              frameRate={frameRate}
+              busy={busy}
+              onApply={applyNumericPrecision}
+            />
+            <output className="timeline-v1__precision-status-output" aria-live="polite">
+              {dynamicTrim.active
+                ? `Dynamic Trim ${dynamicTrim.state}${dynamicTrim.message ? ` — ${dynamicTrim.message}` : ''}. Enter commits; Escape cancels.`
+                : shuttleState.direction === 0
+                  ? 'Shuttle stopped'
+                  : `Shuttle ${shuttleState.direction < 0 ? 'backwards' : 'forwards'} ${shuttleState.rate}x`}
+            </output>
+          </div>
+          <div className="timeline-v1__track-add" role="group" aria-label="Add Timeline track" data-t5-track-add>
+            <span>Add track</span>
+            <button type="button" disabled={busy} onClick={() => onAddTrack('video')}>+ Video</button>
+            <button type="button" disabled={busy} onClick={() => onAddTrack('audio')}>+ Audio</button>
+            <button type="button" disabled={busy} onClick={() => onAddTrack('caption')}>+ Captions</button>
+          </div>
+          {advancedControls}
+        </div>
+      </details>
+      </div>
       {precisionDraft?.ok ? (
         <TimelineTrimView
           frames={trimViewFrames}
@@ -1665,85 +1751,8 @@ export function Timeline({
         onClose={() => setFreezePanelOpen(false)}
       />
 
-      {animationSubject ? (
-        <div className="timeline-animation__target-bar" role="group" aria-label="Selected item animation">
-          <button
-            type="button"
-            aria-pressed={animationTargetExpanded(animationPresentation, animationSubject.target)}
-            aria-label={animationTargetExpanded(animationPresentation, animationSubject.target) ? 'Collapse Animation' : 'Expand Animation'}
-            title={animationSubject.sourceAnchored ? 'Source animation — follows this footage wherever this source range is used.' : 'Show editor animation for this item.'}
-            onClick={() => changeAnimationPresentation(animationPresentationForTarget(
-              animationPresentation,
-              animationSubject.target,
-              !animationTargetExpanded(animationPresentation, animationSubject.target),
-            ))}
-          >
-            <span aria-hidden="true">◇</span>
-            {animationTargetExpanded(animationPresentation, animationSubject.target) ? 'Collapse Animation' : 'Expand Animation'}
-          </button>
-          <span>{animationSubject.label}</span>
-          {animationSubject.state.tracks.length > 0 ? <span>{animationSubject.state.tracks.length} animated propert{animationSubject.state.tracks.length === 1 ? 'y' : 'ies'}</span> : <span>No animation yet</span>}
-          <button
-            type="button"
-            aria-pressed={animationPresentation.graphOpen}
-            disabled={animationSubject.state.tracks.length === 0}
-            onClick={() => changeAnimationPresentation(Object.freeze({ ...animationPresentation, graphOpen: !animationPresentation.graphOpen }))}
-          >
-            {animationPresentation.graphOpen ? 'Close Graph' : 'Open Graph'}
-          </button>
-        </div>
-      ) : null}
       {animationNotice ? <p className="timeline-animation__notice" role="status">{animationNotice}</p> : null}
 
-      <details ref={advancedDetailsRef} className="timeline-v1__advanced">
-        <summary>Advanced timeline controls</summary>
-        <div className="timeline-v1__advanced-body">
-          <div className="timeline-v1__precision-status" role="group" aria-label="Precision trim playback">
-            <button
-              type="button"
-              className="timeline-v1__precision-status-button"
-              aria-pressed={dynamicTrim.active}
-              disabled={!dynamicTrim.active && selectedEditPoints.length !== 1}
-              title={dynamicTrim.active ? 'Leave Dynamic Trim without changing the project.' : 'Select one Roll edit point, then enter Dynamic Trim.'}
-              onClick={toggleDynamicTrim}
-            >
-              Dynamic Trim
-            </button>
-            <button
-              type="button"
-              className="timeline-v1__precision-status-button"
-              aria-pressed={audioScrubbingEnabled}
-              onClick={() => onAudioScrubbingChange(!audioScrubbingEnabled)}
-            >
-              Audio Scrubbing
-            </button>
-            <TimelinePrecisionPopover
-              item={selectedItem}
-              editPoint={selectedEditPoints.length === 1 ? selectedEditPoints[0] : null}
-              precisionTool={precisionTool}
-              timescale={model.timescale}
-              durationTicks={model.durationTicks}
-              frameRate={frameRate}
-              busy={busy}
-              onApply={applyNumericPrecision}
-            />
-            <output className="timeline-v1__precision-status-output" aria-live="polite">
-              {dynamicTrim.active
-                ? `Dynamic Trim ${dynamicTrim.state}${dynamicTrim.message ? ` — ${dynamicTrim.message}` : ''}. Enter commits; Escape cancels.`
-                : shuttleState.direction === 0
-                  ? 'Shuttle stopped'
-                  : `Shuttle ${shuttleState.direction < 0 ? 'backwards' : 'forwards'} ${shuttleState.rate}x`}
-            </output>
-          </div>
-          <div className="timeline-v1__track-add" role="group" aria-label="Add Timeline track" data-t5-track-add>
-            <span>Add track</span>
-            <button type="button" disabled={busy} onClick={() => onAddTrack('video')}>+ Video</button>
-            <button type="button" disabled={busy} onClick={() => onAddTrack('audio')}>+ Audio</button>
-            <button type="button" disabled={busy} onClick={() => onAddTrack('caption')}>+ Captions</button>
-          </div>
-          {advancedControls}
-        </div>
-      </details>
 
       <div ref={viewportGridRef} className="timeline-v1__viewport-grid">
         {/*
@@ -1826,6 +1835,7 @@ export function Timeline({
         >
           <div className="timeline-v1__content" style={{ width: `${contentWidthPx}px` }}>
             <TimelineMarkers
+              controlsHost={markerControlsHost}
               markers={markers}
               timescale={model.timescale}
               pixelsPerSecond={viewport.pixelsPerSecond}
@@ -1945,6 +1955,9 @@ export function Timeline({
                   onSeek={onSeek}
                   onGesture={onGesture}
                   onItemAction={routeItemAction}
+                  bodyDrag={bodyDrag}
+                  bodyDragFeedback={bodyDragFeedback}
+                  onBodyDragFeedback={setBodyDragFeedback}
                   onOpenProposal={onOpenProposal}
                   onContextMenu={openContextMenu}
                 />

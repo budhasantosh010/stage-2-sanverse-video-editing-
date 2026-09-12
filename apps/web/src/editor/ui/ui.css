@@ -216,3 +216,16 @@
     transform: none !important;
   }
 }
+/* Native top-layer panels escape panel overflow without moving editor content. */
+[popover].timeline-v1__advanced-body,
+[popover].timeline-audio-direct__options-panel,
+[popover].studio-screen__layout-popover {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+}
+[popover].timeline-v1__advanced-body:not(:popover-open),
+[popover].timeline-audio-direct__options-panel:not(:popover-open),
+[popover].studio-screen__layout-popover:not(:popover-open) {
+  display: none;
+}

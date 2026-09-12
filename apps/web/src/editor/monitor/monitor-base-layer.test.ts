@@ -134,8 +134,13 @@ describe('the base picture layer', () => {
     expect(showsGapLayer(layer)).toBe(false)
   })
 
-  it('is loading, not a gap, when no source is attached at all', () => {
+  it('shows a canonical gap even when no file is attached for that empty interval', () => {
     expect(resolveMonitorBaseLayer(healthy({ hasSource: false, inCanonicalGap: true })))
+      .toEqual({ kind: 'gap' })
+  })
+
+  it('keeps an unavailable source loading when the composition does not declare a gap', () => {
+    expect(resolveMonitorBaseLayer(healthy({ hasSource: false, inCanonicalGap: false })))
       .toEqual({ kind: 'loading' })
   })
 
