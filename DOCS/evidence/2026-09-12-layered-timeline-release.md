@@ -57,6 +57,14 @@ Open http://localhost:2010/. API is 2011. Keep PowerShell open; Ctrl+C stops the
 
 ## Owner test
 
+### September 12 focused follow-up
+
+Two fixes after baseline cb857393: decoder group readiness barrier (FAIL-095) and accepted Inspector/motion save-label update (FAIL-094). Tests were RED before each implementation. Final affected web selection: 100/100 PASS in .sanverse-data/high-impact-followup-tests.json. Web build PASS: JS 1,018.55 kB/gzip 283.83 (+0.29/+0.11); CSS unchanged. Independent four-file review PASS; optional deferred-play-promise regression suggested, not a blocking finding. Ownership boundary and diff check PASS.
+
+On resume the server was absent; restarted hidden from this checkout on 2010/2011 (launcher PID 19884, historical; verify before stopping). Real browser reopened the saved test project at change 68 and Undo restored the two temporary test actions through 69 and 70. The second click reported a transport timeout but the next authoritative save status confirmed change 70; no blind repeat. A continuous playback/performance comparison was not completed in this follow-up. Independent extracted audio and owner confidence remain OPEN.
+
+The earlier review/approval usage interruption is recorded as INFRA-021 and recovered. No raw media, export-frame JPGs or .sanverse-data files are included in the commit. Motion/2000 remains untouched.
+
 Commit includes source/tests, startup script and text evidence only. Two local historical export-frame JPGs are deliberately not staged; no user-media image is published with this push.
 
 Open/upload a short video, choose Studio, split once, drag sideways and between video tracks, trim an edge, use picture/timeline zoom, change speed/reverse, Undo/Redo, then Export. Compare the downloaded picture and sound with Preview. Record the exact action and timestamp for any mismatch. Independent extracted-audio behavior is not yet available.

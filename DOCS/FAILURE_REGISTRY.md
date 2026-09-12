@@ -46,9 +46,26 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 - What/where: Studio header Project save status after Apply motion, September 11 real browser test.
 - How/why: header still displayed change 59 while edit-project.json contained accepted motion at revision 60; next timeline action refreshed the label. Exact callback cause not investigated.
 - Impact: confusing feedback, not observed data loss; reopened project and Undo/Redo retained the motion.
-- Attempts: checked canonical persisted revision and subsequent UI saves; no broad save-system changes made in this batch.
-- Status: OPEN, nonblocking UI feedback issue.
+- Attempts: confirmed the shared onCreateOverlay callback adopted the server project but omitted the persisted save notification. Inspector edit regression failed with the old label, then passed after the notification was added. No broad save-system changes.
+- Status: RESOLVED for the reproduced accepted Inspector/motion callback; no claim about every save lifecycle.
 - One-line solution: route accepted motion-save notifications through the same header save-status update as timeline operations.
+
+### FAIL-095 — Ready video layers ran ahead while a sibling loaded or sought
+
+- What/where: layer-video-decoder.ts; overlapping Studio picture playback, September 12.
+- Who/impact: users playing overlapping footage could see repeated corrective seeks and uneven playback.
+- How/why: Studio froze the composition clock while a required layer was unavailable, but already-ready decoders continued playing.
+- Attempts/evidence: two RED tests proved premature play and failure to pause a sibling; shared readiness barrier made both pass. Affected regression 100/100 and web build PASS. Independent review found no blocking defects.
+- Status: RESOLVED for reproduced decoder synchronization; sustained real-browser performance and owner confidence remain separate OPEN gates.
+- One-line solution: synchronize every active muted decoder against one group readiness barrier and invalidate stale playback attempts when suspended.
+
+### INFRA-021 — Review interruption and restricted Git child process
+
+- What/where/when: September 12 follow-up; approval service and independent reviewer first hit usage limits. On resume, ownership-check Node process could not spawn Git under restrictions.
+- Impact: final verification/push delayed; not a diagnosed product failure.
+- Attempts: preserved changes without bypass; resumed after the user continued, obtained review PASS and reran the same boundary check with approved execution, PASS.
+- Status: RESOLVED for this follow-up.
+- One-line solution: retain exact evidence and resume the original focused checks when authorized execution is available.
 
 ### INFRA-020 — Final web checks launched without the web workspace configuration
 

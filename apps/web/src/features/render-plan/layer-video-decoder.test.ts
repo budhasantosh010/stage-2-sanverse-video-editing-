@@ -34,6 +34,36 @@ function setup(maxDecoders = 4, onChange = () => undefined) {
 }
 
 describe('layer video decoder lifecycle', () => {
+  it('waits for all active layers before starting any decoder', async () => {
+    const { pool, media, loaded } = setup()
+    pool.update([request('lower', 2), request('upper', 7)], true)
+    loaded(media[0])
+    await Promise.resolve()
+    expect(media[0].play).not.toHaveBeenCalled()
+    loaded(media[1])
+    await Promise.resolve()
+    expect(media[0].play).toHaveBeenCalledTimes(1)
+    expect(media[1].play).toHaveBeenCalledTimes(1)
+    pool.dispose()
+  })
+
+  it('pauses ready layers while another corrects drift, then resumes together', async () => {
+    const { pool, media, loaded, paused } = setup()
+    pool.update([request('lower', 2), request('upper', 7)], true)
+    media.forEach(loaded)
+    await Promise.resolve()
+    media[0].currentTime = 2.04
+    pool.update([request('lower', 2.04), request('upper', 7.2)], true)
+    expect(pool.status('upper').state).toBe('seeking')
+    expect(paused.get(media[0])).toBe(true)
+    expect(paused.get(media[1])).toBe(true)
+    media[1].dispatchEvent(new Event('seeked'))
+    await Promise.resolve()
+    expect(paused.get(media[0])).toBe(false)
+    expect(paused.get(media[1])).toBe(false)
+    pool.dispose()
+  })
+
   it('keeps a held frame paused while other layers play and notifies frame readiness', () => {
     const changed = vi.fn()
     const { pool, media, loaded } = setup(4, changed)

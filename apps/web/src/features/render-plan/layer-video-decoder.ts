@@ -41,11 +41,12 @@ export function createLayerVideoDecoderPool(options: Readonly<{
   }
   const decoders = new Map<string, Decoder>()
   let disposed = false
+  let suspended = false
 
-  function sync(decoder: Decoder) {
+  function sync(decoder: Decoder, allowPlayback = true) {
     if (decoder.released || decoder.error) return
     const { video, request } = decoder
-    if (!decoder.playing) video.pause()
+    if (!decoder.playing || suspended) video.pause()
     if (video.readyState < 1 || decoder.seeking || video.seeking) return
     const seconds = request.sourceTicks / PROJECT_TIMESCALE
     const tolerance = decoder.playing ? 0.08 : 0.001
@@ -61,28 +62,42 @@ export function createLayerVideoDecoderPool(options: Readonly<{
       video.pause()
       return
     }
-    if (!decoder.playing || video.readyState < 2 || !video.paused || decoder.playPending) return
+    if (!allowPlayback || suspended || !decoder.playing || video.readyState < 2 || !video.paused || decoder.playPending) return
     decoder.playPending = true
     const epoch = decoder.playbackEpoch
     // play() may resolve after a pause, source replacement, or disposal.
     try {
       Promise.resolve(video.play()).then(() => {
         decoder.playPending = false
-        if (decoder.released || !decoder.playing) video.pause()
-        else if (epoch !== decoder.playbackEpoch) sync(decoder)
+        if (decoder.released || !decoder.playing || suspended) video.pause()
+        else if (epoch !== decoder.playbackEpoch) synchronizeGroup()
       }, () => {
         decoder.playPending = false
-        if (!decoder.released && decoder.playing && epoch === decoder.playbackEpoch) {
+        if (!decoder.released && decoder.playing && !suspended && epoch === decoder.playbackEpoch) {
           decoder.error = 'PLAYBACK_REJECTED'
           video.pause()
+          synchronizeGroup()
           options.onChange?.()
-        } else sync(decoder)
+        } else if (!decoder.released) synchronizeGroup()
       })
     } catch {
       decoder.playPending = false
       decoder.error = 'PLAYBACK_REJECTED'
       video.pause()
     }
+  }
+
+  // The editor freezes its composition clock while any required layer is not
+  // ready. Decoders must share that barrier, or a ready layer runs ahead and
+  // repeatedly seeks backwards while its sibling is still loading.
+  function synchronizeGroup() {
+    if (disposed) return
+    decoders.forEach(decoder => sync(decoder, false))
+    const blocked = [...decoders.keys()].some(id => status(id).state !== 'ready')
+    if (blocked && !suspended) decoders.forEach(decoder => { decoder.playbackEpoch += 1 })
+    suspended = blocked
+    if (suspended) decoders.forEach(decoder => decoder.video.pause())
+    else decoders.forEach(decoder => sync(decoder))
   }
 
   function release(decoder: Decoder) {
@@ -100,11 +115,12 @@ export function createLayerVideoDecoderPool(options: Readonly<{
       video, request: { ...request }, playing, released: false, seeking: false,
       playPending: false, playbackEpoch: 0, detach: () => undefined,
     }
-    const ready = () => { sync(decoder); options.onChange?.() }
-    const seeked = () => { decoder.seeking = false; sync(decoder); options.onChange?.() }
+    const ready = () => { synchronizeGroup(); options.onChange?.() }
+    const seeked = () => { decoder.seeking = false; synchronizeGroup(); options.onChange?.() }
     const failed = () => {
       decoder.error = 'MEDIA_DECODE_FAILED'
       video.pause()
+      synchronizeGroup()
       options.onChange?.()
     }
     video.addEventListener('loadedmetadata', ready)
@@ -168,8 +184,8 @@ export function createLayerVideoDecoderPool(options: Readonly<{
           if (decoder.playing !== shouldPlay) decoder.playbackEpoch += 1
           decoder.playing = shouldPlay
         }
-        sync(decoder)
       }
+      synchronizeGroup()
     },
     frame(id) {
       return status(id).state === 'ready' ? decoders.get(id)!.video : null

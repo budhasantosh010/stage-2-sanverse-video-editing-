@@ -1,5 +1,13 @@
 # Project Log
 
+## 2026-09-12 — Focused loading synchronization and save feedback
+
+- Reproduced two decoder failures before implementing a group readiness barrier. Ready layers now pause while a required sibling loads or corrects drift; stale play promises respect the barrier and disposal.
+- Reproduced stale Inspector saved-change status and notified the existing save-state reducer only after accepted server persistence.
+- Affected tests: 100/100; production web build PASS (JS 1,018.55 kB/gzip 283.83, +0.29/+0.11 versus pushed baseline); independent review PASS with one nonblocking deferred-play coverage suggestion. No dependencies or Motion changes.
+- Previous approval/reviewer usage interruption recovered on resume. The ownership checker initially could not spawn Git in the restricted environment; the same scoped check passed with approved execution.
+- Independent audio remains explicitly unimplemented. Do not confuse this follow-up with full FAIL-069 closure.
+
 ## 2026-09-12 — Layered timeline release candidate and requested push
 
 - Connected bounded layered canvases to the canonical Studio clock and the shared preview/export layer manifest. Transferred footage now automatically selects v10; existing single-primary projects retain v9.

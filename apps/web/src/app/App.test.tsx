@@ -233,6 +233,8 @@ describe('App', () => {
     await user.click(within(soundSection).getByRole('button', { name: 'Apply' }))
 
     await waitFor(() => expect(api.current().revision).toBe(1))
+    await waitFor(() => expect(screen.getByRole('status', { name: 'Project save status' }))
+      .toHaveTextContent('Saved on this computer · up to change 1'))
     expect(api.current().changeSets).toHaveLength(1)
     expect(api.current().changeSets[0].changeSet.operations).toEqual([
       expect.objectContaining({

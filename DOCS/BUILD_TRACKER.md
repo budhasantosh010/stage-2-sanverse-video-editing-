@@ -2,6 +2,11 @@
 
 Last updated: 2026-09-12
 
+- [x] Follow-up: shared decoder readiness barrier prevents ready layers running ahead during sibling loading/seeking; RED/GREEN regression, 100/100 affected checks, production build and independent review PASS.
+- [x] FAIL-094 accepted Inspector/motion save callback updates the header revision.
+- [ ] Independent extracted dialogue and end-to-end independent audio editing.
+- [ ] Continuous matched editing workflow and owner confidence acceptance; not equivalent to test-pass percentage.
+
 Latest: layered Studio presentation/shared clock, automatic v10 transfer compilation and cross-track overlap operations are implemented. Same-track overlay stacking review correction is included. Independent extracted audio and owner confidence are still unchecked. See `DOCS/evidence/2026-09-12-layered-timeline-release.md` for final evidence; September 12 push is owner-authorized and supersedes historical no-push notes.
 
 Latest: FAIL-088 reverse resources Studio-wired, FAIL-089 pending reverse seek restored, FAIL-090 linked-audio Inspector focus repaired. 103/103 focused regression; real UI exact reverse seek and draft guard verified; original test content saved at 58. Still open: live layered canvas/clock, preview/export overlap release, independent extracted audio, full matched editing-confidence workflow. Do not start Motion integration or claim competitor-parity percentage yet.

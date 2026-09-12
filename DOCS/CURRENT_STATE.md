@@ -2,6 +2,10 @@
 
 Last updated: 2026-09-12
 
+## Latest follow-up — decoder barrier and save feedback
+
+Resume baseline: pushed commit `cb857393c28034633ac4cfb549494ff3091f884d`, branch `timeline-t55-editor-confidence`. Two focused fixes now pass 100/100 affected web tests: all active picture decoders pause together while one loads/seeks, and accepted Inspector/motion edits update the saved revision label. Web production build PASS: JS 1,018.55 kB / gzip 283.83; CSS unchanged. Independent four-file review PASS; scoped ownership boundary PASS, no Motion changes. See the September 12 release report for remaining work. Independent extracted dialogue and the full matched owner workflow are still OPEN; no competitor-parity claim.
+
 ## Authoritative latest checkpoint — layered timeline release candidate
 
 The September 12 owner request explicitly authorizes committing and pushing this timeline batch, superseding historical local-only/no-push instructions below. Branch: `timeline-t55-editor-confidence`; pre-batch HEAD: `be50d9dbf316d3207954402452d7156d471549bf`. Motion/2000 remains untouched.
