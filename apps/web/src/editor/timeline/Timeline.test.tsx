@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -129,6 +129,45 @@ const renderTimeline = (input: Readonly<{
 }
 
 describe('Timeline V1', () => {
+  it('keeps scrolling both axes during a stationary edge hold and stops without committing on cancel', () => {
+    const frames = new Map<number, FrameRequestCallback>()
+    let nextFrame = 0
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frames.set(++nextFrame, callback); return nextFrame })
+    const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(id => { frames.delete(id) })
+    const commit = vi.fn()
+    const preview = vi.fn(() => ({ ok: true as const, operations: [], description: 'Move', landingStartTicks: 0 }))
+    const { container, unmount } = renderTimeline({ bodyDrag: { preview, commit } })
+    try {
+      const port = container.querySelector<HTMLElement>('[data-timeline-viewport]')!
+      Object.defineProperties(port, {
+        scrollWidth: { configurable: true, value: 3000 }, clientWidth: { configurable: true, value: 600 },
+        scrollHeight: { configurable: true, value: 2000 }, clientHeight: { configurable: true, value: 300 },
+      })
+      const bounds = { left: 0, right: 600, top: 0, bottom: 300, width: 600, height: 300, x: 0, y: 0, toJSON: () => ({}) }
+      vi.spyOn(port, 'getBoundingClientRect').mockReturnValue(bounds)
+      const clip = screen.getByRole('button', { name: /clip, video/i })
+      vi.spyOn(clip.closest('[data-body-track-id]')!, 'getBoundingClientRect').mockReturnValue(bounds)
+      const send = (type: string, x: number, y: number) => {
+        const event = new Event(type, { bubbles: true })
+        Object.defineProperties(event, { button: { value: 0 }, pointerId: { value: 31 }, clientX: { value: x }, clientY: { value: y }, shiftKey: { value: true } })
+        fireEvent(clip, event)
+      }
+      send('pointerdown', 200, 100)
+      send('pointermove', 598, 298)
+      for (let frame = 1; frame <= 60; frame++) act(() => {
+        const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback(frame * 16))
+      })
+      expect(port.scrollLeft).toBeGreaterThan(500)
+      expect(port.scrollTop).toBeGreaterThan(500)
+      expect(preview.mock.calls.length).toBeGreaterThan(50)
+      expect(commit).not.toHaveBeenCalled()
+      send('pointercancel', 598, 298)
+      const left = port.scrollLeft, top = port.scrollTop
+      act(() => { const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback(1200)) })
+      expect([port.scrollLeft, port.scrollTop]).toEqual([left, top])
+      expect(commit).not.toHaveBeenCalled()
+    } finally { unmount(); raf.mockRestore(); cancel.mockRestore() }
+  }, 20_000)
   it.each([100, 400])('cancels an outside drop after the last pointermove at y=%s', (lastMoveY) => {
     const commit = vi.fn()
     const { container } = renderTimeline({ bodyDrag: { preview: () => ({ ok: true, operations: [], description: 'Move', landingStartTicks: 0 }), commit } })

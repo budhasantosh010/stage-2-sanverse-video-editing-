@@ -13,7 +13,7 @@ import {
   type DerivedMediaClip,
 } from './timeline-derived-media'
 import { derivedMediaClipFor, type AssetFacts } from './timeline-item-clip'
-import { mediaAnalysisKeyId } from './media-analysis-key'
+import { mediaAnalysisKeyId, FILMSTRIP_GRID_TICKS } from './media-analysis-key'
 import {
   LONG_FORM_IMAGE_ITEMS,
   LONG_FORM_MUSIC_ITEMS,
@@ -59,6 +59,19 @@ const keyIds = (clip: DerivedMediaClip, pixelsPerSecond = 100): readonly string[
   derivedMediaKeys(plan(clip, pixelsPerSecond)).map(mediaAnalysisKeyId)
 
 describe('which pictures one piece of footage needs', () => {
+  it('maps retimed filmstrip cells over the complete source span', () => {
+    const media = plan(videoClip({ sourceStartTicks: 4 * T, sourceDurationTicks: 4 * T, durationTicks: 2 * T }))
+    if (media.kind !== 'filmstrip') throw new Error('expected filmstrip')
+    expect(media.cells.at(-1)!.key.sourceTicks).toBeGreaterThanOrEqual(7 * T)
+    expect(media.cells.at(-1)!.offsetPx + media.cells.at(-1)!.widthPx).toBeCloseTo(200)
+  })
+
+  it('starts reversed filmstrips at the final source moment', () => {
+    const media = plan(videoClip({ sourceStartTicks: 4 * T, sourceDurationTicks: 4 * T, durationTicks: 2 * T, sourceDirection: 'reverse' }))
+    if (media.kind !== 'filmstrip') throw new Error('expected filmstrip')
+    expect(media.cells[0].key.sourceTicks).toBe(8 * T - FILMSTRIP_GRID_TICKS)
+    expect(media.cells.at(-1)!.key.sourceTicks).toBeLessThan(media.cells[0].key.sourceTicks)
+  })
   it('takes them from the recording, offset by however much was trimmed', () => {
     const untrimmed = plan(videoClip())
     const trimmed = plan(videoClip({ sourceStartTicks: 4 * T }))
@@ -202,6 +215,18 @@ describe('which pictures a still picture needs', () => {
 describe('which loudness numbers a piece of sound needs', () => {
   const sound = (overrides: Partial<DerivedMediaClip> = {}) =>
     plan(videoClip({ drawSound: true, mediaKind: 'audio', ...overrides }))
+
+  it('uses source duration, not screen duration, for retimed sound', () => {
+    const media = sound({ sourceStartTicks: 4 * T, durationTicks: 2 * T, sourceDurationTicks: 4 * T })
+    expect(media).toMatchObject({ kind: 'waveform', fromTicks: 4 * T, toTicks: 8 * T })
+  })
+
+  it('carries reverse direction without reversing reusable source block keys', () => {
+    const forward = sound({ sourceStartTicks: 4 * T, sourceDurationTicks: 4 * T, durationTicks: 2 * T })
+    const reverse = sound({ sourceStartTicks: 4 * T, sourceDurationTicks: 4 * T, durationTicks: 2 * T, sourceDirection: 'reverse' })
+    expect(reverse).toMatchObject({ kind: 'waveform', sourceDirection: 'reverse', fromTicks: 4 * T, toTicks: 8 * T })
+    expect(derivedMediaKeys(reverse)).toEqual(derivedMediaKeys(forward))
+  })
 
   it('covers the stretch of the file the clip actually shows', () => {
     const media = sound({ sourceStartTicks: 4 * T, durationTicks: 3 * T })

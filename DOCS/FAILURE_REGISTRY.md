@@ -13,6 +13,25 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 
 ## Active issues
 
+### FAIL-099 — Retimed/reversed waveforms and filmstrips showed wrong source moments
+
+- What/where: timeline-item-clip.ts → timeline-derived-media.ts → TimelineWaveform.tsx; canonical picture, linked dialogue and extracted sound decorations.
+- When/who: September14 remaining-confidence audit; users cutting visually after changing speed/direction.
+- How/why: the decoration adapter dropped source duration/direction. Planning treated composition duration as source duration, and waveform bars always drew forward. Export/audio playback were not the source of this defect.
+- Impact: plausible-looking but incorrect waveform/transient or thumbnail placement can cause the user to cut at the wrong moment.
+- Attempts/evidence: four new regressions failed first; carry explicit source duration/direction, scale filmstrip cells into composition width, mirror reverse waveform bars while retaining reusable source keys. Focused decoration/dataflow/canvas checks 62/62 PASS. Existing frame-cache quarter-second quantization remains; tests were corrected to that documented cache contract instead of asserting one-tick thumbnail accuracy.
+- Status: RESOLVED for reproduced timing defect; live-browser acceptance remains blocked by INFRA-023.
+- One-line solution: derive decorations from canonical source span/direction, never badge text or screen duration.
+
+### INFRA-023 — Browser connection unavailable during remaining confidence gate
+
+- What/where: Codex in-app browser control for localhost:2010, September14 follow-up after cbea7814.
+- How/why: selecting the existing tab timed out and reset the browser kernel; one fresh surface-inventory attempt also timed out. Internal cause unknown; no website-level action could be completed.
+- Impact: blocks sustained live held-drag, new waveform visual verification and matched OpenCut comparison. Component checks are not a replacement for this evidence.
+- Attempts/evidence: restarted only the authorized 2010/2011 launcher; attempted getTab then getState, each bounded at30 seconds. Stopped repeated retries. No project mutation or new UI-export claim in this follow-up.
+- Status: BLOCKED.
+- One-line solution: restore the browser-control connection, then resume the exact held-drag/waveform/same-task comparison checklist from the follow-up report.
+
 ### FAIL-096 — Explicit audio split/delete could fall through to another clip
 
 - What/where: timeline-gesture-adapter.ts; explicit selected-clip commands in overlapping picture/audio timelines.
@@ -282,7 +301,7 @@ September 9: FAIL-069 remains OPEN. Opt-in v10 layer contract and synthetic laye
 | [x] | FAIL-066 | P1 | T5.5 repair | Waveform contrast and selection reflow obscured editing | RESOLVED | T5.5 confidence |
 | [x] | FAIL-067 | P0 | T5.5 repair | Incompatible tracks passed compatibility validation | RESOLVED | T5.5 confidence |
 | [x] | FAIL-068 | P1 | T5.5 repair | Saved-change label lagged behind a successfully persisted drag | RESOLVED | T5.5 confidence |
-| [ ] | FAIL-069 | P1 | T5.5 repair | Primary footage cannot move freely between video tracks | OPEN | T5.5 confidence |
+| [ ] | FAIL-069 | P1 | T5.5 repair | Layered transfer/extracted audio implemented; confidence monitoring remains | MONITORING | September14 release |
 | [ ] | INFRA-006 | P2 | T5.5 repair | Fresh extra-audio browser test could not open filechooser | BLOCKED | T5.5 confidence |
 | [ ] | INFRA-007 | P2 | T5.5 repair | Viewport and screenshot evidence dimensions mismatched requested size | MONITORING | T5.5 confidence |
 | [ ] | FAIL-070 | P1 | T5.5 repair | Edge scrolling implemented; sustained edge-hold UI proof remains | MONITORING | T5.5 confidence |
@@ -480,9 +499,10 @@ Evidence: `DOCS/evidence/2026-09-06-t55-drag-reliability/T55_DRAG_RELIABILITY.md
 
 - **Status / impact:** MONITORING, P1; outside release fixed, sustained edge-hold UI proof outstanding.
 - **Where / when:** TimelineItem.moveBodyDrag; Sep6 focused source review.
-- **What / how / why:** No hovered lane falls back to source track; no edge-autoscroll is added, limiting long or diagonal drag confidence.
+- **What / how / why:** Original outside-target fallback and missing edge scrolling were corrected; sustained live held-pointer confidence evidence remains outstanding.
 - **Attempted / evidence:** Added visible-lane hit testing, actual-release recomputation and bounded RAF edge scrolling. Regression first failed because pointerup used the last valid lane; now both outside-move and outside-release cases pass. Live outside drop left revision 15 unchanged. Geometry tests cover both axes, outside bounds and delayed-frame caps. A DOMRect.toJSON assumption caused a test error; replaced with explicit rectangle fields.
-- **One-line solution:** Keep release targeting authoritative and finish sustained edge-hold UI verification before closing the whole issue.
+- **September14 update:** Actual Timeline component is now exercised with a stationary corner pointer across60 scheduled frames, checking both scroll axes, repeated landing recomputation, no early commit and cancel cleanup. This is simulated DOM/RAF evidence, not a native browser smoothness measurement. Native browser control is blocked by INFRA-023.
+- **One-line solution:** Keep release targeting authoritative and finish sustained edge-hold UI verification after browser recovery before closing the whole issue.
 
 ### FAIL-072 — Audio-name drag changed volume
 

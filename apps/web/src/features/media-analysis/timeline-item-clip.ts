@@ -69,6 +69,8 @@ export const derivedMediaClipFor = (
     // A picture has no moments, so its moment is always zero rather than
     // whatever number happened to be lying around.
     sourceStartTicks: facts.mediaKind === 'image' ? 0 : Math.max(0, item.sourceStartTicks ?? 0),
+    sourceDurationTicks: item.sourceDurationTicks ?? item.durationTicks,
+    sourceDirection: item.sourceDirection ?? 'forward',
     drawSound,
   })
 }

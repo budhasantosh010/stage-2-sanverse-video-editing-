@@ -4,6 +4,10 @@ Last updated: 2026-09-14
 
 ## Current release
 
+- [x] FAIL-099 retimed/reversed waveform and filmstrip source accuracy; focused tests/build/independent review.
+- [x] Sustained stationary edge-hold/cancel component proof,60 frames/both axes; not a live-browser performance claim.
+- [ ] Live waveform/held-drag/OpenCut comparison — BLOCKED by INFRA-023 browser connection.
+
 - [x] Independently extracted sound: typed operation, own identity/track, drag/trim/split/delete/gain/fades/pan, Inspector, history, save/reopen and shared preview/export.
 - [x] Three independent-review blockers fixed (FAIL-096/097/098), focused regression, final production build/re-review and scoped boundary check.
 - [x] Bounded real-browser audio/timing workflow and two fully decoded MP4s; temporary edits restored at saved revision92.

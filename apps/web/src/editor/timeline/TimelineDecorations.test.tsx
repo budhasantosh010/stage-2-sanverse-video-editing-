@@ -20,6 +20,8 @@ import {
 import { drawsOn } from '../../test/setup'
 import { DEFAULT_KEYMAP, DEFAULT_TRACK_PRESENTATION } from '../../features/timeline'
 import { Timeline } from './Timeline'
+import { acceptChangeSet } from '@sanverse/edit-domain'
+import { changeSetOf, testProject, testSetTimeTransform } from '@sanverse/edit-domain/test-fixtures'
 import { laneHeightPx, TIMELINE_LANE_HEIGHTS } from './timeline-lane-metrics'
 
 /**
@@ -210,6 +212,17 @@ describe('real pictures inside the footage', () => {
 })
 
 describe('real sound shapes', () => {
+  it('paints reversed sound from right to left using the actual source peaks', async () => {
+    const base = testProject()
+    const accepted = acceptChangeSet(base, changeSetOf('changeset_waveformreverse', base.revision, [testSetTimeTransform({ direction: 'reverse' })]))
+    if (!accepted.ok) throw new Error(JSON.stringify(accepted.error))
+    await renderTimeline({ project: accepted.value, client: instantClient({ peaks: [0, 0.4, 0.9, 0.2] }) })
+    const shape = canvasesIn(/A1 dialogue lane/i, 'timeline-waveform')[0]
+    const rectangles = drawsOn(shape).filter(draw => draw.kind === 'rect')
+    expect(rectangles.length).toBeGreaterThan(4)
+    expect(rectangles[0].args[0]).toBeGreaterThan(rectangles.at(-1)!.args[0])
+    expect(Math.max(...rectangles.map(draw => draw.args[3]))).toBeGreaterThan(Math.min(...rectangles.map(draw => draw.args[3])))
+  })
   it('reserves a separate name strip above the waveform', async () => {
     await renderTimeline()
     const waveform = canvasesIn(/A1 dialogue lane/i, 'timeline-waveform')[0]

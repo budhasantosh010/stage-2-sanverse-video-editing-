@@ -29,6 +29,8 @@ Do not remove current overlap guards while only the decoder foundation exists. D
 
 ## Current checkpoint
 
+**September14 follow-up:** FAIL-099 retimed/reversed waveform and filmstrip accuracy fixed. Sustained60-frame two-axis edge-hold/cancel component proof passed; live/browser comparison remains BLOCKED by INFRA-023. See evidence/2026-09-14-timeline-decoration-followup.md. Do not check off the full real workflow/confidence gates from simulated component evidence.
+
 **September 14:** Independent extracted audio and three review corrections delivered; bounded browser extraction/drag/trim/split/delete/history/reopen, half/double-speed/reverse playback and two exports passed. Original content restored at revision92. Final build/independent review passed. See evidence/2026-09-14-independent-audio-release.md. The full continuous/comparison checklist and owner confidence below remain open; this release does not relabel them as complete.
 
 September 12 focused follow-up: FAIL-094 save feedback and FAIL-095 decoder group readiness repaired; 100/100 affected checks, web build, independent review and boundary PASS. Temporary browser edits restored at saved change 70. Independent audio and continuous workflow/confidence gates remain unchecked. See release report for exact scope and limitations.

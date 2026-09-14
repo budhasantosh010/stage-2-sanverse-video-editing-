@@ -1,5 +1,11 @@
 # Project Log
 
+## 2026-09-14 — Remaining-confidence source decoration correction
+
+- Reproduced four wrong-source-timing/direction cases; fixed shared media decoration projection, reversed waveform drawing and retimed filmstrip placement (FAIL-099).
+- Focused decorations62/62, existing timeline32/32, sustained60-frame edge-hold/cancel1/1 passed in separate selections. Default timeout caused a test harness cascade; isolated runs with bounded deadlines passed unchanged assertions. New test fixture nullable duration corrected. Frontend production build/review/boundary PASS.
+- Browser getTab and one fresh inventory call each timed out/reset; live comparison remains BLOCKED (INFRA-023). No project edits or new export. Published handoff lists exact recovery workflow and owner-only acceptance; no Motion change/parity claim.
+
 ## 2026-09-14 — Independent audio and bounded workflow release
 
 - Implemented typed extraction preserving source identity and one shared editor/history/compiler/mixer. Added independent audio movement, trimming, splitting/deletion and Inspector routing through existing controls.

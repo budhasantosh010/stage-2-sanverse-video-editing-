@@ -61,6 +61,8 @@ export type TimelineItemView = Readonly<{
   /** Original-media time when this item refers to source footage. */
   sourceStartTicks: number | null
   sourceDurationTicks: number | null
+  /** Source playback direction for decorations; never inferred from a label. */
+  sourceDirection?: 'forward' | 'reverse'
 
   gainDb: number | null
   fadeInTicks: number | null

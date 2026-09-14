@@ -460,7 +460,7 @@ export const buildTimelineViewModel = (
         assetId: clip.assetId, operationId: null, changeSetId: null,
         sourceStartTicks: clip.sourceRange.start.ticks, sourceDurationTicks: clip.sourceRange.duration.ticks,
         gainDb: clip.gainDb, fadeInTicks: clip.fadeIn.ticks, fadeOutTicks: clip.fadeOut.ticks, pan: clip.pan,
-        speedBadge: speedBadgeFor(clip.timeTransform), proposalId: null, proposalBaseRevision: null,
+        speedBadge: speedBadgeFor(clip.timeTransform), sourceDirection: clip.timeTransform.direction, proposalId: null, proposalBaseRevision: null,
       }, selectedItemIds))
     }
   }
@@ -524,6 +524,7 @@ export const buildTimelineViewModel = (
         fadeOutTicks: clip.fadeOut.ticks,
         pan: clip.pan,
         speedBadge: speedBadgeFor(clip.timeTransform),
+        sourceDirection: clip.timeTransform.direction,
         proposalId: null,
         proposalBaseRevision: null,
       }, selectedItemIds))
@@ -570,6 +571,7 @@ export const buildTimelineViewModel = (
           fadeOutTicks: freeze ? null : clip.fadeOut.ticks,
           pan: freeze ? null : clip.pan,
           speedBadge: freeze ? 'Freeze' : speedBadgeFor(clip.timeTransform),
+          sourceDirection: clip.timeTransform.direction,
           proposalId: null,
           proposalBaseRevision: null,
         }, selectedItemIds))

@@ -97,6 +97,9 @@ export type DerivedMediaClip = Readonly<{
   durationTicks: number
   /** Where it starts inside its own file. Zero for a picture. */
   sourceStartTicks: number
+  /** Distinct from on-screen duration after slow/fast playback. */
+  sourceDurationTicks?: number
+  sourceDirection?: 'forward' | 'reverse'
   /** True when it is the sound of a piece of footage rather than a picture. */
   drawSound: boolean
 }>
@@ -128,6 +131,7 @@ export type ClipDerivedMedia =
       /** The stretch of the file the clip actually shows, for slicing. */
       fromTicks: number
       toTicks: number
+      sourceDirection?: 'forward' | 'reverse'
     }>
 
 export type ClipDerivedMediaInput = Readonly<{
@@ -157,11 +161,13 @@ export const clipDerivedMedia = (input: ClipDerivedMediaInput): ClipDerivedMedia
   if (clip.assetVersion.length === 0) return Object.freeze({ kind: 'none' as const })
 
   const widthPx = clipWidthPx(clip.durationTicks, timescale, pixelsPerSecond)
+  const sourceDuration = Math.max(1, clip.sourceDurationTicks ?? clip.durationTicks)
+  const sourceRate = sourceDuration / Math.max(1, clip.durationTicks)
 
   if (clip.drawSound) {
     if (widthPx < MIN_CLIP_WIDTH_FOR_WAVEFORM_PX) return Object.freeze({ kind: 'none' as const })
     const fromTicks = clip.sourceStartTicks
-    const toTicks = clip.sourceStartTicks + clip.durationTicks
+    const toTicks = clip.sourceStartTicks + sourceDuration
     const planned = planWaveformBlocks({
       fromTicks,
       toTicks,
@@ -191,6 +197,7 @@ export const clipDerivedMedia = (input: ClipDerivedMediaInput): ClipDerivedMedia
       truncated: planned.truncated,
       fromTicks,
       toTicks,
+      sourceDirection: clip.sourceDirection ?? 'forward',
     })
   }
 
@@ -217,7 +224,7 @@ export const clipDerivedMedia = (input: ClipDerivedMediaInput): ClipDerivedMedia
    * ticks — converting through rounded seconds drifts a frame or two across a
    * long timeline, and the drift is invisible until it is wrong.
    */
-  const rawStepTicks = (cellWidthPx / Math.max(1, pixelsPerSecond)) * timescale
+  const rawStepTicks = (cellWidthPx / Math.max(1, pixelsPerSecond)) * timescale * sourceRate
   const stepTicks = Math.max(
     FILMSTRIP_GRID_TICKS,
     Math.round(rawStepTicks / FILMSTRIP_GRID_TICKS) * FILMSTRIP_GRID_TICKS,
@@ -248,19 +255,21 @@ export const clipDerivedMedia = (input: ClipDerivedMediaInput): ClipDerivedMedia
    * entire filmstrip.
    */
   const sourceStartTicks = clip.sourceStartTicks
-  const sourceEndTicks = sourceStartTicks + clip.durationTicks
-  const moments: number[] = [sourceStartTicks]
+  const sourceEndTicks = sourceStartTicks + sourceDuration
+  const reverse = clip.sourceDirection === 'reverse'
+  const firstMoment = reverse ? sourceEndTicks - 1 : sourceStartTicks
+  const moments: number[] = [firstMoment]
   let truncated = false
   for (
-    let moment = Math.ceil((sourceStartTicks + 1) / stepTicks) * stepTicks;
-    moment < sourceEndTicks;
-    moment += stepTicks
+    let moment = reverse ? Math.floor((firstMoment - 1) / stepTicks) * stepTicks : Math.ceil((firstMoment + 1) / stepTicks) * stepTicks;
+    reverse ? moment >= sourceStartTicks : moment < sourceEndTicks;
+    moment += reverse ? -stepTicks : stepTicks
   ) {
     if (moments.length >= maxCells) { truncated = true; break }
     moments.push(moment)
   }
 
-  const toPx = (ticks: number): number => (ticks / Math.max(1, timescale)) * Math.max(1, pixelsPerSecond)
+  const toPx = (ticks: number): number => (ticks / Math.max(1, timescale)) * Math.max(1, pixelsPerSecond) / sourceRate
   const cells: FilmstripCell[] = moments.map((moment, index) => {
     const key = filmstripFrameKey({
       assetId: clip.assetId,
@@ -271,12 +280,13 @@ export const clipDerivedMedia = (input: ClipDerivedMediaInput): ClipDerivedMedia
     // Each picture fills the space up to the next one, and the last is cropped
     // to the clip's end — so a filmstrip can never draw past the clip it
     // belongs to, and never leaves a gap between two pictures.
-    const nextMoment = moments[index + 1] ?? sourceEndTicks
+    const offsetPx = toPx(Math.abs(moment - firstMoment))
+    const nextOffsetPx = moments[index + 1] === undefined ? widthPx : toPx(Math.abs(moments[index + 1] - firstMoment))
     return Object.freeze({
       key,
       keyId: mediaAnalysisKeyId(key),
-      offsetPx: toPx(moment - sourceStartTicks),
-      widthPx: Math.max(1, toPx(nextMoment - moment)),
+      offsetPx,
+      widthPx: Math.max(1, nextOffsetPx - offsetPx),
     })
   })
 

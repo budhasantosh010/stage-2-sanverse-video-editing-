@@ -2,6 +2,8 @@
 
 This is the smallest authoritative resume point for a new or compacted session.
 
+Latest September14 follow-up: source-timing waveform/filmstrip fix verified; live held-drag/waveform/OpenCut comparison blocked by browser control (INFRA-023). Read the LATEST FOLLOW-UP section of DOCS/HANDOFF.md first, then evidence/2026-09-14-timeline-decoration-followup.md.
+
 **CURRENT TIMELINE RESUME — September 14:** Read the top of DOCS/HANDOFF.md first and evidence/2026-09-14-independent-audio-release.md. Independent audio, review fixes and bounded browser/edit/export workflow are delivered on timeline-t55-editor-confidence. Original test content restored at saved revision92; do not repeat Undos. Sustained interaction/comparison and owner acceptance remain OPEN. Verify HEAD/remote; older T5/checkpoint sections are historical, not a parity declaration.
 
 ## Macro goal

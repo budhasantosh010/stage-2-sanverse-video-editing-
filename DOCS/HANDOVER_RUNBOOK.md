@@ -4,6 +4,8 @@ Use this runbook when a new session, agent, or context window resumes the projec
 
 ## Current handoff — September 14
 
+Newest checkpoint: waveform/filmstrip source-time/direction correction verified; live held-drag/waveform/OpenCut comparison BLOCKED by INFRA-023. Start at LATEST FOLLOW-UP in HANDOFF.md and evidence/2026-09-14-timeline-decoration-followup.md; older release evidence remains valid within its named scope.
+
 Use CURRENT HANDOFF at the top of DOCS/HANDOFF.md for exact checkout, release evidence, failures, restoration92, startup and ordered next work. Independent audio and bounded functional workflow are delivered; sustained interaction/comparison and owner confidence remain OPEN. Re-check Git/project state; never repeat historical Undos. The literal one-video constraint below was superseded by bounded muted decoders under one composition clock. Report: evidence/2026-09-14-independent-audio-release.md.
 
 ## Historical handoff — August T5

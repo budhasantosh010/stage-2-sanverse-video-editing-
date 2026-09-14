@@ -1,5 +1,15 @@
 # HANDOFF — everything a new agent needs to continue Sanverse Stage 2
 
+## LATEST FOLLOW-UP — September14 source-timing accuracy
+
+This section supersedes remaining-status wording below. Base release `cbea7814ad5aa7ea68709123463ab0c03c26cafb` is already pushed. This follow-up fixes FAIL-099: retimed/reversed waveforms and filmstrips now use the true source span/direction rather than on-screen duration. One existing projection/cache path; no domain/export changes or Motion edits.
+
+Verification: decoration/dataflow/canvas62/62 PASS; existing Timeline32/32 PASS in a separate selection; new60-frame stationary two-axis edge-hold/cancel1/1 PASS. Final frontend build and independent review PASS. JS1,025.17kB/gzip285.74; CSS unchanged. Detailed failed attempts, limits and exact next steps: `evidence/2026-09-14-timeline-decoration-followup.md`.
+
+**Remaining agent-side high-impact gate: BLOCKED by INFRA-023.** Browser getTab timed out/reset; one fresh getState also timed out. Live held-drag/waveform verification and same-task OpenCut comparison cannot be certified by component tests. Restore the browser-control connection before retrying; do not repeatedly restart servers or implement guessed fixes. No project mutation or new export in this follow-up; last known restored content is revision92, re-check for owner edits.
+
+Owner-only acceptance remains: finish a real edit and listen to the exported sound. No competitor-confidence percentage is measured. Motion integration remains later/separately authorized. Exact checkout/startup and previous functional export evidence are below. Follow-up commit contains this handoff; verify HEAD and remote on resume.
+
 ## CURRENT HANDOFF — September 14 independent audio release
 
 This section supersedes historical checkpoints below. Branch: `timeline-t55-editor-confidence`; base `d8975c82bdb63cacd018e5bc2a4b6685eb299014`. Read `evidence/2026-09-14-independent-audio-release.md`, `CURRENT_STATE.md`, `FAILURE_REGISTRY.md` and `plans/2026-09-08-layered-editor-engine.md`. The focused release commit contains this handoff; verify HEAD and remote before continuing.

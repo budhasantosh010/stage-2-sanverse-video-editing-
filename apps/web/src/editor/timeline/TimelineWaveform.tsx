@@ -72,6 +72,7 @@ export function TimelineWaveform({
   const blocks = media.kind === 'waveform' ? media.blocks : []
   const fromTicks = media.kind === 'waveform' ? media.fromTicks : 0
   const toTicks = media.kind === 'waveform' ? media.toTicks : 0
+  const reverse = media.kind === 'waveform' && media.sourceDirection === 'reverse'
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -140,7 +141,8 @@ export function TimelineWaveform({
         const barWidth = sliceWidthPx / peaks.length
         for (let index = 0; index < peaks.length; index += 1) {
           const halfHeight = Math.max(0.5, (peaks[index] * availableHeight) / 2)
-          context.fillRect(leftPx + index * barWidth, centerY - halfHeight, Math.max(0.5, barWidth), halfHeight * 2)
+          const x = leftPx + index * barWidth
+          context.fillRect(reverse ? width - x - barWidth : x, centerY - halfHeight, Math.max(0.5, barWidth), halfHeight * 2)
         }
       }
 
@@ -153,8 +155,9 @@ export function TimelineWaveform({
         context.save()
         context.font = '9px system-ui, sans-serif'
         context.globalAlpha = muted ? 0.45 : 0.68
-        context.fillText('L', leftPx + 2, Math.min(height - 2, 9))
-        context.fillText('R', leftPx + 2, Math.max(10, half + 9))
+        const labelLeft = reverse ? width - leftPx - sliceWidthPx : leftPx
+        context.fillText('L', labelLeft + 2, Math.min(height - 2, 9))
+        context.fillText('R', labelLeft + 2, Math.max(10, half + 9))
         context.restore()
       } else {
         drawPeaks(combined, middle, height)
@@ -169,7 +172,7 @@ export function TimelineWaveform({
             : pending > 0 && ready === 0 ? 'loading'
               : 'ready',
     )
-  }, [controller, version, blocks, fromTicks, toTicks, widthPx, heightPx, muted, channelDisplayMode, selected, onStateChange])
+  }, [controller, version, blocks, fromTicks, toTicks, reverse, widthPx, heightPx, muted, channelDisplayMode, selected, onStateChange])
 
   if (media.kind !== 'waveform') return null
 
