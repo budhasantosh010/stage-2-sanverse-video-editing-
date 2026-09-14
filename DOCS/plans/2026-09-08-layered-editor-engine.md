@@ -19,7 +19,7 @@ Execution is local and sequential on the critical path, following the owner's in
 - [x] Layered export: scoped FFmpeg compositor, synthetic pixel/frame checks and real revision-64 1080p export/full decode. Existing non-overlap path preserved.
 - [x] Layered preview: dedicated bounded decoder/controller integrated into Studio under the existing editor playhead; focused lifecycle/Studio tests and real simultaneous pictures/playback verified. Performance/owner confidence stays a separate gate.
 - [x] Cross-layer overlap refusal removed only after shared renderer implementation; same-track collisions, locks and revision guards remain. Actual pointer transfer and history observed; temporary test edits restored.
-- [ ] Independent audio: introduce explicit typed extraction/link state and source identity; existing linked clips retain old behavior. Route independent moves/trims/gain through the same accepted operations/history and shared audio projection/export. No conversion of video assets into fake music assets.
+- [x] Independent audio: explicit typed extraction/link state and source identity; existing linked clips retain old behavior. Independent moves/trims/gain use the same accepted operations/history and shared audio projection/export. September14 browser/exact-export and synthetic-audio evidence recorded; no fake music assets.
 - [ ] Real workflow: overlap footage, resize/crop top layer, hide/reveal top track, independently move extracted audio, split/trim, Undo/Redo, save/reopen, export, inspect resulting frames and sound. Restore only temporary test edits.
 - [ ] Confidence closure: sustained edge scrolling, audio-body hit targets, waveform truth, same-task OpenCut comparison, and owner review. Automated tests do not establish subjective parity with OpenCut/CapCut/DaVinci.
 
@@ -28,6 +28,8 @@ Execution is local and sequential on the critical path, following the owner's in
 Do not remove current overlap guards while only the decoder foundation exists. Do not advertise independent audio before it is represented and rendered correctly. A partial implementation is recorded as partial, not as a finished editor.
 
 ## Current checkpoint
+
+**September 14:** Independent extracted audio and three review corrections delivered; bounded browser extraction/drag/trim/split/delete/history/reopen, half/double-speed/reverse playback and two exports passed. Original content restored at revision92. Final build/independent review passed. See evidence/2026-09-14-independent-audio-release.md. The full continuous/comparison checklist and owner confidence below remain open; this release does not relabel them as complete.
 
 September 12 focused follow-up: FAIL-094 save feedback and FAIL-095 decoder group readiness repaired; 100/100 affected checks, web build, independent review and boundary PASS. Temporary browser edits restored at saved change 70. Independent audio and continuous workflow/confidence gates remain unchecked. See release report for exact scope and limitations.
 
@@ -42,7 +44,7 @@ September 10 reverse/selection continuation: reverse resource pool and React bin
 - [x] Linked audio click focus with dirty-Inspector protection.
 - [x] Live layered canvas presentation with a shared composition clock and regression-tested stacking, gaps, speed/reverse/hold and transitions.
 - [x] Real simultaneous-picture preview and layered export evidence; only cross-track overlap guards removed. This is not comprehensive visual fidelity certification.
-- [ ] Typed independently extracted dialogue: move/trim/gain with correct history and preview/export audio.
+- [x] Typed independently extracted dialogue: move/trim/gain with correct history and preview/export audio — September14 release.
 - [ ] One continuous real-user workflow: trim, picture/timeline zoom, play/pause, slow/fast/reverse, drag both axes, split/delete, Undo/Redo, save/reopen and export; close sustained edge-hold and fresh audio-drag evidence.
 - [ ] Matched OpenCut/CapCut-style editing session and owner acceptance. This certifies the agreed workflow, not full competitor feature parity.
 

@@ -51,6 +51,20 @@ const defaultProps = {
 }
 
 describe('Inspector shell', () => {
+  it('shows extracted sound controls without picture controls or a linked-video claim', () => {
+    const original = selection(testProject(), `dialogue:${TEST_CLIP_ID}`)
+    if (original.kind !== 'dialogue') throw new Error('dialogue selection missing')
+    render(<Inspector {...defaultProps} selection={{ ...original,
+      timelineItemId: 'clip:clip_extracted01', laneKind: 'music',
+      clip: { ...original.clip, clipId: 'clip_extracted01', extractedFromClipId: TEST_CLIP_ID },
+    }} />)
+    expect(screen.getByLabelText('Gain (dB)')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Show this clip')).not.toBeInTheDocument()
+    expect(screen.queryByText('Transition')).not.toBeInTheDocument()
+    expect(screen.queryByText('Picture controls')).not.toBeInTheDocument()
+    expect(screen.queryByText('Dialogue linked to video')).not.toBeInTheDocument()
+  })
+
   it('shows the explicit empty state', () => {
     render(<Inspector {...defaultProps} selection={selection()} />)
     expect(screen.getByText('Nothing selected')).toBeInTheDocument()

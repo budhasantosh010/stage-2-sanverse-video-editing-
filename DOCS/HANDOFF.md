@@ -1,6 +1,37 @@
 # HANDOFF — everything a new agent needs to continue Sanverse Stage 2
 
-## CURRENT HANDOFF — September 12 timeline confidence
+## CURRENT HANDOFF — September 14 independent audio release
+
+This section supersedes historical checkpoints below. Branch: `timeline-t55-editor-confidence`; base `d8975c82bdb63cacd018e5bc2a4b6685eb299014`. Read `evidence/2026-09-14-independent-audio-release.md`, `CURRENT_STATE.md`, `FAILURE_REGISTRY.md` and `plans/2026-09-08-layered-editor-engine.md`. The focused release commit contains this handoff; verify HEAD and remote before continuing.
+
+### Completed now
+
+- Typed independent extraction with stable video-source identity and one atomic history entry. Sound can move/trim/split/delete and use its own gain/fades/pan/Inspector without moving the picture or duplicating dialogue.
+- Same canonical project/revision/operations/history, audio mixer and preview/export compiler. Audio-only nodes never enter the picture stack. Motion/2000 untouched; no new dependency or UI redesign.
+- Three independently reviewed blockers fixed: explicit split/delete falling through to another clip, long J/L fades invalidating extraction, and missing/misleading independent-audio Inspector (FAIL-096/097/098).
+- Bounded real-browser workflow: extraction → own gain → horizontal/vertical sound drag → trim → split → Undo/Redo → save/reopen → delete/Undo → export; then 0.5x → 2x → backwards picture → playback to end → second export.
+- Both real MP4s fully decoded. Final revision-84 export: 30.933333s, 15,751,833 bytes; SHA-256 `269b0ef225e843d006f87058de837ad78e1e128b2aff616ed12e53849e4532b8`. Paths, first export hash and exact revision ledger are in the release report.
+- A real synthetic FFmpeg test measures trim silence, gain, stereo pan, no doubled sound and unchanged picture length. This is not a full human-voice audition.
+
+### Verification and recovery
+
+- Domain 572/572, render contract 154/154 and affected web 732/732 passed before review corrections. Final correction selections: web48/48, extraction5/5; real synthetic FFmpeg1/1. Overlapping selections are not one additive suite total.
+- Final all-workspace production build PASS; JS1,024.62kB/gzip285.56, CSS145.14/gzip24.42. Independent re-review, added-line security scan, diff and editor ownership checks PASS. Font-runtime/chunk-size/CRLF warnings remain.
+- Test project `project_e58e4bb1e9f088fa38801efbeb52b83b` was restored by eight UI Undos at revisions85–92 to pre-test content from70. **Do not repeat these Undos.** Original V2 start1.678/duration24.989, V1 start28.412/duration5.011, title5–8, linked sound restored; no extracted audio remains in the restored owner project. Extraction is available to use again.
+- Exact checkout: `C:\Users\Lenovo\.chatgpt-code-harness\worktrees\task-T-9525c3a99bec0971c5a7c902-2c59592c\timeline-t55-editor-confidence`.
+- Start here with `npm run dev:timeline`, then open `http://localhost:2010/` (API2011). No repeated npm install. September14 hidden launcher PID2832 is historical; identify current ports/process before stopping anything.
+- Local media/exports/results under `.sanverse-data` are ignored and unavailable on a fresh clone. Leave the two pre-existing untracked JPGs in `evidence/2026-09-06-t55-drag-reliability/` untouched.
+- Rollback: scoped revert of this release if approved, never reset user work or mutate the separately owned Motion lane. This release extends the operation contract; older builds cannot replay newly extracted-audio projects.
+
+### Remaining high-impact work and ownership
+
+1. **Agent-assisted confidence gate, not closed:** sustained edge-autoscroll, waveform truth/readability, measured playback/interaction behavior and same-task recorded OpenCut comparison. The bounded functional walkthrough above does not complete the entire historical continuous/comparison checklist. Fix only reproduced blocking defects.
+2. **Owner-only acceptance:** do a real short edit, listen through the output and judge trust/smoothness. Record concrete action/timestamp/expected/actual differences. No defensible competitor-parity percentage exists yet.
+3. **After acceptance:** separately authorize Motion integration. Do not begin it from this handoff.
+
+INFRA-007 screenshot/coordinate mismatch still prevents exact visual certification; keyboard activation verified export when a pointer click missed. One Vite websocket recovery error was captured, not an export exception. INFRA-022 records interrupted sessions, wrong-cwd test invocation and missing test filtergraph setup. Final re-review suggested additional already-retimed/reversed extraction coverage (nonblocking). No claim that every registry entry is resolved.
+
+## Historical handoff — September 12 timeline confidence
 
 This section supersedes historical checkpoints below. Read it with CURRENT_STATE.md, plans/2026-09-08-layered-editor-engine.md, FAILURE_REGISTRY.md and evidence/2026-09-12-layered-timeline-release.md.
 

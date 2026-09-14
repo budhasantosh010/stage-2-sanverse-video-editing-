@@ -162,10 +162,12 @@ export const compileProjectToRenderPlan = (project: EditProject, options: Readon
   const segmentTrackIds = new Map<string, string>()
   for (const track of composition.tracks) {
     const timelineVideoTrack = trackById(trackState, track.trackId) ?? primaryTrack
-    const videoEnabledForTrack = timelineVideoTrack?.outputEnabled ?? true
-    const dialogueEnabledForTrack = trackAudible(dialogueTrack)
-    const dialogueGainDb = dialogueTrack?.audioState?.gainDb ?? 0
-    const dialoguePan = dialogueTrack?.audioState?.pan ?? 0
+    const audioOnly = track.kind === 'audio'
+    const soundTrack = audioOnly ? trackById(trackState, track.trackId) : dialogueTrack
+    const videoEnabledForTrack = !audioOnly && (timelineVideoTrack?.outputEnabled ?? true)
+    const dialogueEnabledForTrack = trackAudible(soundTrack)
+    const dialogueGainDb = soundTrack?.audioState?.gainDb ?? 0
+    const dialoguePan = soundTrack?.audioState?.pan ?? 0
     for (const clip of track.clips) {
       // A hidden piece leaves a hole rather than shifting everything after it,
       // so that switching it back on restores the exact video the user saw.
@@ -224,7 +226,7 @@ export const compileProjectToRenderPlan = (project: EditProject, options: Readon
       }
 
       const audioSource = linkedAudioSourceRange(clip)
-      const linkedAudio = asset.hasAudio
+      const linkedAudio = asset.hasAudio && !clip.audioDetached
         ? Object.freeze({
             interval: Object.freeze({
               start: mediaTime(linkedAudioCompositionStartTicks(clip)),
@@ -237,6 +239,7 @@ export const compileProjectToRenderPlan = (project: EditProject, options: Readon
       segments.push(Object.freeze({
         nodeId: clip.clipId,
         kind: 'source-segment' as const,
+        ...(audioOnly ? { audioOnly: true as const } : {}),
         interval,
         assetId: clip.assetId,
         sourceStartTicks: clip.sourceRange.start.ticks,
@@ -252,7 +255,7 @@ export const compileProjectToRenderPlan = (project: EditProject, options: Readon
         videoEnabled: videoEnabledForTrack,
         audioEnabled: dialogueEnabledForTrack && linkedAudio !== null,
         linkedAudio,
-        footageMotions: motions,
+        footageMotions: audioOnly ? Object.freeze([]) : motions,
         gainDb: clip.gainDb + dialogueGainDb,
         fadeInTicks: clip.fadeIn.ticks,
         fadeOutTicks: clip.fadeOut.ticks,

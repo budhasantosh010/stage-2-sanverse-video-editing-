@@ -270,7 +270,7 @@ export function TimelineItem({
     : canonicalLeftPx
   const widthPx = ticksToPixels(previewDurationTicks, timescale, pixelsPerSecond)
   const isOverlayFamily = DRAGGABLE_KINDS.includes(item.kind)
-  const isPrimaryPrecisionTarget = item.state === 'committed' && item.selected && laneKind === 'video'
+  const isPrimaryPrecisionTarget = item.state === 'committed' && item.selected && (laneKind === 'video' || laneKind === 'music')
     && item.kind === 'clip' && item.clipId !== null
   const canPrecisionEdge = isPrimaryPrecisionTarget
     && (precisionTool === 'standard-trim' || precisionTool === 'ripple-trim')
@@ -752,13 +752,13 @@ export function TimelineItem({
           durationTicks={item.durationTicks}
           disabled={busy}
           muted={muted || !item.enabled}
-          supportsPan={laneKind === 'dialogue'}
+          supportsPan={laneKind === 'dialogue' || item.clipId !== null}
           normalization={normalization}
           onCommit={(next: TimelineAudioState) => {
-            if (laneKind === 'dialogue' && item.linkedClipId !== null) {
+            if (item.clipId !== null || (laneKind === 'dialogue' && item.linkedClipId !== null)) {
               onGesture({
                 type: 'set-audio',
-                clipId: item.linkedClipId,
+                clipId: (item.clipId ?? item.linkedClipId) as string,
                 gainDb: next.gainDb,
                 fadeInTicks: next.fadeInTicks,
                 fadeOutTicks: next.fadeOutTicks,

@@ -1,6 +1,14 @@
 # Current State
 
-Last updated: 2026-09-12
+Last updated: 2026-09-14
+
+## Current authoritative checkpoint — independent audio release
+
+Typed independent sound extraction and its timeline/Inspector/history/preview/export path are implemented. Bounded browser workflow and two real exports passed; final export includes 2x backwards picture with independent sound. Three review blockers (FAIL-096/097/098) fixed; final independent review and all-workspace build PASS. Full evidence: `DOCS/evidence/2026-09-14-independent-audio-release.md`; resume from the top of `DOCS/HANDOFF.md`. Test edits restored at revision92 to revision70 content; do not repeat Undos. Branch remains `timeline-t55-editor-confidence`; this focused release includes the handoff. Motion unchanged.
+
+Remaining: agent-assisted sustained interaction/waveform/matched-comparison gate, then owner real-edit/audio/confidence acceptance. Those remain OPEN; do not claim parity or a completion percentage. Older paragraphs below describe their dated checkpoints, not the latest implementation state.
+
+## Historical September 12 checkpoint
 
 **Implementation HEAD verified for handoff: 4c4b297333c6d80fe160930926d3f0c17b7a90cf, pushed on timeline-t55-editor-confidence.** Complete current resume instructions are at the top of DOCS/HANDOFF.md. This documentation-only checkpoint makes no new runtime claims. High-impact work is NOT all finished: independent extracted audio, continuous real-user workflow and owner confidence remain OPEN. Temporary actions were restored at saved change70; re-check actual project state before editing.
 

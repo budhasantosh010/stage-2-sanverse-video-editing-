@@ -62,6 +62,10 @@ export type LinkedAudioWindowV1 = Readonly<{
 }>
 
 export type Clip = Readonly<{
+  /** True after a reversible extraction; absent means legacy linked sound. */
+  audioDetached?: boolean
+  /** Provenance only: an extracted audio clip remains editable after its picture is removed. */
+  extractedFromClipId?: string
   clipId: string
   assetId: string
   sourceRange: TimeRange
@@ -215,6 +219,8 @@ const CLIP_KEYS = [
  * render plan.
  */
 const OPTIONAL_CLIP_KEYS = [
+  'audioDetached',
+  'extractedFromClipId',
   'timeTransform',
   'pan',
   'segmentKind',
@@ -361,6 +367,7 @@ export const placeSourceSpan = (
 ): readonly SourceSpanPlacement[] => {
   const placements: SourceSpanPlacement[] = []
   for (const track of composition.tracks) {
+    if (track.kind !== 'video') continue
     for (const clip of track.clips) {
       if (clip.assetId !== assetId) continue
       const overlap = rangeIntersection(clip.sourceRange, sourceRange)
@@ -464,6 +471,13 @@ const validateClip = (
   // a refusal, not a silent fallback: a rate somebody hand-edited into a file
   // must not be quietly replaced by a different one.
   let pan = CENTRE_PAN
+  if (input.audioDetached !== undefined && typeof input.audioDetached !== 'boolean') {
+    issues.push({ path: `${path}.audioDetached`, code: 'TYPE_INVALID' })
+  }
+  if (input.extractedFromClipId !== undefined &&
+    (typeof input.extractedFromClipId !== 'string' || !CLIP_ID_PATTERN.test(input.extractedFromClipId))) {
+    issues.push({ path: `${path}.extractedFromClipId`, code: 'VALUE_OUT_OF_RANGE' })
+  }
   if (Object.hasOwn(input, 'pan')) {
     const stored = input.pan
     if (
@@ -655,6 +669,8 @@ const validateClip = (
   }
   return Object.freeze({
     clipId: input.clipId,
+    ...(input.audioDetached !== undefined ? { audioDetached: input.audioDetached as boolean } : {}),
+    ...(input.extractedFromClipId !== undefined ? { extractedFromClipId: input.extractedFromClipId as string } : {}),
     assetId: asset.assetId,
     sourceRange: sourceRange.value,
     compositionStart: compositionStart.value,
@@ -738,6 +754,14 @@ export const validateComposition = (
         rawTrack.clips.forEach((rawClip, clipIndex) => {
           const clip = validateClip(rawClip, `${trackPath}.clips[${clipIndex}]`, assets, issues)
           if (!clip) return
+          if (clip.extractedFromClipId !== undefined &&
+            (rawTrack.kind !== 'audio' || clip.audioDetached || isFreezeClip(clip) || clip.linkedAudio != null ||
+              assets.find(asset => asset.assetId === clip.assetId)?.hasAudio !== true)) {
+            issues.push({ path: `${trackPath}.clips[${clipIndex}].extractedFromClipId`, code: 'VALUE_OUT_OF_RANGE' })
+          }
+          if (clip.audioDetached && rawTrack.kind !== 'video') {
+            issues.push({ path: `${trackPath}.clips[${clipIndex}].audioDetached`, code: 'VALUE_OUT_OF_RANGE' })
+          }
           if (seenClipIds.has(clip.clipId)) {
             issues.push({ path: `${trackPath}.clips[${clipIndex}].clipId`, code: 'DUPLICATE_ID' })
             return

@@ -33,6 +33,7 @@ export const MOVE_PRIMARY_CLIP_PRIMITIVE_ID = 'sanverse.timeline.move-primary.pr
 export const CLIP_ENABLED_PRIMITIVE_ID = 'sanverse.timeline.enabled.primitive/v1'
 export const CLIP_AUDIO_PRIMITIVE_ID = 'sanverse.timeline.audio.primitive/v1'
 export const LINKED_AUDIO_PRIMITIVE_ID = 'sanverse.timeline.linked-audio.primitive/v1'
+export const EXTRACT_AUDIO_PRIMITIVE_ID = 'sanverse.timeline.extract-audio.primitive/v1'
 export const FREEZE_FRAME_PRIMITIVE_ID = 'sanverse.timeline.freeze-frame.primitive/v1'
 export const CLIP_TRANSITION_PRIMITIVE_ID = 'sanverse.timeline.transition.primitive/v1'
 /** One atomic full-state timing answer for professional precision edits. */
@@ -166,6 +167,14 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDescriptor[] = Object.freez
     level: 'primitive' as const,
     accepts: 'One piece of footage, a loudness change, and ramps at each end.',
     produces: Object.freeze(['set-clip-audio']),
+    requires: Object.freeze([]),
+  }),
+  Object.freeze({
+    capabilityId: EXTRACT_AUDIO_PRIMITIVE_ID,
+    version: 1,
+    level: 'primitive' as const,
+    accepts: 'A linked picture clip, a new audio clip identity and an existing independent audio track.',
+    produces: Object.freeze(['extract-clip-audio']),
     requires: Object.freeze([]),
   }),
   Object.freeze({

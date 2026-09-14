@@ -21,6 +21,9 @@ import {
 } from '../../features/timeline/timeline-test-fixtures'
 import { Timeline } from './Timeline'
 import type { TimelineBodyDragApi } from '../../features/timeline/timeline-body-drag-plan'
+import { acceptChangeSet, createIdFactory } from '@sanverse/edit-domain'
+import { testProject, changeSetOf, TEST_CLIP_ID } from '@sanverse/edit-domain/test-fixtures'
+import { planExtractAudio } from '../../features/timeline/timeline-extract-audio'
 
 afterEach(cleanup)
 
@@ -59,6 +62,7 @@ const renderTimeline = (input: Readonly<{
   freezeClipLabel?: string | null
   freezeUnavailableReason?: string | null
   onFreezeApply?: (durationTicks: number) => void
+  extractAudioUnavailableReason?: string | null
 }> = {}) => {
   const selection = input.selection ?? {
     itemIds: input.selectedItemId ? [input.selectedItemId] : [],
@@ -72,6 +76,7 @@ const renderTimeline = (input: Readonly<{
   })
   const props = {
     model,
+    extractAudioUnavailableReason: input.extractAudioUnavailableReason,
     playheadTicks: input.playheadTicks ?? 0,
     viewport: input.currentViewport ?? viewport(),
     selection,
@@ -199,7 +204,7 @@ describe('Timeline V1', () => {
     // Split moved from plain `S` to Ctrl+B, because `S` now toggles snapping
     // and one key with two meanings makes a user distrust their own hands.
     fireEvent.keyDown(screen.getByRole('region', { name: 'Project timeline' }), { key: 'b', ctrlKey: true })
-    expect(onGesture).toHaveBeenCalledWith({ type: 'split', atTicks: ticks(5) })
+    expect(onGesture).toHaveBeenCalledWith({ type: 'split', atTicks: ticks(5), clipId: TEST_CLIP_ID })
   })
 
   it('selects a main-video clip on pointer down so a loading filmstrip cannot swallow the first click', () => {
@@ -488,6 +493,33 @@ describe('Timeline V1', () => {
     expect(totalItems).toBeGreaterThan(150)
     expect(renderedItems.length).toBeGreaterThan(0)
     expect(renderedItems.length).toBeLessThan(totalItems / 2)
+  })
+
+  it('routes Extract audio from More to the shared action handler', () => {
+    const onAction = vi.fn()
+    renderTimeline({ onAction, extractAudioUnavailableReason: null })
+    fireEvent.click(screen.getByRole('button', { name: 'More things you can do' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Extract audio$/i }))
+    expect(onAction).toHaveBeenCalledWith('extract-audio')
+  })
+
+  it('exposes trim and independent gain on the selected extracted audio', () => {
+    const base = testProject()
+    const plan = planExtractAudio({ project: base, clipId: TEST_CLIP_ID, lockedTrackIds: [],
+      pendingProposalExists: false, exportInProgress: false, ids: createIdFactory('changeset_extractui') })
+    if (!plan.ok) throw new Error(plan.refusal.message)
+    const accepted = acceptChangeSet(base, changeSetOf('changeset_extractui', base.revision, plan.operations))
+    if (!accepted.ok) throw new Error(JSON.stringify(accepted.error))
+    const model = buildTimelineViewModel({ project: accepted.value, selectedItemIds: [], pending: null })
+    const item = model.lanes.flatMap(lane => lane.items).find(item => item.detail === 'Independent audio')!
+    const selectedModel = buildTimelineViewModel({ project: accepted.value, selectedItemIds: [item.id], pending: null })
+    const onGesture = vi.fn()
+    renderTimeline({ model: selectedModel, selectedItemId: item.id, onGesture })
+    expect(screen.getByTitle(/^Trim start\. Drag to preview/)).toBeTruthy()
+    const gain = screen.getByRole('slider', { name: 'Clip gain' })
+    fireEvent.keyDown(gain, { key: 'ArrowDown' })
+    fireEvent.keyUp(gain, { key: 'ArrowDown' })
+    expect(onGesture).toHaveBeenCalledWith(expect.objectContaining({ type: 'set-audio', clipId: item.clipId }))
   })
 
   it('opens the Hold frame panel from More', () => {

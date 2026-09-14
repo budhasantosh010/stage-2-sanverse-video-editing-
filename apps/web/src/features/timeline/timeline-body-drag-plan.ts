@@ -44,7 +44,10 @@ export function planTimelineBodyDrag(input: Readonly<{
 
   if (clipId !== null) {
     const transferring = source.trackId !== destination.trackId
-    if (transferring && (item.linkedClipId !== null || destination.trackKind !== 'video')) return refuse('TRACK_INCOMPATIBLE', 'Move the picture to another video track. Its linked sound stays on Dialogue.')
+    const independentAudio = source.trackKind === 'audio' && item.kind === 'clip' && item.linkedClipId === null
+    if (transferring && (item.linkedClipId !== null ||
+      destination.trackKind !== (independentAudio ? 'audio' : 'video') ||
+      destination.trackRole === 'dialogue')) return refuse('TRACK_INCOMPATIBLE', 'Move picture to a video track, or independent sound to an audio track. Linked sound stays on Dialogue.')
     const composition = effectiveComposition(project)
     const clip = findClip(composition, clipId)
     if (!clip) return refuse('ITEM_UNKNOWN', 'This section is no longer in the project.')
@@ -74,7 +77,7 @@ export function planTimelineBodyDrag(input: Readonly<{
     const applied = applyTimelineOperation(composition, result.value, project.assets, trackState)
     if (!applied.ok) return refuse('DOMAIN_REFUSAL', `Cannot move here: ${applied.error.reason}.`)
     if (!primaryVisualOrderSupported(applied.value, trackState, activeOperations(project))) return refuse('OPERATION_UNSUPPORTED', 'Move the visuals to this video track or above it first. Visuals beneath footage are not supported yet.')
-    return success([result.value], transferring ? 'Move footage to video track; keep linked sound' : 'Move linked video and audio', request.toStartTicks)
+    return success([result.value], independentAudio ? 'Move independent audio' : transferring ? 'Move footage to video track; keep linked sound' : 'Move linked video and audio', request.toStartTicks)
   }
 
   if (item.kind !== 'music' && item.kind !== 'media-overlay') return refuse('OPERATION_UNSUPPORTED', 'Use the Inspector to position this item.')

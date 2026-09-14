@@ -126,6 +126,8 @@ export type LinkedAudioNode = Readonly<{
 
 /** T2 v8 moving-picture segment. Explicit fields replace the v7 optional defaults. */
 export type MovingSourceSegmentNode = Readonly<{
+  /** Independent source audio has no membership in the picture manifest. */
+  audioOnly?: true
   nodeId: string
   kind: 'source-segment'
   interval: TimeRange
@@ -546,7 +548,11 @@ const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]
       if (!Object.hasOwn(segment, key)) issues.push({ path: `${path}.${key}`, code: 'FIELD_REQUIRED' })
     }
     for (const key of Object.keys(segment)) {
-      if (!(expectedKeys as readonly string[]).includes(key)) issues.push({ path: `${path}.${key}`, code: 'FIELD_UNKNOWN' })
+      if (key !== 'audioOnly' && !(expectedKeys as readonly string[]).includes(key)) issues.push({ path: `${path}.${key}`, code: 'FIELD_UNKNOWN' })
+    }
+    if (Object.hasOwn(segment, 'audioOnly') &&
+      (segment.audioOnly !== true || segment.kind !== 'source-segment' || segment.videoEnabled !== false || layers === undefined)) {
+      issues.push({ path: `${path}.audioOnly`, code: 'VALUE_OUT_OF_RANGE' })
     }
     if (typeof segment.nodeId !== 'string' || segment.nodeId.length === 0) {
       issues.push({ path: `${path}.nodeId`, code: 'VALUE_OUT_OF_RANGE' })
@@ -660,7 +666,7 @@ const validateSegments = (input: unknown, durationTicks: number, issues: Issue[]
       Number.isSafeInteger(sourceDuration) ? sourceDuration as number : -1,
       issues,
     )
-    spans.push({ start: interval.start, end: interval.start + interval.duration, track: layers?.get(String(segment.nodeId)) ?? '' })
+    spans.push({ start: interval.start, end: interval.start + interval.duration, track: segment.audioOnly === true ? `audio:${segment.nodeId}` : layers?.get(String(segment.nodeId)) ?? '' })
   })
 
   spans.sort((left, right) => left.track.localeCompare(right.track) || left.start - right.start)
@@ -741,6 +747,7 @@ function validatePictureLayers(input: Record<string, unknown>, issues: Issue[]):
     if (!Array.isArray(list)) continue
     for (const node of list) {
       if (!isRecord(node) || typeof node.nodeId !== 'string') continue
+      if (node.audioOnly === true) continue
       if (nodes.has(node.nodeId)) issues.push({ path: 'pictureLayers', code: 'VALUE_OUT_OF_RANGE' })
       nodes.add(node.nodeId)
     }

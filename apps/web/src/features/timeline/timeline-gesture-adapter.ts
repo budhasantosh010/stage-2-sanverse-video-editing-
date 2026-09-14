@@ -10,6 +10,7 @@ import {
   type TimelineOperation,
 } from '@sanverse/edit-domain'
 import { err, ok } from '@sanverse/edit-domain/result'
+import { clipCompositionDurationTicks } from '@sanverse/edit-domain/composition'
 
 import {
   buildMoveAtPlayhead,
@@ -23,9 +24,9 @@ import {
 } from './timeline-edits'
 
 export type TimelineGesture =
-  | Readonly<{ type: 'split'; atTicks: number }>
-  | Readonly<{ type: 'remove-ripple'; atTicks: number }>
-  | Readonly<{ type: 'remove-gap'; atTicks: number }>
+  | Readonly<{ type: 'split'; atTicks: number; clipId?: string }>
+  | Readonly<{ type: 'remove-ripple'; atTicks: number; clipId?: string }>
+  | Readonly<{ type: 'remove-gap'; atTicks: number; clipId?: string }>
   | Readonly<{ type: 'trim-start'; clipId: string; deltaTicks: number }>
   | Readonly<{ type: 'trim-end'; clipId: string; deltaTicks: number }>
   | Readonly<{ type: 'set-enabled'; clipId: string; enabled: boolean }>
@@ -80,9 +81,8 @@ const validTicks = (ticks: number): boolean => Number.isSafeInteger(ticks) && ti
  * refused rather than addressed ambiguously.
  */
 const interiorTick = (clip: ReturnType<typeof findClip>): number | null => {
-  if (!clip || clip.sourceRange.duration.ticks <= 1) return null
-  const offset = Math.max(1, Math.floor(clip.sourceRange.duration.ticks / 2))
-  return clip.compositionStart.ticks + Math.min(offset, clip.sourceRange.duration.ticks - 1)
+  if (!clip || clipCompositionDurationTicks(clip) <= 1) return null
+  return clip.compositionStart.ticks + Math.max(1, Math.floor(clipCompositionDurationTicks(clip) / 2))
 }
 
 /**
@@ -151,8 +151,22 @@ export const adaptTimelineGesture = (
     return refuse('EXPORT_IN_PROGRESS', 'Wait for the current export to finish before changing the timeline.')
   }
 
-  const composition = effectiveComposition(input.project)
+  const fullComposition = effectiveComposition(input.project)
   const gesture = input.gesture
+  // Builders may resolve a playhead, but an explicit selection must never be
+  // replaced by overlapping picture or audio. Retain track peers for reorder.
+  const target = gesture.clipId ? findClip(fullComposition, gesture.clipId) : null
+  if (gesture.clipId && !target) return refuse('CLIP_UNKNOWN', 'That section no longer exists.')
+  if (target && 'atTicks' in gesture &&
+    (gesture.atTicks < target.compositionStart.ticks ||
+      gesture.atTicks >= target.compositionStart.ticks + clipCompositionDurationTicks(target))) {
+    return refuse('GESTURE_OUT_OF_RANGE', 'Choose a moment inside the selected section.')
+  }
+  const composition = target ? {
+    ...fullComposition,
+    tracks: [...fullComposition.tracks].sort((a, b) =>
+      Number(b.clips.some(clip => clip.clipId === target.clipId)) - Number(a.clips.some(clip => clip.clipId === target.clipId))),
+  } : fullComposition
   let built: TimelineEditResult
 
   if (gesture.type === 'split') {
@@ -165,7 +179,7 @@ export const adaptTimelineGesture = (
     })
     if (!clip) return refuse('NO_TARGET', 'There is no section at that moment.')
     const atClipTime = gesture.atTicks - clip.compositionStart.ticks
-    if (atClipTime <= 0 || atClipTime >= clip.sourceRange.duration.ticks) {
+    if (atClipTime <= 0 || atClipTime >= clipCompositionDurationTicks(clip)) {
       return refuse('GESTURE_OUT_OF_RANGE', 'A split must be inside a section, not on its edge.')
     }
     built = buildSplitAtPlayhead(

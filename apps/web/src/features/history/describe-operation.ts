@@ -15,6 +15,8 @@ export const describeOperation = (operation: EditOperation): string => {
   const seconds = (ticks: number) => (toMilliseconds({ ticks, timescale: 1_440_000 }) / 1_000).toFixed(1)
 
   switch (operation.kind) {
+    case 'extract-clip-audio':
+      return 'Extracted sound from picture'
     case 'add-nameplate':
       return operation.secondaryText
         ? `${operation.primaryText} — ${operation.secondaryText}`

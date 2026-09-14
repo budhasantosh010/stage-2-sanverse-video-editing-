@@ -2,9 +2,9 @@
 
 Use this runbook when a new session, agent, or context window resumes the project.
 
-## Current handoff — September 12
+## Current handoff — September 14
 
-Use CURRENT HANDOFF at the top of DOCS/HANDOFF.md for the exact checkout, pushed implementation4c4b2973, evidence, failures, saved-project restoration70, startup and ordered next work. Independent extracted dialogue and owner confidence remain OPEN. Re-check Git/project state before acting; never repeat historical Undos. The literal one-video constraint below was superseded by bounded muted decoders under one composition clock.
+Use CURRENT HANDOFF at the top of DOCS/HANDOFF.md for exact checkout, release evidence, failures, restoration92, startup and ordered next work. Independent audio and bounded functional workflow are delivered; sustained interaction/comparison and owner confidence remain OPEN. Re-check Git/project state; never repeat historical Undos. The literal one-video constraint below was superseded by bounded muted decoders under one composition clock. Report: evidence/2026-09-14-independent-audio-release.md.
 
 ## Historical handoff — August T5
 

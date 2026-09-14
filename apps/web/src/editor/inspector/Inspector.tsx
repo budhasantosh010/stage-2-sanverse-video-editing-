@@ -46,7 +46,7 @@ const selectionKey = (selection: InspectorSelection): string =>
 
 const summaryType = (selection: Exclude<InspectorSelection, { kind: 'nothing' }>): string => {
   if (selection.kind === 'video') return 'Video clip'
-  if (selection.kind === 'dialogue') return 'Dialogue linked to video'
+  if (selection.kind === 'dialogue') return selection.clip.extractedFromClipId ? 'Extracted audio' : 'Dialogue linked to video'
   if (selection.kind === 'caption') return 'Caption cue'
   if (selection.kind === 'media-overlay') return 'Media overlay'
   if (selection.kind === 'nameplate') return 'Nameplate'

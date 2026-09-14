@@ -222,6 +222,7 @@ export type TimelineProps = Readonly<{
   transitionSubject?: TimelineTransitionSubject | null
   onTransitionApply?(style: TransitionStyleV1, durationTicks: number, audio: TransitionAudioV1): void
   linkedAudioSubject?: TimelineLinkedAudioSubject | null
+  extractAudioUnavailableReason?: string | null
   onLinkedAudioApply?(leadTicks: number, tailTicks: number): void
   freezeClipLabel?: string | null
   freezeUnavailableReason?: string | null
@@ -350,6 +351,7 @@ export function Timeline({
   transitionSubject = null,
   onTransitionApply = () => undefined,
   linkedAudioSubject = null,
+  extractAudioUnavailableReason = 'Choose footage with linked sound first.',
   onLinkedAudioApply = () => undefined,
   freezeClipLabel = null,
   freezeUnavailableReason = null,
@@ -951,6 +953,7 @@ export function Timeline({
       ? 'Choose a main-video or dialogue piece that contains linked sound.'
       : lockedReason,
     freeze: freezeUnavailableReason ?? lockedReason,
+    'extract-audio': extractAudioUnavailableReason ?? lockedReason,
     // Speed works on a piece of the MAIN video. B-roll, pictures and music are
     // not pieces of the video's own body — they are laid on top of it — and
     // retiming them needs a different mechanism, so this says so plainly
@@ -1018,13 +1021,14 @@ export function Timeline({
     const isPrimaryFootage = selectedItem.kind === 'clip'
 
     if (action === 'split') {
-      if (isPrimaryFootage) onGesture({ type: 'split', atTicks: playheadTicks })
+      if (isPrimaryFootage) onGesture({ type: 'split', atTicks: playheadTicks, clipId: selectedItem.clipId ?? undefined })
       else onItemAction(selectedItem.id, { type: 'split', atTicks: playheadTicks })
       return
     }
     if (isPrimaryFootage) {
       onGesture({
         type: action === 'ripple-delete' ? 'remove-ripple' : 'remove-gap',
+        clipId: selectedItem.clipId ?? undefined,
         atTicks: Math.max(selectedItem.startTicks, Math.min(
           playheadTicks,
           selectedItem.startTicks + selectedItem.durationTicks - 1,

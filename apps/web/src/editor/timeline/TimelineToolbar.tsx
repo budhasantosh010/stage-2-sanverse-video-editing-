@@ -61,6 +61,7 @@ export type TimelineToolbarAction =
   | 'close-gap'
   | 'transition'
   | 'linked-audio'
+  | 'extract-audio'
   | 'freeze'
   | 'speed'
 
@@ -207,6 +208,7 @@ const OVERFLOW_BUTTONS: readonly ButtonSpec[] = Object.freeze([
   { action: 'close-gap', label: 'Close gap', hint: 'Pull everything after the empty space back', icon: ICONS.gap },
   { action: 'transition', label: 'Transition', hint: 'Fade between this clip and the next', icon: ICONS.transition },
   { action: 'linked-audio', label: 'J/L cut', hint: 'Start the sound early or let it run late while it stays linked', icon: ICONS.linkedAudio },
+  { action: 'extract-audio', label: 'Extract audio', hint: 'Edit sound independently from its picture', icon: ICONS.linkedAudio },
   { action: 'freeze', label: 'Hold frame', hint: 'Pause on the frame at the playhead without using zero speed', icon: ICONS.freeze },
   { action: 'speed', label: 'Speed', hint: 'Change how fast this plays', icon: ICONS.speed },
 ])

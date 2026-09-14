@@ -448,6 +448,23 @@ export const buildTimelineViewModel = (
     return resolved ? laneByTrackId.get(resolved.trackId) ?? fallback : fallback
   }
 
+  for (const track of composition.tracks.filter(track => track.kind === 'audio')) {
+    const lane = laneByTrackId.get(track.trackId)
+    if (!lane) continue
+    for (const clip of track.clips) {
+      addItem(lane, makeItem({
+        id: `clip:${clip.clipId}`, laneId: lane.id, kind: 'clip', state: 'committed',
+        label: `Audio · ${displayAsset(clip.assetId, 'Extracted dialogue')}`, detail: 'Independent audio',
+        startTicks: clip.compositionStart.ticks, durationTicks: clipCompositionDurationTicks(clip),
+        enabled: clip.enabled, blockedReason: null, clipId: clip.clipId, linkedClipId: null,
+        assetId: clip.assetId, operationId: null, changeSetId: null,
+        sourceStartTicks: clip.sourceRange.start.ticks, sourceDurationTicks: clip.sourceRange.duration.ticks,
+        gainDb: clip.gainDb, fadeInTicks: clip.fadeIn.ticks, fadeOutTicks: clip.fadeOut.ticks, pan: clip.pan,
+        speedBadge: speedBadgeFor(clip.timeTransform), proposalId: null, proposalBaseRevision: null,
+      }, selectedItemIds))
+    }
+  }
+
   canonicalVideoTracks.forEach((track) => {
     const videoLane = laneByTrackId.get(track.trackId)
     if (!videoLane) return
@@ -526,7 +543,7 @@ export const buildTimelineViewModel = (
             : audioEnd > pictureEnd
               ? `L-cut · ends ${Math.round((audioEnd - pictureEnd) / 1_440)} ms late`
               : 'Linked audio adjusted'
-      if (dialogueLane) {
+      if (dialogueLane && !clip.audioDetached) {
         addItem(dialogueLane, makeItem({
           id: `dialogue:${clip.clipId}`,
           laneId: dialogueLane.id,

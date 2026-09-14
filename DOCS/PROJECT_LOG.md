@@ -1,5 +1,12 @@
 # Project Log
 
+## 2026-09-14 — Independent audio and bounded workflow release
+
+- Implemented typed extraction preserving source identity and one shared editor/history/compiler/mixer. Added independent audio movement, trimming, splitting/deletion and Inspector routing through existing controls.
+- Review found wrong-target fallback, long J/L fade invalidation and Inspector gaps; RED/GREEN fixes and final independent re-review passed. Domain572, contract154, web732 selections passed before final corrections; final focused web48/domain5 and actual FFmpeg1 passed. Final all-workspace build PASS; tests overlap, not additive.
+- Browser revisions71–84 proved own-audio edits/history/reopen, half/double-speed and reverse playback, with real exports81/84; both full decodes passed. Eight UI Undos85–92 restored original content. Details/hashes and limitations are in evidence/2026-09-14-independent-audio-release.md.
+- Registry and all resume entry points updated. Remaining sustained interaction/comparison and owner acceptance are explicitly open; no Motion changes or parity claim. Focused commit/push is owner-authorized.
+
 ## 2026-09-12 — Documentation-only next-agent handoff
 
 - Owner asked whether high-impact work is finished and requested documentation/push. Answer: not all finished; independent audio and real-user confidence gates remain open.

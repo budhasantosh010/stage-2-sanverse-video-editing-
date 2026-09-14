@@ -124,7 +124,7 @@ export function ClipEditorialSections({
 
   return (
     <>
-      <InspectorSection title="Clip" defaultOpen>
+      {!selection.clip.extractedFromClipId && <InspectorSection title="Clip" defaultOpen>
         <label className="inspector-field inspector-field--checkbox">
           <input
             aria-label="Show this clip"
@@ -145,7 +145,7 @@ export function ClipEditorialSections({
             enabled.markApplied,
           )}
         />
-      </InspectorSection>
+      </InspectorSection>}
 
       <InspectorSection title="Sound" defaultOpen>
         <NumberField
@@ -183,7 +183,7 @@ export function ClipEditorialSections({
         />
       </InspectorSection>
 
-      <InspectorSection title="Transition">
+      {!selection.clip.extractedFromClipId && <InspectorSection title="Transition">
         {selection.nextClipId ? (
           <>
             <label className="inspector-field">
@@ -241,13 +241,13 @@ export function ClipEditorialSections({
         ) : (
           <p className="inspector__guidance">This is the last clip, so it has no next clip to transition into.</p>
         )}
-      </InspectorSection>
+      </InspectorSection>}
 
-      <InspectorSection title="Picture controls">
+      {!selection.clip.extractedFromClipId && <InspectorSection title="Picture controls">
         <p className="inspector__guidance">
           Position, scale, rotation, crop, opacity, masks, layers and effects are not targetable on source clips in the current project schema. No fake controls are shown.
         </p>
-      </InspectorSection>
+      </InspectorSection>}
     </>
   )
 }

@@ -5,6 +5,7 @@ import {
   OPERATION_SCHEMA_VERSION,
   VISUAL_PROPERTIES_PRIMITIVE_ID,
   acceptChangeSet,
+  activeTimelineTrackState,
   setChangeSetActive,
   type EditOperation,
   type EditProject,
@@ -87,6 +88,24 @@ const accept = (project: EditProject, operation: EditOperation): EditProject => 
 }
 
 describe('resolveInspectorSelection', () => {
+  it('resolves extracted sound to its own audio controls on a music lane', () => {
+    const base = testProject()
+    const project = accept(base, {
+      schemaVersion: OPERATION_SCHEMA_VERSION,
+      operationId: 'operation_extractaudio',
+      capabilityId: 'sanverse.timeline.extract-audio.primitive/v1',
+      kind: 'extract-clip-audio',
+      clipId: TEST_CLIP_ID,
+      newClipId: 'clip_extracted01',
+      trackId: activeTimelineTrackState(base).tracks.find(track => track.role === 'music')!.trackId,
+      extensions: {},
+    })
+    expect(resolve(project, 'clip:clip_extracted01')).toMatchObject({
+      kind: 'dialogue', laneKind: 'music', state: 'committed',
+      clip: { clipId: 'clip_extracted01', extractedFromClipId: TEST_CLIP_ID },
+    })
+  })
+
   it('returns the explicit empty state when nothing is selected', () => {
     const project = testProject()
     expect(resolve(project, null)).toMatchObject({

@@ -2,7 +2,7 @@
 
 This is the smallest authoritative resume point for a new or compacted session.
 
-**CURRENT TIMELINE RESUME — September 12:** Read the top of DOCS/HANDOFF.md first, then CURRENT_STATE.md and plans/2026-09-08-layered-editor-engine.md. Implementation is pushed through 4c4b2973 on timeline-t55-editor-confidence in the isolated timeline worktree. Layered preview/export and latest decoder/save fixes are shipped; independent extracted audio and full editing-confidence acceptance remain OPEN. Older T5 sections below are historical, not a declaration that the repair program is finished.
+**CURRENT TIMELINE RESUME — September 14:** Read the top of DOCS/HANDOFF.md first and evidence/2026-09-14-independent-audio-release.md. Independent audio, review fixes and bounded browser/edit/export workflow are delivered on timeline-t55-editor-confidence. Original test content restored at saved revision92; do not repeat Undos. Sustained interaction/comparison and owner acceptance remain OPEN. Verify HEAD/remote; older T5/checkpoint sections are historical, not a parity declaration.
 
 ## Macro goal
 

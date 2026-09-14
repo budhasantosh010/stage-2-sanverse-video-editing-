@@ -1,12 +1,25 @@
 # Build Tracker
 
-Last updated: 2026-09-12
+Last updated: 2026-09-14
+
+## Current release
+
+- [x] Independently extracted sound: typed operation, own identity/track, drag/trim/split/delete/gain/fades/pan, Inspector, history, save/reopen and shared preview/export.
+- [x] Three independent-review blockers fixed (FAIL-096/097/098), focused regression, final production build/re-review and scoped boundary check.
+- [x] Bounded real-browser audio/timing workflow and two fully decoded MP4s; temporary edits restored at saved revision92.
+- [x] Updated release report, failure registry and next-agent handoff.
+- [ ] Full sustained interaction/waveform/same-task competitor comparison gate (agent-assisted).
+- [ ] Owner real-edit and exported-sound acceptance; Motion integration only afterward.
+
+See `DOCS/evidence/2026-09-14-independent-audio-release.md`. Historical dated entries below are not current open-feature declarations.
+
+## Historical September 12 tracker
 
 - [x] September12 next-agent handoff consolidated, historical entry points labeled, implementation commits and remaining acceptance gates recorded in DOCS/HANDOFF.md.
 
 - [x] Follow-up: shared decoder readiness barrier prevents ready layers running ahead during sibling loading/seeking; RED/GREEN regression, 100/100 affected checks, production build and independent review PASS.
 - [x] FAIL-094 accepted Inspector/motion save callback updates the header revision.
-- [ ] Independent extracted dialogue and end-to-end independent audio editing.
+- [x] Independent extracted dialogue and end-to-end independent audio editing — delivered September14; see current report.
 - [ ] Continuous matched editing workflow and owner confidence acceptance; not equivalent to test-pass percentage.
 
 Latest: layered Studio presentation/shared clock, automatic v10 transfer compilation and cross-track overlap operations are implemented. Same-track overlay stacking review correction is included. Independent extracted audio and owner confidence are still unchecked. See `DOCS/evidence/2026-09-12-layered-timeline-release.md` for final evidence; September 12 push is owner-authorized and supersedes historical no-push notes.

@@ -13,6 +13,45 @@ authoritative. A checked box means `RESOLVED`, `WONT_FIX`, or `DUPLICATE`.
 
 ## Active issues
 
+### FAIL-096 — Explicit audio split/delete could fall through to another clip
+
+- What/where: timeline-gesture-adapter.ts; explicit selected-clip commands in overlapping picture/audio timelines.
+- When/who: September 13 independent review of extracted-audio implementation; affects direct timeline editing.
+- How/why: prioritizing the owning track did not reject playheads outside the explicit target, so a later playhead lookup could resolve another clip.
+- Impact: a command could edit the wrong item.
+- Attempts/evidence: reproduced out-of-range/end-boundary cases before the fix; reject outside the selected half-open interval. Focused web review-fix selection 48/48 passed; September 14 independent re-review passed.
+- Status: RESOLVED.
+- One-line solution: validate explicit identity and timing before permitting any playhead-based builder.
+
+### FAIL-097 — Extracting long J/L-cut audio invalidated the silent picture
+
+- What/where: extract-clip-audio in timeline-operations.ts; linked sound longer than picture with long fades.
+- When/who: September 13 independent review; users extracting J/L-cut dialogue.
+- How/why: the copied sound correctly inherited its fades, but the now-silent picture retained fades exceeding its shorter duration.
+- Impact: extraction was rejected as RESULT_INVALID despite a valid sound interval.
+- Attempts/evidence: failing long-window regression, then preserve sound fades and clear silent-picture fades. Domain extraction 5/5 passed; independent re-review passed.
+- Status: RESOLVED.
+- One-line solution: retain audio envelope on the extracted sound, not on its now-silent picture.
+
+### FAIL-098 — Extracted sound had no usable Inspector
+
+- What/where: inspector-selection-resolver and Inspector editorial sections; canonical audio clip selection.
+- When/who: September 13 review and September 14 browser walkthrough.
+- How/why: audio-lane clips did not resolve to the existing sound Inspector; reusing it initially exposed picture-only sections and false linked-video wording.
+- Impact: users could not reliably inspect/change the independent sound through the existing panel.
+- Attempts/evidence: RED resolver/shell tests; route to own clip ID and suppress picture-only sections for extracted sound. Focused web 48/48 passed. Reopened browser project showed its own -1 dB Gain field.
+- Status: RESOLVED.
+- One-line solution: derive the existing audio Inspector from the selected canonical audio identity.
+
+### INFRA-022 — Interrupted release checks and test-harness setup errors
+
+- What/where: September 13–14 local terminal, browser and independent-review sessions in timeline-t55-editor-confidence.
+- How/why: usage interruptions stopped servers/reviewer; ephemeral workspace variables were lost. One wrong-cwd command invoked a non-project Vitest version; an initial new FFmpeg test omitted filtergraph.txt.
+- Impact: delayed verification, not evidence of an application regression. No dependency manifest was changed by the wrong-cwd invocation.
+- Attempts/evidence: restored exact checkout, used local node_modules/vitest with explicit --root, restarted only 2010/2011, wrote the required test filtergraph, reran real FFmpeg test (1/1 PASS), finished all-workspace build and independent review. A mistaken temporary source file under desktop cwd was moved into the authorized checkout before testing.
+- Status: RESOLVED for this release; screenshot/coordinate limitations remain tracked separately in INFRA-007.
+- One-line solution: use explicit checkout/local tooling and persist checkpoints before resuming interrupted release work.
+
 ### FAIL-091 — Initial layered gap never published readiness
 
 - What/where: LayeredFootageCanvases controller binding; first mount inside an empty composition interval.
@@ -415,11 +454,11 @@ Evidence: `DOCS/evidence/2026-09-06-t55-drag-reliability/T55_DRAG_RELIABILITY.md
 
 ### FAIL-069 — Primary footage cannot move freely between video tracks
 
-- **Status / impact:** OPEN, P1; affects confidence or evidence for this repair.
-- **Where / when:** Existing primary composition/track model; Sep6 browser.
-- **What / how / why:** The original blanket transfer refusal is now removed for supported non-overlapping picture moves. Remaining arbitrary overlap/lower visual interleaving cannot be represented by the sequential primary render path; independent extracted dialogue is also not represented.
-- **Attempted / evidence:** Typed optional destination, transactional replay, shared drag decision, real V1→V2/Undo/Redo/sideways move and fresh decoded revision-30 export verified. Owning-track visibility and source timing fixed. Same/higher authored visual ordering now passes automated checks (FAIL-077); final UI proof is blocked by INFRA-014.
-- **One-line solution:** Keep the proven bounded transfer; next design and implement shared layered picture/audio rendering before enabling overlapping primary layers or independent extracted dialogue.
+- **Status / impact:** MONITORING, P1; implementation delivered, broader confidence acceptance remains open.
+- **Where / when:** Existing primary composition/track model; found September6, updated September14.
+- **What / how / why:** Sequential primary rendering originally prevented cross-track overlap and independent sound. Shared v10 picture layers now support cross-track overlap; typed independent audio now uses canonical audio clips and the same mixer/export path. Same-track collision guards remain intentional.
+- **Attempted / evidence:** September12 layered release plus September14 extraction release; real pointer movement, history, save/reopen and fully decoded revision81/84 MP4s; synthetic export verifies trimmed/gained/panned sound without duplication. FAIL-096/097/098 corrected review defects. See the dated release reports for exact scope.
+- **One-line solution:** Retain the implemented shared engine and close sustained interaction/waveform/matched-owner-workflow evidence before claiming competitor confidence.
 
 ### INFRA-006 — Fresh extra-audio browser test could not open filechooser
 

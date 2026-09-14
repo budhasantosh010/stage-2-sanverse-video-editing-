@@ -12,6 +12,8 @@ import {
   clipTimeToSource,
   isFreezeClip,
   linkedAudioCompositionDurationTicks,
+  linkedAudioCompositionStartTicks,
+  linkedAudioSourceRange,
   validateComposition,
   type Clip,
   type Composition,
@@ -333,6 +335,7 @@ export type MovePrimaryClipOperation = Common &
   }>
 
 export type TimelineOperation =
+  | (Common & Readonly<{ kind: 'extract-clip-audio'; clipId: string; newClipId: string; trackId: string }>)
   | SplitClipOperation
   | TrimClipOperation
   | RemoveClipOperation
@@ -348,6 +351,7 @@ export type TimelineOperation =
   | MovePrimaryClipOperation
 
 export const TIMELINE_OPERATION_KINDS: readonly string[] = Object.freeze([
+  'extract-clip-audio',
   'set-clip-time-transform',
   'split-clip',
   'trim-clip',
@@ -382,6 +386,7 @@ export type TimelineOperationError = {
 const COMMON_KEYS = ['schemaVersion', 'operationId', 'capabilityId', 'kind', 'extensions'] as const
 
 const KEYS_BY_KIND: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  'extract-clip-audio': Object.freeze([...COMMON_KEYS, 'clipId', 'newClipId', 'trackId']),
   'split-clip': Object.freeze([...COMMON_KEYS, 'clipId', 'atClipTime', 'newClipId']),
   'trim-clip': Object.freeze([...COMMON_KEYS, 'clipId', 'trimStart', 'trimEnd', 'ripple']),
   'remove-clip': Object.freeze([...COMMON_KEYS, 'clipId', 'ripple']),
@@ -486,6 +491,16 @@ export const validateTimelineOperation = (
 
   let extra: Record<string, unknown> = {}
   switch (kind) {
+    case 'extract-clip-audio': {
+      if (typeof input.newClipId !== 'string' || !CLIP_ID_PATTERN.test(input.newClipId) || input.newClipId === input.clipId) {
+        issues.push({ path: `${path}.newClipId`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      if (typeof input.trackId !== 'string' || !TRACK_ID_PATTERN.test(input.trackId)) {
+        issues.push({ path: `${path}.trackId`, code: 'VALUE_OUT_OF_RANGE' })
+      }
+      extra = { newClipId: input.newClipId, trackId: input.trackId }
+      break
+    }
     case 'split-clip': {
       const atClipTime = time(input.atClipTime, 'atClipTime')
       if (atClipTime !== null && atClipTime.ticks <= 0) {
@@ -931,6 +946,28 @@ export const applyTimelineOperation = (
   let nextClips: readonly Clip[]
 
   switch (operation.kind) {
+    case 'extract-clip-audio': {
+      const asset = assets.find(asset => asset.assetId === clip.assetId)
+      if (track.kind !== 'video' || isFreezeClip(clip) || clip.audioDetached ||
+        asset?.mediaKind !== 'video' || !asset.hasAudio) return err(fail('LINKED_AUDIO_WINDOW_INVALID'))
+      const destination = trackState?.tracks.find(track => track.trackId === operation.trackId)
+      if (!destination || destination.kind !== 'audio' || destination.role === 'dialogue') return err(fail('DESTINATION_TRACK_INVALID'))
+      if (composition.tracks.some(track => track.clips.some(clip => clip.clipId === operation.newClipId))) return err(fail('CLIP_ID_IN_USE'))
+      const target = composition.tracks.find(track => track.trackId === destination.trackId)
+      if (target && (target.kind !== 'audio' || target.clips.length >= MAX_CLIPS_PER_TRACK)) return err(fail('RESULT_INVALID'))
+      const sound: Clip = {
+        ...clip, clipId: operation.newClipId, extractedFromClipId: clip.clipId,
+        sourceRange: linkedAudioSourceRange(clip),
+        compositionStart: mediaTime(linkedAudioCompositionStartTicks(clip)),
+        linkedAudio: null, audioDetached: false,
+      }
+      const tracks = composition.tracks.map(candidate => candidate.trackId === track.trackId
+        ? { ...candidate, clips: candidate.clips.map(entry => entry.clipId === clip.clipId ? { ...entry, audioDetached: true, linkedAudio: null, fadeIn: ZERO_TIME, fadeOut: ZERO_TIME } : entry) }
+        : candidate.trackId === destination.trackId ? { ...candidate, clips: [...candidate.clips, sound] } : candidate)
+      if (!target) tracks.push({ trackId: destination.trackId, kind: 'audio', order: Math.max(...tracks.map(track => track.order)) + 1, clips: [sound] })
+      const rebuilt = validateComposition({ ...composition, tracks }, assets, 'composition')
+      return rebuilt.ok ? ok(rebuilt.value) : err(fail('RESULT_INVALID'))
+    }
     case 'split-clip': {
       if (isFreezeClip(clip)) return err(fail('FREEZE_OPERATION_UNSUPPORTED'))
       if (clip.linkedAudio !== null && clip.linkedAudio !== undefined) {
@@ -1235,7 +1272,8 @@ export const applyTimelineOperation = (
     case 'move-primary-clip': {
       if (operation.destinationTrackId !== undefined && operation.destinationTrackId !== track.trackId) {
         const destination = trackState?.tracks.find(candidate => candidate.trackId === operation.destinationTrackId)
-        if (!destination || destination.kind !== 'video') return err(fail('DESTINATION_TRACK_INVALID'))
+        if (!destination || destination.kind !== track.kind ||
+          (destination.kind === 'audio' && destination.role === 'dialogue')) return err(fail('DESTINATION_TRACK_INVALID'))
         const moved = { ...clip, compositionStart: operation.compositionStart }
         // Cross-track overlap is explicit layered composition. The normal
         // composition validator below still rejects overlap on the destination.
@@ -1244,7 +1282,7 @@ export const applyTimelineOperation = (
         const tracks = composition.tracks.map(candidate => candidate.trackId === track.trackId
           ? { ...candidate, clips: candidate.clips.filter(entry => entry.clipId !== clip.clipId) }
           : candidate.trackId === destination.trackId ? { ...candidate, clips: [...candidate.clips, moved] } : candidate)
-        if (!target) tracks.push({ trackId: destination.trackId, kind: 'video', order: Math.max(...tracks.map(candidate => candidate.order)) + 1, clips: [moved] })
+        if (!target) tracks.push({ trackId: destination.trackId, kind: track.kind, order: Math.max(...tracks.map(candidate => candidate.order)) + 1, clips: [moved] })
         const rebuilt = validateComposition({ ...composition, tracks }, assets, 'composition')
         return rebuilt.ok ? ok(rebuilt.value) : err(fail('RESULT_INVALID'))
       }

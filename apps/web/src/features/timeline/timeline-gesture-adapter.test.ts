@@ -25,6 +25,18 @@ const adapt = (
 })
 
 describe('timeline gesture adapter', () => {
+  it.each(['split', 'remove-gap', 'remove-ripple'] as const)(
+    'refuses %s outside the explicitly selected clip instead of targeting its neighbour',
+    (type) => {
+      const project = splitProject(testProject(), 10, createIds())
+      for (const atTicks of [ticks(10), ticks(15)]) {
+        expect(adapt(project, { type, clipId: TEST_CLIP_ID, atTicks })).toMatchObject({
+          ok: false, error: { code: 'GESTURE_OUT_OF_RANGE' },
+        })
+      }
+    },
+  )
+
   it('emits the existing split operation for a valid split', () => {
     const result = adapt(testProject(), { type: 'split', atTicks: ticks(10) })
     expect(result.ok).toBe(true)

@@ -125,7 +125,7 @@ const refusal = (
 })
 
 const primaryTrackOf = (composition: Composition, clipId: string) =>
-  composition.tracks.find((track) => track.kind === 'video' && track.clips.some((clip) => clip.clipId === clipId)) ?? null
+  composition.tracks.find((track) => (track.kind === 'video' || track.kind === 'audio') && track.clips.some((clip) => clip.clipId === clipId)) ?? null
 
 const ordered = (composition: Composition, clipId: string): readonly Clip[] => {
   const track = primaryTrackOf(composition, clipId)

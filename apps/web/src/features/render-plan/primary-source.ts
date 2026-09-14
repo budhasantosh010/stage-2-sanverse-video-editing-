@@ -175,11 +175,9 @@ export const resolvePrimarySource = (
 
   const composition = effectiveComposition(project)
 
-  // Every track, in the compiler's own order, because the compiler builds a
-  // segment from every clip of every track without filtering by kind. Matching
-  // it exactly is what stops the screen and the file disagreeing about where
-  // the footage is.
+  // Audio clips share source identity, but never supply a monitor picture.
   for (const track of composition.tracks) {
+    if (track.kind !== 'video') continue
     for (const clip of track.clips) {
       const start = clip.compositionStart.ticks
       const end = start + clipCompositionDurationTicks(clip)
@@ -221,6 +219,7 @@ export const nextPrimaryStartTicks = (
   const composition = effectiveComposition(project)
   let best: number | null = null
   for (const track of composition.tracks) {
+    if (track.kind !== 'video') continue
     for (const clip of track.clips) {
       const start = clip.compositionStart.ticks
       if (start >= compositionTicks && (best === null || start < best)) best = start

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { planExtractAudio } from '../../features/timeline/timeline-extract-audio'
 import type { AddNameplateOperation, EditProject, TimelineOperation } from '@sanverse/edit-domain'
 import {
   DEFAULT_CAPTION_STYLE_ID,
@@ -2673,7 +2674,7 @@ export function StudioScreen({
     if (clipId === null) return null
     const composition = effectiveComposition(editProject)
     const clip = findClip(composition, clipId)
-    if (!clip || isFreezeClip(clip)) return null
+    if (!clip || isFreezeClip(clip) || clip.audioDetached || clip.extractedFromClipId) return null
     const asset = editProject.assets.find((candidate) => candidate.assetId === clip.assetId)
     if (!asset || asset.mediaKind !== 'video' || !asset.hasAudio) return null
     const pictureStart = clip.compositionStart.ticks
@@ -2925,6 +2926,11 @@ export function StudioScreen({
     } as const
 
     switch (action) {
+      case 'extract-audio': {
+        if (!linkedAudioSubject) { setTimelineNotice('Choose footage with linked sound first.'); return }
+        applyPlanned(planExtractAudio({ ...common, clipId: linkedAudioSubject.clipId }), changeSetId)
+        return
+      }
       case 'copy': {
         const copied = copySelectionToClipboard({
           project: editProject,
@@ -4514,6 +4520,7 @@ export function StudioScreen({
           transitionSubject={transitionSubject}
           onTransitionApply={handleTransitionApply}
           linkedAudioSubject={linkedAudioSubject}
+          extractAudioUnavailableReason={linkedAudioSubject ? null : 'Choose footage with linked sound first.'}
           onLinkedAudioApply={handleLinkedAudioApply}
           freezeClipLabel={freezeSubject?.clipLabel ?? null}
           freezeUnavailableReason={freezeUnavailableReason}

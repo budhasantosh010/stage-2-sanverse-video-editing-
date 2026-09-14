@@ -181,7 +181,7 @@ export function resolveInspectorSelection(
   }
   const assetFor = (assetId: string | null) => assetId ? findAsset(project.assets, assetId) : undefined
 
-  if (item.kind === 'clip' && (laneKind === 'video' || laneKind === 'dialogue')) {
+  if (item.kind === 'clip' && (laneKind === 'video' || laneKind === 'dialogue' || laneKind === 'music')) {
     const clipId = laneKind === 'dialogue' ? item.linkedClipId : item.clipId
     const clip = clipId ? findClip(evaluation.composition, clipId) : undefined
     const asset = clip ? findAsset(project.assets, clip.assetId) : undefined
@@ -191,7 +191,7 @@ export function resolveInspectorSelection(
     const assetLabel = labelFor(clip.assetId, 'Video')
     return Object.freeze({
       ...base,
-      kind: laneKind === 'dialogue' ? 'dialogue' : 'video',
+      kind: laneKind === 'video' ? 'video' : 'dialogue',
       state: 'committed',
       clip,
       asset,
